@@ -1,11 +1,11 @@
-# HOURSE-PROJECT
+# HORSE-PROJECT
 
-Repository chứa toàn bộ mã nguồn của dự án HOURSE theo mô hình monorepo.
+Repository chứa toàn bộ mã nguồn của dự án HORSE theo mô hình monorepo.
 
 ## Cấu trúc
 
 ```text
-HOURSE-PROJECT/
+HORSE-PROJECT/
 ├── BACKEND/     # API và xử lý phía máy chủ
 ├── FRONTEND/    # Giao diện người dùng
 ├── .gitignore
