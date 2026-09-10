@@ -10,6 +10,7 @@ Kết nối SQL Server bằng tài khoản `sa`, sau đó chạy đúng thứ t�
 2. `01_create_schema.sql` — tạo bảng, khóa ngoại, ràng buộc và index.
 3. `02_seed_data.sql` — tạo tài khoản quản lý câu lạc bộ mặc định.
 4. `03_horse_role_features.sql` — bổ sung quyền sở hữu, huấn luyện viên hiện tại, lưu trữ hồ sơ và lịch sử đua.
+5. `04_cloudinary_profile_files.sql` — lưu metadata file chính và đề xuất thay file trên Cloudinary.
 
 Các script đều có kiểm tra dữ liệu hoặc đối tượng đã tồn tại, vì vậy có thể chạy lại mà không tạo trùng.
 

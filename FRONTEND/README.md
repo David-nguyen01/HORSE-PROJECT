@@ -1,17 +1,35 @@
-# HORSE Frontend
+# Racehorse Club Frontend
 
-Thư mục dành cho giao diện người dùng của HORSE.
+Giao diện React/Vite tạm thời để kiểm thử các API backend đã triển khai.
 
-Khi thêm frontend, hãy bổ sung hướng dẫn cài đặt, biến môi trường và lệnh khởi chạy tại đây.
+## Chạy dự án
 
-## Quy tắc logout và protected route
+Backend phải chạy tại `http://localhost:8080`, sau đó:
 
-Frontend phải thực hiện đủ các bước sau khi người dùng logout:
+```bash
+cd FRONTEND
+npm install
+npm run dev
+```
 
-1. Gọi `POST /api/auth/logout` với refresh token.
-2. Xóa access token, refresh token và thông tin người dùng khỏi bộ nhớ phía client.
-3. Điều hướng tới `/login` bằng chế độ `replace`, không dùng `push`.
-4. Mọi protected route phải kiểm tra token và gọi `GET /api/auth/me`; nếu API trả `401` thì tiếp tục xóa trạng thái đăng nhập và `replace` về `/login`.
-5. Khi trang được khôi phục từ browser back-forward cache (`pageshow` với `event.persisted`), phải chạy lại bước kiểm tra phiên.
+Mở `http://localhost:5173`. Vite proxy toàn bộ `/api` và `/actuator` sang backend nên không cần sửa URL khi chạy local.
 
-Backend lưu `sessionId` trong JWT và kiểm tra session trong SQL Server ở mỗi request. Vì thế ngay sau logout, access token cũ không thể gọi API, kể cả khi trình duyệt còn giữ bản hiển thị cũ trong lịch sử.
+Tài khoản quản lý mặc định sau khi chạy các script database:
+
+```text
+Email: admin@gmail.com
+Password: Admin123
+```
+
+Có thể tạo file `.env` từ `.env.example` nếu backend dùng URL khác.
+
+## Phạm vi giao diện thử nghiệm
+
+- Đăng nhập, đăng ký với role hợp lệ, làm mới access token và đăng xuất.
+- Protected route xác minh phiên bằng `/api/auth/me`; logout dùng `replace` và chặn quay lại trang cũ bằng nút Back.
+- Tổng quan theo dữ liệu thật, danh sách và chi tiết hồ sơ ngựa.
+- Tạo ngựa, lưu trữ hồ sơ, xem phả hệ và thành tích đua theo quyền.
+- Xem/thay/xóa file hồ sơ chính; chủ sở hữu chỉ gửi đề xuất.
+- Quản lý tài khoản và thay đổi role dành cho `CLUB_MANAGER`.
+
+FR03 chưa có API nên giao diện không tạo số liệu thể lực giả.

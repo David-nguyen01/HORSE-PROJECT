@@ -38,7 +38,19 @@ public class HorseAccessService {
         return horse;
     }
 
-    private Horse requireExisting(UUID horseId) {
+    public Horse requireOwned(UUID horseId, UUID ownerId) {
+        Horse horse = requireExisting(horseId);
+        if (!ownershipRepository.existsByHorseIdAndOwnerId(horseId, ownerId)) {
+            throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + horseId);
+        }
+        return horse;
+    }
+
+    public Horse requireExisting(UUID horseId) {
+        return findExisting(horseId);
+    }
+
+    private Horse findExisting(UUID horseId) {
         return horseRepository.findDetailById(horseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ngựa: " + horseId));
     }

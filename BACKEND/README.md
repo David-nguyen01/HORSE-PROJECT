@@ -16,6 +16,7 @@ Mở thư mục `../DATABASE` bằng SSMS, đăng nhập `sa` và chạy lần l
 2. `01_create_schema.sql`
 3. `02_seed_data.sql`
 4. `03_horse_role_features.sql`
+5. `04_cloudinary_profile_files.sql`
 
 Sau đó chạy backend:
 
@@ -32,6 +33,15 @@ jdbc:sqlserver://localhost:1433;databaseName=racehorse;encrypt=true;trustServerC
 ```
 
 Backend dùng SQL Authentication với username `sa` và password `sa123456`. Có thể ghi đè bằng `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` trên môi trường triển khai.
+
+Để bật upload Cloudinary, đặt các biến môi trường sau trước khi chạy backend. Không commit API secret vào repository:
+
+```text
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+CLOUDINARY_FOLDER=racehorse
+```
 
 Cấu hình nằm tại `src/main/resources/application.properties`. `spring.jpa.hibernate.ddl-auto=none` bảo đảm ứng dụng không tự tạo hoặc thay đổi schema; mọi thay đổi database phải được viết thành script mới trong `../DATABASE` và chạy chủ động bằng SSMS.
 
@@ -73,6 +83,12 @@ mvn test
 | `GET` | `/api/horses/{id}/race-results` | Xem lịch sử đua và thống kê thắng |
 | `POST` | `/api/horses/{id}/race-results` | Thêm kết quả đua lịch sử |
 | `PUT` | `/api/horses/{id}/race-results/{resultId}` | Chỉnh sửa kết quả đua lịch sử |
+| `GET` | `/api/horses/{id}/main-file` | Mọi role đã đăng nhập xem file hồ sơ chính |
+| `PUT` | `/api/horses/{id}/main-file` | Quản lý/HLV trưởng thay trực tiếp file chính |
+| `DELETE` | `/api/horses/{id}/main-file` | Quản lý/HLV trưởng xóa file chính |
+| `POST` | `/api/horses/{id}/main-file/proposals` | Chủ sở hữu đề xuất file chính mới |
+| `GET` | `/api/horses/{id}/main-file/proposals` | Quản lý/HLV trưởng xem đề xuất đang chờ |
+| `POST` | `/api/horses/{id}/main-file/proposals/{proposalId}/approve` | Quản lý/HLV trưởng duyệt đề xuất |
 
 ## Phân quyền API đã triển khai
 
@@ -84,6 +100,8 @@ mvn test
 | Tìm kiếm toàn bộ ngựa | Có | Có | Không | Không | Không |
 | Xem hồ sơ/phả hệ/lịch sử đua | Có | Có | Chỉ ngựa đang sở hữu | Không | Không |
 | Thêm/sửa kết quả đua lịch sử | Có | Có | Không | Không | Không |
+| Xem file hồ sơ chính | Có | Có | Có | Có | Có |
+| Thay/xóa file hồ sơ chính | Có | Có | Chỉ đề xuất | Không | Không |
 
 `CLUB_MANAGER` là admin nghiệp vụ. `HORSE_OWNER` bị kiểm tra quyền sở hữu theo dữ liệu `horse_ownerships`, không chỉ kiểm tra role trong JWT. Hồ sơ đã lưu trữ không xuất hiện trong tìm kiếm hoặc danh sách của chủ sở hữu.
 
@@ -271,6 +289,61 @@ Tài liệu yêu cầu chưa xác định đơn vị chuẩn cho cự ly/thời 
 
 `totalWins` được tính lại từ số bản ghi có `finishPosition = 1` mỗi lần đọc.
 
+### File hồ sơ chính trên Cloudinary
+
+Các API upload dùng `multipart/form-data` với trường file tên `file`. Backend chấp nhận:
+
+- Mọi MIME type bắt đầu bằng `image/`; Cloudinary phải nhận diện kết quả là resource `image`.
+- PDF hợp lệ có MIME `application/pdf` và chữ ký file `%PDF-`.
+- DOCX hợp lệ; backend kiểm tra container ZIP phải có `[Content_Types].xml` và `word/document.xml`.
+
+Giới hạn upload hiện tại là `50MB/file`, cấu hình bằng `spring.servlet.multipart.max-file-size`.
+
+Quản lý câu lạc bộ hoặc huấn luyện viên trưởng thay trực tiếp file chính:
+
+```http
+PUT /api/horses/{horseId}/main-file
+Authorization: Bearer <access-token>
+Content-Type: multipart/form-data
+
+file=<binary>
+```
+
+Chủ sở hữu chỉ có thể đề xuất và phải thực sự sở hữu con ngựa:
+
+```http
+POST /api/horses/{horseId}/main-file/proposals
+Authorization: Bearer <access-token>
+Content-Type: multipart/form-data
+
+file=<binary>
+```
+
+Đề xuất mới có trạng thái `PENDING`. Sau khi được duyệt, đề xuất trở thành `ACTIVE`; file chính trước đó chuyển thành `REPLACED`. File cũ vẫn được giữ trên Cloudinary để tránh mất dữ liệu vì chưa có yêu cầu xóa lịch sử phiên bản.
+
+`DELETE /api/horses/{horseId}/main-file` xóa file đang active khỏi Cloudinary với `invalidate=true` và đánh dấu metadata `DELETED`. Cloudinary lưu `resource_type` là `image` hoặc `raw`; DOCX dùng `raw`.
+
+Response metadata:
+
+```json
+{
+  "id": "UUID",
+  "horseId": "UUID",
+  "uploadedBy": { "id": "UUID", "username": "owner.one" },
+  "approvedBy": { "id": "UUID", "username": "manager" },
+  "originalFilename": "horse-profile.png",
+  "contentType": "image/png",
+  "format": "png",
+  "size": 123456,
+  "secureUrl": "https://res.cloudinary.com/...",
+  "status": "ACTIVE",
+  "approvedAt": "2026-09-10T08:00:00Z",
+  "createdAt": "2026-09-10T07:55:00Z"
+}
+```
+
+Khi hồ sơ ngựa được lưu trữ bằng `/archive`, backend không thay đổi metadata và không xóa bất kỳ file nào trên Cloudinary.
+
 ## Cấu trúc source
 
 ```text
@@ -294,6 +367,13 @@ src/main/java/com/racehorse/
     ├── mapper/
     ├── repository/
     └── service/
+├── media/
+│   ├── config/
+│   ├── controller/
+│   ├── dto/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 └── racing/
     ├── controller/
     ├── dto/
@@ -320,8 +400,9 @@ Khi đổi role, `CLUB_MANAGER` gửi toàn bộ danh sách role thay thế tớ
 
 Các mục dưới đây được giữ lại và không tự suy diễn:
 
-- FR01 ảnh hồ sơ: chưa có quyết định dùng ổ đĩa local, database hay object storage; chưa rõ API tải/xóa ảnh và quyền truy cập file.
-- FR03 dashboard thể lực: chưa có công thức cho khối lượng tập, tiến triển tốc độ và chỉ số hồi phục; chưa xác định dữ liệu đầu vào và mẫu PDF/ảnh xuất ra.
+- FR01 tối đa 10 ảnh bổ sung: tài liệu mới chỉ xác định quyền đối với file chính, chưa xác định quyền thêm/xóa/thay ảnh bổ sung.
+- FR01 từ chối đề xuất file chính: đã có luồng đề xuất và phê duyệt, nhưng chưa có quy tắc ai được từ chối, lý do có bắt buộc hay owner có được rút đề xuất không.
+- FR03 dashboard thể lực: đây là màn hình chỉ đọc và trực quan hóa dữ liệu gốc, không tự tính các chỉ số và không nhập dữ liệu tại dashboard. Theo xác nhận nghiệp vụ, Huấn luyện viên trưởng nhập trực tiếp các thông số buổi tập tại FR07; cần bổ sung `khối lượng tập luyện`, `hồi phục nhịp tim` và `trạng thái thể lực` vào bản ghi FR07 bên cạnh trường `tốc độ trung bình` đã có trong tài liệu. Mỗi điểm trên biểu đồ FR03 phải tham chiếu được về đúng bản ghi FR07 gốc. PDF/ảnh là bản xuất của dashboard theo bộ lọc và khoảng thời gian đang hiển thị, không phải một báo cáo có công thức riêng.
 - FR04 kế hoạch huấn luyện: dữ liệu giai đoạn đủ rõ, nhưng cần thống nhất trạng thái vòng đời của kế hoạch (`draft/active/completed/cancelled`) và quy tắc một hay nhiều kế hoạch hoạt động trên cùng ngựa.
 - FR05 lịch hằng ngày/lượt chạy thử: chưa có mô hình đường đua, làn chạy, khung giờ, trạng thái công bố và kênh gửi thông báo. Xác nhận hoàn thành thuộc FR15 nhưng tài liệu FR15 chưa được cung cấp.
 - FR06 cảnh báo realtime: chưa có giao thức nhận telemetry, đơn vị nhịp tim/tốc độ, cấu trúc ngưỡng và kênh push tới web/mobile.
