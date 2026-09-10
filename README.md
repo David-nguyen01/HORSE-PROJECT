@@ -8,6 +8,7 @@ Repository chứa toàn bộ mã nguồn của dự án HORSE theo mô hình mon
 HORSE-PROJECT/
 ├── BACKEND/     # API và xử lý phía máy chủ
 ├── FRONTEND/    # Giao diện người dùng
+├── DATABASE/    # Script khởi tạo Microsoft SQL Server
 ├── .gitignore
 └── README.md
 ```
