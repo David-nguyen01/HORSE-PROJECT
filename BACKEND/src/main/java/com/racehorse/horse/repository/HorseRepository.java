@@ -10,9 +10,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface HorseRepository extends JpaRepository<Horse, UUID> {
+
+    List<Horse> findByArchivedAtIsNullOrderByNameAsc();
 
     boolean existsByCodeIgnoreCase(String code);
 

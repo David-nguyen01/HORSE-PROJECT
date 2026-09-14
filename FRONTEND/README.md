@@ -31,5 +31,7 @@ Có thể tạo file `.env` từ `.env.example` nếu backend dùng URL khác.
 - Tạo ngựa, lưu trữ hồ sơ, xem phả hệ và thành tích đua theo quyền.
 - Xem/thay/xóa file hồ sơ chính; chủ sở hữu chỉ gửi đề xuất.
 - Quản lý tài khoản và thay đổi role dành cho `CLUB_MANAGER`.
+- FR07 nhập trực tiếp chỉ số buổi tập cho HLV trưởng/Quản lý; chủ sở hữu xem trong hồ sơ ngựa.
+- FR03 lưới trạng thái, ba biểu đồ, bộ lọc ngày/ngựa/trạng thái và xuất PNG/PDF.
 
-FR03 chưa có API nên giao diện không tạo số liệu thể lực giả.
+Mỗi điểm biểu đồ FR03 hiển thị mã đánh giá để đối chiếu về bản ghi FR07 gốc. Giao diện không tự tính lại các chỉ số.

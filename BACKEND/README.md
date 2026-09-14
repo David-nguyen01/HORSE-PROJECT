@@ -17,6 +17,11 @@ Mở thư mục `../DATABASE` bằng SSMS, đăng nhập `sa` và chạy lần l
 3. `02_seed_data.sql`
 4. `03_horse_role_features.sql`
 5. `04_cloudinary_profile_files.sql`
+6. `05_training_evaluations.sql`
+7. `06_training_plans_scheduling_monitoring.sql`
+8. `07_health_medical.sql`
+9. `08_stable_care_inventory.sql`
+10. `09_racing_reporting_rbac_audit.sql`
 
 Sau đó chạy backend:
 
@@ -89,6 +94,10 @@ mvn test
 | `POST` | `/api/horses/{id}/main-file/proposals` | Chủ sở hữu đề xuất file chính mới |
 | `GET` | `/api/horses/{id}/main-file/proposals` | Quản lý/HLV trưởng xem đề xuất đang chờ |
 | `POST` | `/api/horses/{id}/main-file/proposals/{proposalId}/approve` | Quản lý/HLV trưởng duyệt đề xuất |
+| `POST` | `/api/training-evaluations` | Quản lý/HLV trưởng hoàn tất đánh giá buổi tập FR07 |
+| `GET` | `/api/training-evaluations/{id}` | Xem và đối chiếu một đánh giá gốc |
+| `GET` | `/api/horses/{id}/training-evaluations` | Danh sách đánh giá đã hoàn tất của một ngựa |
+| `GET` | `/api/fitness/dashboard` | Dashboard dữ liệu thể lực FR03 |
 
 ## Phân quyền API đã triển khai
 
@@ -102,6 +111,9 @@ mvn test
 | Thêm/sửa kết quả đua lịch sử | Có | Có | Không | Không | Không |
 | Xem file hồ sơ chính | Có | Có | Có | Có | Có |
 | Thay/xóa file hồ sơ chính | Có | Có | Chỉ đề xuất | Không | Không |
+| Nhập đánh giá buổi tập FR07 | Có | Có | Không | Không | Không |
+| Xem đánh giá FR07 | Có | Có | Chỉ ngựa đang sở hữu | Không | Không |
+| Xem dashboard thể lực FR03 | Có | Có | Không | Không | Không |
 
 `CLUB_MANAGER` là admin nghiệp vụ. `HORSE_OWNER` bị kiểm tra quyền sở hữu theo dữ liệu `horse_ownerships`, không chỉ kiểm tra role trong JWT. Hồ sơ đã lưu trữ không xuất hiện trong tìm kiếm hoặc danh sách của chủ sở hữu.
 
@@ -344,6 +356,51 @@ Response metadata:
 
 Khi hồ sơ ngựa được lưu trữ bằng `/archive`, backend không thay đổi metadata và không xóa bất kỳ file nào trên Cloudinary.
 
+## FR07 — nhập chỉ số buổi tập
+
+`POST /api/training-evaluations` chỉ dành cho `CLUB_MANAGER` và `HEAD_TRAINER`. Các chỉ số trong request được lưu nguyên giá trị người dùng nhập; backend không suy ra tốc độ, khối lượng hay trạng thái màu.
+
+```json
+{
+  "horseId": "09f3b358-49b2-4f3c-a523-570928ade54f",
+  "sessionDate": "2026-09-14",
+  "durationMinutes": 45,
+  "distanceMeters": 3200.00,
+  "averageSpeedKmh": 42.50,
+  "trainingLoad": 72.00,
+  "heartRateRecoveryBpm": 58,
+  "perceivedExertion": 7,
+  "fitnessStatus": "GREEN",
+  "trainerNotes": "Ngựa hoàn tất giáo án và hồi phục ổn định.",
+  "videoUrl": "https://example.com/training-session.mp4"
+}
+```
+
+Quy tắc validation chính:
+
+- `sessionDate` không được ở tương lai; `durationMinutes` từ 1 phút.
+- `distanceMeters` và `averageSpeedKmh` phải lớn hơn 0; `trainingLoad` không âm.
+- `heartRateRecoveryBpm` từ 0–300; `perceivedExertion` từ 1–10.
+- `fitnessStatus` nhận `GREEN`, `YELLOW` hoặc `RED` do người nhập quyết định.
+- `trainerNotes` bắt buộc, tối đa 4.000 ký tự; `videoUrl` không bắt buộc và phải dùng HTTP/HTTPS.
+
+Không có API sửa/xóa đánh giá vì tài liệu chưa đưa ra quy tắc hiệu chỉnh dữ liệu đã hoàn tất và yêu cầu nhật ký thay đổi. `GET /api/training-evaluations/{id}` trả đúng bản ghi gốc. `GET /api/horses/{id}/training-evaluations?page=0&size=20` trả lịch sử theo ngày mới nhất; chủ sở hữu chỉ truy cập được ngựa đang có liên kết sở hữu.
+
+## FR03 — dashboard thể lực
+
+`GET /api/fitness/dashboard` dành cho `CLUB_MANAGER` và `HEAD_TRAINER`, hỗ trợ:
+
+```text
+horseId=<uuid>&from=2026-09-01&to=2026-09-14&fitnessStatus=GREEN&query=horse-code-or-name
+```
+
+- `from` và `to` không bắt buộc; mặc định là 30 ngày gần nhất tính cả ngày hiện tại.
+- Khoảng ngày không được đảo ngược và `to` không được ở tương lai.
+- `fitnessStatus` lọc ngựa theo trạng thái ở đánh giá mới nhất trong khoảng đang xem.
+- `horses` là lưới ngựa và trạng thái mới nhất; `dataPoints` là dữ liệu thô cho ba biểu đồ.
+- Mỗi `dataPoints[].evaluationId` liên kết trực tiếp tới bản ghi FR07 để đối chiếu.
+- API không tổng hợp hoặc tính toán lại các chỉ số. Xuất PNG/PDF được thực hiện ở frontend từ đúng dashboard và bộ lọc đang hiển thị.
+
 ## Cấu trúc source
 
 ```text
@@ -374,6 +431,12 @@ src/main/java/com/racehorse/
 │   ├── entity/
 │   ├── repository/
 │   └── service/
+├── training/
+│   ├── controller/
+│   ├── dto/
+│   ├── entity/
+│   ├── repository/
+│   └── service/
 └── racing/
     ├── controller/
     ├── dto/
@@ -382,7 +445,7 @@ src/main/java/com/racehorse/
     └── service/
 ```
 
-Các module `training`, `scheduling`, `telemetry`, `alert` và `notification` chỉ được thêm khi đủ quy tắc nghiệp vụ; không tạo lớp rỗng hoặc tự suy diễn để giữ chỗ.
+Module `training` hiện chứa FR03/FR07. Các module `scheduling`, `telemetry`, `alert` và `notification` chỉ được thêm khi đủ quy tắc nghiệp vụ; không tạo lớp rỗng hoặc tự suy diễn để giữ chỗ.
 
 ## Role
 
@@ -402,11 +465,11 @@ Các mục dưới đây được giữ lại và không tự suy diễn:
 
 - FR01 tối đa 10 ảnh bổ sung: tài liệu mới chỉ xác định quyền đối với file chính, chưa xác định quyền thêm/xóa/thay ảnh bổ sung.
 - FR01 từ chối đề xuất file chính: đã có luồng đề xuất và phê duyệt, nhưng chưa có quy tắc ai được từ chối, lý do có bắt buộc hay owner có được rút đề xuất không.
-- FR03 dashboard thể lực: đây là màn hình chỉ đọc và trực quan hóa dữ liệu gốc, không tự tính các chỉ số và không nhập dữ liệu tại dashboard. Theo xác nhận nghiệp vụ, Huấn luyện viên trưởng nhập trực tiếp các thông số buổi tập tại FR07; cần bổ sung `khối lượng tập luyện`, `hồi phục nhịp tim` và `trạng thái thể lực` vào bản ghi FR07 bên cạnh trường `tốc độ trung bình` đã có trong tài liệu. Mỗi điểm trên biểu đồ FR03 phải tham chiếu được về đúng bản ghi FR07 gốc. PDF/ảnh là bản xuất của dashboard theo bộ lọc và khoảng thời gian đang hiển thị, không phải một báo cáo có công thức riêng.
+- FR03 chưa có bộ lọc theo giai đoạn huấn luyện vì giai đoạn thuộc FR04 và quy tắc liên kết buổi tập với giai đoạn chưa được xác nhận. Dashboard hiện lọc theo ngựa, khoảng ngày, trạng thái thể lực và từ khóa; không tự tính lại bất kỳ chỉ số nào.
 - FR04 kế hoạch huấn luyện: dữ liệu giai đoạn đủ rõ, nhưng cần thống nhất trạng thái vòng đời của kế hoạch (`draft/active/completed/cancelled`) và quy tắc một hay nhiều kế hoạch hoạt động trên cùng ngựa.
 - FR05 lịch hằng ngày/lượt chạy thử: chưa có mô hình đường đua, làn chạy, khung giờ, trạng thái công bố và kênh gửi thông báo. Xác nhận hoàn thành thuộc FR15 nhưng tài liệu FR15 chưa được cung cấp.
 - FR06 cảnh báo realtime: chưa có giao thức nhận telemetry, đơn vị nhịp tim/tốc độ, cấu trúc ngưỡng và kênh push tới web/mobile.
-- FR07 video buổi tập: chưa có quyết định lưu file hay dịch vụ video, giới hạn dung lượng/định dạng và quyền tải xuống.
+- FR07 hiện chỉ lưu URL video HTTP/HTTPS. Chưa có quyết định về upload file video, dịch vụ lưu trữ, giới hạn dung lượng/định dạng và quyền tải xuống.
 - `STABLE_STAFF`: tài liệu hiện chỉ nói được nhận lịch/nhiệm vụ ở FR05; chưa đủ dữ liệu để xây endpoint đúng logic.
 - `VETERINARIAN`: chức năng nằm tại FR09 nhưng tài liệu FR09 chưa được cung cấp, nên chưa tạo API thú y.
 
