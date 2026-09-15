@@ -7,6 +7,7 @@ import com.racehorse.racing.service.RaceResultService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +19,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -35,9 +35,9 @@ public class RaceResultController {
     @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')")
     RaceHistoryResponse history(
             @PathVariable UUID horseId,
-            @AuthenticationPrincipal Jwt jwt) {
-        List<String> roles = jwt.getClaimAsStringList("roles");
-        boolean privileged = roles.contains("CLUB_MANAGER") || roles.contains("HEAD_TRAINER");
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        boolean privileged = authentication.getAuthorities().stream().anyMatch(authority ->
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
         return service.history(horseId, UUID.fromString(jwt.getSubject()), privileged);
     }
 

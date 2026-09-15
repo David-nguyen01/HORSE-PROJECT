@@ -7,7 +7,6 @@ import com.racehorse.auth.dto.UserResponse;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
-import com.racehorse.auth.repository.LoginSessionRepository;
 import com.racehorse.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,9 +16,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.Set;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -36,20 +32,13 @@ class UserManagementServiceTest {
     @Mock
     private UserAccountRepository userRepository;
 
-    @Mock
-    private LoginSessionRepository sessionRepository;
-
-    private static final Instant NOW = Instant.parse("2026-09-10T00:00:00Z");
-
     private UserManagementService service;
 
     @BeforeEach
     void setUp() {
         service = new UserManagementService(
                 userRepository,
-                new BCryptPasswordEncoder(4),
-                sessionRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                new BCryptPasswordEncoder(4));
     }
 
     @Test
@@ -128,6 +117,6 @@ class UserManagementServiceTest {
 
         assertThat(response.roles())
                 .containsExactlyInAnyOrder(Role.HEAD_TRAINER, Role.VETERINARIAN);
-        verify(sessionRepository).revokeAllActiveByUserId(targetId, NOW);
+        verify(userRepository).findById(targetId);
     }
 }

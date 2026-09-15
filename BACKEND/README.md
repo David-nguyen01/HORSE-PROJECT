@@ -22,6 +22,7 @@ Mở thư mục `../DATABASE` bằng SSMS, đăng nhập `sa` và chạy lần l
 8. `07_health_medical.sql`
 9. `08_stable_care_inventory.sql`
 10. `09_racing_reporting_rbac_audit.sql`
+11. `10_confirmed_business_rules.sql`
 
 Sau đó chạy backend:
 
@@ -98,6 +99,25 @@ mvn test
 | `GET` | `/api/training-evaluations/{id}` | Xem và đối chiếu một đánh giá gốc |
 | `GET` | `/api/horses/{id}/training-evaluations` | Danh sách đánh giá đã hoàn tất của một ngựa |
 | `GET` | `/api/fitness/dashboard` | Dashboard dữ liệu thể lực FR03 |
+| `POST` | `/api/training-plans` | Tạo kế hoạch nhiều giai đoạn FR04 |
+| `PUT` | `/api/training-plans/{id}` | Sửa kế hoạch chưa phát sinh lịch |
+| `POST` | `/api/training-plans/{id}/copy` | Sao chép kế hoạch cho ngựa khác |
+| `GET` | `/api/training-plans/{id}` | Xem chi tiết kế hoạch và các giai đoạn |
+| `GET` | `/api/horses/{id}/training-plans` | Danh sách kế hoạch của một ngựa |
+| `POST` | `/api/training-schedules` | Tạo lịch từ giai đoạn của kế hoạch active FR05 |
+| `POST` | `/api/training-schedules/{id}/publish` | Công bố lịch và tạo thông báo cho nhân viên |
+| `GET` | `/api/training-schedules?from=&to=&horseId=` | Lịch huấn luyện dành cho quản lý/HLV trưởng |
+| `GET` | `/api/training-schedules/mine?from=&to=` | Nhân viên xem lịch đã công bố của mình |
+| `POST` | `/api/racetracks` | Quản lý tạo đường đua và số làn |
+| `GET` | `/api/racetracks` | Quản lý/HLV trưởng xem danh sách đường đua |
+| `GET` | `/api/racetracks/{id}/slots?date=` | Xem các slot trống/đã đặt theo ngày và làn |
+| `POST` | `/api/trial-run-bookings` | Quản lý/HLV trưởng đặt một slot chạy thử |
+| `GET` | `/api/notifications?unreadOnly=` | Người dùng xem thông báo của chính mình |
+| `PATCH` | `/api/notifications/{id}/read` | Đánh dấu thông báo đã đọc |
+| `POST` | `/api/horses/{id}/training-locks` | Bác sĩ/Quản lý khóa huấn luyện FR11 |
+| `POST` | `/api/training-locks/{id}/release` | Bác sĩ thú y gỡ khóa sau ngày tái khám |
+| `GET` | `/api/horses/{id}/training-locks/current` | Xem khóa đang hoạt động |
+| `GET` | `/api/horses/{id}/training-locks` | Xem lịch sử khóa huấn luyện |
 
 ## Phân quyền API đã triển khai
 
@@ -114,12 +134,21 @@ mvn test
 | Nhập đánh giá buổi tập FR07 | Có | Có | Không | Không | Không |
 | Xem đánh giá FR07 | Có | Có | Chỉ ngựa đang sở hữu | Không | Không |
 | Xem dashboard thể lực FR03 | Có | Có | Không | Không | Không |
+| Tạo/sửa/sao chép kế hoạch FR04 | Có | Có | Không | Không | Không |
+| Tạo/công bố và xem toàn bộ lịch FR05 | Có | Có | Không | Không | Không |
+| Quản lý đường đua | Có | Không | Không | Không | Không |
+| Xem/đặt slot chạy thử | Có | Có | Không | Không | Không |
+| Xem lịch đã công bố được giao | Không | Không | Không | Có | Không |
+| Tạo khóa huấn luyện FR11 | Có | Không | Không | Không | Có |
+| Gỡ khóa huấn luyện FR11 | Không | Không | Không | Không | Có |
+| Xem khóa huấn luyện | Có | Có | Không | Không | Có |
+| Xem thông báo của chính mình | Có | Có | Có | Có | Có |
 
 `CLUB_MANAGER` là admin nghiệp vụ. `HORSE_OWNER` bị kiểm tra quyền sở hữu theo dữ liệu `horse_ownerships`, không chỉ kiểm tra role trong JWT. Hồ sơ đã lưu trữ không xuất hiện trong tìm kiếm hoặc danh sách của chủ sở hữu.
 
 Các endpoint phân trang trả cấu trúc ổn định gồm `content` và `page` (`size`, `number`, `totalElements`, `totalPages`). Tham số `sort` có dạng `field,direction`, ví dụ `sort=name,asc`.
 
-Khi `CLUB_MANAGER` thay role của một tài khoản, backend thu hồi toàn bộ phiên đang hoạt động của tài khoản đó. Người dùng phải đăng nhập lại để nhận quyền mới và không thể tiếp tục dùng quyền cũ.
+Hệ thống có đúng 5 role cố định. Khi `CLUB_MANAGER` thay role của một tài khoản khác, backend đọc lại role từ database trên mỗi request nên quyền mới có hiệu lực ở request kế tiếp mà không buộc người dùng đăng nhập lại. JWT không được dùng làm nguồn quyền sau khi phát hành.
 
 Đăng ký tài khoản:
 
@@ -445,7 +474,7 @@ src/main/java/com/racehorse/
     └── service/
 ```
 
-Module `training` hiện chứa FR03/FR07. Các module `scheduling`, `telemetry`, `alert` và `notification` chỉ được thêm khi đủ quy tắc nghiệp vụ; không tạo lớp rỗng hoặc tự suy diễn để giữ chỗ.
+Module `training` hiện chứa FR03, FR04, FR05 và FR07; module `notification` cung cấp thông báo trong web, còn module `health` hiện cung cấp khóa huấn luyện FR11. Telemetry và cảnh báo realtime tiếp tục chờ đặc tả giao thức.
 
 ## Role
 
@@ -465,13 +494,14 @@ Các mục dưới đây được giữ lại và không tự suy diễn:
 
 - FR01 tối đa 10 ảnh bổ sung: tài liệu mới chỉ xác định quyền đối với file chính, chưa xác định quyền thêm/xóa/thay ảnh bổ sung.
 - FR01 từ chối đề xuất file chính: đã có luồng đề xuất và phê duyệt, nhưng chưa có quy tắc ai được từ chối, lý do có bắt buộc hay owner có được rút đề xuất không.
-- FR03 chưa có bộ lọc theo giai đoạn huấn luyện vì giai đoạn thuộc FR04 và quy tắc liên kết buổi tập với giai đoạn chưa được xác nhận. Dashboard hiện lọc theo ngựa, khoảng ngày, trạng thái thể lực và từ khóa; không tự tính lại bất kỳ chỉ số nào.
-- FR04 kế hoạch huấn luyện: dữ liệu giai đoạn đủ rõ, nhưng cần thống nhất trạng thái vòng đời của kế hoạch (`draft/active/completed/cancelled`) và quy tắc một hay nhiều kế hoạch hoạt động trên cùng ngựa.
-- FR05 lịch hằng ngày/lượt chạy thử: chưa có mô hình đường đua, làn chạy, khung giờ, trạng thái công bố và kênh gửi thông báo. Xác nhận hoàn thành thuộc FR15 nhưng tài liệu FR15 chưa được cung cấp.
+- FR03 chưa có bộ lọc theo giai đoạn vì bản ghi FR07 hiện chưa nhận `trainingScheduleId` từ request. Dashboard vẫn không tự tính lại bất kỳ chỉ số nào.
+- FR04 hiện dùng cờ `active`, không tự giới hạn số kế hoạch active trên một ngựa vì tài liệu không quy định. Kế hoạch đã phát sinh lịch không cho thay toàn bộ giai đoạn để bảo toàn dữ liệu tham chiếu.
+- FR05 đã có lịch nháp, công bố, kiểm tra trùng nhân viên, đường đua/làn chạy và đúng 18 slot một giờ từ 06:00 đến 24:00 mỗi ngày. Thông báo chỉ hiển thị trên web bằng polling; không gửi email/SMS/mobile push.
+- Cân nặng ngựa được lưu thành lịch sử nhập thủ công trong `horse_weight_records`. API ghi chưa mở vì chưa xác định role nào được phép nhập.
 - FR06 cảnh báo realtime: chưa có giao thức nhận telemetry, đơn vị nhịp tim/tốc độ, cấu trúc ngưỡng và kênh push tới web/mobile.
 - FR07 hiện chỉ lưu URL video HTTP/HTTPS. Chưa có quyết định về upload file video, dịch vụ lưu trữ, giới hạn dung lượng/định dạng và quyền tải xuống.
-- `STABLE_STAFF`: tài liệu hiện chỉ nói được nhận lịch/nhiệm vụ ở FR05; chưa đủ dữ liệu để xây endpoint đúng logic.
-- `VETERINARIAN`: chức năng nằm tại FR09 nhưng tài liệu FR09 chưa được cung cấp, nên chưa tạo API thú y.
+- FR08–FR10 và FR12: tài liệu đã đủ trường dữ liệu cơ bản nhưng API và giao diện chưa được triển khai trong mốc hiện tại.
+- FR13–FR23: database nền đã có; các API nghiệp vụ và giao diện vẫn cần triển khai theo từng luồng phụ thuộc. FR21 chỉ sử dụng đúng 5 role cố định, không cho tạo role mới.
 
 ## Quy ước
 

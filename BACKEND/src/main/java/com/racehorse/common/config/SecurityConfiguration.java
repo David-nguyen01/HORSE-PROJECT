@@ -1,5 +1,6 @@
 package com.racehorse.common.config;
 
+import com.racehorse.auth.repository.UserAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -8,13 +9,15 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.UUID;
 
 @Configuration
 @EnableMethodSecurity
@@ -59,13 +62,20 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter authoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        authoritiesConverter.setAuthoritiesClaimName("roles");
-        authoritiesConverter.setAuthorityPrefix("ROLE_");
-
+    JwtAuthenticationConverter jwtAuthenticationConverter(UserAccountRepository userRepository) {
         JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
-        authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
+        authenticationConverter.setJwtGrantedAuthoritiesConverter(jwt -> {
+            try {
+                return userRepository.findById(UUID.fromString(jwt.getSubject()))
+                        .filter(user -> user.isEnabled())
+                        .map(user -> user.getRoles().stream()
+                                .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role.name()))
+                                .toList())
+                        .orElse(List.of());
+            } catch (IllegalArgumentException exception) {
+                return List.of();
+            }
+        });
         return authenticationConverter;
     }
 }

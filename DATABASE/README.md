@@ -15,7 +15,8 @@ Kết nối SQL Server bằng tài khoản `sa`, sau đó chạy đúng thứ t�
 7. `06_training_plans_scheduling_monitoring.sql` — kế hoạch/giai đoạn, lịch và lượt chạy thử, notification, telemetry, ngưỡng và cảnh báo cho FR04–FR06.
 8. `07_health_medical.sql` — file dùng chung, trạng thái sức khỏe, khám bệnh/phụ lục, chấn thương 3D, khóa huấn luyện và chăm sóc phòng ngừa cho FR08–FR12.
 9. `08_stable_care_inventory.sql` — chuồng/ô chuồng, sinh hoạt, dinh dưỡng có phiên bản, nhiệm vụ, sự cố, danh mục và tồn kho cho FR13–FR17/FR20.
-10. `09_racing_reporting_rbac_audit.sql` — cuộc đua/đăng ký, sổ giao dịch, báo cáo chủ sở hữu, nền tảng RBAC động và audit append-only cho FR18–FR23.
+10. `09_racing_reporting_rbac_audit.sql` — cuộc đua/đăng ký, sổ giao dịch, ma trận quyền cho 5 role cố định và audit append-only cho FR18–FR23.
+11. `10_confirmed_business_rules.sql` — cấu hình đường đua 06:00–24:00, slot 60 phút và lịch sử cân nặng nhập thủ công.
 
 Các script đều có kiểm tra dữ liệu hoặc đối tượng đã tồn tại, vì vậy có thể chạy lại mà không tạo trùng.
 
@@ -29,6 +30,7 @@ Các script đều có kiểm tra dữ liệu hoặc đối tượng đã tồn 
 - FR14 lưu từng phiên bản khẩu phần; lịch sử cũ không bị ghi đè.
 - FR19/FR22 dùng chung `financial_transactions` và bảng nối báo cáo–giao dịch để mọi tổng số truy ngược được về dữ liệu gốc.
 - FR23 dùng trigger chặn mọi thao tác sửa/xóa trên `audit_logs`. Thời gian lưu giữ nằm trong `audit_settings` và phải được quản lý câu lạc bộ cấu hình, vì tài liệu chưa nêu số ngày mặc định.
+- FR21 giữ đúng 5 role trong ràng buộc `user_roles`; ứng dụng không cung cấp API tạo thêm role. Quản lý câu lạc bộ được thay role của tài khoản khác.
 
 Các bảng mới là nền tảng database. Chúng không đồng nghĩa API/backend cho các FR tương ứng đã được triển khai. Những quyết định chưa có trong tài liệu như vòng đời kế hoạch đầy đủ, giao thức telemetry, quy trình duyệt bổ sung tồn kho và số ngày giữ audit không được tự đặt trong schema.
 

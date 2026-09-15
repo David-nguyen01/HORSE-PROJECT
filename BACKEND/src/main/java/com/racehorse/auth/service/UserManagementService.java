@@ -7,7 +7,6 @@ import com.racehorse.auth.dto.UpdateUserRolesRequest;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
-import com.racehorse.auth.repository.LoginSessionRepository;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,7 +16,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Locale;
-import java.time.Clock;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,18 +24,11 @@ public class UserManagementService {
 
     private final UserAccountRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final LoginSessionRepository sessionRepository;
-    private final Clock clock;
-
     public UserManagementService(
             UserAccountRepository userRepository,
-            PasswordEncoder passwordEncoder,
-            LoginSessionRepository sessionRepository,
-            Clock clock) {
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
-        this.sessionRepository = sessionRepository;
-        this.clock = clock;
     }
 
     @Transactional
@@ -70,7 +61,6 @@ public class UserManagementService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy tài khoản: " + targetUserId));
         target.replaceRoles(request.roles());
-        sessionRepository.revokeAllActiveByUserId(targetUserId, clock.instant());
         return toResponse(target);
     }
 

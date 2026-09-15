@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Backend (Spring Boot)",
+      "request": "launch",
+      "mainClass": "com.racehorse.RacehorseApplication",
+      "projectName": "racehorse-backend",
+      "cwd": "${workspaceFolder}/BACKEND",
+      "console": "integratedTerminal"
+    },
+    {
+      "type": "node",
+      "name": "Frontend (Vite)",
+      "request": "launch",
+      "runtimeExecutable": "npm.cmd",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "${workspaceFolder}/FRONTEND",
+      "console": "integratedTerminal",
+      "serverReadyAction": {
+        "pattern": "Local:\\s+(https?://\\S+)",
+        "uriFormat": "%s",
+        "action": "openExternally"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Full Stack (Local)",
+      "configurations": ["Backend (Spring Boot)", "Frontend (Vite)"],
+      "stopAll": true
+    }
+  ]
+}

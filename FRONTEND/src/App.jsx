@@ -1,6 +1,6 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ArrowLeft, Award, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, X, Zap } from 'lucide-react'
+import { Activity, ArrowLeft, Award, Bell, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, X, Zap } from 'lucide-react'
 import { api, authApi, clearAuth, getAuth, pageContent, saveAuth } from './api'
 
 const FitnessPage = lazy(() => import('./FitnessPage'))
@@ -33,8 +33,11 @@ function AuthProvider({ children }) {
   useEffect(() => {
     verify()
     const onPageShow = (event) => { if (event.persisted || getAuth()) verify() }
+    const onFocus = () => { if (getAuth()) verify() }
+    const timer = window.setInterval(() => { if (getAuth()) verify() }, 30000)
     window.addEventListener('pageshow', onPageShow)
-    return () => window.removeEventListener('pageshow', onPageShow)
+    window.addEventListener('focus', onFocus)
+    return () => { window.clearInterval(timer); window.removeEventListener('pageshow', onPageShow); window.removeEventListener('focus', onFocus) }
   }, [verify])
   const value = useMemo(() => ({
     auth, user: auth?.user, checking,
@@ -112,8 +115,32 @@ function AppLayout() {
       <nav>{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}><Icon size={19} /><span>{label}</span></NavLink>)}</nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="users" element={hasAny(user, 'CLUB_MANAGER') ? <Users /> : <Navigate to="/" replace />} /></Routes></Suspense></div></div>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="users" element={hasAny(user, 'CLUB_MANAGER') ? <Users /> : <Navigate to="/" replace />} /></Routes></Suspense></div></div>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
+  </div>
+}
+
+function NotificationBell() {
+  const [items, setItems] = useState([])
+  const [open, setOpen] = useState(false)
+  const load = useCallback(() => api('/api/notifications?unreadOnly=true&size=20')
+    .then((data) => setItems(pageContent(data)))
+    .catch(() => setItems([])), [])
+  useEffect(() => {
+    load()
+    const timer = window.setInterval(load, 30000)
+    return () => window.clearInterval(timer)
+  }, [load])
+  const markRead = async (id) => {
+    await api(`/api/notifications/${id}/read`, { method: 'PATCH' })
+    setItems((current) => current.filter((item) => item.id !== id))
+  }
+  return <div className="notification-center">
+    <button className="notification-button" aria-label="Thông báo" onClick={() => setOpen((value) => !value)}><Bell size={19} />{items.length > 0 && <span>{items.length > 99 ? '99+' : items.length}</span>}</button>
+    {open && <div className="notification-panel">
+      <div className="notification-head"><b>Thông báo</b><small>{items.length} chưa đọc</small></div>
+      {items.length ? items.map((item) => <button key={item.id} className="notification-item" onClick={() => markRead(item.id)}><span className={`notification-priority ${String(item.priority).toLowerCase()}`} /><div><b>{item.title}</b><p>{item.message}</p><small>{new Date(item.createdAt).toLocaleString('vi-VN')}</small></div></button>) : <div className="notification-empty">Không có thông báo mới.</div>}
+    </div>}
   </div>
 }
 

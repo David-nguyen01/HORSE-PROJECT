@@ -13,6 +13,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,8 +50,8 @@ public class HorseController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')")
-    HorseResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return horseService.getByIdForUser(id, userId(jwt), isPrivileged(jwt));
+    HorseResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        return horseService.getByIdForUser(id, userId(jwt), isPrivileged(authentication));
     }
 
     @GetMapping
@@ -96,8 +97,8 @@ public class HorseController {
         return UUID.fromString(jwt.getSubject());
     }
 
-    private boolean isPrivileged(Jwt jwt) {
-        java.util.List<String> roles = jwt.getClaimAsStringList("roles");
-        return roles.contains("CLUB_MANAGER") || roles.contains("HEAD_TRAINER");
+    private boolean isPrivileged(Authentication authentication) {
+        return authentication.getAuthorities().stream().anyMatch(authority ->
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
     }
 }

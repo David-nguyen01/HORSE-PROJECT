@@ -1,0 +1,43 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Database: initialize local",
+      "type": "shell",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}/DATABASE/setup-local.ps1"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Backend: test",
+      "type": "shell",
+      "command": "mvn.cmd",
+      "args": ["test"],
+      "options": { "cwd": "${workspaceFolder}/BACKEND" },
+      "group": "test",
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Frontend: install dependencies",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["install"],
+      "options": { "cwd": "${workspaceFolder}/FRONTEND" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Frontend: build",
+      "type": "shell",
+      "command": "npm.cmd",
+      "args": ["run", "build"],
+      "options": { "cwd": "${workspaceFolder}/FRONTEND" },
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

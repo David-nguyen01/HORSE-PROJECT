@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -36,6 +37,17 @@ public class GlobalExceptionHandler {
             BusinessException exception,
             HttpServletRequest request) {
         return build(HttpStatus.CONFLICT, exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ApiErrorResponse> handleDataIntegrity(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        return build(
+                HttpStatus.CONFLICT,
+                "Dữ liệu xung đột với ràng buộc nghiệp vụ hoặc đang được tham chiếu",
+                request,
+                Map.of());
     }
 
     @ExceptionHandler(ExternalServiceException.class)
