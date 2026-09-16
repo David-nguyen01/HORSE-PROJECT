@@ -32,7 +32,7 @@ public class RaceResultController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     RaceHistoryResponse history(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
@@ -42,7 +42,7 @@ public class RaceResultController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     ResponseEntity<RaceResultResponse> create(
             @PathVariable UUID horseId,
             @Valid @RequestBody UpsertRaceResultRequest request) {
@@ -52,7 +52,7 @@ public class RaceResultController {
     }
 
     @PutMapping("/{resultId}")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     RaceResultResponse update(
             @PathVariable UUID horseId,
             @PathVariable UUID resultId,

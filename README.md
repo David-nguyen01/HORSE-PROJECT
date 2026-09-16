@@ -27,7 +27,7 @@ Lần đầu mở project:
 
 1. Mở đúng thư mục gốc `HORSE-PROJECT` bằng VS Code.
 2. Cài các extension được VS Code đề xuất cho Java, Spring Boot và Maven.
-3. Nếu chưa có database, chọn **Terminal → Run Task → Database: initialize local**.
+3. Nếu chưa có database, chọn **Terminal → Run Task → Database: initialize local**. Task này chạy file tổng `DATABASE/racehorse_database_full.sql`.
 4. Chọn **Terminal → Run Task → Frontend: install dependencies** một lần.
 5. Mở **Run and Debug**, chọn **Full Stack (Local)** rồi nhấn `F5`.
 
@@ -46,3 +46,5 @@ Các task kiểm tra có sẵn trong **Terminal → Run Task**:
 - `Database: initialize local`
 - `Frontend: install dependencies`
 - `Frontend: build`
+
+Những quyết định nghiệp vụ chưa được chốt được lưu tại [BUSINESS_DECISIONS_PENDING.md](BUSINESS_DECISIONS_PENDING.md). Không tự triển khai các quy tắc trong file này khi chưa có xác nhận của chủ dự án.

@@ -35,7 +35,7 @@ public class TrainingScheduleController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrainingScheduleResponse create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateTrainingScheduleRequest request) {
@@ -43,19 +43,19 @@ public class TrainingScheduleController {
     }
 
     @PostMapping("/{scheduleId}/publish")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrainingScheduleResponse publish(@PathVariable UUID scheduleId) {
         return service.publish(scheduleId);
     }
 
     @GetMapping("/{scheduleId}")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','STABLE_STAFF')")
     TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         return service.get(scheduleId, userId(jwt), isPrivileged(authentication));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     List<TrainingScheduleResponse> calendar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -64,7 +64,7 @@ public class TrainingScheduleController {
     }
 
     @GetMapping("/mine")
-    @PreAuthorize("hasRole('STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasRole('STABLE_STAFF')")
     List<TrainingScheduleResponse> mine(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,

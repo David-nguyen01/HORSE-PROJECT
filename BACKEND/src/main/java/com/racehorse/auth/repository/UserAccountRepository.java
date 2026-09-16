@@ -8,6 +8,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> {
@@ -28,4 +29,12 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             """
             )
     Page<UserAccount> search(@Param("query") String query, Pageable pageable);
+
+    @Query(value = """
+            select concat('PERM_', rp.module_code, '_', rp.action_code)
+            from user_roles ur
+            join role_permissions rp on rp.role_code = ur.role and rp.granted = 1
+            where ur.user_id = :userId
+            """, nativeQuery = true)
+    List<String> findGrantedPermissionCodes(@Param("userId") UUID userId);
 }

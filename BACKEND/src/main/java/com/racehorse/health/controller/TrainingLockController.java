@@ -32,7 +32,7 @@ public class TrainingLockController {
 
     @PostMapping("/horses/{horseId}/training-locks")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('VETERINARIAN', 'CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_EDIT') and hasAnyRole('VETERINARIAN','CLUB_MANAGER')")
     TrainingLockResponse lock(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
@@ -41,7 +41,7 @@ public class TrainingLockController {
     }
 
     @PostMapping("/training-locks/{lockId}/release")
-    @PreAuthorize("hasRole('VETERINARIAN')")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_EDIT') and hasRole('VETERINARIAN')")
     TrainingLockResponse release(
             @PathVariable UUID lockId,
             @AuthenticationPrincipal Jwt jwt,
@@ -50,13 +50,13 @@ public class TrainingLockController {
     }
 
     @GetMapping("/horses/{horseId}/training-locks/current")
-    @PreAuthorize("hasAnyRole('VETERINARIAN', 'CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER')")
     TrainingLockResponse current(@PathVariable UUID horseId) {
         return service.current(horseId);
     }
 
     @GetMapping("/horses/{horseId}/training-locks")
-    @PreAuthorize("hasAnyRole('VETERINARIAN', 'CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER')")
     List<TrainingLockResponse> history(@PathVariable UUID horseId) {
         return service.history(horseId);
     }

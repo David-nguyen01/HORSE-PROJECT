@@ -9,7 +9,12 @@ if (-not $sqlcmdCommand) {
     throw "sqlcmd was not found. Install SQL Server Command Line Utilities and try again."
 }
 
-$migrationFiles = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "*.sql" -File | Sort-Object Name
+$fullDatabasePath = Join-Path $PSScriptRoot "racehorse_database_full.sql"
+if (Test-Path -LiteralPath $fullDatabasePath) {
+    $migrationFiles = @(Get-Item -LiteralPath $fullDatabasePath)
+} else {
+    $migrationFiles = Get-ChildItem -LiteralPath $PSScriptRoot -Filter "[0-9][0-9]_*.sql" -File | Sort-Object Name
+}
 if ($migrationFiles.Count -eq 0) {
     throw "No SQL migration files were found in $PSScriptRoot."
 }

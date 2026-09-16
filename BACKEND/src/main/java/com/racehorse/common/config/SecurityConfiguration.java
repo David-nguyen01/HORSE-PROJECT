@@ -1,6 +1,7 @@
 package com.racehorse.common.config;
 
 import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.audit.security.AuditMutationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -12,11 +13,13 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @Configuration
@@ -27,7 +30,8 @@ public class SecurityConfiguration {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter) throws Exception {
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            AuditMutationFilter auditMutationFilter) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -45,6 +49,7 @@ public class SecurityConfiguration {
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter)))
+                .addFilterAfter(auditMutationFilter, BearerTokenAuthenticationFilter.class)
                 .build();
     }
 
@@ -68,9 +73,14 @@ public class SecurityConfiguration {
             try {
                 return userRepository.findById(UUID.fromString(jwt.getSubject()))
                         .filter(user -> user.isEnabled())
-                        .map(user -> user.getRoles().stream()
-                                .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role.name()))
-                                .toList())
+                        .map(user -> {
+                            List<GrantedAuthority> authorities = new ArrayList<>();
+                            user.getRoles().forEach(role -> authorities.add(
+                                    new SimpleGrantedAuthority("ROLE_" + role.name())));
+                            userRepository.findGrantedPermissionCodes(user.getId()).forEach(permission ->
+                                    authorities.add(new SimpleGrantedAuthority(permission)));
+                            return authorities;
+                        })
                         .orElse(List.of());
             } catch (IllegalArgumentException exception) {
                 return List.of();

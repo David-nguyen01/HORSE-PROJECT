@@ -24,7 +24,7 @@ public class PedigreeController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     PedigreeResponse get(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
