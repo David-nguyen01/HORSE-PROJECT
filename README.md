@@ -31,7 +31,7 @@ Lần đầu mở project:
 4. Chọn **Terminal → Run Task → Frontend: install dependencies** một lần.
 5. Mở **Run and Debug**, chọn **Full Stack (Local)** rồi nhấn `F5`.
 
-VS Code sẽ chạy backend tại `http://localhost:8080` và frontend tại `http://localhost:5173`. Cấu hình local mặc định kết nối database bằng `sa / sa123456`; có thể ghi đè bằng các biến môi trường `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`.
+VS Code sẽ chạy backend tại `http://localhost:8080` và frontend tại `http://localhost:5173`. Backend mặc định trỏ tới Azure SQL; mật khẩu phải được cung cấp qua biến môi trường `DB_PASSWORD`. Khi cần chạy SQL Server local, ghi đè `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` trong môi trường local, không commit credential vào repository.
 
 Tài khoản quản lý mặc định sau khi chạy seed database:
 

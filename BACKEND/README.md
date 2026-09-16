@@ -38,10 +38,10 @@ Mặc định API chạy tại `http://localhost:8080`. Script `02_seed_data.sql
 Chuỗi kết nối mặc định:
 
 ```text
-jdbc:sqlserver://localhost:1433;databaseName=racehorse;encrypt=true;trustServerCertificate=true
+jdbc:sqlserver://racehorse-training-management.database.windows.net:1433;databaseName=racehorse;encrypt=true;trustServerCertificate=true
 ```
 
-Backend dùng SQL Authentication với username `sa` và password `sa123456`. Có thể ghi đè bằng `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` trên môi trường triển khai.
+Backend mặc định trỏ tới Azure SQL với username `racehorse_admin`. Mật khẩu không được lưu trong source; bắt buộc cung cấp bằng biến môi trường `DB_PASSWORD`. Có thể ghi đè kết nối bằng `DB_URL` và `DB_USERNAME`.
 
 Để bật upload Cloudinary, đặt các biến môi trường sau trước khi chạy backend. Không commit API secret vào repository:
 
