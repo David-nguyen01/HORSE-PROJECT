@@ -223,27 +223,38 @@
       </div>
     </div>
 
-    <!-- Tab: 3D Model Placeholder -->
+    <!-- Tab: 3D Model Viewer -->
     <div class="htab-panel" id="htab-model" style="display:none">
       <div class="card">
         <div class="card-head">
-          <h3>Bản đồ chấn thương</h3>
+          <h3>Bản đồ chấn thương 3D</h3>
           <select class="filter-select" style="font-size:.83rem;">
             <option>Gold Wind — HM-002</option>
             <option>Moonlight Dancer — HM-004</option>
           </select>
         </div>
         <div class="card-body">
-          <div class="model-placeholder">
-            <div class="model-icon">🐴</div>
-            <b>Mô hình 3D / 2D đang phát triển</b>
-            <p>Tính năng đánh dấu vị trí chấn thương trực quan sẽ được triển khai trong phiên bản tiếp theo.<br>Hiện tại, thông tin vị trí chấn thương được ghi trong phần ghi chú của lệnh Khóa huấn luyện.</p>
-            <div style="margin-top:.5rem;display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center">
-              <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Gân chân phải — sau trên</span>
-              <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Mức độ: Trung bình</span>
-              <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Thời gian hồi phục: 3 tuần</span>
-            </div>
+          <!-- Toggle Buttons -->
+          <div style="display:flex;gap:.5rem;margin-bottom:1rem;justify-content:center;">
+            <button class="btn btn-secondary active-model-btn" data-model="0c0418e7b36d4edeacca232291508713" style="border-color:var(--brass); color:var(--brass)">Da (Skin)</button>
+            <button class="btn btn-secondary" data-model="50131e742d6641009006414f42cde119">Cơ (Muscle)</button>
+            <button class="btn btn-secondary" data-model="8963e97beaec4dc88062287a6e5cab67">Xương (Skeleton)</button>
           </div>
+
+          <!-- Sketchfab Iframe Wrapper -->
+          <div class="sketchfab-embed-wrapper" style="width: 100%; height: 450px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--parchment-2); background: #1c1d18; box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);">
+            <iframe id="sketchfab-iframe" title="Horse 3D Model" width="100%" height="100%" frameborder="0" allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true" allow="autoplay; fullscreen; xr-spatial-tracking" execution-while-out-of-viewport execution-while-not-rendered web-share src="https://sketchfab.com/models/0c0418e7b36d4edeacca232291508713/embed?autostart=1&ui_infos=0&ui_watermark=0&ui_theme=dark"></iframe>
+          </div>
+
+          <div style="margin-top:1.2rem;display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center">
+            <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Gân chân phải — sau trên</span>
+            <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Mức độ: Trung bình</span>
+            <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Thời gian hồi phục: 3 tuần</span>
+          </div>
+          
+          <p style="font-size: .8rem; color: #a89e7a; text-align: center; margin-top: 1rem; margin-bottom: 0;">
+            Ghi chú: Việc bôi đỏ trực tiếp vùng chấn thương trên model Sketchfab yêu cầu tích hợp Viewer API. Hiện tại hệ thống hiển thị model xem trước nguyên bản.
+          </p>
         </div>
       </div>
     </div>
@@ -408,6 +419,24 @@
   document.getElementById('closeCareModal').addEventListener('click', () => careModal.style.display = 'none');
   document.getElementById('cancelCareModal').addEventListener('click', () => careModal.style.display = 'none');
   careModal.addEventListener('mousedown', e => { if (e.target === careModal) careModal.style.display = 'none'; });
+
+  // 3D Model Switcher (Sketchfab)
+  const iframe = document.getElementById('sketchfab-iframe');
+  document.querySelectorAll('[data-model]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      // Update styling
+      document.querySelectorAll('[data-model]').forEach(b => {
+        b.style.borderColor = '';
+        b.style.color = '';
+      });
+      e.target.style.borderColor = 'var(--brass)';
+      e.target.style.color = 'var(--brass)';
+      
+      // Update iframe source
+      const modelId = e.target.getAttribute('data-model');
+      iframe.src = `https://sketchfab.com/models/${modelId}/embed?autostart=1&ui_infos=0&ui_watermark=0&ui_theme=dark`;
+    });
+  });
 </script>
 
 </body>
