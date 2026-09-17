@@ -36,6 +36,17 @@ public class HorseMeasurementController {
                                     @AuthenticationPrincipal Jwt jwt,Authentication auth) {
         return service.readiness(horseId,raceEventId,userId(jwt),privileged(auth));
     }
+    @PutMapping("/health-status")
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    HorseMeasurementService.HealthStatusView updateHealth(@PathVariable UUID horseId,@AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UpdateHorseHealthStatusRequest request){
+        return service.updateHealthStatus(horseId,userId(jwt),request);
+    }
+    @GetMapping("/health-status")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW')")
+    HorseMeasurementService.HealthStatusView health(@PathVariable UUID horseId,@AuthenticationPrincipal Jwt jwt,Authentication auth){
+        return service.healthStatus(horseId,userId(jwt),privileged(auth));
+    }
     private UUID userId(Jwt jwt){return UUID.fromString(jwt.getSubject());}
     private boolean privileged(Authentication a){return a.getAuthorities().stream().anyMatch(x->!x.getAuthority().equals("ROLE_HORSE_OWNER")&&x.getAuthority().startsWith("ROLE_"));}
 }

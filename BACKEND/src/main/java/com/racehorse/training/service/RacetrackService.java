@@ -100,6 +100,22 @@ public class RacetrackService {
         return toResponse(bookingRepository.save(new TrialRunBooking(schedule, lane, start, end)));
     }
 
+    @Transactional(readOnly = true)
+    public List<TrialRunBookingResponse> bookings(UUID racetrackId,UUID horseId,LocalDate from,LocalDate to,boolean includeCancelled) {
+        if(from!=null&&to!=null&&to.isBefore(from)) throw new BusinessException("to không được trước from");
+        Instant start=from==null?null:from.atStartOfDay(clubZone).toInstant();
+        Instant end=to==null?null:to.plusDays(1).atStartOfDay(clubZone).toInstant();
+        return bookingRepository.search(racetrackId,horseId,includeCancelled,start,end).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public void cancelBooking(UUID id) {
+        TrialRunBooking booking=bookingRepository.findDetailById(id)
+                .orElseThrow(()->new ResourceNotFoundException("Không tìm thấy lượt chạy thử: "+id));
+        if(booking.getCancelledAt()!=null) throw new BusinessException("Lượt chạy thử đã bị hủy");
+        booking.cancel(Instant.now());
+    }
+
     private void validateSlotStart(Racetrack track, LocalTime start) {
         if (start.getMinute() != 0 || start.getSecond() != 0 || start.getNano() != 0)
             throw new BusinessException("Slot phải bắt đầu đúng đầu giờ");
@@ -127,6 +143,6 @@ public class RacetrackService {
         return new TrialRunBookingResponse(value.getId(), value.getTrainingSchedule().getId(),
                 value.getTrainingSchedule().getHorse().getId(), value.getLane().getRacetrack().getId(),
                 value.getLane().getRacetrack().getName(), value.getLane().getId(), value.getLane().getLaneNumber(),
-                value.getBookedStart(), value.getBookedEnd());
+                value.getBookedStart(), value.getBookedEnd(),value.getCancelledAt());
     }
 }

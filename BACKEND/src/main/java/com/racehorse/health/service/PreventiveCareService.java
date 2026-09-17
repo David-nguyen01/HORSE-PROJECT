@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -44,5 +45,46 @@ public class PreventiveCareService {
         return new PreventiveCareResponse(id,uuid(s.get("horse_id")),(String)s.get("care_type"),
                 dueDate,recurrence,(Integer)s.get("reminder_lead_days"),true,next);
     }
+    @Transactional(readOnly=true)
+    public List<CareView> list(UUID horse,UUID requester,boolean privileged,String careType,String status,LocalDate from,LocalDate to){
+        access.requireReadable(horse,requester,privileged);
+        StringBuilder sql=new StringBuilder("select * from preventive_care_schedules where horse_id=?");
+        List<Object> args=new ArrayList<>(); args.add(horse);
+        if(careType!=null&&!careType.isBlank()){sql.append(" and care_type=?");args.add(careType.trim().toUpperCase(Locale.ROOT));}
+        if(status!=null&&!status.isBlank()) switch(status.trim().toUpperCase(Locale.ROOT)){
+            case "PENDING" -> sql.append(" and completed_at is null and cancelled_at is null");
+            case "COMPLETED" -> sql.append(" and completed_at is not null");
+            case "CANCELLED" -> sql.append(" and cancelled_at is not null");
+            default -> throw new BusinessException("status chỉ nhận PENDING, COMPLETED hoặc CANCELLED");
+        }
+        if(from!=null){sql.append(" and due_date>=?");args.add(from);}
+        if(to!=null){sql.append(" and due_date<=?");args.add(to);}
+        sql.append(" order by due_date,id");
+        return jdbc.query(sql.toString(),(rs,row)->new CareView(rs.getObject("id",UUID.class),horse,rs.getString("care_type"),
+                rs.getString("details"),rs.getObject("due_date",LocalDate.class),rs.getObject("recurrence_days",Integer.class),
+                rs.getInt("reminder_lead_days"),rs.getObject("completed_at",OffsetDateTime.class),rs.getString("completion_notes"),
+                rs.getObject("next_schedule_id",UUID.class),rs.getObject("cancelled_at",OffsetDateTime.class)),args.toArray());
+    }
+    @Transactional
+    public CareView update(UUID id,CreatePreventiveCareRequest r,UUID actor){
+        Map<String,Object> row=requirePending(id); String type=r.careType().trim().toUpperCase(Locale.ROOT);
+        if(!List.of("VACCINATION","DEWORMING","FARRIER").contains(type))throw new BusinessException("careType không hợp lệ");
+        jdbc.update("update preventive_care_schedules set care_type=?,details=?,due_date=?,recurrence_days=?,reminder_lead_days=?,created_by_user_id=? where id=?",
+                type,r.details(),r.dueDate(),r.recurrenceDays(),r.reminderLeadDays(),actor,id);
+        UUID horse=uuid(row.get("horse_id"));
+        return list(horse,actor,true,null,null,null,null).stream().filter(x->x.id().equals(id)).findFirst().orElseThrow();
+    }
+    @Transactional
+    public void cancel(UUID id){ requirePending(id); jdbc.update("update preventive_care_schedules set cancelled_at=SYSDATETIMEOFFSET() where id=?",id); }
+    private Map<String,Object> requirePending(UUID id){
+        List<Map<String,Object>> rows=jdbc.queryForList("select * from preventive_care_schedules where id=?",id);
+        if(rows.isEmpty())throw new ResourceNotFoundException("Không tìm thấy lịch chăm sóc: "+id);
+        Map<String,Object> row=rows.getFirst();
+        if(row.get("completed_at")!=null||row.get("cancelled_at")!=null)throw new BusinessException("Chỉ có thể thay đổi lịch đang chờ");
+        return row;
+    }
     private UUID uuid(Object value){return value instanceof UUID id?id:UUID.fromString(String.valueOf(value));}
+    public record CareView(UUID id,UUID horseId,String careType,String details,LocalDate dueDate,Integer recurrenceDays,
+                           int reminderLeadDays,OffsetDateTime completedAt,String completionNotes,UUID nextScheduleId,
+                           OffsetDateTime cancelledAt){}
 }

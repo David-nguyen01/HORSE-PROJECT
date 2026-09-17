@@ -45,8 +45,10 @@ public class DailyAutomationJob {
             jdbc.update("""
                     insert into owner_reports(id,owner_user_id,period_start,period_end,generated_at,generated_by_user_id,horse_ids_json,transaction_ids_json)
                     select ?,?,?,?,?,?,
-                        (select ho.horse_id as id from horse_ownerships ho where ho.owner_id=? for json path),N'[]'
-                    """,report,owner,day,day,OffsetDateTime.now(zone),generator,owner);
+                        (select ho.horse_id as id from horse_ownerships ho where ho.owner_id=? for json path),
+                        (select ft.id from financial_transactions ft join horse_ownerships ho on ho.horse_id=ft.horse_id
+                         where ho.owner_id=? and ft.transaction_date=? for json path)
+                    """,report,owner,day,day,OffsetDateTime.now(zone),generator,owner,owner,day);
             jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key) values(newid(),?,'OWNER_REPORT_READY','NORMAL',N'Báo cáo ngày mới',N'Báo cáo ngày '+convert(varchar(10),?,23)+N' đã sẵn sàng (VND).','OWNER_REPORT',?,?)",
                     owner,day,report,"owner-report:"+owner+":"+day);
         }

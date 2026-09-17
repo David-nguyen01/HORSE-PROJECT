@@ -31,8 +31,10 @@ public class ProfileFileValidator {
 
         String contentType = normalizeContentType(file.getContentType());
         ProfileFileCategory category;
-        if (contentType.startsWith("image/")) {
+        String detectedImageType = detectImageType(content);
+        if (detectedImageType != null) {
             category = ProfileFileCategory.IMAGE;
+            contentType = detectedImageType;
         } else if (PDF.equals(contentType) && isPdf(content)) {
             category = ProfileFileCategory.PDF;
         } else if ((DOCX.equals(contentType) || filename.toLowerCase(Locale.ROOT).endsWith(".docx"))
@@ -80,6 +82,28 @@ public class ProfileFileValidator {
                 && content[2] == 'D'
                 && content[3] == 'F'
                 && content[4] == '-';
+    }
+
+    private String detectImageType(byte[] bytes) {
+        if (starts(bytes,0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a)) return "image/png";
+        if (starts(bytes,0xff,0xd8,0xff)) return "image/jpeg";
+        if (ascii(bytes,0,"GIF87a")||ascii(bytes,0,"GIF89a")) return "image/gif";
+        if (ascii(bytes,0,"RIFF")&&ascii(bytes,8,"WEBP")) return "image/webp";
+        if (starts(bytes,0x42,0x4d)) return "image/bmp";
+        if (starts(bytes,0x49,0x49,0x2a,0x00)||starts(bytes,0x4d,0x4d,0x00,0x2a)) return "image/tiff";
+        return null;
+    }
+
+    private boolean starts(byte[] bytes,int... signature){
+        if(bytes.length<signature.length)return false;
+        for(int i=0;i<signature.length;i++)if((bytes[i]&0xff)!=signature[i])return false;
+        return true;
+    }
+
+    private boolean ascii(byte[] bytes,int offset,String value){
+        if(bytes.length<offset+value.length())return false;
+        for(int i=0;i<value.length();i++)if((char)bytes[offset+i]!=value.charAt(i))return false;
+        return true;
     }
 
     private boolean isDocx(byte[] content) {

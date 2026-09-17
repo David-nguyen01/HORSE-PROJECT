@@ -64,10 +64,32 @@ public class HorseMeasurementService {
         return new RaceReadinessResponse(horseId,raceEventId,failed.isEmpty(),health,lockCount==0,fitness,restingHr,weight,List.copyOf(failed));
     }
 
+    @Transactional
+    public HealthStatusView updateHealthStatus(UUID horseId,UUID veterinarianId,UpdateHorseHealthStatusRequest request){
+        access.requireActive(horseId);
+        String status=request.status().trim().toUpperCase(Locale.ROOT);
+        if(!Set.of("FIT","MONITOR","INJURED","QUARANTINED").contains(status))
+            throw new com.racehorse.common.exception.BusinessException("status chỉ nhận FIT, MONITOR, INJURED hoặc QUARANTINED");
+        String source=request.sourceType()==null||request.sourceType().isBlank()?"MANUAL":request.sourceType().trim().toUpperCase(Locale.ROOT);
+        jdbc.update("update horses set health_status=?,health_changed_by_user_id=?,health_source_type=?,health_source_id=?,health_changed_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                status,veterinarianId,source,request.sourceId(),horseId);
+        return healthStatus(horseId,veterinarianId,true);
+    }
+
+    @Transactional(readOnly=true)
+    public HealthStatusView healthStatus(UUID horseId,UUID requester,boolean privileged){
+        access.requireReadable(horseId,requester,privileged);
+        return jdbc.query("select id,health_status,health_changed_by_user_id,health_source_type,health_source_id,health_changed_at from horses where id=?",
+                rs->{if(!rs.next())throw new ResourceNotFoundException("Không tìm thấy ngựa: "+horseId);return new HealthStatusView(
+                        rs.getObject(1,UUID.class),rs.getString(2),rs.getObject(3,UUID.class),rs.getString(4),
+                        rs.getObject(5,UUID.class),rs.getObject(6,OffsetDateTime.class));},horseId);
+    }
+
     private HorseWeightResponse weight(ResultSet rs,int row) throws SQLException { return new HorseWeightResponse(
             rs.getObject(1,UUID.class),rs.getObject(2,UUID.class),rs.getObject(3,UUID.class),rs.getBigDecimal(4),
             rs.getObject(5,OffsetDateTime.class),rs.getString(6)); }
     private String firstString(String sql,Object... args) { List<String> x=jdbc.query(sql,(r,n)->r.getString(1),args); return x.isEmpty()?null:x.getFirst(); }
     private Integer firstInteger(String sql,Object... args) { List<Integer> x=jdbc.query(sql,(r,n)->r.getObject(1,Integer.class),args); return x.isEmpty()?null:x.getFirst(); }
     private BigDecimal firstDecimal(String sql,Object... args) { List<BigDecimal> x=jdbc.query(sql,(r,n)->r.getBigDecimal(1),args); return x.isEmpty()?null:x.getFirst(); }
+    public record HealthStatusView(UUID horseId,String status,UUID changedBy,String sourceType,UUID sourceId,OffsetDateTime changedAt){}
 }

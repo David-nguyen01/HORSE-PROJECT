@@ -23,11 +23,17 @@ public class CloudinaryStorageClient implements CloudStorageClient {
 
     @Override
     public CloudAsset upload(byte[] content, String originalFilename, UUID horseId) {
+        return upload(content, originalFilename, "horses/" + horseId);
+    }
+
+    @Override
+    public CloudAsset upload(byte[] content, String originalFilename, String folderScope) {
         requireConfigured();
         try {
+            String safeScope=folderScope==null?"shared":folderScope.replaceAll("[^a-zA-Z0-9/_-]","-");
             Map<?, ?> result = cloudinary.uploader().upload(content, ObjectUtils.asMap(
                     "resource_type", "auto",
-                    "folder", normalizedFolder() + "/horses/" + horseId,
+                    "folder", normalizedFolder() + "/" + safeScope,
                     "use_filename", true,
                     "unique_filename", true,
                     "overwrite", false));

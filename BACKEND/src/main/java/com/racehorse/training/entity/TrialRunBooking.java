@@ -37,4 +37,7 @@ public class TrialRunBooking {
     public Instant getBookedStart() { return bookedStart; }
     public Instant getBookedEnd() { return bookedEnd; }
     public Instant getCancelledAt() { return cancelledAt; }
+    public void cancel(Instant at) {
+        if (cancelledAt == null) cancelledAt = at;
+    }
 }

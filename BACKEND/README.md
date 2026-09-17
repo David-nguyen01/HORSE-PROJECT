@@ -25,7 +25,6 @@ Mở thư mục `../DATABASE` bằng SSMS, đăng nhập `sa` và chạy lần l
 11. `10_confirmed_business_rules.sql`
 12. `11_confirmed_automation_and_governance.sql`
 13. `12_compact_schema.sql`
-11. `10_confirmed_business_rules.sql`
 
 Sau đó chạy backend:
 
@@ -477,7 +476,7 @@ src/main/java/com/racehorse/
     └── service/
 ```
 
-Module `training` hiện chứa FR03, FR04, FR05 và FR07; module `notification` cung cấp thông báo trong web, còn module `health` hiện cung cấp khóa huấn luyện FR11. Telemetry và cảnh báo realtime tiếp tục chờ đặc tả giao thức.
+Module `training` chứa FR03–FR07; telemetry FR06 do Head Trainer nhập thủ công. Module `notification` cung cấp thông báo trong web; module `health` quản lý trạng thái, cân nặng, chăm sóc phòng ngừa và khóa huấn luyện.
 
 ## Role
 
@@ -496,7 +495,10 @@ Khi đổi role, `CLUB_MANAGER` gửi toàn bộ danh sách role thay thế tớ
 ### Telemetry thủ công và cảnh báo FR06
 
 - `POST /api/horses/{horseId}/metric-thresholds` — `HEAD_TRAINER` cấu hình ngưỡng `HEART_RATE` hoặc `SPEED` theo từng ngựa.
+- `GET|PUT|DELETE /api/horses/{horseId}/metric-thresholds[/{thresholdId}]` — xem, sửa hoặc kết thúc hiệu lực ngưỡng.
 - `POST /api/horses/{horseId}/telemetry` — `HEAD_TRAINER` nhập danh sách chỉ số với ngữ cảnh `RESTING`, `TRAINING` hoặc `RECOVERY`.
+- `GET /api/horses/{horseId}/telemetry` — xem lịch sử telemetry, lọc theo ngữ cảnh và thời gian.
+- `GET /api/horses/{horseId}/alerts` và `POST /api/horses/{horseId}/alerts/{alertId}/acknowledge` — lọc và xác nhận cảnh báo.
 - Mỗi dòng phải có ít nhất `heartRateBpm` hoặc `speedKmh`. Backend tự tạo cảnh báo và thông báo khi vượt ngưỡng đang hiệu lực.
 
 ### Cân nặng và sẵn sàng thi đấu
@@ -512,6 +514,8 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 ### Chăm sóc phòng ngừa FR12
 
 - `POST /api/horses/{horseId}/preventive-care` — bác sĩ tạo lịch, chu kỳ và số ngày báo trước.
+- `GET /api/horses/{horseId}/preventive-care` — xem và lọc lịch theo loại, trạng thái, khoảng ngày.
+- `PUT|DELETE /api/preventive-care/{id}` — bác sĩ sửa hoặc hủy lịch chưa hoàn thành.
 - `POST /api/preventive-care/{id}/complete` — bác sĩ xác nhận hoàn thành; lịch kế tiếp tự sinh nếu có `recurrenceDays`.
 - Job chạy 06:00 theo `app.club-time-zone`, tạo nhắc lịch đến hạn và báo cáo ngày cho chủ sở hữu. Báo cáo hiện dùng VND; phân bổ chi phí cho nhiều chủ sở hữu được để lại cho giai đoạn sau.
 
@@ -521,6 +525,19 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 - `PUT /api/admin/role-permissions/{role}` — Club Manager bật/tắt một quyền của role khác; body gồm `module`, `action`, `granted`.
 - Quyền đã cấp được nạp thành authority `PERM_{MODULE}_{ACTION}` ở lần xác thực request tiếp theo. Ma trận có thể thu hồi/khôi phục quyền trong phạm vi trách nhiệm nghiệp vụ của role, nhưng không mở rộng qua các giới hạn bắt buộc như chỉ bác sĩ nhập cân nặng hoặc chỉ HLV trưởng nhập telemetry. Năm role vẫn cố định và không cho hạ quyền `CLUB_MANAGER`.
 - Mọi request tạo/sửa/xóa thành công và mọi lần login thành công được tự ghi vào `audit_logs`. Bảng audit vẫn chỉ cho thêm, không cho sửa/xóa.
+- `GET /api/admin/audit-logs` — Club Manager lọc audit theo người thao tác, module, action, entity và thời gian.
+
+### API quản trị nghiệp vụ bổ sung
+
+- `/api/stables` — CRUD chuồng; thêm/ngừng ô chuồng; phân bổ hoặc kết thúc phân bổ ngựa.
+- `/api/financial-transactions` — ghi sổ thu/chi VND, tra cứu và tổng hợp. Giao dịch là sổ cái chỉ thêm, không sửa/xóa.
+- `/api/races` — CRUD giải đua; đăng ký, xác nhận và rút đăng ký ngựa.
+- `/api/owner-reports` — xem, tạo và tải báo cáo JSON. Job 06:00 tạo báo cáo ngày và thông báo cho chủ sở hữu.
+- `/api/trial-run-bookings` — đặt, xem danh sách và hủy lượt chạy thử.
+- `/api/files` — upload, xem metadata và xóa file Cloudinary dùng chung; chỉ nhận ảnh, PDF hoặc DOCX.
+- `GET|PUT /api/horses/{horseId}/health-status` — xem trạng thái; bác sĩ cập nhật `FIT`, `MONITOR`, `INJURED`, `QUARANTINED`.
+
+Các API trên kết hợp năm role cố định với authority động trong ma trận RBAC. Theo yêu cầu hiện tại, chưa triển khai API tổng quát cho `module_records` (mục 11), backend khám/điều trị/thuốc/mô hình chấn thương 3D (mục 12), và xuất báo cáo PDF/ảnh (mục 14).
 
 ## Chức năng chưa triển khai vì thiếu đặc tả
 
@@ -532,7 +549,7 @@ Các mục dưới đây được giữ lại và không tự suy diễn:
 - FR04 hiện dùng cờ `active`, không tự giới hạn số kế hoạch active trên một ngựa vì tài liệu không quy định. Kế hoạch đã phát sinh lịch không cho thay toàn bộ giai đoạn để bảo toàn dữ liệu tham chiếu.
 - FR05 đã có lịch nháp, công bố, kiểm tra trùng nhân viên, đường đua/làn chạy và đúng 18 slot một giờ từ 06:00 đến 24:00 mỗi ngày. Thông báo chỉ hiển thị trên web bằng polling; không gửi email/SMS/mobile push.
 - FR07 hiện chỉ lưu URL video HTTP/HTTPS. Chưa có quyết định về upload file video, dịch vụ lưu trữ, giới hạn dung lượng/định dạng và quyền tải xuống.
-- FR13–FR20 và FR22: database nền đã có; các API nghiệp vụ còn lại cần triển khai theo từng luồng phụ thuộc. Quy tắc phân bổ chi phí đồng sở hữu của FR19/FR22 vẫn chờ quyết định.
+- Quy tắc phân bổ chi phí đồng sở hữu của FR19/FR22 vẫn chờ quyết định; hiện báo cáo dùng VND và liệt kê toàn bộ giao dịch của các ngựa thuộc owner.
 
 ## Quy ước
 
