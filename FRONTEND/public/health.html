@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sức khỏe & Y tế — Turfline Stable Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app-shell.css">
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-mark"><span class="glyph">◆</span><span class="wordmark"><b>Turfline</b>Stable Manager</span></div></div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Tổng quan</span>
+      <a href="dashboard.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <span class="nav-section-label">Quản lý Ngựa</span>
+      <a href="horses.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
+      <span class="nav-section-label">Huấn luyện</span>
+      <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
+      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
+      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
+      <span class="nav-section-label">Y tế</span>
+      <a href="health.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
+      <span class="nav-section-label">Quản trị</span>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip"><span class="avatar">BT</span><div class="user-info"><b>BS. Bùi Thanh</b><small>Bác sĩ Thú y</small></div></div>
+      <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+    </div>
+  </aside>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <span class="topbar-title">Sức khỏe & Y tế</span>
+    <div class="topbar-right">
+      <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
+      <button class="notif-btn"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge">2</span></button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">FLOW 3 · Y TẾ & PHỤC HỒI</p>
+        <h1>Sức khỏe & Y tế</h1>
+        <p class="sub">Quản lý khóa huấn luyện, tiêm phòng và chăm sóc định kỳ.</p>
+      </div>
+      <div class="heading-actions">
+        <button class="btn btn-secondary" id="btnNewCare">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
+          Thêm lịch chăm sóc
+        </button>
+        <button class="btn btn-primary" style="background:#c4573f;" id="btnNewLock">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Khóa huấn luyện
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card rose">
+        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+        <div><strong>2</strong><span>Đang bị khóa</span></div>
+      </div>
+      <div class="stat-card gold">
+        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+        <div><strong>5</strong><span>Đang theo dõi</span></div>
+      </div>
+      <div class="stat-card blue">
+        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+        <div><strong>3</strong><span>Lịch tiêm tuần này</span></div>
+      </div>
+      <div class="stat-card green">
+        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+        <div><strong>41</strong><span>Đủ điều kiện tập</span></div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" data-htab="locks">Khóa huấn luyện</button>
+      <button class="tab-btn" data-htab="care">Chăm sóc định kỳ</button>
+      <button class="tab-btn" data-htab="model">Bản đồ chấn thương</button>
+    </div>
+
+    <!-- Tab: Training Locks -->
+    <div class="htab-panel active" id="htab-locks">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;">
+
+        <!-- Lock 1 — ACTIVE -->
+        <div class="lock-card">
+          <div class="lock-horse">
+            <b>Gold Wind</b>
+            <small>HM-002 · Arabian · Chuồng B-03</small>
+          </div>
+          <span class="badge locked"><i></i>Đang khóa</span>
+          <p class="lock-reason">Chấn thương gân chân phải sau trận đấu ngày 05/09. Cần nghỉ tuyệt đối ít nhất 3 tuần.</p>
+          <div class="lock-meta">
+            Khóa bởi: BS. Bùi Thanh · 06/09/2026<br>
+            Ngày xem xét: 27/09/2026
+          </div>
+          <div style="display:flex;gap:.5rem;grid-column:1/-1;margin-top:.4rem;">
+            <button class="btn btn-secondary" style="font-size:.82rem;">Cập nhật lý do</button>
+            <button class="btn btn-primary" style="font-size:.82rem;" id="btnRelease1">Gỡ khóa</button>
+          </div>
+        </div>
+
+        <!-- Lock 2 — ACTIVE -->
+        <div class="lock-card">
+          <div class="lock-horse">
+            <b>Moonlight Dancer</b>
+            <small>HM-004 · Thoroughbred · Chuồng B-11</small>
+          </div>
+          <span class="badge locked"><i></i>Đang khóa</span>
+          <p class="lock-reason">Phục hồi sau phẫu thuật khớp gối. Phác đồ 6 tuần. Không tập nặng, chỉ cho đi bộ nhẹ từ tuần 3.</p>
+          <div class="lock-meta">
+            Khóa bởi: BS. Bùi Thanh · 22/08/2026<br>
+            Ngày xem xét: 03/10/2026
+          </div>
+          <div style="display:flex;gap:.5rem;grid-column:1/-1;margin-top:.4rem;">
+            <button class="btn btn-secondary" style="font-size:.82rem;">Cập nhật lý do</button>
+            <button class="btn btn-primary" style="font-size:.82rem;">Gỡ khóa</button>
+          </div>
+        </div>
+
+        <!-- Lock 3 — RELEASED -->
+        <div class="lock-card" style="border-left-color:#2f6b57;opacity:.7;">
+          <div class="lock-horse">
+            <b>Summer Wind</b>
+            <small>HM-006 · Arabian · Chuồng C-02</small>
+          </div>
+          <span class="badge completed"><i></i>Đã gỡ khóa</span>
+          <p class="lock-reason">Viêm cơ nhẹ. Đã phục hồi hoàn toàn sau 10 ngày nghỉ.</p>
+          <div class="lock-meta">
+            Gỡ bởi: BS. Bùi Thanh · 15/09/2026<br>
+            Lý do gỡ: Kiểm tra lại, không còn dấu hiệu viêm.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Tab: Preventive Care -->
+    <div class="htab-panel" id="htab-care" style="display:none">
+      <div class="card">
+        <div class="card-head">
+          <h3>Lịch chăm sóc định kỳ</h3>
+          <div style="display:flex;gap:.5rem">
+            <select class="filter-select" style="font-size:.83rem;">
+              <option>Tất cả loại</option>
+              <option>Tiêm phòng</option>
+              <option>Tẩy giun</option>
+              <option>Kiểm tra móng (Farrier)</option>
+              <option>Khám tổng quát</option>
+            </select>
+            <select class="filter-select" style="font-size:.83rem;">
+              <option>Tất cả trạng thái</option>
+              <option>Đã lên lịch</option>
+              <option>Hoàn thành</option>
+              <option>Quá hạn</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Ngựa</th><th>Loại chăm sóc</th><th>Ngày dự kiến</th><th>Ghi chú</th><th>Trạng thái</th><th></th>
+            </tr></thead>
+            <tbody>
+              <tr>
+                <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
+                <td>💉 Tiêm phòng cúm ngựa</td>
+                <td>20/09/2026</td>
+                <td style="font-size:.82rem;color:#55503f;">Vắc-xin EIV, liều nhắc hàng năm</td>
+                <td><span class="badge draft"><i></i>Đã lên lịch</span></td>
+                <td><button class="btn btn-secondary" style="font-size:.8rem;" id="btnCompleteCare1">Xác nhận hoàn thành</button></td>
+              </tr>
+              <tr>
+                <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005</small></div></div></td>
+                <td>🪱 Tẩy giun định kỳ</td>
+                <td>22/09/2026</td>
+                <td style="font-size:.82rem;color:#55503f;">Ivermectin 1% — liều 3 tháng</td>
+                <td><span class="badge draft"><i></i>Đã lên lịch</span></td>
+                <td><button class="btn btn-secondary" style="font-size:.8rem;">Xác nhận hoàn thành</button></td>
+              </tr>
+              <tr>
+                <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007</small></div></div></td>
+                <td>🔨 Kiểm tra móng (Farrier)</td>
+                <td>18/09/2026</td>
+                <td style="font-size:.82rem;color:#55503f;">Đóng lại móng sau phải</td>
+                <td><span class="badge red"><i></i>Quá hạn</span></td>
+                <td><button class="btn btn-secondary" style="font-size:.8rem;">Xác nhận hoàn thành</button></td>
+              </tr>
+              <tr>
+                <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003</small></div></div></td>
+                <td>🩺 Khám tổng quát</td>
+                <td>12/09/2026</td>
+                <td style="font-size:.82rem;color:#55503f;">Theo dõi nhịp tim sau đợt nghỉ</td>
+                <td><span class="badge completed"><i></i>Hoàn thành</span></td>
+                <td></td>
+              </tr>
+              <tr>
+                <td><div class="td-horse"><span class="horse-mono">GW</span><div><b>Gold Wind</b><small>HM-002</small></div></div></td>
+                <td>💉 Tiêm kháng sinh</td>
+                <td>10/09/2026</td>
+                <td style="font-size:.82rem;color:#55503f;">Theo phác đồ điều trị chấn thương gân</td>
+                <td><span class="badge completed"><i></i>Hoàn thành</span></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: 3D Model Placeholder -->
+    <div class="htab-panel" id="htab-model" style="display:none">
+      <div class="card">
+        <div class="card-head">
+          <h3>Bản đồ chấn thương</h3>
+          <select class="filter-select" style="font-size:.83rem;">
+            <option>Gold Wind — HM-002</option>
+            <option>Moonlight Dancer — HM-004</option>
+          </select>
+        </div>
+        <div class="card-body">
+          <div class="model-placeholder">
+            <div class="model-icon">🐴</div>
+            <b>Mô hình 3D / 2D đang phát triển</b>
+            <p>Tính năng đánh dấu vị trí chấn thương trực quan sẽ được triển khai trong phiên bản tiếp theo.<br>Hiện tại, thông tin vị trí chấn thương được ghi trong phần ghi chú của lệnh Khóa huấn luyện.</p>
+            <div style="margin-top:.5rem;display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center">
+              <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Gân chân phải — sau trên</span>
+              <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Mức độ: Trung bình</span>
+              <span style="background:rgba(196,87,63,.12);border:1px solid rgba(196,87,63,.2);border-radius:999px;padding:.3rem .8rem;font-size:.8rem;color:#a83820;">Thời gian hồi phục: 3 tuần</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<!-- Modal: Khóa huấn luyện -->
+<div class="modal-backdrop" id="lockModal" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div><p class="eyebrow">FLOW 3 · Y TẾ</p><h2>Phát lệnh Khóa huấn luyện</h2></div>
+      <button class="btn btn-ghost btn-icon" id="closeLockModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="notice warning" style="margin-bottom:1rem;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Sau khi phát lệnh, Head Trainer <b>không thể xếp lịch cường độ CAO</b> cho ngựa này cho đến khi được gỡ khóa.
+      </div>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Ngựa cần khóa *</label>
+          <select>
+            <option value="">Chọn ngựa…</option>
+            <option>Storm Thunder — HM-001</option>
+            <option>Silver Blaze — HM-003</option>
+            <option>Night Runner — HM-005</option>
+            <option>Red Fury — HM-007</option>
+          </select>
+        </div>
+        <div class="form-field full">
+          <label>Lý do khóa / Chẩn đoán *</label>
+          <textarea rows="3" placeholder="VD: Chấn thương gân chân phải. Không tập nặng ít nhất 3 tuần…"></textarea>
+        </div>
+        <div class="form-field full">
+          <label>Vị trí chấn thương (mô tả)</label>
+          <input placeholder="VD: Gân chân phải, sau trên, mức độ trung bình">
+          <span class="hint">Bản đồ 3D/2D sẽ hỗ trợ đánh dấu trực quan trong phiên bản tới.</span>
+        </div>
+        <div class="form-field">
+          <label>Ngày xem xét lại</label>
+          <input type="date">
+          <span class="hint">Ngày ước tính kiểm tra lại để xem xét gỡ khóa.</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelLockModal">Hủy</button>
+      <button class="btn btn-danger">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Phát lệnh Khóa
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Gỡ khóa -->
+<div class="modal-backdrop" id="releaseModal" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div><p class="eyebrow">FLOW 3 · Y TẾ</p><h2>Gỡ Khóa huấn luyện</h2></div>
+      <button class="btn btn-ghost btn-icon" id="closeReleaseModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="notice success" style="margin-bottom:1rem;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Sau khi gỡ khóa, Head Trainer sẽ được phép xếp lịch tập mọi cường độ cho ngựa này.
+      </div>
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Lý do gỡ khóa *</label>
+          <textarea rows="3" placeholder="VD: Kiểm tra lại ngày 27/09, không còn dấu hiệu viêm. Ngựa đã hồi phục hoàn toàn…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelReleaseModal">Hủy</button>
+      <button class="btn btn-primary" style="background:#2f6b57;">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        Xác nhận gỡ khóa
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Thêm lịch chăm sóc -->
+<div class="modal-backdrop" id="careModal" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div><p class="eyebrow">FLOW 3 · CHĂM SÓC ĐỊNH KỲ</p><h2>Thêm lịch chăm sóc</h2></div>
+      <button class="btn btn-ghost btn-icon" id="closeCareModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Ngựa *</label>
+          <select><option value="">Chọn ngựa…</option><option>Storm Thunder — HM-001</option><option>Gold Wind — HM-002</option><option>Night Runner — HM-005</option></select>
+        </div>
+        <div class="form-field">
+          <label>Loại chăm sóc *</label>
+          <select>
+            <option>Tiêm phòng</option>
+            <option>Tẩy giun</option>
+            <option>Kiểm tra móng (Farrier)</option>
+            <option>Khám tổng quát</option>
+            <option>Khác</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Ngày dự kiến *</label>
+          <input type="date">
+        </div>
+        <div class="form-field full">
+          <label>Ghi chú / Phác đồ</label>
+          <textarea rows="2" placeholder="VD: Ivermectin 1% — liều 3 tháng…"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelCareModal">Hủy</button>
+      <button class="btn btn-primary">Lưu lịch</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const toggle = document.getElementById('sidebarToggle');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
+  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+
+  // Tabs
+  document.querySelectorAll('[data-htab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-htab]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.htab-panel').forEach(p => p.style.display = 'none');
+      btn.classList.add('active');
+      document.getElementById('htab-' + btn.dataset.htab).style.display = '';
+    });
+  });
+
+  // Lock modal
+  const lockModal = document.getElementById('lockModal');
+  document.getElementById('btnNewLock').addEventListener('click', () => lockModal.style.display = 'flex');
+  document.getElementById('closeLockModal').addEventListener('click', () => lockModal.style.display = 'none');
+  document.getElementById('cancelLockModal').addEventListener('click', () => lockModal.style.display = 'none');
+  lockModal.addEventListener('mousedown', e => { if (e.target === lockModal) lockModal.style.display = 'none'; });
+
+  // Release modal
+  const releaseModal = document.getElementById('releaseModal');
+  document.getElementById('btnRelease1').addEventListener('click', () => releaseModal.style.display = 'flex');
+  document.getElementById('closeReleaseModal').addEventListener('click', () => releaseModal.style.display = 'none');
+  document.getElementById('cancelReleaseModal').addEventListener('click', () => releaseModal.style.display = 'none');
+  releaseModal.addEventListener('mousedown', e => { if (e.target === releaseModal) releaseModal.style.display = 'none'; });
+
+  // Care modal
+  const careModal = document.getElementById('careModal');
+  document.getElementById('btnNewCare').addEventListener('click', () => careModal.style.display = 'flex');
+  document.getElementById('closeCareModal').addEventListener('click', () => careModal.style.display = 'none');
+  document.getElementById('cancelCareModal').addEventListener('click', () => careModal.style.display = 'none');
+  careModal.addEventListener('mousedown', e => { if (e.target === careModal) careModal.style.display = 'none'; });
+</script>
+
+</body>
+</html>

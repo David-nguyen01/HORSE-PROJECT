@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hồ sơ ngựa — Turfline Stable Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app-shell.css">
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-mark">
+        <span class="glyph">◆</span>
+        <span class="wordmark"><b>Turfline</b>Stable Manager</span>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Tổng quan</span>
+      <a href="dashboard.html" class="nav-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <span class="nav-section-label">Quản lý Ngựa</span>
+      <a href="horses.html" class="nav-link active">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>
+        Hồ sơ ngựa
+      </a>
+      <span class="nav-section-label">Huấn luyện</span>
+      <a href="training-plans.html" class="nav-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+        Giáo án huấn luyện
+      </a>
+      <a href="training-schedule.html" class="nav-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Lịch tập & Phân công
+      </a>
+      <a href="fitness.html" class="nav-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        Thể lực & Đánh giá
+      </a>
+      <span class="nav-section-label">Y tế</span>
+      <a href="health.html" class="nav-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Sức khỏe & Y tế
+      </a>
+      <span class="nav-section-label">Quản trị</span>
+      <a href="users.html" class="nav-link">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Người dùng & Vai trò
+      </a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip">
+        <span class="avatar">NT</span>
+        <div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div>
+      </div>
+      <a href="login.html" class="btn-logout">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Đăng xuất
+      </a>
+    </div>
+  </aside>
+
+  <!-- ═══ TOPBAR ═══ -->
+  <header class="topbar">
+    <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <span class="topbar-title">Hồ sơ ngựa</span>
+    <div class="topbar-right">
+      <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
+      <button class="notif-btn" aria-label="Thông báo">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span class="notif-badge">3</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="main-content">
+
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">FR01 · HỒ SƠ GỐC</p>
+        <h1>Danh mục ngựa</h1>
+        <p class="sub">Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành.</p>
+      </div>
+      <div class="heading-actions">
+        <button class="btn btn-primary" id="btnAddHorse">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Thêm ngựa
+        </button>
+      </div>
+    </div>
+
+    <!-- Toolbar -->
+    <div class="toolbar card">
+      <label class="search-box" style="flex:1;min-width:200px;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Tìm theo tên, mã hoặc số chip…" id="searchInput">
+      </label>
+      <select class="filter-select" id="filterStatus">
+        <option value="">Tất cả trạng thái</option>
+        <option value="ACTIVE">Đang hoạt động</option>
+        <option value="RESTING">Nghỉ ngơi</option>
+        <option value="INJURED">Bị thương</option>
+        <option value="RETIRED">Đã nghỉ hưu</option>
+      </select>
+      <select class="filter-select" id="filterBreed">
+        <option value="">Tất cả giống</option>
+        <option value="Thoroughbred">Thoroughbred</option>
+        <option value="Arabian">Arabian</option>
+        <option value="Quarter Horse">Quarter Horse</option>
+      </select>
+      <span class="record-count" id="recordCount">48 hồ sơ</span>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div class="table-wrap">
+        <table id="horsesTable">
+          <thead>
+            <tr>
+              <th>Ngựa</th>
+              <th>Giống</th>
+              <th>Giới tính</th>
+              <th>Ngày sinh</th>
+              <th>Chuồng</th>
+              <th>Trạng thái</th>
+              <th>Trainer</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
+              <td>Thoroughbred</td><td>Ngựa đực</td><td>12/03/2019</td><td>A-12</td>
+              <td><span class="badge active"><i></i>Hoạt động</span></td>
+              <td>Nguyễn Thắng</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">GW</span><div><b>Gold Wind</b><small>HM-002</small></div></div></td>
+              <td>Arabian</td><td>Ngựa cái</td><td>07/09/2020</td><td>B-03</td>
+              <td><span class="badge injured"><i></i>Chấn thương</span></td>
+              <td>Trần Minh</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003</small></div></div></td>
+              <td>Quarter Horse</td><td>Ngựa đực</td><td>22/01/2018</td><td>C-07</td>
+              <td><span class="badge resting"><i></i>Nghỉ ngơi</span></td>
+              <td>Nguyễn Thắng</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">MD</span><div><b>Moonlight Dancer</b><small>HM-004</small></div></div></td>
+              <td>Thoroughbred</td><td>Ngựa cái</td><td>14/06/2021</td><td>B-11</td>
+              <td><span class="badge injured"><i></i>Chấn thương</span></td>
+              <td>Lê Hoàng</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005</small></div></div></td>
+              <td>Thoroughbred</td><td>Ngựa đực</td><td>03/11/2019</td><td>A-08</td>
+              <td><span class="badge active"><i></i>Hoạt động</span></td>
+              <td>Nguyễn Thắng</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">SW</span><div><b>Summer Wind</b><small>HM-006</small></div></div></td>
+              <td>Arabian</td><td>Ngựa cái</td><td>28/04/2020</td><td>C-02</td>
+              <td><span class="badge active"><i></i>Hoạt động</span></td>
+              <td>Trần Minh</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007</small></div></div></td>
+              <td>Arabian</td><td>Ngựa đực</td><td>17/08/2018</td><td>A-15</td>
+              <td><span class="badge active"><i></i>Hoạt động</span></td>
+              <td>Lê Hoàng</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+            <tr>
+              <td><div class="td-horse"><span class="horse-mono">BK</span><div><b>Black Knight</b><small>HM-008</small></div></div></td>
+              <td>Quarter Horse</td><td>Ngựa đực</td><td>09/02/2017</td><td>D-01</td>
+              <td><span class="badge retired"><i></i>Đã nghỉ hưu</span></td>
+              <td>—</td>
+              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<!-- Modal: Thêm ngựa -->
+<div class="modal-backdrop" id="addHorseModal" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addHorseTitle">
+    <div class="modal-head">
+      <div>
+        <p class="eyebrow">FLOW 1 · HỒ SƠ NGỰA</p>
+        <h2 id="addHorseTitle">Thêm hồ sơ ngựa</h2>
+      </div>
+      <button class="btn btn-ghost btn-icon" id="closeAddModal" aria-label="Đóng">
+        <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form class="form-grid" id="addHorseForm">
+        <div class="form-field">
+          <label for="hCode">Mã ngựa *</label>
+          <input id="hCode" placeholder="VD: HM-049" required>
+        </div>
+        <div class="form-field">
+          <label for="hName">Tên ngựa *</label>
+          <input id="hName" placeholder="VD: Thunder Storm" required>
+        </div>
+        <div class="form-field">
+          <label for="hChip">Số chip / hộ chiếu</label>
+          <input id="hChip" placeholder="VD: 956000012345678">
+        </div>
+        <div class="form-field">
+          <label for="hBirth">Ngày sinh *</label>
+          <input id="hBirth" type="date" required>
+        </div>
+        <div class="form-field">
+          <label for="hGender">Giới tính *</label>
+          <select id="hGender">
+            <option value="STALLION">Ngựa đực (Stallion)</option>
+            <option value="MARE">Ngựa cái (Mare)</option>
+            <option value="GELDING">Ngựa thiến (Gelding)</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="hBreed">Giống *</label>
+          <input id="hBreed" placeholder="VD: Thoroughbred" required>
+        </div>
+        <div class="form-field full">
+          <label for="hColor">Màu sắc / nhận dạng *</label>
+          <input id="hColor" placeholder="VD: Nâu hung, sao trắng trán, chân trắng sau trái" required>
+        </div>
+        <div class="form-field">
+          <label for="hStable">Vị trí chuồng *</label>
+          <input id="hStable" placeholder="VD: A-12" required>
+        </div>
+        <div class="form-field">
+          <label for="hStatus">Trạng thái</label>
+          <select id="hStatus">
+            <option value="ACTIVE">Đang hoạt động</option>
+            <option value="RESTING">Nghỉ ngơi</option>
+            <option value="INJURED">Bị thương</option>
+          </select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelAddModal">Hủy</button>
+      <button class="btn btn-primary" onclick="document.getElementById('addHorseForm').submit()">Lưu hồ sơ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Sidebar toggle
+  const toggle = document.getElementById('sidebarToggle');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
+  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+
+  // Modal
+  const modal = document.getElementById('addHorseModal');
+  document.getElementById('btnAddHorse').addEventListener('click', () => modal.style.display = 'flex');
+  document.getElementById('closeAddModal').addEventListener('click', () => modal.style.display = 'none');
+  document.getElementById('cancelAddModal').addEventListener('click', () => modal.style.display = 'none');
+  modal.addEventListener('mousedown', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+  // Simple search/filter
+  const searchInput = document.getElementById('searchInput');
+  const filterStatus = document.getElementById('filterStatus');
+  const rows = document.querySelectorAll('#horsesTable tbody tr');
+  function applyFilter() {
+    const q = searchInput.value.toLowerCase();
+    let visible = 0;
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      const matchQ = !q || text.includes(q);
+      const matchStatus = !filterStatus.value || text.includes(filterStatus.value === 'ACTIVE' ? 'hoạt động' : filterStatus.value === 'RESTING' ? 'nghỉ ngơi' : filterStatus.value === 'INJURED' ? 'chấn thương' : 'nghỉ hưu');
+      row.style.display = (matchQ && matchStatus) ? '' : 'none';
+      if (matchQ && matchStatus) visible++;
+    });
+    document.getElementById('recordCount').textContent = visible + ' hồ sơ';
+  }
+  searchInput.addEventListener('input', applyFilter);
+  filterStatus.addEventListener('change', applyFilter);
+</script>
+
+</body>
+</html>

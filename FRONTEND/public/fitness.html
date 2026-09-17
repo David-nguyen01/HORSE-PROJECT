@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thể lực & Đánh giá — Turfline Stable Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app-shell.css">
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-mark"><span class="glyph">◆</span><span class="wordmark"><b>Turfline</b>Stable Manager</span></div></div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Tổng quan</span>
+      <a href="dashboard.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <span class="nav-section-label">Quản lý Ngựa</span>
+      <a href="horses.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
+      <span class="nav-section-label">Huấn luyện</span>
+      <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
+      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
+      <a href="fitness.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
+      <span class="nav-section-label">Y tế</span>
+      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
+      <span class="nav-section-label">Quản trị</span>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip"><span class="avatar">NT</span><div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div></div>
+      <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+    </div>
+  </aside>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <span class="topbar-title">Thể lực & Đánh giá</span>
+    <div class="topbar-right">
+      <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
+      <button class="notif-btn"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge">3</span></button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">FR03 · THEO DÕI THỂ LỰC</p>
+        <h1>Dashboard thể lực</h1>
+        <p class="sub">Dữ liệu gốc do huấn luyện viên nhập sau từng buổi tập.</p>
+      </div>
+      <div class="heading-actions">
+        <button class="btn btn-secondary">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+          Xuất ảnh
+        </button>
+        <button class="btn btn-secondary">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+          Xuất PDF
+        </button>
+        <button class="btn btn-primary" id="btnNewEval">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nhập buổi tập
+        </button>
+      </div>
+    </div>
+
+    <!-- Filter -->
+    <div class="toolbar card">
+      <label class="search-box" style="flex:1;min-width:160px;">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input placeholder="Tên hoặc mã ngựa…">
+      </label>
+      <select class="filter-select">
+        <option value="">Tất cả ngựa</option>
+        <option>Storm Thunder — HM-001</option>
+        <option>Night Runner — HM-005</option>
+        <option>Red Fury — HM-007</option>
+      </select>
+      <select class="filter-select">
+        <option value="">Tất cả thể trạng</option>
+        <option>Thể lực tốt (GREEN)</option>
+        <option>Cần theo dõi (YELLOW)</option>
+        <option>Cần chú ý (RED)</option>
+      </select>
+      <input type="date" class="filter-select" value="2026-08-18">
+      <span style="color:#a89e7a;font-size:.85rem;">đến</span>
+      <input type="date" class="filter-select" value="2026-09-17">
+      <button class="btn btn-secondary">Áp dụng</button>
+    </div>
+
+    <!-- Horse fitness cards -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1.4rem;">
+      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
+        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(111,191,122,.18);display:flex;align-items:center;justify-content:center;color:#3a8a4a;flex-shrink:0;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div style="flex:1"><b style="font-size:.9rem;display:block">Storm Thunder</b><small style="color:#a89e7a">HM-001 · A-12</small></div>
+        <span class="badge green">Tốt</span>
+      </div>
+      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
+        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(214,163,59,.15);display:flex;align-items:center;justify-content:center;color:#8a6a10;flex-shrink:0;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div style="flex:1"><b style="font-size:.9rem;display:block">Silver Blaze</b><small style="color:#a89e7a">HM-003 · C-07</small></div>
+        <span class="badge yellow">Theo dõi</span>
+      </div>
+      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
+        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(111,191,122,.18);display:flex;align-items:center;justify-content:center;color:#3a8a4a;flex-shrink:0;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div style="flex:1"><b style="font-size:.9rem;display:block">Night Runner</b><small style="color:#a89e7a">HM-005 · A-08</small></div>
+        <span class="badge green">Tốt</span>
+      </div>
+      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
+        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(196,87,63,.15);display:flex;align-items:center;justify-content:center;color:#a83820;flex-shrink:0;">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+        </div>
+        <div style="flex:1"><b style="font-size:.9rem;display:block">Red Fury</b><small style="color:#a89e7a">HM-007 · A-15</small></div>
+        <span class="badge red">Cần chú ý</span>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid" style="margin-bottom:1.2rem;">
+      <div class="chart-card">
+        <h4>Khối lượng tập luyện</h4>
+        <p class="sub">Giá trị nhập trực tiếp</p>
+        <!-- SVG bar chart mock -->
+        <svg viewBox="0 0 280 140" height="140" width="100%" style="display:block">
+          <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2f6b57" stop-opacity=".7"/><stop offset="100%" stop-color="#2f6b57" stop-opacity=".15"/></linearGradient></defs>
+          <!-- Grid lines -->
+          <line x1="30" y1="10" x2="275" y2="10" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="40" x2="275" y2="40" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="70" x2="275" y2="70" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="100" x2="275" y2="100" stroke="#e4e0d2" stroke-width="1"/>
+          <!-- Bars -->
+          <rect x="40"  y="45" width="22" height="55" fill="url(#g1)" rx="3"/>
+          <rect x="72"  y="30" width="22" height="70" fill="url(#g1)" rx="3"/>
+          <rect x="104" y="55" width="22" height="45" fill="url(#g1)" rx="3"/>
+          <rect x="136" y="20" width="22" height="80" fill="url(#g1)" rx="3"/>
+          <rect x="168" y="38" width="22" height="62" fill="url(#g1)" rx="3"/>
+          <rect x="200" y="15" width="22" height="85" fill="url(#g1)" rx="3"/>
+          <rect x="232" y="42" width="22" height="58" fill="#2f6b57" rx="3"/>
+          <!-- Labels -->
+          <text x="51" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T9/8</text>
+          <text x="83" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T11/8</text>
+          <text x="115" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T14/8</text>
+          <text x="147" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T18/8</text>
+          <text x="179" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T22/8</text>
+          <text x="211" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T02/9</text>
+          <text x="243" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T14/9</text>
+        </svg>
+      </div>
+      <div class="chart-card">
+        <h4>Tốc độ trung bình</h4>
+        <p class="sub">km/h</p>
+        <svg viewBox="0 0 280 140" height="140" width="100%" style="display:block">
+          <defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#d6a33b" stop-opacity=".3"/><stop offset="100%" stop-color="#d6a33b" stop-opacity=".02"/></linearGradient></defs>
+          <line x1="30" y1="10" x2="275" y2="10" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="45" x2="275" y2="45" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="80" x2="275" y2="80" stroke="#e4e0d2" stroke-width="1"/>
+          <polyline points="51,72 83,58 115,65 147,42 179,55 211,38 243,44" fill="none" stroke="#d6a33b" stroke-width="2.5" stroke-linejoin="round"/>
+          <polygon points="51,72 83,58 115,65 147,42 179,55 211,38 243,44 243,100 51,100" fill="url(#g2)"/>
+          <circle cx="51" cy="72" r="4" fill="#d6a33b"/>
+          <circle cx="83" cy="58" r="4" fill="#d6a33b"/>
+          <circle cx="115" cy="65" r="4" fill="#d6a33b"/>
+          <circle cx="147" cy="42" r="4" fill="#d6a33b"/>
+          <circle cx="179" cy="55" r="4" fill="#d6a33b"/>
+          <circle cx="211" cy="38" r="4" fill="#d6a33b"/>
+          <circle cx="243" cy="44" r="4" fill="#d6a33b"/>
+        </svg>
+      </div>
+      <div class="chart-card">
+        <h4>Hồi phục nhịp tim</h4>
+        <p class="sub">BPM hồi phục</p>
+        <svg viewBox="0 0 280 140" height="140" width="100%" style="display:block">
+          <defs><linearGradient id="g3" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#c4573f" stop-opacity=".3"/><stop offset="100%" stop-color="#c4573f" stop-opacity=".02"/></linearGradient></defs>
+          <line x1="30" y1="10" x2="275" y2="10" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="45" x2="275" y2="45" stroke="#e4e0d2" stroke-width="1"/>
+          <line x1="30" y1="80" x2="275" y2="80" stroke="#e4e0d2" stroke-width="1"/>
+          <polyline points="51,80 83,62 115,75 147,55 179,68 211,48 243,52" fill="none" stroke="#c4573f" stroke-width="2.5" stroke-linejoin="round"/>
+          <polygon points="51,80 83,62 115,75 147,55 179,68 211,48 243,52 243,100 51,100" fill="url(#g3)"/>
+          <circle cx="51" cy="80" r="4" fill="#c4573f"/>
+          <circle cx="83" cy="62" r="4" fill="#c4573f"/>
+          <circle cx="115" cy="75" r="4" fill="#c4573f"/>
+          <circle cx="147" cy="55" r="4" fill="#c4573f"/>
+          <circle cx="179" cy="68" r="4" fill="#c4573f"/>
+          <circle cx="211" cy="48" r="4" fill="#c4573f"/>
+          <circle cx="243" cy="52" r="4" fill="#c4573f"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Data table -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Dữ liệu buổi tập gốc</h3>
+        <span style="font-size:.83rem;color:#a89e7a;">7 điểm dữ liệu</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Ngày</th><th>Ngựa</th><th>Khối lượng</th><th>Tốc độ</th><th>Hồi phục</th><th>Thể trạng</th><th>Ghi chú</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td>14/09/2026</td>
+              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
+              <td>341.0</td><td>52.4 km/h</td><td>48 BPM</td>
+              <td><span class="badge green">Thể lực tốt</span></td>
+              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Ngựa giữ tốc độ ổn định. Nhịp tim hồi phục nhanh.</td>
+            </tr>
+            <tr>
+              <td>12/09/2026</td>
+              <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005</small></div></div></td>
+              <td>285.0</td><td>49.2 km/h</td><td>51 BPM</td>
+              <td><span class="badge green">Thể lực tốt</span></td>
+              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Phản xạ tốt, ổn định qua đoạn cong.</td>
+            </tr>
+            <tr>
+              <td>11/09/2026</td>
+              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
+              <td>243.0</td><td>48.6 km/h</td><td>52 BPM</td>
+              <td><span class="badge green">Thể lực tốt</span></td>
+              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Buổi phục hồi. Ngựa hào hứng.</td>
+            </tr>
+            <tr>
+              <td>08/09/2026</td>
+              <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007</small></div></div></td>
+              <td>458.5</td><td>55.1 km/h</td><td>68 BPM</td>
+              <td><span class="badge yellow">Cần theo dõi</span></td>
+              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Cường độ cao, hơi chậm đoạn cuối. Theo dõi nhịp tim.</td>
+            </tr>
+            <tr>
+              <td>05/09/2026</td>
+              <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003</small></div></div></td>
+              <td>210.0</td><td>44.3 km/h</td><td>72 BPM</td>
+              <td><span class="badge red">Cần chú ý</span></td>
+              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Nhịp tim hồi phục chậm. Cần giảm cường độ.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<!-- Modal: Nhập buổi tập -->
+<div class="modal-backdrop" id="evalModal" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <div><p class="eyebrow">FR07 · ĐÁNH GIÁ BUỔI TẬP</p><h2>Nhập thông số hoàn tất</h2></div>
+      <button class="btn btn-ghost btn-icon" id="closeEvalModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-field full">
+          <label>Ngựa *</label>
+          <select>
+            <option value="">Chọn ngựa…</option>
+            <option>Storm Thunder — HM-001</option>
+            <option>Night Runner — HM-005</option>
+            <option>Red Fury — HM-007</option>
+            <option>Silver Blaze — HM-003</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Ngày buổi tập *</label>
+          <input type="date" value="2026-09-17">
+        </div>
+        <div class="form-field">
+          <label>Thời lượng (phút) *</label>
+          <input type="number" min="1" placeholder="VD: 65">
+        </div>
+        <div class="form-field">
+          <label>Cự ly đã chạy (mét) *</label>
+          <input type="number" min="1" step="0.01" placeholder="VD: 1200">
+        </div>
+        <div class="form-field">
+          <label>Tốc độ trung bình (km/h) *</label>
+          <input type="number" min="1" step="0.01" placeholder="VD: 52.4">
+        </div>
+        <div class="form-field">
+          <label>Khối lượng tập luyện *</label>
+          <input type="number" min="0" step="0.01" placeholder="VD: 341.0">
+        </div>
+        <div class="form-field">
+          <label>Hồi phục nhịp tim (BPM) *</label>
+          <input type="number" min="0" max="300" placeholder="VD: 48">
+        </div>
+        <div class="form-field">
+          <label>Mức gắng sức cảm nhận (1–10) *</label>
+          <input type="number" min="1" max="10" value="5">
+        </div>
+        <div class="form-field">
+          <label>Trạng thái thể lực *</label>
+          <select>
+            <option value="GREEN">Thể lực tốt (GREEN)</option>
+            <option value="YELLOW">Cần theo dõi (YELLOW)</option>
+            <option value="RED">Cần chú ý (RED)</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label>Liên kết video</label>
+          <input type="url" placeholder="https://…">
+        </div>
+        <div class="form-field full">
+          <label>Ghi chú huấn luyện viên *</label>
+          <textarea rows="3" placeholder="Nhận xét sau buổi tập…"></textarea>
+        </div>
+      </div>
+      <div class="notice info" style="margin-top:.8rem;">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Các thông số được lưu đúng giá trị bạn nhập và không được backend tự tính lại.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="cancelEvalModal">Hủy</button>
+      <button class="btn btn-primary">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
+        Hoàn tất đánh giá
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const toggle = document.getElementById('sidebarToggle');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
+  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+
+  const modal = document.getElementById('evalModal');
+  document.getElementById('btnNewEval').addEventListener('click', () => modal.style.display = 'flex');
+  document.getElementById('closeEvalModal').addEventListener('click', () => modal.style.display = 'none');
+  document.getElementById('cancelEvalModal').addEventListener('click', () => modal.style.display = 'none');
+  modal.addEventListener('mousedown', e => { if (e.target === modal) modal.style.display = 'none'; });
+</script>
+
+</body>
+</html>

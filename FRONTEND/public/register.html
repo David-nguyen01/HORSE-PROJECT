@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng ký — Turfline Stable Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+
+<div class="auth-card">
+
+  <div class="auth-brand">
+    <div class="brand-mark">
+      <span class="glyph">◆</span>
+      <span class="wordmark"><b>Turfline</b>Stable Manager</span>
+    </div>
+
+    <form class="auth-form" action="#" method="post">
+      <p class="kicker">Get started</p>
+      <h2>Tạo tài khoản</h2>
+      <p class="lede">Điền thông tin bên dưới, hệ thống sẽ gửi yêu cầu phê duyệt đến quản lý câu lạc bộ.</p>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="reg-firstname">Họ</label>
+          <input id="reg-firstname" name="firstname" type="text" required placeholder="Nguyễn">
+        </div>
+        <div class="field">
+          <label for="reg-lastname">Tên</label>
+          <input id="reg-lastname" name="lastname" type="text" required placeholder="An">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="reg-email">Email</label>
+        <input id="reg-email" name="email" type="email" autocomplete="email" required placeholder="ten.ban@turfline.vn">
+      </div>
+
+      <div class="field">
+        <label id="roleLabel">Vai trò đăng ký</label>
+        <div class="select-custom" id="roleDropdown">
+          <button type="button" class="select-trigger" id="roleTrigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="roleLabel roleTriggerText">
+            <span id="roleTriggerText" class="select-trigger-text is-placeholder">Chọn vai trò của bạn</span>
+            <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <ul class="select-options" id="roleOptions" role="listbox" tabindex="-1">
+            <li role="option" data-value="head_trainer">Head Trainer — Huấn luyện viên Trưởng</li>
+            <li role="option" data-value="veterinarian">Veterinarian — Bác sĩ Thú y</li>
+            <li role="option" data-value="groom">Groom / Stable Hand — Chăm sóc &amp; Chuồng trại</li>
+            <li role="option" data-value="owner">Horse Owner — Chủ sở hữu Ngựa</li>
+            <li role="option" data-value="manager">Club Manager — Quản lý Câu lạc bộ</li>
+          </ul>
+          <input type="hidden" id="reg-role" name="role">
+        </div>
+      </div>
+
+      <div class="field" id="roleKeyField" hidden>
+        <label for="reg-rolekey">Mã xác thực vai trò</label>
+        <input id="reg-rolekey" name="role_key" type="text" placeholder="Nhập mã được cấp cho vai trò này">
+        <p class="field-hint">Liên hệ Quản lý câu lạc bộ để nhận mã cho vai trò này.</p>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="reg-password">Mật khẩu</label>
+          <input id="reg-password" name="password" type="password" autocomplete="new-password" required placeholder="Tối thiểu 8 ký tự">
+        </div>
+        <div class="field">
+          <label for="reg-password2">Nhập lại mật khẩu</label>
+          <input id="reg-password2" name="password2" type="password" autocomplete="new-password" required placeholder="••••••••">
+        </div>
+      </div>
+
+      <div class="field-note">
+        <label class="check">
+          <input type="checkbox" id="terms" name="terms" required>
+          Tôi đồng ý với điều khoản sử dụng của câu lạc bộ
+        </label>
+      </div>
+
+      <button type="submit" class="btn-primary">Gửi yêu cầu đăng ký</button>
+
+      <p class="auth-switch">Đã có tài khoản? <a href="login.html">Đăng nhập</a></p>
+    </form>
+  </div>
+
+  <div class="auth-info">
+    <div>
+      <p class="kicker">Join the paddock</p>
+      <h2>Ba bước để <span class="muted">bắt đầu</span></h2>
+      <p>Tạo tài khoản, chờ phê duyệt và truy cập đúng theo vai trò của bạn.</p>
+    </div>
+
+    <div class="steps-box">
+      <div class="step">
+        <span class="num">01</span>
+        <div>
+          <h4>Tạo tài khoản</h4>
+          <p>Điền thông tin cá nhân và chọn vai trò bạn đảm nhận trong câu lạc bộ.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="num">02</span>
+        <div>
+          <h4>Nhập mã xác thực vai trò</h4>
+          <p>Với vai trò ngoài Horse Owner, cần mã do Quản lý câu lạc bộ cấp trước để được kích hoạt đúng quyền.</p>
+        </div>
+      </div>
+      <div class="step">
+        <span class="num">03</span>
+        <div>
+          <h4>Truy cập theo vai trò</h4>
+          <p>Bắt đầu làm việc với dữ liệu và chức năng dành riêng cho bạn.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <h5>Về mã xác thực vai trò</h5>
+      <p>Horse Owner không cần mã. Các vai trò còn lại (Head Trainer, Veterinarian, Groom, Club Manager) cần nhập đúng mã được cấp để tài khoản được gán đúng quyền.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const roleTrigger = document.getElementById('roleTrigger');
+  const roleTriggerText = document.getElementById('roleTriggerText');
+  const roleOptionsList = document.getElementById('roleOptions');
+  const roleHiddenInput = document.getElementById('reg-role');
+  const roleFieldWrap = document.getElementById('roleDropdown');
+
+  function openRoleDropdown() {
+    roleOptionsList.classList.add('is-open');
+    roleTrigger.setAttribute('aria-expanded', 'true');
+  }
+  function closeRoleDropdown() {
+    roleOptionsList.classList.remove('is-open');
+    roleTrigger.setAttribute('aria-expanded', 'false');
+  }
+
+  roleTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    roleOptionsList.classList.contains('is-open') ? closeRoleDropdown() : openRoleDropdown();
+  });
+
+  roleOptionsList.querySelectorAll('li').forEach((li) => {
+    li.addEventListener('click', () => {
+      roleHiddenInput.value = li.dataset.value;
+      roleTriggerText.textContent = li.textContent;
+      roleTriggerText.classList.remove('is-placeholder');
+      roleOptionsList.querySelectorAll('li').forEach((o) => o.setAttribute('aria-selected', 'false'));
+      li.setAttribute('aria-selected', 'true');
+      roleFieldWrap.classList.remove('has-error');
+      closeRoleDropdown();
+      roleHiddenInput.dispatchEvent(new Event('change'));
+    });
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!roleFieldWrap.contains(e.target)) closeRoleDropdown();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeRoleDropdown();
+  });
+
+  document.querySelector('.auth-form').addEventListener('submit', (e) => {
+    if (!roleHiddenInput.value) {
+      e.preventDefault();
+      roleFieldWrap.classList.add('has-error');
+      roleTrigger.focus();
+    }
+  });
+</script>
+
+<script>
+  const roleSelect = document.getElementById('reg-role');
+  const roleKeyField = document.getElementById('roleKeyField');
+  const roleKeyInput = document.getElementById('reg-rolekey');
+
+  function toggleRoleKey() {
+    const isOwner = roleSelect.value === 'owner';
+    roleKeyField.hidden = isOwner;
+    roleKeyInput.required = !isOwner;
+    if (isOwner) roleKeyInput.value = '';
+  }
+
+  roleSelect.addEventListener('change', toggleRoleKey);
+</script>
+
+</body>
+</html>

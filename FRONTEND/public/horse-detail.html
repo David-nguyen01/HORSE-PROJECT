@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storm Thunder — Hồ sơ ngựa | Turfline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app-shell.css">
+</head>
+<body class="app-body">
+
+<div class="app-shell" id="appShell">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand"><div class="brand-mark"><span class="glyph">◆</span><span class="wordmark"><b>Turfline</b>Stable Manager</span></div></div>
+    <nav class="sidebar-nav">
+      <span class="nav-section-label">Tổng quan</span>
+      <a href="dashboard.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+      <span class="nav-section-label">Quản lý Ngựa</span>
+      <a href="horses.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
+      <span class="nav-section-label">Huấn luyện</span>
+      <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
+      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
+      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
+      <span class="nav-section-label">Y tế</span>
+      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
+      <span class="nav-section-label">Quản trị</span>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="user-chip"><span class="avatar">NT</span><div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div></div>
+      <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+    </div>
+  </aside>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <div style="display:flex;align-items:center;gap:.5rem;font-size:.88rem;color:#a89e7a;">
+      <a href="horses.html" style="color:var(--brass)">Hồ sơ ngựa</a>
+      <span>›</span>
+      <span>Storm Thunder</span>
+    </div>
+    <div class="topbar-right">
+      <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
+      <button class="notif-btn" aria-label="Thông báo"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge">3</span></button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <a href="horses.html" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.88rem;color:var(--brass);margin-bottom:1.2rem;text-decoration:none;">
+      <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,19 5,12 12,5"/></svg>
+      Danh mục ngựa
+    </a>
+
+    <!-- Hero -->
+    <div class="card" style="margin-bottom:1.2rem;">
+      <div class="card-body" style="padding:1.6rem;">
+        <div class="horse-hero">
+          <div class="profile-media">ST</div>
+          <div class="horse-title">
+            <p class="code">HM-001</p>
+            <h1>Storm Thunder</h1>
+            <div class="meta">
+              <span class="badge active"><i></i>Đang hoạt động</span>
+              <span style="font-size:.88rem;color:#6b6349;">Thoroughbred</span>
+              <span style="font-size:.88rem;color:#6b6349;">Ngựa đực</span>
+              <span style="font-size:.88rem;color:#6b6349;">Chuồng A-12</span>
+            </div>
+          </div>
+          <div class="hero-actions">
+            <label class="btn btn-secondary" style="cursor:pointer;">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="16,16 12,12 8,16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+              Tải file hồ sơ
+              <input type="file" hidden accept="image/*,.pdf,.docx">
+            </label>
+            <button class="btn btn-secondary" id="btnEditHorse">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Chỉnh sửa
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" role="tab" data-tab="info">Thông tin định danh</button>
+      <button class="tab-btn" role="tab" data-tab="owners">Chủ sở hữu</button>
+      <button class="tab-btn" role="tab" data-tab="pedigree">Phả hệ</button>
+      <button class="tab-btn" role="tab" data-tab="races">Thành tích</button>
+      <button class="tab-btn" role="tab" data-tab="evals">Đánh giá buổi tập</button>
+    </div>
+
+    <!-- Tab: Info -->
+    <div class="tab-panel active card" id="tab-info">
+      <div class="card-body">
+        <dl class="info-grid">
+          <div><dt>Số chip / hộ chiếu</dt><dd>956000012345678</dd></div>
+          <div><dt>Ngày sinh</dt><dd>12/03/2019 (5 tuổi)</dd></div>
+          <div><dt>Giới tính</dt><dd>Ngựa đực (Stallion)</dd></div>
+          <div><dt>Giống</dt><dd>Thoroughbred</dd></div>
+          <div><dt>Màu sắc / nhận dạng</dt><dd>Nâu hung, sao trắng trán, chân trắng sau trái</dd></div>
+          <div><dt>Vị trí chuồng</dt><dd>Chuồng A-12</dd></div>
+          <div><dt>Huấn luyện viên hiện tại</dt><dd>Nguyễn Thắng</dd></div>
+          <div><dt>Cập nhật lần cuối</dt><dd>15/09/2026, 14:32</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Tab: Owners -->
+    <div class="tab-panel card" id="tab-owners">
+      <div class="card-head">
+        <h3>Chủ sở hữu</h3>
+        <button class="btn btn-secondary" style="font-size:.82rem;" id="btnAddOwner">+ Liên kết chủ</button>
+      </div>
+      <div class="card-body">
+        <div class="owner-row">
+          <span class="owner-avatar">PL</span>
+          <div class="owner-name"><b>Phạm Long</b><small>phong.long@email.com</small></div>
+          <span class="share">60%</span>
+        </div>
+        <div class="owner-row">
+          <span class="owner-avatar">TH</span>
+          <div class="owner-name"><b>Trần Hoa</b><small>tran.hoa@email.com</small></div>
+          <span class="share">40%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Pedigree -->
+    <div class="tab-panel card" id="tab-pedigree">
+      <div class="card-head"><h3>Phả hệ 3 thế hệ</h3></div>
+      <div class="card-body">
+        <div class="pedigree">
+          <div class="pedigree-main">
+            <small>Hồ sơ hiện tại</small>
+            <b>Storm Thunder</b>
+            <span style="font-size:.75rem;color:rgba(237,230,214,.5)">HM-001</span>
+          </div>
+          <div class="pedigree-branches">
+            <div class="pedigree-branch">
+              <div class="pedigree-node">
+                <small>Ngựa bố (Sire)</small>
+                <b>Thunder King</b>
+                <span style="font-size:.75rem;color:#a89e7a">TK-IRE-2010</span>
+              </div>
+              <div class="pedigree-grandparents">
+                <div class="pedigree-node"><small>Ông nội</small><b>Royal Flame</b></div>
+                <div class="pedigree-node"><small>Bà nội</small><b>Silk Cloud</b></div>
+              </div>
+            </div>
+            <div class="pedigree-branch">
+              <div class="pedigree-node">
+                <small>Ngựa mẹ (Dam)</small>
+                <b>Silver Star</b>
+                <span style="font-size:.75rem;color:#a89e7a">SS-AUS-2012</span>
+              </div>
+              <div class="pedigree-grandparents">
+                <div class="pedigree-node"><small>Ông ngoại</small><b>Desert Wind</b></div>
+                <div class="pedigree-node unknown"><small>Bà ngoại</small><b>—</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Races -->
+    <div class="tab-panel card" id="tab-races">
+      <div class="card-head">
+        <h3>Thành tích thi đấu</h3>
+        <div style="display:flex;gap:1rem;">
+          <span style="font-size:.9rem;color:#6b6349;"><b style="color:var(--ink);font-family:var(--serif);font-size:1.1rem;">3</b> Chiến thắng</span>
+          <span style="font-size:.9rem;color:#6b6349;"><b style="color:var(--ink);font-family:var(--serif);font-size:1.1rem;">8</b> Cuộc đua</span>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0 1.4rem;">
+        <div class="race-row">
+          <div class="race-pos first">1</div>
+          <div class="race-info"><b>Giải mùa Xuân 2026</b><small>15/03/2026 · Trường đua Phú Thọ · 1400m</small></div>
+        </div>
+        <div class="race-row">
+          <div class="race-pos second">2</div>
+          <div class="race-info"><b>Cup Tháng 12 — 2025</b><small>10/12/2025 · Trường đua Đại Nam · 1200m</small></div>
+        </div>
+        <div class="race-row">
+          <div class="race-pos first">1</div>
+          <div class="race-info"><b>Giải mở rộng — Thu 2025</b><small>22/09/2025 · Trường đua Phú Thọ · 1600m</small></div>
+        </div>
+        <div class="race-row">
+          <div class="race-pos" style="">3</div>
+          <div class="race-info"><b>Cup Chào Hè 2025</b><small>05/06/2025 · Trường đua Đại Nam · 1000m</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Evaluations -->
+    <div class="tab-panel card" id="tab-evals">
+      <div class="card-head">
+        <h3>Đánh giá buổi tập</h3>
+        <span style="font-size:.83rem;color:#a89e7a;">3 bản ghi gần nhất</span>
+      </div>
+      <div class="card-body" style="padding:0 1.4rem;">
+        <div class="eval-row">
+          <div class="eval-dot green"></div>
+          <div class="eval-body">
+            <b>14/09/2026 · 65 phút</b>
+            <small>1200 m · 52.4 km/h · Gắng sức 7/10</small>
+            <p>Ngựa giữ tốc độ ổn định. Nhịp tim hồi phục nhanh. Tiếp tục tăng cự ly tuần tới.</p>
+          </div>
+          <dl class="eval-stats"><div><dt>Khối lượng</dt><dd>341.0</dd></div><div><dt>Hồi phục</dt><dd>48 BPM</dd></div></dl>
+        </div>
+        <div class="eval-row">
+          <div class="eval-dot green"></div>
+          <div class="eval-body">
+            <b>11/09/2026 · 50 phút</b>
+            <small>900 m · 48.6 km/h · Gắng sức 6/10</small>
+            <p>Buổi tập phục hồi. Ngựa có vẻ hào hứng, phản xạ tốt với đường cong.</p>
+          </div>
+          <dl class="eval-stats"><div><dt>Khối lượng</dt><dd>243.0</dd></div><div><dt>Hồi phục</dt><dd>52 BPM</dd></div></dl>
+        </div>
+        <div class="eval-row">
+          <div class="eval-dot yellow"></div>
+          <div class="eval-body">
+            <b>08/09/2026 · 70 phút</b>
+            <small>1400 m · 55.1 km/h · Gắng sức 9/10</small>
+            <p>Cường độ cao, ngựa hơi chậm ở đoạn cuối. Cần theo dõi nhịp tim.</p>
+          </div>
+          <dl class="eval-stats"><div><dt>Khối lượng</dt><dd>458.5</dd></div><div><dt>Hồi phục</dt><dd>68 BPM</dd></div></dl>
+        </div>
+      </div>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="danger-zone">
+      <div><b>Lưu trữ hồ sơ</b><span>Hồ sơ sẽ ẩn khỏi danh mục; file Cloudinary không bị xóa.</span></div>
+      <button class="btn btn-danger">Lưu trữ</button>
+    </div>
+
+  </main>
+</div>
+
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+<script>
+  // Sidebar toggle
+  const toggle = document.getElementById('sidebarToggle');
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
+  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
