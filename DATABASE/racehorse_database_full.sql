@@ -2197,7 +2197,8 @@ DROP TABLE IF EXISTS dbo.module_permissions;
 DROP TABLE IF EXISTS dbo.role_definitions;
 GO
 
-DECLARE @table_count INT=(SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0);
+/* sysdiagrams is an SSMS support table, not a Racehorse business table. */
+DECLARE @table_count INT=(SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND name<>N'sysdiagrams');
 IF @table_count > 30
     THROW 51030, N'Compact schema vượt quá giới hạn 30 bảng.', 1;
 GO
