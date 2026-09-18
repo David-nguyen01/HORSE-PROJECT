@@ -75,4 +75,8 @@ public class UserAccount extends BaseEntity {
         this.roles.clear();
         this.roles.addAll(roles);
     }
+
+    public void deactivate() {
+        this.enabled = false;
+    }
 }

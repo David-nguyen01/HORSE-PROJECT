@@ -9,6 +9,7 @@ import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,11 +25,15 @@ public class UserManagementService {
 
     private final UserAccountRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbc;
+
     public UserManagementService(
             UserAccountRepository userRepository,
-            PasswordEncoder passwordEncoder) {
+            PasswordEncoder passwordEncoder,
+            JdbcTemplate jdbc) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -60,7 +65,41 @@ public class UserManagementService {
         UserAccount target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy tài khoản: " + targetUserId));
+        if (target.getRoles().contains(Role.CLUB_MANAGER) && !request.roles().contains(Role.CLUB_MANAGER)) {
+            throw new BusinessException("CLUB_MANAGER role cannot be removed via this endpoint");
+        }
         target.replaceRoles(request.roles());
+        return toResponse(target);
+    }
+
+    @Transactional
+    public UserResponse deactivate(UUID actorId, UUID targetUserId) {
+        // Self-protection
+        if (actorId.equals(targetUserId)) {
+            throw new BusinessException("Không thể vô hiệu hóa chính tài khoản của bạn");
+        }
+
+        UserAccount target = userRepository.findById(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy tài khoản: " + targetUserId));
+
+        // CLUB_MANAGER protection
+        if (target.getRoles().contains(Role.CLUB_MANAGER)) {
+            throw new BusinessException("Không thể vô hiệu hóa tài khoản có role CLUB_MANAGER");
+        }
+
+        // Current trainer in-use check
+        Integer trainerCount = jdbc.queryForObject("""
+                select count(*) from horses
+                where current_trainer_id = ? and archived_at is null
+                """, Integer.class, targetUserId);
+        if (trainerCount != null && trainerCount > 0) {
+            throw new BusinessException(
+                    "Không thể vô hiệu hóa tài khoản đang là huấn luyện viên hiện tại của "
+                            + trainerCount + " ngựa đang hoạt động");
+        }
+
+        target.deactivate();
         return toResponse(target);
     }
 

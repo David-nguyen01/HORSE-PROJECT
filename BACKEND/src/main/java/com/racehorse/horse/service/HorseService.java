@@ -17,11 +17,13 @@ import com.racehorse.horse.repository.HorseOwnershipRepository;
 import com.racehorse.horse.repository.HorseRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Arrays;
 import java.util.List;
@@ -36,18 +38,21 @@ public class HorseService {
     private final UserAccountRepository userRepository;
     private final HorseMapper horseMapper;
     private final Clock clock;
+    private final JdbcTemplate jdbc;
 
     public HorseService(
             HorseRepository horseRepository,
             HorseOwnershipRepository ownershipRepository,
             UserAccountRepository userRepository,
             HorseMapper horseMapper,
-            Clock clock) {
+            Clock clock,
+            JdbcTemplate jdbc) {
         this.horseRepository = horseRepository;
         this.ownershipRepository = ownershipRepository;
         this.userRepository = userRepository;
         this.horseMapper = horseMapper;
         this.clock = clock;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -147,6 +152,61 @@ public class HorseService {
     @Transactional
     public HorseResponse archive(UUID id) {
         Horse horse = findHorse(id);
+
+        List<String> blocking = new ArrayList<>();
+
+        // 1. Active race registrations
+        Integer raceRegs = jdbc.queryForObject("""
+                select count(*) from module_records
+                where module_code = 'RACING' and record_type = 'RACE_REGISTRATIONS'
+                  and horse_id = ? and status != 'WITHDRAWN'
+                """, Integer.class, id);
+        if (raceRegs != null && raceRegs > 0) {
+            blocking.add("Đăng ký đua đang hoạt động (" + raceRegs + ")");
+        }
+
+        // 2. Active training schedules (not cancelled and not completed)
+        Integer schedules = jdbc.queryForObject("""
+                select count(*) from training_schedules
+                where horse_id = ? and cancelled_at is null and completed_at is null
+                """, Integer.class, id);
+        if (schedules != null && schedules > 0) {
+            blocking.add("Lịch huấn luyện đang hoạt động (" + schedules + ")");
+        }
+
+        // 3. Active training locks (not released)
+        Integer locks = jdbc.queryForObject("""
+                select count(*) from training_locks
+                where horse_id = ? and released_at is null
+                """, Integer.class, id);
+        if (locks != null && locks > 0) {
+            blocking.add("Khóa huấn luyện đang hoạt động (" + locks + ")");
+        }
+
+        // 4. Active ownership ties
+        Integer ownerships = jdbc.queryForObject("""
+                select count(*) from horse_ownerships
+                where horse_id = ?
+                """, Integer.class, id);
+        if (ownerships != null && ownerships > 0) {
+            blocking.add("Hợp đồng sở hữu (" + ownerships + ")");
+        }
+
+        // 5. Open/active medical records
+        Integer medicalRecords = jdbc.queryForObject("""
+                select count(*) from module_records
+                where module_code = 'MEDICAL' and horse_id = ?
+                  and status not in ('CLOSED', 'RESOLVED', 'COMPLETED')
+                """, Integer.class, id);
+        if (medicalRecords != null && medicalRecords > 0) {
+            blocking.add("Hồ sơ y tế đang mở (" + medicalRecords + ")");
+        }
+
+        if (!blocking.isEmpty()) {
+            throw new BusinessException(
+                    "Không thể lưu trữ ngựa do còn liên kết: " + String.join(", ", blocking));
+        }
+
         horse.archive(clock.instant());
         return toResponse(horse);
     }

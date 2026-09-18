@@ -11,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -66,5 +67,12 @@ public class UserController {
             @PathVariable UUID id,
             @Valid @RequestBody UpdateUserRolesRequest request) {
         return userManagementService.updateRoles(UUID.fromString(jwt.getSubject()), id, request);
+    }
+
+    @PatchMapping("/{id}/deactivate")
+    UserResponse deactivate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable UUID id) {
+        return userManagementService.deactivate(UUID.fromString(jwt.getSubject()), id);
     }
 }
