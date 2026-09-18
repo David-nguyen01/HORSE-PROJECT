@@ -10,7 +10,9 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
 
-public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+public interface AuditLogRepository extends org.springframework.data.repository.Repository<AuditLog, Long> {
+
+    AuditLog save(AuditLog entity);
 
     @EntityGraph(attributePaths = {"actor"})
     @Query("""

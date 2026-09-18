@@ -100,7 +100,7 @@ public class RaceEventService {
         return toResponse(find(id));
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.SERIALIZABLE)
     public RaceRegistrationResponse registerHorse(UUID raceEventId, UUID userId, boolean privileged, RegisterHorseRequest request) {
         RaceEvent event = find(raceEventId);
         if (!event.isActive()) {
@@ -138,7 +138,7 @@ public class RaceEventService {
                     "registered_by_user_id", userId.toString(),
                     "submitted_at", now.toString(),
                     "confirmed_at", now.toString(), // Auto-confirming for now based on FR18 unless specified otherwise
-                    "registered_weight_kg", readiness.weightKg()
+                    "registered_weight_kg", readiness.latestWeightKg()
             ));
         } catch (JsonProcessingException e) {
             throw new BusinessException("Lỗi lưu dữ liệu đăng ký");

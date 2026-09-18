@@ -32,13 +32,17 @@ class UserManagementServiceTest {
     @Mock
     private UserAccountRepository userRepository;
 
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private UserManagementService service;
 
     @BeforeEach
     void setUp() {
         service = new UserManagementService(
                 userRepository,
-                new BCryptPasswordEncoder(4));
+                new BCryptPasswordEncoder(4),
+                jdbc);
     }
 
     @Test

@@ -34,12 +34,13 @@ public class DashboardService {
 
         // 1. Financials
         String finSql = """
-                select transaction_type, category, sum(amount) as total
-                from financial_transactions
-                where transaction_date >= coalesce(?, '1900-01-01')
-                  and transaction_date <= coalesce(?, '2100-01-01')
-                  and (? is null or stable_id = ?)
-                group by transaction_type, category
+                select t.transaction_type, t.category, sum(t.amount) as total
+                from financial_transactions t
+                left join stables s on t.stable_id = s.id
+                where t.transaction_date >= coalesce(?, '1900-01-01')
+                  and t.transaction_date <= coalesce(?, '2100-01-01')
+                  and (? is null or t.stable_id = ?)
+                group by t.transaction_type, t.category
                 """;
 
         BigDecimal[] totalRevenue = {BigDecimal.ZERO};
@@ -103,20 +104,22 @@ public class DashboardService {
             LocalDate startDate, LocalDate endDate, UUID stableId, Pageable pageable) {
 
         Long total = jdbc.queryForObject("""
-                select count(*) from financial_transactions
-                where transaction_date >= coalesce(?, '1900-01-01')
-                  and transaction_date <= coalesce(?, '2100-01-01')
-                  and (? is null or stable_id = ?)
+                select count(*) from financial_transactions t
+                left join stables s on t.stable_id = s.id
+                where t.transaction_date >= ?
+                  and t.transaction_date <= ?
+                  and (? is null or t.stable_id = ?)
                 """, Long.class, startDate, endDate, stableId, stableId);
 
         List<DashboardDrilldownResponse.DrilldownRow> rows = jdbc.query("""
-                select id, transaction_type as col1, category as col2,
-                       cast(amount as varchar) as col3, convert(varchar(10), transaction_date, 23) as col4
-                from financial_transactions
-                where transaction_date >= coalesce(?, '1900-01-01')
-                  and transaction_date <= coalesce(?, '2100-01-01')
-                  and (? is null or stable_id = ?)
-                order by transaction_date desc
+                select t.id, t.transaction_type as col1, t.category as col2,
+                       cast(t.amount as varchar) as col3, convert(varchar(10), t.transaction_date, 23) as col4
+                from financial_transactions t
+                left join stables s on t.stable_id = s.id
+                where t.transaction_date >= ?
+                  and t.transaction_date <= ?
+                  and (? is null or t.stable_id = ?)
+                order by t.transaction_date desc
                 offset ? rows fetch next ? rows only
                 """, (rs, rowNum) -> new DashboardDrilldownResponse.DrilldownRow(
                 rs.getObject("id", UUID.class),
@@ -134,16 +137,16 @@ public class DashboardService {
 
         Long total = jdbc.queryForObject("""
                 select count(*) from race_events
-                where race_date >= coalesce(?, '1900-01-01')
-                  and race_date <= coalesce(?, '2100-01-01')
+                where race_date >= ?
+                  and race_date <= ?
                 """, Long.class, startDate, endDate);
 
         List<DashboardDrilldownResponse.DrilldownRow> rows = jdbc.query("""
                 select id, race_name as col1, racecourse as col2,
                        race_class as col3, convert(varchar(10), race_date, 23) as col4
                 from race_events
-                where race_date >= coalesce(?, '1900-01-01')
-                  and race_date <= coalesce(?, '2100-01-01')
+                where race_date >= ?
+                  and race_date <= ?
                 order by race_date desc
                 offset ? rows fetch next ? rows only
                 """, (rs, rowNum) -> new DashboardDrilldownResponse.DrilldownRow(
@@ -162,16 +165,16 @@ public class DashboardService {
 
         Long total = jdbc.queryForObject("""
                 select count(*) from training_evaluations
-                where session_date >= coalesce(?, '1900-01-01')
-                  and session_date <= coalesce(?, '2100-01-01')
+                where session_date >= ?
+                  and session_date <= ?
                 """, Long.class, startDate, endDate);
 
         List<DashboardDrilldownResponse.DrilldownRow> rows = jdbc.query("""
                 select id, task_name as col1, score as col2,
                        notes as col3, convert(varchar(10), session_date, 23) as col4
                 from training_evaluations
-                where session_date >= coalesce(?, '1900-01-01')
-                  and session_date <= coalesce(?, '2100-01-01')
+                where session_date >= ?
+                  and session_date <= ?
                 order by session_date desc
                 offset ? rows fetch next ? rows only
                 """, (rs, rowNum) -> new DashboardDrilldownResponse.DrilldownRow(

@@ -84,8 +84,8 @@ public class AuditQueryService {
             if (updated == 0) {
                 jdbc.update("""
                         insert into module_records (
-                            id, module_code, record_type, data_json, user_id, updated_at, created_at
-                        ) values (newid(), ?, ?, ?, ?, ?, ?)
+                            id, module_code, record_type, status, data_json, user_id, updated_at, created_at
+                        ) values (newid(), ?, ?, 'ACTIVE', ?, ?, ?, ?)
                         """, SYSTEM_MODULE, AUDIT_SETTINGS_TYPE, json, userId, OffsetDateTime.now(), OffsetDateTime.now());
             }
             return getSettings();

@@ -48,6 +48,9 @@ class HorseServiceTest {
     @Mock
     private UserAccountRepository userRepository;
 
+    @Mock
+    private org.springframework.jdbc.core.JdbcTemplate jdbc;
+
     private HorseService horseService;
 
     @BeforeEach
@@ -57,7 +60,8 @@ class HorseServiceTest {
                 ownershipRepository,
                 userRepository,
                 new HorseMapper(),
-                Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC),
+                jdbc);
     }
 
     @Test

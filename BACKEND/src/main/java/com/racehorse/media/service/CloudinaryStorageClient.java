@@ -23,11 +23,16 @@ public class CloudinaryStorageClient implements CloudStorageClient {
 
     @Override
     public CloudAsset upload(byte[] content, String originalFilename, UUID horseId) {
+        return upload(content, originalFilename, "horses/" + horseId);
+    }
+
+    @Override
+    public CloudAsset upload(byte[] content, String originalFilename, String folderPath) {
         requireConfigured();
         try {
             Map<?, ?> result = cloudinary.uploader().upload(content, ObjectUtils.asMap(
                     "resource_type", "auto",
-                    "folder", normalizedFolder() + "/horses/" + horseId,
+                    "folder", normalizedFolder() + "/" + folderPath,
                     "use_filename", true,
                     "unique_filename", true,
                     "overwrite", false));

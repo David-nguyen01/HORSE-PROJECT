@@ -11,12 +11,19 @@ import java.util.*;
 
 @Component
 public class DailyAutomationJob {
-    private final JdbcTemplate jdbc; private final ZoneId zone;
-    public DailyAutomationJob(JdbcTemplate jdbc,@Value("${app.club-time-zone}") String zone){this.jdbc=jdbc;this.zone=ZoneId.of(zone);}
+    private final JdbcTemplate jdbc; private final ZoneId zone; private final com.racehorse.audit.service.AuditService auditService;
+    public DailyAutomationJob(JdbcTemplate jdbc, @org.springframework.beans.factory.annotation.Value("${app.club-time-zone}") String zone, com.racehorse.audit.service.AuditService auditService){
+        this.jdbc=jdbc;this.zone=ZoneId.of(zone);this.auditService=auditService;
+    }
 
-    @Scheduled(cron="${app.jobs.daily-cron}",zone="${app.club-time-zone}")
+    @org.springframework.scheduling.annotation.Scheduled(cron="${app.jobs.daily-cron}",zone="${app.club-time-zone}")
     @Transactional
-    public void runAtSixEveryDay(){ LocalDate today=LocalDate.now(zone); remindPreventiveCare(today); createOwnerReports(today.minusDays(1)); }
+    public void runAtSixEveryDay(){ 
+        LocalDate today=LocalDate.now(zone); 
+        remindPreventiveCare(today); 
+        createOwnerReports(today.minusDays(1)); 
+        auditService.record(null, "SYSTEM", "EXECUTE", "SYSTEM", null, "Daily automated tasks executed", "127.0.0.1", "system-cron");
+    }
 
     void remindPreventiveCare(LocalDate today){
         jdbc.update("""
