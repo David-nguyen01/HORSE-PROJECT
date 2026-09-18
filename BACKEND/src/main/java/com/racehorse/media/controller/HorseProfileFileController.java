@@ -32,13 +32,13 @@ public class HorseProfileFileController {
     }
 
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW')")
     HorseProfileFileResponse get(@PathVariable UUID horseId) {
         return service.getActive(horseId);
     }
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     HorseProfileFileResponse replace(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
@@ -47,14 +47,14 @@ public class HorseProfileFileController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     ResponseEntity<Void> delete(@PathVariable UUID horseId) {
         service.deleteActive(horseId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value = "/proposals", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER')")
     ResponseEntity<HorseProfileFileResponse> propose(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
@@ -65,13 +65,13 @@ public class HorseProfileFileController {
     }
 
     @GetMapping("/proposals")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_APPROVE') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     List<HorseProfileFileResponse> pendingProposals(@PathVariable UUID horseId) {
         return service.pendingProposals(horseId);
     }
 
     @PostMapping("/proposals/{proposalId}/approve")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     HorseProfileFileResponse approve(
             @PathVariable UUID horseId,
             @PathVariable UUID proposalId,

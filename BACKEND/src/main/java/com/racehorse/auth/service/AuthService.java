@@ -6,6 +6,7 @@ import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.auth.security.UserPrincipal;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.audit.service.AuditService;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,16 +22,19 @@ public class AuthService {
     private final UserAccountRepository userRepository;
     private final JwtTokenService jwtTokenService;
     private final LoginSessionService loginSessionService;
+    private final AuditService auditService;
 
     public AuthService(
             AuthenticationManager authenticationManager,
             UserAccountRepository userRepository,
             JwtTokenService jwtTokenService,
-            LoginSessionService loginSessionService) {
+            LoginSessionService loginSessionService,
+            AuditService auditService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtTokenService = jwtTokenService;
         this.loginSessionService = loginSessionService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -42,6 +46,8 @@ public class AuthService {
         UserAccount user = userRepository.findById(principal.id())
                 .orElseThrow(() -> new ResourceNotFoundException("Tài khoản không còn tồn tại"));
         IssuedLoginSession session = loginSessionService.create(user, client);
+        auditService.record(user.getId(), "AUTH", "LOGIN", "USER", user.getId(),
+                "Đăng nhập thành công", client.ipAddress(), client.userAgent());
         return issueTokenPair(session);
     }
 

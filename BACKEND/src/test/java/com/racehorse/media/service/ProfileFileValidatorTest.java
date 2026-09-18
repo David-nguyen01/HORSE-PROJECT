@@ -19,7 +19,7 @@ class ProfileFileValidatorTest {
     @Test
     void acceptsImagePdfAndRealDocxContainer() throws IOException {
         assertThat(validator.validate(new MockMultipartFile(
-                "file", "horse.png", "image/png", new byte[]{1, 2, 3})).category())
+                "file", "horse.png", "application/octet-stream", pngBytes())).category())
                 .isEqualTo(ProfileFileCategory.IMAGE);
         assertThat(validator.validate(new MockMultipartFile(
                 "file", "record.pdf", "application/pdf", "%PDF-1.7".getBytes())).category())
@@ -39,6 +39,9 @@ class ProfileFileValidatorTest {
                 .isInstanceOf(BusinessException.class);
         assertThatThrownBy(() -> validator.validate(new MockMultipartFile(
                 "file", "fake.pdf", "application/pdf", "not-pdf".getBytes())))
+                .isInstanceOf(BusinessException.class);
+        assertThatThrownBy(() -> validator.validate(new MockMultipartFile(
+                "file", "fake.png", "image/png", new byte[]{1,2,3})))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -65,4 +68,5 @@ class ProfileFileValidatorTest {
         }
         return output.toByteArray();
     }
+    private byte[] pngBytes(){return new byte[]{(byte)0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,1};}
 }

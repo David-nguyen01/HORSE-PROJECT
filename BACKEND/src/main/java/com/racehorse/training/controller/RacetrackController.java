@@ -19,15 +19,15 @@ public class RacetrackController {
 
     @PostMapping("/api/racetracks")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasRole('CLUB_MANAGER')")
     RacetrackResponse create(@Valid @RequestBody CreateRacetrackRequest request) { return service.create(request); }
 
     @GetMapping("/api/racetracks")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     List<RacetrackResponse> list() { return service.list(); }
 
     @GetMapping("/api/racetracks/{racetrackId}/slots")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     List<TrackSlotResponse> slots(@PathVariable UUID racetrackId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.slots(racetrackId, date);
@@ -35,6 +35,20 @@ public class RacetrackController {
 
     @PostMapping("/api/trial-run-bookings")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrialRunBookingResponse book(@Valid @RequestBody CreateTrialRunBookingRequest request) { return service.book(request); }
+
+    @GetMapping("/api/trial-run-bookings")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    List<TrialRunBookingResponse> bookings(@RequestParam(required=false) UUID racetrackId,
+            @RequestParam(required=false) UUID horseId,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue="false") boolean includeCancelled) {
+        return service.bookings(racetrackId,horseId,from,to,includeCancelled);
+    }
+
+    @DeleteMapping("/api/trial-run-bookings/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    void cancel(@PathVariable UUID id){service.cancelBooking(id);}
 }

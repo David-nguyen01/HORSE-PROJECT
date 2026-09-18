@@ -139,7 +139,7 @@ class HorseProfileFileServiceTest {
     }
 
     private MockMultipartFile imageFile() {
-        return new MockMultipartFile("file", "horse.png", "image/png", new byte[]{1, 2, 3});
+        return new MockMultipartFile("file", "horse.png", "image/png", new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1});
     }
 
     private CloudAsset imageAsset() {

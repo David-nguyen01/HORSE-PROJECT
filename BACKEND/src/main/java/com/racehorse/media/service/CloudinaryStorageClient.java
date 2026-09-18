@@ -30,6 +30,7 @@ public class CloudinaryStorageClient implements CloudStorageClient {
     public CloudAsset upload(byte[] content, String originalFilename, String folderPath) {
         requireConfigured();
         try {
+            String safeScope=folderScope==null?"shared":folderScope.replaceAll("[^a-zA-Z0-9/_-]","-");
             Map<?, ?> result = cloudinary.uploader().upload(content, ObjectUtils.asMap(
                     "resource_type", "auto",
                     "folder", normalizedFolder() + "/" + folderPath,

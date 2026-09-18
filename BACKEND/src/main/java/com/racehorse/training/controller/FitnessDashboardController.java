@@ -15,7 +15,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/fitness")
-@PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+@PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
 public class FitnessDashboardController {
 
     private final FitnessDashboardService service;

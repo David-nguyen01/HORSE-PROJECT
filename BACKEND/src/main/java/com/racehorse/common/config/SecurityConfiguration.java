@@ -16,6 +16,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -74,9 +75,14 @@ public class SecurityConfiguration {
             try {
                 return userRepository.findById(UUID.fromString(jwt.getSubject()))
                         .filter(user -> user.isEnabled())
-                        .map(user -> user.getRoles().stream()
-                                .map(role -> (GrantedAuthority) new SimpleGrantedAuthority("ROLE_" + role.name()))
-                                .toList())
+                        .map(user -> {
+                            List<GrantedAuthority> authorities = new ArrayList<>();
+                            user.getRoles().forEach(role -> authorities.add(
+                                    new SimpleGrantedAuthority("ROLE_" + role.name())));
+                            userRepository.findGrantedPermissionCodes(user.getId()).forEach(permission ->
+                                    authorities.add(new SimpleGrantedAuthority(permission)));
+                            return authorities;
+                        })
                         .orElse(List.of());
             } catch (IllegalArgumentException exception) {
                 return List.of();

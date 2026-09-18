@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
-@PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+@PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
 public class TrainingPlanController {
 
     private final TrainingPlanService service;

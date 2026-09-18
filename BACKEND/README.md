@@ -23,6 +23,8 @@ Mở thư mục `../DATABASE` bằng SSMS, đăng nhập `sa` và chạy lần l
 9. `08_stable_care_inventory.sql`
 10. `09_racing_reporting_rbac_audit.sql`
 11. `10_confirmed_business_rules.sql`
+12. `11_confirmed_automation_and_governance.sql`
+13. `12_compact_schema.sql`
 
 Sau đó chạy backend:
 
@@ -35,10 +37,10 @@ Mặc định API chạy tại `http://localhost:8080`. Script `02_seed_data.sql
 Chuỗi kết nối mặc định:
 
 ```text
-jdbc:sqlserver://localhost:1433;databaseName=racehorse;encrypt=true;trustServerCertificate=true
+jdbc:sqlserver://racehorse-training-management.database.windows.net:1433;databaseName=racehorse;encrypt=true;trustServerCertificate=true
 ```
 
-Backend dùng SQL Authentication với username `sa` và password `sa123456`. Có thể ghi đè bằng `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` trên môi trường triển khai.
+Backend mặc định trỏ tới Azure SQL với username `racehorse_admin`. Mật khẩu không được lưu trong source; bắt buộc cung cấp bằng biến môi trường `DB_PASSWORD`. Có thể ghi đè kết nối bằng `DB_URL` và `DB_USERNAME`.
 
 Để bật upload Cloudinary, đặt các biến môi trường sau trước khi chạy backend. Không commit API secret vào repository:
 
@@ -474,7 +476,7 @@ src/main/java/com/racehorse/
     └── service/
 ```
 
-Module `training` hiện chứa FR03, FR04, FR05 và FR07; module `notification` cung cấp thông báo trong web, còn module `health` hiện cung cấp khóa huấn luyện FR11. Telemetry và cảnh báo realtime tiếp tục chờ đặc tả giao thức.
+Module `training` chứa FR03–FR07; telemetry FR06 do Head Trainer nhập thủ công. Module `notification` cung cấp thông báo trong web; module `health` quản lý trạng thái, cân nặng, chăm sóc phòng ngừa và khóa huấn luyện.
 
 ## Role
 
@@ -488,6 +490,55 @@ Module `training` hiện chứa FR03, FR04, FR05 và FR07; module `notification`
 
 Khi đổi role, `CLUB_MANAGER` gửi toàn bộ danh sách role thay thế tới `PUT /api/users/{id}/roles`. Danh sách không được rỗng. Quản lý câu lạc bộ không thể dùng endpoint này để tự thay đổi role của chính mình.
 
+## API nghiệp vụ mới đã chốt
+
+### Telemetry thủ công và cảnh báo FR06
+
+- `POST /api/horses/{horseId}/metric-thresholds` — `HEAD_TRAINER` cấu hình ngưỡng `HEART_RATE` hoặc `SPEED` theo từng ngựa.
+- `GET|PUT|DELETE /api/horses/{horseId}/metric-thresholds[/{thresholdId}]` — xem, sửa hoặc kết thúc hiệu lực ngưỡng.
+- `POST /api/horses/{horseId}/telemetry` — `HEAD_TRAINER` nhập danh sách chỉ số với ngữ cảnh `RESTING`, `TRAINING` hoặc `RECOVERY`.
+- `GET /api/horses/{horseId}/telemetry` — xem lịch sử telemetry, lọc theo ngữ cảnh và thời gian.
+- `GET /api/horses/{horseId}/alerts` và `POST /api/horses/{horseId}/alerts/{alertId}/acknowledge` — lọc và xác nhận cảnh báo.
+- Mỗi dòng phải có ít nhất `heartRateBpm` hoặc `speedKmh`. Backend tự tạo cảnh báo và thông báo khi vượt ngưỡng đang hiệu lực.
+
+### Cân nặng và sẵn sàng thi đấu
+
+- `POST /api/horses/{horseId}/weights` — chỉ `VETERINARIAN` được nhập.
+- `GET /api/horses/{horseId}/weights` — quản lý, HLV trưởng, bác sĩ và chủ sở hữu liên quan được xem.
+- `GET /api/horses/{horseId}/race-readiness?raceEventId={id}` — trả `ready` và danh sách quy tắc chưa đạt. Điều kiện hiện tại: sức khỏe `FIT`, không có khóa huấn luyện, đánh giá thể lực mới nhất `GREEN`, có cân nặng, nhịp tim nghỉ 30–42 bpm; nếu truyền giải đua thì cân nặng còn phải nằm trong giới hạn của giải. Thiếu dữ liệu được xem là chưa sẵn sàng.
+
+Không đặt một ngưỡng tốc độ chung cho mọi ngựa. Tốc độ và các ngưỡng tập luyện phải được HLV trưởng cấu hình theo từng ngựa.
+
+Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.org/wp-content/uploads/2024/01/AAEPCareGuidelinesRR2012.pdf) nêu mạch bình thường của ngựa trưởng thành là 30–42 bpm. Không dùng ngưỡng 64 bpm của luật endurance FEI làm chuẩn chung cho ngựa đua vì đó là tiêu chí phục hồi của một môn thi cụ thể. Cân nặng cũng không có một khoảng bình thường chung cho mọi giống; backend chỉ yêu cầu có lần cân gần nhất và đối chiếu giới hạn của giải nếu giải có khai báo.
+
+### Chăm sóc phòng ngừa FR12
+
+- `POST /api/horses/{horseId}/preventive-care` — bác sĩ tạo lịch, chu kỳ và số ngày báo trước.
+- `GET /api/horses/{horseId}/preventive-care` — xem và lọc lịch theo loại, trạng thái, khoảng ngày.
+- `PUT|DELETE /api/preventive-care/{id}` — bác sĩ sửa hoặc hủy lịch chưa hoàn thành.
+- `POST /api/preventive-care/{id}/complete` — bác sĩ xác nhận hoàn thành; lịch kế tiếp tự sinh nếu có `recurrenceDays`.
+- Job chạy 06:00 theo `app.club-time-zone`, tạo nhắc lịch đến hạn và báo cáo ngày cho chủ sở hữu. Báo cáo hiện dùng VND; phân bổ chi phí cho nhiều chủ sở hữu được để lại cho giai đoạn sau.
+
+### Ma trận quyền và audit
+
+- `GET /api/admin/role-permissions` — Club Manager xem ma trận `VIEW/EDIT/APPROVE`.
+- `PUT /api/admin/role-permissions/{role}` — Club Manager bật/tắt một quyền của role khác; body gồm `module`, `action`, `granted`.
+- Quyền đã cấp được nạp thành authority `PERM_{MODULE}_{ACTION}` ở lần xác thực request tiếp theo. Ma trận có thể thu hồi/khôi phục quyền trong phạm vi trách nhiệm nghiệp vụ của role, nhưng không mở rộng qua các giới hạn bắt buộc như chỉ bác sĩ nhập cân nặng hoặc chỉ HLV trưởng nhập telemetry. Năm role vẫn cố định và không cho hạ quyền `CLUB_MANAGER`.
+- Mọi request tạo/sửa/xóa thành công và mọi lần login thành công được tự ghi vào `audit_logs`. Bảng audit vẫn chỉ cho thêm, không cho sửa/xóa.
+- `GET /api/admin/audit-logs` — Club Manager lọc audit theo người thao tác, module, action, entity và thời gian.
+
+### API quản trị nghiệp vụ bổ sung
+
+- `/api/stables` — CRUD chuồng; thêm/ngừng ô chuồng; phân bổ hoặc kết thúc phân bổ ngựa.
+- `/api/financial-transactions` — ghi sổ thu/chi VND, tra cứu và tổng hợp. Giao dịch là sổ cái chỉ thêm, không sửa/xóa.
+- `/api/races` — CRUD giải đua; đăng ký, xác nhận và rút đăng ký ngựa.
+- `/api/owner-reports` — xem, tạo và tải báo cáo JSON. Job 06:00 tạo báo cáo ngày và thông báo cho chủ sở hữu.
+- `/api/trial-run-bookings` — đặt, xem danh sách và hủy lượt chạy thử.
+- `/api/files` — upload, xem metadata và xóa file Cloudinary dùng chung; chỉ nhận ảnh, PDF hoặc DOCX.
+- `GET|PUT /api/horses/{horseId}/health-status` — xem trạng thái; bác sĩ cập nhật `FIT`, `MONITOR`, `INJURED`, `QUARANTINED`.
+
+Các API trên kết hợp năm role cố định với authority động trong ma trận RBAC. Theo yêu cầu hiện tại, chưa triển khai API tổng quát cho `module_records` (mục 11), backend khám/điều trị/thuốc/mô hình chấn thương 3D (mục 12), và xuất báo cáo PDF/ảnh (mục 14).
+
 ## Chức năng chưa triển khai vì thiếu đặc tả
 
 Các mục dưới đây được giữ lại và không tự suy diễn:
@@ -497,11 +548,8 @@ Các mục dưới đây được giữ lại và không tự suy diễn:
 - FR03 chưa có bộ lọc theo giai đoạn vì bản ghi FR07 hiện chưa nhận `trainingScheduleId` từ request. Dashboard vẫn không tự tính lại bất kỳ chỉ số nào.
 - FR04 hiện dùng cờ `active`, không tự giới hạn số kế hoạch active trên một ngựa vì tài liệu không quy định. Kế hoạch đã phát sinh lịch không cho thay toàn bộ giai đoạn để bảo toàn dữ liệu tham chiếu.
 - FR05 đã có lịch nháp, công bố, kiểm tra trùng nhân viên, đường đua/làn chạy và đúng 18 slot một giờ từ 06:00 đến 24:00 mỗi ngày. Thông báo chỉ hiển thị trên web bằng polling; không gửi email/SMS/mobile push.
-- Cân nặng ngựa được lưu thành lịch sử nhập thủ công trong `horse_weight_records`. API ghi chưa mở vì chưa xác định role nào được phép nhập.
-- FR06 cảnh báo realtime: chưa có giao thức nhận telemetry, đơn vị nhịp tim/tốc độ, cấu trúc ngưỡng và kênh push tới web/mobile.
 - FR07 hiện chỉ lưu URL video HTTP/HTTPS. Chưa có quyết định về upload file video, dịch vụ lưu trữ, giới hạn dung lượng/định dạng và quyền tải xuống.
-- FR08–FR10 và FR12: tài liệu đã đủ trường dữ liệu cơ bản nhưng API và giao diện chưa được triển khai trong mốc hiện tại.
-- FR13–FR23: database nền đã có; các API nghiệp vụ và giao diện vẫn cần triển khai theo từng luồng phụ thuộc. FR21 chỉ sử dụng đúng 5 role cố định, không cho tạo role mới.
+- Quy tắc phân bổ chi phí đồng sở hữu của FR19/FR22 vẫn chờ quyết định; hiện báo cáo dùng VND và liệt kê toàn bộ giao dịch của các ngựa thuộc owner.
 
 ## Quy ước
 

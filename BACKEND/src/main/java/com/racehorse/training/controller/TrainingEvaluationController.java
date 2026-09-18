@@ -34,7 +34,7 @@ public class TrainingEvaluationController {
 
     @PostMapping("/training-evaluations")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrainingEvaluationResponse create(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateTrainingEvaluationRequest request) {
@@ -42,7 +42,7 @@ public class TrainingEvaluationController {
     }
 
     @GetMapping("/training-evaluations/{evaluationId}")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     TrainingEvaluationResponse get(
             @PathVariable UUID evaluationId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
@@ -50,7 +50,7 @@ public class TrainingEvaluationController {
     }
 
     @GetMapping("/horses/{horseId}/training-evaluations")
-    @PreAuthorize("hasAnyRole('CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     Page<TrainingEvaluationResponse> listForHorse(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
