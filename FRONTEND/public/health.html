@@ -223,113 +223,50 @@
       </div>
     </div>
 
-    <!-- Tab: 3D Model Viewer -->
+    <!-- Tab: 3D Model Viewer (Sketchfab Viewer API) -->
     <div class="htab-panel" id="htab-model" style="display:none">
       <div class="card">
         <div class="card-head" style="flex-wrap:wrap;gap:.8rem;">
           <h3>Bản đồ chấn thương 3D</h3>
           <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;">
-            <select class="filter-select" style="font-size:.83rem;" id="injuryHorseSelect">
-              <option value="gold-wind">Gold Wind — HM-002</option>
-              <option value="moonlight">Moonlight Dancer — HM-004</option>
-            </select>
             <div style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;color:#6b6349;">
               <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#e53e3e;box-shadow:0 0 6px #e53e3e;"></span>Nghiêm trọng
               <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dd6b20;box-shadow:0 0 6px #dd6b20;margin-left:.4rem;"></span>Theo dõi
+              <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4a9e6b;box-shadow:0 0 6px #4a9e6b;margin-left:.4rem;"></span>Bình thường
             </div>
+            <button id="btn3dReset" class="btn btn-secondary" style="font-size:.8rem;padding:.3rem .7rem;">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+              Đặt lại
+            </button>
           </div>
         </div>
         <div class="card-body" style="padding-bottom:.8rem;">
 
-          <!-- 3D Viewer + Dot Overlay -->
-          <div id="viewer3d-wrap" style="position:relative;width:100%;height:480px;border-radius:12px;overflow:hidden;border:1px solid var(--parchment-2);background:#181c24;">
-
-            <!-- Single Sketchfab basemesh iframe -->
-            <iframe id="sketchfab-iframe" title="Horse Basemesh 3D" width="100%" height="100%"
-              frameborder="0" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen
-              src="https://sketchfab.com/models/0ef074acfc834c769a6ec37d6a4be1b9/embed?autostart=1&ui_theme=dark&ui_infos=0&ui_watermark=0&ui_controls=1&ui_help=0&ui_settings=0&ui_inspector=0&ui_annotations=0&ui_stop=0&preload=1"
-              style="display:block;position:absolute;inset:0;width:100%;height:100%;">
-            </iframe>
-
-            <!-- SVG Injury Dot Overlay (pointer-events:none so mouse passes to iframe) -->
-            <svg id="injury-svg" viewBox="0 0 100 100" preserveAspectRatio="none"
-              style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:10;">
-
-              <!-- === Gold Wind injuries (default visible) === -->
-              <!-- Dot 1: Gân chân trước phải — Nghiêm trọng -->
-              <g class="inj-dot horse-gold-wind" data-zone="tendon_front_right">
-                <circle cx="63" cy="74" r="2.2" fill="#e53e3e" opacity="0.95">
-                  <animate attributeName="r" values="2.2;3.5;2.2" dur="1.4s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.95;0.35;0.95" dur="1.4s" repeatCount="indefinite"/>
-                </circle>
-                <circle cx="63" cy="74" r="5" fill="none" stroke="#e53e3e" stroke-width="0.7" opacity="0.6">
-                  <animate attributeName="r" values="5;8;5" dur="1.4s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.6;0;0.6" dur="1.4s" repeatCount="indefinite"/>
-                </circle>
-              </g>
-
-              <!-- Dot 2: Khớp gối chân trước phải — Theo dõi -->
-              <g class="inj-dot horse-gold-wind" data-zone="knee_front_right">
-                <circle cx="62" cy="65" r="2.0" fill="#dd6b20" opacity="0.9">
-                  <animate attributeName="r" values="2;3.2;2" dur="2s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.9;0.3;0.9" dur="2s" repeatCount="indefinite"/>
-                </circle>
-                <circle cx="62" cy="65" r="4.5" fill="none" stroke="#dd6b20" stroke-width="0.6" opacity="0.5">
-                  <animate attributeName="r" values="4.5;7;4.5" dur="2s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.5;0;0.5" dur="2s" repeatCount="indefinite"/>
-                </circle>
-              </g>
-
-              <!-- === Moonlight Dancer injuries (hidden by default) === -->
-              <!-- Dot 3: Khớp stifle sau trái — Nghiêm trọng -->
-              <g class="inj-dot horse-moonlight" data-zone="stifle_back_left" style="display:none">
-                <circle cx="36" cy="63" r="2.2" fill="#e53e3e" opacity="0.95">
-                  <animate attributeName="r" values="2.2;3.5;2.2" dur="1.2s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.95;0.35;0.95" dur="1.2s" repeatCount="indefinite"/>
-                </circle>
-                <circle cx="36" cy="63" r="5" fill="none" stroke="#e53e3e" stroke-width="0.7" opacity="0.6">
-                  <animate attributeName="r" values="5;8.5;5" dur="1.2s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.6;0;0.6" dur="1.2s" repeatCount="indefinite"/>
-                </circle>
-              </g>
-
-              <!-- Dot 4: Bắp vai trái — Theo dõi -->
-              <g class="inj-dot horse-moonlight" data-zone="shoulder_left" style="display:none">
-                <circle cx="30" cy="44" r="2.0" fill="#dd6b20" opacity="0.9">
-                  <animate attributeName="r" values="2;3.2;2" dur="1.8s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.9;0.3;0.9" dur="1.8s" repeatCount="indefinite"/>
-                </circle>
-                <circle cx="30" cy="44" r="4.5" fill="none" stroke="#dd6b20" stroke-width="0.6" opacity="0.5">
-                  <animate attributeName="r" values="4.5;7;4.5" dur="1.8s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.5;0;0.5" dur="1.8s" repeatCount="indefinite"/>
-                </circle>
-              </g>
-
+          <!-- Status loading -->
+          <div id="viewer3d-status" style="height:480px;border-radius:12px;background:#181c24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:#a89e7a;font-size:.9rem;">
+            <svg width="32" height="32" fill="none" stroke="#c1663f" stroke-width="1.5" viewBox="0 0 24 24" style="animation:spin 1.2s linear infinite">
+              <circle cx="12" cy="12" r="10" stroke-opacity=".3"/>
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="#c1663f"/>
             </svg>
-
-            <!-- Invisible hit-zones (absolute divs) for click/hover on dots -->
-            <div id="dot-hits" style="position:absolute;inset:0;z-index:11;pointer-events:none;"></div>
-
-            <!-- Tooltip -->
-            <div id="inj-tooltip" style="display:none;position:absolute;z-index:20;min-width:200px;max-width:240px;
-              background:rgba(20,27,46,0.96);border:1px solid rgba(229,62,62,0.45);border-radius:10px;
-              padding:.8rem 1rem;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.5);">
-              <p id="tt-label" style="margin:0 0 .2rem;font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#fc8181;"></p>
-              <p id="tt-name" style="margin:0 0 .3rem;font-size:.92rem;font-weight:600;color:#f1efe6;"></p>
-              <p id="tt-desc" style="margin:0 0 .5rem;font-size:.82rem;color:#a89e7a;line-height:1.4;"></p>
-              <div id="tt-tags" style="display:flex;gap:.35rem;flex-wrap:wrap;"></div>
-            </div>
-
-            <!-- Bottom hint -->
-            <div style="position:absolute;bottom:0;left:0;right:0;padding:.45rem 1rem;
-              background:linear-gradient(transparent,rgba(18,22,35,0.75));pointer-events:none;z-index:12;text-align:center;">
-              <span style="font-size:.72rem;color:rgba(237,230,214,.55);">
-                Kéo để xoay · Scroll để zoom · Bấm chấm đỏ để xem chi tiết chấn thương
-              </span>
-            </div>
+            Đang tải mô hình 3D…
           </div>
 
-          <!-- Injury list below viewer -->
+          <!-- Sketchfab iframe (API mode — no src, will be set by JS) -->
+          <iframe id="api-frame"
+            allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true"
+            allow="autoplay; fullscreen; xr-spatial-tracking"
+            style="display:none;width:100%;height:480px;border:none;border-radius:12px;background:#181c24;">
+          </iframe>
+
+          <!-- Instruction bar -->
+          <div id="viewer3d-hint" style="display:none;margin-top:.5rem;text-align:center;">
+            <span style="font-size:.75rem;color:#a89e7a;">
+              🖱 Kéo để xoay · Scroll để zoom ·
+              <b style="color:#f1efe6;">Click vào bộ phận</b> để chuyển trạng thái chấn thương
+            </span>
+          </div>
+
+          <!-- Injury state list (populated by JS) -->
           <div id="injury-list" style="margin-top:1rem;display:flex;flex-direction:column;gap:.5rem;"></div>
 
         </div>
@@ -459,223 +396,231 @@
   </div>
 </div>
 
+<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
 <script>
+  // ── Sidebar & basic UI ──────────────────────
   const toggle = document.getElementById('sidebarToggle');
   const sidebar = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
   toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
   backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
 
-  // Tabs
+  // ── Tab switching ───────────────────────────
   document.querySelectorAll('[data-htab]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-htab]').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.htab-panel').forEach(p => p.style.display = 'none');
       btn.classList.add('active');
       document.getElementById('htab-' + btn.dataset.htab).style.display = '';
+      if (btn.dataset.htab === 'model') initViewer();
     });
   });
 
-  // Lock modal
-  const lockModal = document.getElementById('lockModal');
+  // ── Modals ───────────────────────────────────
+  const lockModal    = document.getElementById('lockModal');
+  const releaseModal = document.getElementById('releaseModal');
+  const careModal    = document.getElementById('careModal');
   document.getElementById('btnNewLock').addEventListener('click', () => lockModal.style.display = 'flex');
   document.getElementById('closeLockModal').addEventListener('click', () => lockModal.style.display = 'none');
   document.getElementById('cancelLockModal').addEventListener('click', () => lockModal.style.display = 'none');
   lockModal.addEventListener('mousedown', e => { if (e.target === lockModal) lockModal.style.display = 'none'; });
-
-  // Release modal
-  const releaseModal = document.getElementById('releaseModal');
   document.getElementById('btnRelease1').addEventListener('click', () => releaseModal.style.display = 'flex');
   document.getElementById('closeReleaseModal').addEventListener('click', () => releaseModal.style.display = 'none');
   document.getElementById('cancelReleaseModal').addEventListener('click', () => releaseModal.style.display = 'none');
   releaseModal.addEventListener('mousedown', e => { if (e.target === releaseModal) releaseModal.style.display = 'none'; });
-
-  // Care modal
-  const careModal = document.getElementById('careModal');
   document.getElementById('btnNewCare').addEventListener('click', () => careModal.style.display = 'flex');
   document.getElementById('closeCareModal').addEventListener('click', () => careModal.style.display = 'none');
   document.getElementById('cancelCareModal').addEventListener('click', () => careModal.style.display = 'none');
   careModal.addEventListener('mousedown', e => { if (e.target === careModal) careModal.style.display = 'none'; });
 
-  // ═══════════════════════════════════════════
-  //   INJURY DOT SYSTEM
-  // ═══════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════
+  //  SKETCHFAB VIEWER API — INJURY STATE SYSTEM
+  //  Model: https://sketchfab.com/3d-models/horse-791844e912d0460d8e8951891158c696
+  //  Cách hoạt động: Click trên mesh → đổi màu Material thật của 3D
+  //  → màu LÚC NÀO CŨNG theo model khi xoay (không phải 2D overlay)
+  // ═══════════════════════════════════════════════════════════
 
-  // Data: injuries per horse. cx/cy = percentage position on the SVG viewBox 0-100.
-  const INJURY_DATA = {
-    'gold-wind': [
-      {
-        zone: 'tendon_front_right',
-        cx: 63, cy: 74,
-        label: 'Nghiêm trọng',
-        name: 'Gân chân trước phải',
-        desc: 'Chấn thương gân do va chạm ngày 05/09/2026. Không tập nặng.',
-        tags: ['Thời gian hồi phục: 3 tuần', 'Không tập HIGH', 'Đang theo dõi'],
-        color: '#e53e3e'
-      },
-      {
-        zone: 'knee_front_right',
-        cx: 62, cy: 65,
-        label: 'Theo dõi',
-        name: 'Khớp gối trước phải',
-        desc: 'Viêm nhẹ khớp gối do tập nặng liên tục. Cần kiểm tra mỗi 3 ngày.',
-        tags: ['Mức độ: Nhẹ', 'Đang điều trị'],
-        color: '#dd6b20'
-      }
-    ],
-    'moonlight': [
-      {
-        zone: 'stifle_back_left',
-        cx: 36, cy: 63,
-        label: 'Nghiêm trọng',
-        name: 'Khớp stifle sau trái',
-        desc: 'Phẫu thuật khớp ngày 22/08/2026. Đang phục hồi theo phác đồ 6 tuần.',
-        tags: ['Phục hồi sau mổ', 'Thời gian: 6 tuần', 'Không tập'],
-        color: '#e53e3e'
-      },
-      {
-        zone: 'shoulder_left',
-        cx: 30, cy: 44,
-        label: 'Theo dõi',
-        name: 'Bắp vai trái',
-        desc: 'Căng cơ vai nhẹ. Massage vật lý trị liệu mỗi ngày.',
-        tags: ['Mức độ: Nhẹ', 'Vật lý trị liệu'],
-        color: '#dd6b20'
-      }
-    ]
+  const MODEL_UID = '791844e912d0460d8e8951891158c696';
+
+  // Màu theo trạng thái (linear RGB 0–1)
+  const STATE_COLORS = {
+    normal:    null,                   // khôi phục màu gốc
+    serious:   [0.894, 0.145, 0.145], // đỏ #e53e3e
+    monitoring:[0.867, 0.420, 0.125]  // cam #dd6b20
+  };
+  const STATE_CYCLE  = ['normal', 'serious', 'monitoring'];
+  const STATE_LABELS = {
+    normal:    'Bình thường',
+    serious:   'Nghiêm trọng',
+    monitoring:'Cần theo dõi'
+  };
+  const STATE_DOT_COLORS = {
+    normal:    '#4a9e6b',
+    serious:   '#e53e3e',
+    monitoring:'#dd6b20'
   };
 
-  const wrap = document.getElementById('viewer3d-wrap');
-  const hitDiv = document.getElementById('dot-hits');
-  const tooltip = document.getElementById('inj-tooltip');
-  const ttLabel = document.getElementById('tt-label');
-  const ttName  = document.getElementById('tt-name');
-  const ttDesc  = document.getElementById('tt-desc');
-  const ttTags  = document.getElementById('tt-tags');
-  const injList = document.getElementById('injury-list');
+  let apiInstance   = null;
+  let viewerReady   = false;
+  let viewerInited  = false;
+  // materialId → { state, originalMat, name }
+  const matStates   = {};
 
-  let activeHorse = 'gold-wind';
-  let openZone = null;
+  function initViewer() {
+    if (viewerInited) return;
+    viewerInited = true;
 
-  // Render hit zones + injury list for a horse
-  function renderHorse(horseKey) {
-    activeHorse = horseKey;
-    openZone = null;
-    if (tooltip) tooltip.style.display = 'none';
+    const iframe = document.getElementById('api-frame');
+    const status = document.getElementById('viewer3d-status');
+    const hint   = document.getElementById('viewer3d-hint');
 
-    // Toggle SVG dot groups
-    document.querySelectorAll('.horse-gold-wind').forEach(g => g.style.display = horseKey === 'gold-wind' ? '' : 'none');
-    document.querySelectorAll('.horse-moonlight').forEach(g => g.style.display = horseKey === 'moonlight' ? '' : 'none');
+    const client = new Sketchfab(iframe);
+    client.init(MODEL_UID, {
+      success: function(api) {
+        apiInstance = api;
+        api.start();
 
-    const injuries = INJURY_DATA[horseKey] || [];
+        api.addEventListener('viewerready', function() {
+          viewerReady = true;
 
-    // Build hit zones (small transparent div squares over each dot)
-    if (hitDiv) {
-      hitDiv.innerHTML = '';
-      injuries.forEach(inj => {
-        const pxX = inj.cx;
-        const pxY = inj.cy;
-        const btn = document.createElement('div');
-        btn.style.cssText = `
-          position:absolute;
-          left:${pxX - 3}%; top:${pxY - 3}%;
-          width:6%; height:6%;
-          cursor:pointer;
-          pointer-events:all;
-          border-radius:50%;
-        `;
-        btn.setAttribute('data-zone', inj.zone);
-        btn.title = inj.name;
-        btn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          if (openZone === inj.zone) {
-            tooltip.style.display = 'none';
-            openZone = null;
-            return;
-          }
-          openZone = inj.zone;
-          showTooltip(inj, btn);
+          // Show iframe, hide loading spinner
+          status.style.display = 'none';
+          iframe.style.display = 'block';
+          hint.style.display   = 'block';
+
+          // Cache all original materials
+          api.getMaterialList(function(err, materials) {
+            if (err) return;
+            materials.forEach(mat => {
+              matStates[mat.id] = {
+                state: 'normal',
+                originalMat: JSON.parse(JSON.stringify(mat)),
+                name: mat.name || mat.id
+              };
+            });
+          });
+
+          // Listen for click on any mesh
+          api.addEventListener('click', function(info) {
+            if (!info || !info.material) return;  // clicked empty space
+            const matId = info.material.id;
+            if (matId === undefined) return;
+
+            // Ensure entry exists
+            if (!matStates[matId]) {
+              matStates[matId] = {
+                state: 'normal',
+                originalMat: JSON.parse(JSON.stringify(info.material)),
+                name: info.material.name || matId
+              };
+            }
+
+            // Cycle to next state
+            const cur  = matStates[matId].state;
+            const next = STATE_CYCLE[(STATE_CYCLE.indexOf(cur) + 1) % STATE_CYCLE.length];
+            matStates[matId].state = next;
+
+            // Apply color change to actual 3D material
+            if (next === 'normal') {
+              // Restore original material
+              api.setMaterial(matStates[matId].originalMat, function() {});
+            } else {
+              const rgb = STATE_COLORS[next];
+              api.getMaterialList(function(err2, mats) {
+                if (err2) return;
+                const mat = mats.find(m => m.id === matId);
+                if (!mat) return;
+                // Apply base color + slight emissive so it glows
+                if (mat.channels.AlbedoPBR) {
+                  mat.channels.AlbedoPBR.color = rgb;
+                  mat.channels.AlbedoPBR.texture = null;
+                  mat.channels.AlbedoPBR.factor  = 1;
+                }
+                if (mat.channels.EmitColor) {
+                  mat.channels.EmitColor.enable = true;
+                  mat.channels.EmitColor.factor  = 0.35;
+                  mat.channels.EmitColor.color   = rgb.map(c => c * 0.4);
+                }
+                api.setMaterial(mat, function() {});
+              });
+            }
+
+            // Re-render injury list
+            renderInjuryList();
+          });
         });
-        hitDiv.appendChild(btn);
-      });
-    }
+      },
+      error: function() {
+        const status = document.getElementById('viewer3d-status');
+        status.innerHTML = '<span style="color:#fc8181">⚠ Không tải được mô hình. Vui lòng kiểm tra kết nối.</span>';
+      },
+      ui_theme: 'dark',
+      ui_infos: 0,
+      ui_watermark: 0,
+      ui_controls: 1,
+      ui_help: 0,
+      ui_settings: 0,
+      ui_inspector: 0,
+      ui_annotations: 0,
+      ui_stop: 0,
+      preload: 1,
+      autostart: 1
+    });
+  }
 
-    // Render injury list below viewer
-    if (injList) {
-      injList.innerHTML = injuries.map(inj => `
-        <div style="display:flex;align-items:flex-start;gap:.85rem;padding:.8rem 1rem;
-          border-radius:10px;background:${inj.color === '#e53e3e' ? 'rgba(229,62,62,.06)' : 'rgba(221,107,32,.06)'};
-          border:1px solid ${inj.color === '#e53e3e' ? 'rgba(229,62,62,.2)' : 'rgba(221,107,32,.2)'};">
-          <span style="width:10px;height:10px;border-radius:50%;background:${inj.color};
-            box-shadow:0 0 6px ${inj.color};flex-shrink:0;margin-top:.25rem;"></span>
-          <div style="flex:1">
-            <b style="font-size:.9rem;color:#f1efe6;">${inj.name}</b>
-            <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-              color:${inj.color};margin-left:.5rem;">${inj.label}</span>
-            <p style="font-size:.82rem;color:#a89e7a;margin:.2rem 0 .4rem;">${inj.desc}</p>
-            <div style="display:flex;gap:.35rem;flex-wrap:wrap;">
-              ${inj.tags.map(t => `<span style="font-size:.75rem;padding:.15rem .55rem;border-radius:999px;
-                background:rgba(255,255,255,.07);color:#e4e0d2;">${t}</span>`).join('')}
-            </div>
-          </div>
+  // Render danh sách vùng đã đánh dấu bên dưới viewer
+  function renderInjuryList() {
+    const injList = document.getElementById('injury-list');
+    if (!injList) return;
+    const marked = Object.entries(matStates).filter(([id, s]) => s.state !== 'normal');
+    if (!marked.length) {
+      injList.innerHTML = '<p style="font-size:.83rem;color:#a89e7a;text-align:center;padding:.5rem 0;">Chưa có vùng nào được đánh dấu. Click vào bộ phận trên model để thêm.</p>';
+      return;
+    }
+    injList.innerHTML = marked.map(([id, s]) => {
+      const col = STATE_DOT_COLORS[s.state];
+      return `
+      <div style="display:flex;align-items:center;gap:.85rem;padding:.7rem 1rem;
+        border-radius:10px;background:rgba(255,255,255,.04);
+        border:1px solid rgba(255,255,255,.08);">
+        <span style="width:10px;height:10px;border-radius:50%;flex-shrink:0;
+          background:${col};box-shadow:0 0 7px ${col};"></span>
+        <div style="flex:1">
+          <b style="font-size:.88rem;color:#f1efe6;">${s.name}</b>
+          <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;
+            text-transform:uppercase;color:${col};margin-left:.5rem;">${STATE_LABELS[s.state]}</span>
         </div>
-      `).join('');
-    }
+        <button onclick="resetPart('${id}')" style="font-size:.75rem;padding:.2rem .55rem;
+          border-radius:6px;border:1px solid rgba(255,255,255,.12);background:transparent;
+          color:#a89e7a;cursor:pointer;">Bỏ đánh dấu</button>
+      </div>`;
+    }).join('');
   }
 
-  // Show tooltip near the clicked hit zone
-  function showTooltip(inj, btn) {
-    if (!tooltip || !wrap) return;
-    ttLabel.textContent = inj.label;
-    ttLabel.style.color = inj.color === '#e53e3e' ? '#fc8181' : '#f6ad55';
-    ttName.textContent  = inj.name;
-    ttDesc.textContent  = inj.desc;
-    ttTags.innerHTML = inj.tags.map(t =>
-      `<span style="font-size:.75rem;padding:.15rem .55rem;border-radius:999px;background:rgba(255,255,255,.1);color:#e4e0d2;">${t}</span>`
-    ).join('');
-    tooltip.style.display = 'block';
+  // Đặt lại 1 bộ phận về bình thường
+  window.resetPart = function(matId) {
+    if (!apiInstance || !matStates[matId]) return;
+    apiInstance.setMaterial(matStates[matId].originalMat, function() {});
+    matStates[matId].state = 'normal';
+    renderInjuryList();
+  };
 
-    const wRect = wrap.getBoundingClientRect();
-    const bRect = btn.getBoundingClientRect();
-    let left = bRect.left - wRect.left + bRect.width / 2 + 10;
-    let top  = bRect.top  - wRect.top  - 20;
-
-    const tipW = 240;
-    if (left + tipW > wrap.offsetWidth - 10) left = bRect.left - wRect.left - tipW - 8;
-    if (top < 5) top = 5;
-
-    tooltip.style.left = left + 'px';
-    tooltip.style.top  = top  + 'px';
-  }
-
-  // Click on viewer (not on a dot) → close tooltip
-  if (wrap) {
-    wrap.addEventListener('click', (e) => {
-      if (!e.target.closest('[data-zone]')) {
-        if (tooltip) tooltip.style.display = 'none';
-        openZone = null;
+  // Nút "Đặt lại tất cả"
+  document.getElementById('btn3dReset').addEventListener('click', function() {
+    if (!apiInstance || !viewerReady) return;
+    Object.entries(matStates).forEach(([id, s]) => {
+      if (s.state !== 'normal') {
+        apiInstance.setMaterial(s.originalMat, function() {});
+        s.state = 'normal';
       }
     });
-  }
+    renderInjuryList();
+  });
 
-  // Horse select change
-  const horseSelect = document.getElementById('injuryHorseSelect');
-  if (horseSelect) {
-    horseSelect.addEventListener('change', function() {
-      renderHorse(this.value);
-    });
-  }
-
-  // Init on first tab open
-  const modelTabBtn = document.querySelector('[data-htab="model"]');
-  if (modelTabBtn) {
-    modelTabBtn.addEventListener('click', () => {
-      if (hitDiv && !hitDiv.children.length) renderHorse('gold-wind');
-    });
-  }
-
-  // Also init immediately if tab is already active
-  renderHorse('gold-wind');
+  // Thêm CSS spin animation
+  const style = document.createElement('style');
+  style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+  document.head.appendChild(style);
 </script>
 
 </body>
