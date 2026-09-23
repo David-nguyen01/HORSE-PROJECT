@@ -1,17 +1,144 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sức khỏe & Y tế — Turfline Stable Manager</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="app-shell.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sức khỏe & Y tế — Turfline Stable Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="app-shell.css">
+  
+  <!-- Thư viện Model Viewer của Google -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+
+  <style>
+    /* MASTER-DETAIL LAYOUT */
+    .md-layout {
+      display: flex;
+      gap: 1.5rem;
+      height: calc(100vh - 170px);
+      margin-top: 1rem;
+    }
+    .md-sidebar {
+      width: 340px;
+      background: #151923;
+      border: 1px solid #2a303f;
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .md-search {
+      padding: 1rem;
+      border-bottom: 1px solid #2a303f;
+    }
+    .md-search input {
+      width: 100%;
+      background: #0a0d14;
+      border: 1px solid #2a303f;
+      color: #f1efe6;
+      padding: 0.6rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+    }
+    .md-list {
+      overflow-y: auto;
+      flex: 1;
+      padding: 0.5rem;
+    }
+    .md-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .md-item:hover { background: rgba(255,255,255,0.05); }
+    .md-item.active { background: rgba(47,107,87,0.15); border-left: 3px solid #68d391; }
+    .md-item-avatar {
+      width: 40px; height: 40px; border-radius: 8px;
+      background: #2a303f; display: flex; align-items: center; justify-content: center;
+      font-weight: 600; color: #a89e7a; font-family: 'Fraunces', serif;
+    }
+    .md-item-info { flex: 1; min-width: 0; }
+    .md-item-name { font-weight: 600; color: #f1efe6; margin-bottom: 0.2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .md-item-meta { font-size: 0.75rem; color: #7a7258; }
+    
+    .md-main {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      padding-right: 0.5rem;
+    }
+    .md-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #7a7258;
+      border: 1px dashed #2a303f;
+      border-radius: 12px;
+      background: rgba(21,25,35,0.5);
+    }
+    
+    /* 3D VIEWER STYLES */
+    .viewer-card {
+      background: #151923;
+      border: 1px solid #2a303f;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    model-viewer {
+      width: 100%;
+      height: 500px;
+      background-color: #0d1017;
+      outline: none;
+    }
+    
+    /* HOTSPOTS */
+    .Hotspot {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.8);
+      box-shadow: 0 0 12px rgba(0,0,0,0.8);
+      cursor: pointer;
+      background-color: #48bb78; /* Xanh: Bình thường */
+      transition: transform 0.2s, background-color 0.3s;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .Hotspot[data-status="MONITORING"] { background-color: #ed8936; box-shadow: 0 0 12px rgba(237,137,54,0.6); } /* Cam */
+    .Hotspot[data-status="SEVERE"] { background-color: #e53e3e; box-shadow: 0 0 12px rgba(229,62,62,0.6); animation: pulse 2s infinite; } /* Đỏ */
+    
+    .Hotspot:hover { transform: scale(1.2); }
+    .Hotspot-tooltip {
+      position: absolute;
+      bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: rgba(14,18,30,0.95); padding: 5px 10px; border-radius: 6px;
+      font-size: 0.75rem; white-space: nowrap; color: #fff;
+      border: 1px solid #2a303f;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+      z-index: 10;
+      text-align: center;
+    }
+    .Hotspot:hover .Hotspot-tooltip { opacity: 1; }
+    
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(229,62,62, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(229,62,62, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(229,62,62, 0); }
+    }
+  </style>
 </head>
 <body class="app-body">
 
 <div class="app-shell" id="appShell">
-
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand"><div class="brand-mark"><span class="glyph">◆</span><span class="wordmark"><b>Turfline</b>Stable Manager</span></div></div>
@@ -30,771 +157,408 @@
       <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
     </nav>
     <div class="sidebar-foot">
-      <div class="user-chip"><span class="avatar">BT</span><div class="user-info"><b>BS. Bùi Thanh</b><small>Bác sĩ Thú y</small></div></div>
-      <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+      <div class="user-chip"><span class="avatar" id="userAvatar">?</span><div class="user-info"><b id="userName">Đang tải…</b><small id="userRole"></small></div></div>
+      <a href="#" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
     </div>
   </aside>
 
   <!-- TOPBAR -->
   <header class="topbar">
-    <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <button class="mobile-sidebar-toggle" id="sidebarToggle"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <span class="topbar-title">Sức khỏe & Y tế</span>
-    <div class="topbar-right">
-      <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
-      <button class="notif-btn"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge">2</span></button>
-    </div>
   </header>
 
   <!-- MAIN -->
   <main class="main-content">
-
     <div class="page-heading">
       <div>
         <p class="eyebrow">FLOW 3 · Y TẾ & PHỤC HỒI</p>
-        <h1>Sức khỏe & Y tế</h1>
-        <p class="sub">Quản lý khóa huấn luyện, tiêm phòng và chăm sóc định kỳ.</p>
+        <h1>Hồ sơ Y tế</h1>
+        <p class="sub">Quản lý sức khỏe, chấn thương và theo dõi y tế chi tiết theo từng cá thể ngựa.</p>
       </div>
-      <div class="heading-actions">
-        <button class="btn btn-secondary" id="btnNewCare">
-          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
-          Thêm lịch chăm sóc
-        </button>
-        <button class="btn btn-primary" style="background:#c4573f;" id="btnNewLock">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          Khóa huấn luyện
-        </button>
-      </div>
+      <!-- Tool lấy tọa độ ẩn (chỉ dành cho Dev/Admin để thiết lập tọa độ hotspot) -->
+      <button class="btn btn-secondary" id="btnDevMode" style="display:none;font-size:0.8rem">Bật tool lấy tọa độ 3D</button>
     </div>
 
-    <!-- Stats -->
-    <div class="stats-row">
-      <div class="stat-card rose">
-        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
-        <div><strong>2</strong><span>Đang bị khóa</span></div>
+    <!-- MASTER-DETAIL LAYOUT -->
+    <div class="md-layout">
+      
+      <!-- CỘT TRÁI: DANH SÁCH NGỰA -->
+      <div class="md-sidebar">
+        <div class="md-search">
+          <input type="text" id="searchHorse" placeholder="Tìm kiếm ngựa...">
+        </div>
+        <div class="md-list" id="horseList">
+          <div style="padding: 2rem; text-align: center; color: #7a7258;">Đang tải danh sách...</div>
+        </div>
       </div>
-      <div class="stat-card gold">
-        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-        <div><strong>5</strong><span>Đang theo dõi</span></div>
+
+      <!-- CỘT PHẢI: CHI TIẾT NGỰA ĐƯỢC CHỌN -->
+      <div class="md-main" id="horseDetailArea">
+        <div class="md-empty">
+          <svg width="48" height="48" fill="none" stroke="#2a303f" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:1rem"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <p>Vui lòng chọn một con ngựa từ danh sách bên trái để xem chi tiết y tế.</p>
+        </div>
       </div>
-      <div class="stat-card blue">
-        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
-        <div><strong>3</strong><span>Lịch tiêm tuần này</span></div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Template cho vùng Detail (sẽ được inject vào md-main bằng JS) -->
+<template id="detailTemplate">
+  <!-- Header của ngựa -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h2 id="dt-name" style="margin:0 0 0.2rem 0; color:#f1efe6;">Tên ngựa</h2>
+      <p id="dt-meta" style="margin:0; font-size:0.85rem; color:#a89e7a;">Mã · Giống</p>
+    </div>
+    <div id="dt-badge"></div>
+  </div>
+
+  <!-- Cột 2 Layout: Lệnh & Chăm sóc -->
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Khóa huấn luyện -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Lệnh Khóa Huấn luyện</h3>
+        <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.6rem" id="btnActionLock">Thay đổi</button>
       </div>
-      <div class="stat-card green">
-        <span class="stat-icon"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
-        <div><strong>41</strong><span>Đủ điều kiện tập</span></div>
+      <div class="card-body" id="dt-lock-content" style="padding-bottom:1.2rem;">
+        <p style="font-size:0.85rem; color:#7a7258; margin:0;">Không có lệnh khóa nào. Ngựa có thể tập luyện bình thường.</p>
       </div>
     </div>
-
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" data-htab="locks">Khóa huấn luyện</button>
-      <button class="tab-btn" data-htab="care">Chăm sóc định kỳ</button>
-      <button class="tab-btn" data-htab="model">Bản đồ chấn thương</button>
-    </div>
-
-    <!-- Tab: Training Locks -->
-    <div class="htab-panel active" id="htab-locks">
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;">
-
-        <!-- Lock 1 — ACTIVE -->
-        <div class="lock-card">
-          <div class="lock-horse">
-            <b>Gold Wind</b>
-            <small>HM-002 · Arabian · Chuồng B-03</small>
-          </div>
-          <span class="badge locked"><i></i>Đang khóa</span>
-          <p class="lock-reason">Chấn thương gân chân phải sau trận đấu ngày 05/09. Cần nghỉ tuyệt đối ít nhất 3 tuần.</p>
-          <div class="lock-meta">
-            Khóa bởi: BS. Bùi Thanh · 06/09/2026<br>
-            Ngày xem xét: 27/09/2026
-          </div>
-          <div style="display:flex;gap:.5rem;grid-column:1/-1;margin-top:.4rem;">
-            <button class="btn btn-secondary" style="font-size:.82rem;">Cập nhật lý do</button>
-            <button class="btn btn-primary" style="font-size:.82rem;" id="btnRelease1">Gỡ khóa</button>
-          </div>
-        </div>
-
-        <!-- Lock 2 — ACTIVE -->
-        <div class="lock-card">
-          <div class="lock-horse">
-            <b>Moonlight Dancer</b>
-            <small>HM-004 · Thoroughbred · Chuồng B-11</small>
-          </div>
-          <span class="badge locked"><i></i>Đang khóa</span>
-          <p class="lock-reason">Phục hồi sau phẫu thuật khớp gối. Phác đồ 6 tuần. Không tập nặng, chỉ cho đi bộ nhẹ từ tuần 3.</p>
-          <div class="lock-meta">
-            Khóa bởi: BS. Bùi Thanh · 22/08/2026<br>
-            Ngày xem xét: 03/10/2026
-          </div>
-          <div style="display:flex;gap:.5rem;grid-column:1/-1;margin-top:.4rem;">
-            <button class="btn btn-secondary" style="font-size:.82rem;">Cập nhật lý do</button>
-            <button class="btn btn-primary" style="font-size:.82rem;">Gỡ khóa</button>
-          </div>
-        </div>
-
-        <!-- Lock 3 — RELEASED -->
-        <div class="lock-card" style="border-left-color:#2f6b57;opacity:.7;">
-          <div class="lock-horse">
-            <b>Summer Wind</b>
-            <small>HM-006 · Arabian · Chuồng C-02</small>
-          </div>
-          <span class="badge completed"><i></i>Đã gỡ khóa</span>
-          <p class="lock-reason">Viêm cơ nhẹ. Đã phục hồi hoàn toàn sau 10 ngày nghỉ.</p>
-          <div class="lock-meta">
-            Gỡ bởi: BS. Bùi Thanh · 15/09/2026<br>
-            Lý do gỡ: Kiểm tra lại, không còn dấu hiệu viêm.
-          </div>
-        </div>
-
+    
+    <!-- Lịch chăm sóc -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Lịch chăm sóc & Điều trị</h3>
+        <button class="btn btn-primary" style="font-size:0.75rem; padding:0.3rem 0.6rem" id="btnActionCare">+ Thêm lịch</button>
       </div>
-    </div>
-
-    <!-- Tab: Preventive Care -->
-    <div class="htab-panel" id="htab-care" style="display:none">
-      <div class="card">
-        <div class="card-head">
-          <h3>Lịch chăm sóc định kỳ</h3>
-          <div style="display:flex;gap:.5rem">
-            <select class="filter-select" style="font-size:.83rem;">
-              <option>Tất cả loại</option>
-              <option>Tiêm phòng</option>
-              <option>Tẩy giun</option>
-              <option>Kiểm tra móng (Farrier)</option>
-              <option>Khám tổng quát</option>
-            </select>
-            <select class="filter-select" style="font-size:.83rem;">
-              <option>Tất cả trạng thái</option>
-              <option>Đã lên lịch</option>
-              <option>Hoàn thành</option>
-              <option>Quá hạn</option>
-            </select>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Ngựa</th><th>Loại chăm sóc</th><th>Ngày dự kiến</th><th>Ghi chú</th><th>Trạng thái</th><th></th>
-            </tr></thead>
-            <tbody>
-              <tr>
-                <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
-                <td>💉 Tiêm phòng cúm ngựa</td>
-                <td>20/09/2026</td>
-                <td style="font-size:.82rem;color:#55503f;">Vắc-xin EIV, liều nhắc hàng năm</td>
-                <td><span class="badge draft"><i></i>Đã lên lịch</span></td>
-                <td><button class="btn btn-secondary" style="font-size:.8rem;" id="btnCompleteCare1">Xác nhận hoàn thành</button></td>
-              </tr>
-              <tr>
-                <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005</small></div></div></td>
-                <td>🪱 Tẩy giun định kỳ</td>
-                <td>22/09/2026</td>
-                <td style="font-size:.82rem;color:#55503f;">Ivermectin 1% — liều 3 tháng</td>
-                <td><span class="badge draft"><i></i>Đã lên lịch</span></td>
-                <td><button class="btn btn-secondary" style="font-size:.8rem;">Xác nhận hoàn thành</button></td>
-              </tr>
-              <tr>
-                <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007</small></div></div></td>
-                <td>🔨 Kiểm tra móng (Farrier)</td>
-                <td>18/09/2026</td>
-                <td style="font-size:.82rem;color:#55503f;">Đóng lại móng sau phải</td>
-                <td><span class="badge red"><i></i>Quá hạn</span></td>
-                <td><button class="btn btn-secondary" style="font-size:.8rem;">Xác nhận hoàn thành</button></td>
-              </tr>
-              <tr>
-                <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003</small></div></div></td>
-                <td>🩺 Khám tổng quát</td>
-                <td>12/09/2026</td>
-                <td style="font-size:.82rem;color:#55503f;">Theo dõi nhịp tim sau đợt nghỉ</td>
-                <td><span class="badge completed"><i></i>Hoàn thành</span></td>
-                <td></td>
-              </tr>
-              <tr>
-                <td><div class="td-horse"><span class="horse-mono">GW</span><div><b>Gold Wind</b><small>HM-002</small></div></div></td>
-                <td>💉 Tiêm kháng sinh</td>
-                <td>10/09/2026</td>
-                <td style="font-size:.82rem;color:#55503f;">Theo phác đồ điều trị chấn thương gân</td>
-                <td><span class="badge completed"><i></i>Hoàn thành</span></td>
-                <td></td>
-              </tr>
+      <div class="card-body" style="padding:0">
+        <div class="table-wrap" style="max-height: 180px; overflow-y:auto; border:none;">
+          <table style="width:100%">
+            <tbody id="dt-care-list">
+              <!-- Load bằng JS -->
             </tbody>
           </table>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Tab: 3D Model Viewer với Dot Tracking thực sự -->
-    <div class="htab-panel" id="htab-model" style="display:none">
-      <div class="card">
-        <div class="card-head" style="flex-wrap:wrap;gap:.8rem;">
-          <div>
-            <h3 style="margin:0 0 .2rem 0;">Bản đồ chấn thương 3D</h3>
-            <p style="margin:0;font-size:.8rem;color:#7a7258;">Chấm hiển thị <b>trực tiếp trên model</b> và bám theo khi xoay. Cần mở qua <b>Live Server</b> (Go Live) trên Chrome/Edge.</p>
-          </div>
-          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">
-            <!-- Toggle mark mode -->
-            <button id="btn3dMark" class="btn btn-primary" style="font-size:.8rem;padding:.35rem .8rem;background:#2f6b57;">
-              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-              Thêm điểm chấn thương
-            </button>
-            <button id="btn3dReset" class="btn btn-secondary" style="font-size:.8rem;padding:.35rem .75rem;">
-              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-              Xóa tất cả
-            </button>
-            <!-- Legend -->
-            <div style="display:flex;align-items:center;gap:.4rem;font-size:.75rem;color:#8a8167;">
-              <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#e53e3e;box-shadow:0 0 4px #e53e3e;"></span>Nghiêm trọng
-              <span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#dd6b20;box-shadow:0 0 4px #dd6b20;margin-left:.3rem;"></span>Theo dõi
-            </div>
-          </div>
-        </div>
-        <div class="card-body" style="padding-bottom:1rem;">
-
-          <!-- Mark mode banner -->
-          <div id="mark-banner" style="display:none;margin-bottom:.7rem;padding:.55rem 1rem;border-radius:8px;background:rgba(47,107,87,0.15);border:1px solid rgba(47,107,87,0.4);font-size:.83rem;color:#68d391;display:flex;align-items:center;gap:.5rem;">
-            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            <span><b>Chế độ đánh dấu đang bật</b> — Click thẳng lên model 3D để đặt điểm chấn thương. Click lại nút để tắt.</span>
-          </div>
-
-          <!-- 3D viewer container with dot overlay -->
-          <div id="viewer3d-container" style="position:relative;width:100%;height:500px;border-radius:12px;overflow:hidden;background:#0d1017;border:1px solid rgba(255,255,255,0.07);">
-
-            <!-- Loading state -->
-            <div id="viewer3d-status"
-              style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem;color:#a89e7a;font-size:.9rem;background:#0d1017;">
-              <svg id="viewer-spinner" width="36" height="36" fill="none" stroke="#c1663f" stroke-width="1.5" viewBox="0 0 24 24"
-                style="animation:_spin3d 1.1s linear infinite;">
-                <circle cx="12" cy="12" r="10" stroke-opacity=".25"/>
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="#c1663f"/>
-              </svg>
-              <span id="viewer-status-text">Đang khởi tạo mô hình 3D…</span>
-            </div>
-
-            <!-- iframe: src set by JS (required for Viewer API) -->
-            <iframe id="api-frame"
-              allowfullscreen mozallowfullscreen="true" webkitallowfullscreen="true"
-              allow="autoplay; fullscreen; xr-spatial-tracking"
-              style="position:absolute;inset:0;width:100%;height:100%;border:none;display:none;">
-            </iframe>
-
-            <!-- Dot overlay: pointer-events:none so mouse reaches iframe. Dots have pointer-events:auto -->
-            <div id="dot-overlay"
-              style="position:absolute;inset:0;z-index:10;pointer-events:none;overflow:hidden;">
-            </div>
-
-            <!-- Bottom hint bar -->
-            <div id="viewer-hint-bar"
-              style="display:none;position:absolute;bottom:0;left:0;right:0;padding:.4rem 1rem;
-              background:linear-gradient(transparent,rgba(10,13,20,0.8));pointer-events:none;z-index:11;text-align:center;">
-              <span style="font-size:.72rem;color:rgba(237,230,214,.6);">
-                🖱 Kéo để xoay · Scroll để zoom · <b style="color:#f1efe6;">Click thẳng lên da ngựa</b> khi bật chế độ đánh dấu
-              </span>
-            </div>
-          </div>
-
-          <!-- Fallback message (shown if API fails — e.g. VS Code webview) -->
-          <div id="viewer-fallback" style="display:none;margin-top:.8rem;padding:.85rem 1rem;border-radius:9px;
-            background:rgba(193,102,63,0.08);border:1px solid rgba(193,102,63,0.28);">
-            <div style="font-size:.85rem;color:#c1663f;font-weight:600;margin-bottom:.3rem;">
-              ⚡ Để chấm bám theo model khi xoay: Mở file qua Live Server
-            </div>
-            <div style="font-size:.82rem;color:#7a7258;line-height:1.5;">
-              Nhấn <b>Go Live</b> ở thanh dưới VS Code → Chrome tự mở <code>http://localhost:5500/health.html</code> → vào tab <b>Bản đồ chấn thương</b> → Hoạt động hoàn hảo.
-              <br>VS Code built-in preview (Simple Browser) không hỗ trợ cross-origin postMessage của Sketchfab API.
-            </div>
-          </div>
-
-          <!-- Injury list (built from dot state) -->
-          <div id="injury-dot-list" style="margin-top:1rem;display:flex;flex-direction:column;gap:.5rem;"></div>
-
-        </div>
+  <!-- Bản đồ chấn thương 3D -->
+  <div class="viewer-card" style="display:flex; flex-direction:column;">
+    <div class="card-head" style="border-bottom: 1px solid #2a303f;">
+      <div>
+        <h3 style="margin:0 0 0.2rem 0;">Bản đồ chấn thương 3D</h3>
+        <p style="margin:0; font-size:0.75rem; color:#a89e7a;" id="txtRoleHint">
+          Chỉ Bác sĩ thú y mới được phép đánh dấu chấn thương.
+        </p>
+      </div>
+      <div style="display:flex; gap:0.8rem; font-size:0.75rem;">
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#48bb78;"></span>Bình thường</span>
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#ed8936;"></span>Theo dõi</span>
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#e53e3e;"></span>Nghiêm trọng</span>
       </div>
     </div>
+    <div style="position:relative;">
+      <!-- Khung model -->
+      <model-viewer id="horseModelViewer" 
+        src="./assets/horse.glb" 
+        camera-controls 
+        auto-rotate
+        rotation-per-second="20deg"
+        shadow-intensity="1"
+        camera-orbit="45deg 75deg 105%"
+        interaction-prompt="none"
+        alt="Bản đồ ngựa 3D">
+        
+        <!-- 12 Hotspots Cố định.
+             (Các data-position và data-normal hiện đang đặt ước lượng hoặc 0.
+              Bạn có thể bật btnDevMode để click lấy toạ độ chuẩn và ghi vào đây). -->
+        <button class="Hotspot" slot="hotspot-head" data-surface="" data-position="0 1.6 0.8" data-normal="0 1 0" data-status="NORMAL" data-part="Đầu">
+          <div class="Hotspot-tooltip"><b>Đầu</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        <button class="Hotspot" slot="hotspot-neck" data-surface="" data-position="0 1.3 0.6" data-normal="0 1 0" data-status="NORMAL" data-part="Cổ">
+          <div class="Hotspot-tooltip"><b>Cổ</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        
+        <!-- Chân trước -->
+        <button class="Hotspot" slot="hotspot-leg-fl" data-surface="" data-position="-0.2 0.4 0.5" data-normal="-1 0 0" data-status="NORMAL" data-part="Chân trước trái">
+          <div class="Hotspot-tooltip"><b>Chân trước trái</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        <button class="Hotspot" slot="hotspot-leg-fr" data-surface="" data-position="0.2 0.4 0.5" data-normal="1 0 0" data-status="NORMAL" data-part="Chân trước phải">
+          <div class="Hotspot-tooltip"><b>Chân trước phải</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        
+        <!-- Vai -->
+        <button class="Hotspot" slot="hotspot-shoulder-l" data-surface="" data-position="-0.25 1 0.4" data-normal="-1 0 0" data-status="NORMAL" data-part="Vai trái">
+          <div class="Hotspot-tooltip"><b>Vai trái</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        <button class="Hotspot" slot="hotspot-shoulder-r" data-surface="" data-position="0.25 1 0.4" data-normal="1 0 0" data-status="NORMAL" data-part="Vai phải">
+          <div class="Hotspot-tooltip"><b>Vai phải</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        
+        <!-- Thân giữa -->
+        <button class="Hotspot" slot="hotspot-back" data-surface="" data-position="0 1.2 -0.2" data-normal="0 1 0" data-status="NORMAL" data-part="Lưng">
+          <div class="Hotspot-tooltip"><b>Lưng</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        <button class="Hotspot" slot="hotspot-belly" data-surface="" data-position="0 0.6 -0.2" data-normal="0 -1 0" data-status="NORMAL" data-part="Bụng">
+          <div class="Hotspot-tooltip"><b>Bụng</b><br><span class="sts">Bình thường</span></div>
+        </button>
 
-  </main>
-</div>
+        <!-- Đùi (Chân sau trên) -->
+        <button class="Hotspot" slot="hotspot-thigh-l" data-surface="" data-position="-0.25 0.9 -0.6" data-normal="-1 0 0" data-status="NORMAL" data-part="Đùi trái">
+          <div class="Hotspot-tooltip"><b>Đùi trái</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        <button class="Hotspot" slot="hotspot-thigh-r" data-surface="" data-position="0.25 0.9 -0.6" data-normal="1 0 0" data-status="NORMAL" data-part="Đùi phải">
+          <div class="Hotspot-tooltip"><b>Đùi phải</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        
+        <!-- Chân sau dưới -->
+        <button class="Hotspot" slot="hotspot-leg-bl" data-surface="" data-position="-0.2 0.4 -0.7" data-normal="-1 0 0" data-status="NORMAL" data-part="Chân sau trái">
+          <div class="Hotspot-tooltip"><b>Chân sau trái</b><br><span class="sts">Bình thường</span></div>
+        </button>
+        <button class="Hotspot" slot="hotspot-leg-br" data-surface="" data-position="0.2 0.4 -0.7" data-normal="1 0 0" data-status="NORMAL" data-part="Chân sau phải">
+          <div class="Hotspot-tooltip"><b>Chân sau phải</b><br><span class="sts">Bình thường</span></div>
+        </button>
 
-<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
-
-<!-- Modal: Khóa huấn luyện -->
-<div class="modal-backdrop" id="lockModal" style="display:none">
-  <div class="modal">
-    <div class="modal-head">
-      <div><p class="eyebrow">FLOW 3 · Y TẾ</p><h2>Phát lệnh Khóa huấn luyện</h2></div>
-      <button class="btn btn-ghost btn-icon" id="closeLockModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <div class="notice warning" style="margin-bottom:1rem;">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        Sau khi phát lệnh, Head Trainer <b>không thể xếp lịch cường độ CAO</b> cho ngựa này cho đến khi được gỡ khóa.
+      </model-viewer>
+      
+      <!-- Lớp phủ (Overlay) thông báo chế độ Dev -->
+      <div id="devOverlayMsg" style="display:none; position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.8); color:#00ff00; padding:10px; font-family:monospace; border-radius:6px; z-index:100; pointer-events:none; font-size:12px;">
+        Chế độ Dev: Click vào model để lấy tọa độ<br><span id="devCoordTxt">...</span>
       </div>
-      <div class="form-grid">
-        <div class="form-field full">
-          <label>Ngựa cần khóa *</label>
-          <select>
-            <option value="">Chọn ngựa…</option>
-            <option>Storm Thunder — HM-001</option>
-            <option>Silver Blaze — HM-003</option>
-            <option>Night Runner — HM-005</option>
-            <option>Red Fury — HM-007</option>
-          </select>
-        </div>
-        <div class="form-field full">
-          <label>Lý do khóa / Chẩn đoán *</label>
-          <textarea rows="3" placeholder="VD: Chấn thương gân chân phải. Không tập nặng ít nhất 3 tuần…"></textarea>
-        </div>
-        <div class="form-field full">
-          <label>Vị trí chấn thương (mô tả)</label>
-          <input placeholder="VD: Gân chân phải, sau trên, mức độ trung bình">
-          <span class="hint">Bản đồ 3D/2D sẽ hỗ trợ đánh dấu trực quan trong phiên bản tới.</span>
-        </div>
-        <div class="form-field">
-          <label>Ngày xem xét lại</label>
-          <input type="date">
-          <span class="hint">Ngày ước tính kiểm tra lại để xem xét gỡ khóa.</span>
-        </div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="cancelLockModal">Hủy</button>
-      <button class="btn btn-danger">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Phát lệnh Khóa
-      </button>
     </div>
   </div>
-</div>
+</template>
 
-<!-- Modal: Gỡ khóa -->
-<div class="modal-backdrop" id="releaseModal" style="display:none">
-  <div class="modal">
-    <div class="modal-head">
-      <div><p class="eyebrow">FLOW 3 · Y TẾ</p><h2>Gỡ Khóa huấn luyện</h2></div>
-      <button class="btn btn-ghost btn-icon" id="closeReleaseModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <div class="notice success" style="margin-bottom:1rem;">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Sau khi gỡ khóa, Head Trainer sẽ được phép xếp lịch tập mọi cường độ cho ngựa này.
-      </div>
-      <div class="form-grid">
-        <div class="form-field full">
-          <label>Lý do gỡ khóa *</label>
-          <textarea rows="3" placeholder="VD: Kiểm tra lại ngày 27/09, không còn dấu hiệu viêm. Ngựa đã hồi phục hoàn toàn…"></textarea>
-        </div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="cancelReleaseModal">Hủy</button>
-      <button class="btn btn-primary" style="background:#2f6b57;">
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
-        Xác nhận gỡ khóa
-      </button>
-    </div>
-  </div>
-</div>
+<script type="module">
+  import { initShell, apiFetch, hasRole } from './auth.js';
 
-<!-- Modal: Thêm lịch chăm sóc -->
-<div class="modal-backdrop" id="careModal" style="display:none">
-  <div class="modal">
-    <div class="modal-head">
-      <div><p class="eyebrow">FLOW 3 · CHĂM SÓC ĐỊNH KỲ</p><h2>Thêm lịch chăm sóc</h2></div>
-      <button class="btn btn-ghost btn-icon" id="closeCareModal"><svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <div class="form-grid">
-        <div class="form-field full">
-          <label>Ngựa *</label>
-          <select><option value="">Chọn ngựa…</option><option>Storm Thunder — HM-001</option><option>Gold Wind — HM-002</option><option>Night Runner — HM-005</option></select>
-        </div>
-        <div class="form-field">
-          <label>Loại chăm sóc *</label>
-          <select>
-            <option>Tiêm phòng</option>
-            <option>Tẩy giun</option>
-            <option>Kiểm tra móng (Farrier)</option>
-            <option>Khám tổng quát</option>
-            <option>Khác</option>
-          </select>
-        </div>
-        <div class="form-field">
-          <label>Ngày dự kiến *</label>
-          <input type="date">
-        </div>
-        <div class="form-field full">
-          <label>Ghi chú / Phác đồ</label>
-          <textarea rows="2" placeholder="VD: Ivermectin 1% — liều 3 tháng…"></textarea>
-        </div>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="cancelCareModal">Hủy</button>
-      <button class="btn btn-primary">Lưu lịch</button>
-    </div>
-  </div>
-</div>
+  // Yêu cầu đăng nhập, cho phép Bác sĩ, Quản lý, Head Trainer và Owner xem.
+  const auth = initShell(['CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','HORSE_OWNER']);
+  if (!auth) throw new Error('Not authenticated');
+  
+  // Quyền thao tác sửa (Bác sĩ, Admin)
+  const canEditHealth = hasRole('VETERINARIAN', 'CLUB_MANAGER');
 
-<script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
-<script>
-  // ── Sidebar ──────────────────────────────────
-  const toggle   = document.getElementById('sidebarToggle');
-  const sidebar  = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click',   () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
-  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+  let allHorses = [];
+  let selectedHorseId = null;
+  const STATUS_CYCLE = ['NORMAL', 'MONITORING', 'SEVERE'];
+  const STATUS_LABELS = { 'NORMAL': 'Bình thường', 'MONITORING': 'Cần theo dõi', 'SEVERE': 'Nghiêm trọng' };
 
-  // ── Tab switching ────────────────────────────
-  document.querySelectorAll('[data-htab]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-htab]').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.htab-panel').forEach(p => p.style.display = 'none');
-      btn.classList.add('active');
-      document.getElementById('htab-' + btn.dataset.htab).style.display = '';
-      if (btn.dataset.htab === 'model') initViewer();
-    });
-  });
-
-  // ── Modals ───────────────────────────────────
-  const lockModal    = document.getElementById('lockModal');
-  const releaseModal = document.getElementById('releaseModal');
-  const careModal    = document.getElementById('careModal');
-  document.getElementById('btnNewLock').addEventListener('click',       () => lockModal.style.display    = 'flex');
-  document.getElementById('closeLockModal').addEventListener('click',   () => lockModal.style.display    = 'none');
-  document.getElementById('cancelLockModal').addEventListener('click',  () => lockModal.style.display    = 'none');
-  lockModal.addEventListener('mousedown',    e => { if (e.target === lockModal)    lockModal.style.display    = 'none'; });
-  document.getElementById('btnRelease1').addEventListener('click',      () => releaseModal.style.display = 'flex');
-  document.getElementById('closeReleaseModal').addEventListener('click',() => releaseModal.style.display = 'none');
-  document.getElementById('cancelReleaseModal').addEventListener('click',() => releaseModal.style.display= 'none');
-  releaseModal.addEventListener('mousedown', e => { if (e.target === releaseModal) releaseModal.style.display = 'none'; });
-  document.getElementById('btnNewCare').addEventListener('click',       () => careModal.style.display    = 'flex');
-  document.getElementById('closeCareModal').addEventListener('click',   () => careModal.style.display    = 'none');
-  document.getElementById('cancelCareModal').addEventListener('click',  () => careModal.style.display    = 'none');
-  careModal.addEventListener('mousedown',    e => { if (e.target === careModal)    careModal.style.display    = 'none'; });
-
-  // ═══════════════════════════════════════════════════════════════
-  //  3D DOT TRACKING SYSTEM — SKETCHFAB VIEWER API
-  //  Chấm hiển thị trực tiếp trên model, bám theo khi xoay 360°
-  //  Kỹ thuật: getWorldToScreen() + cameraupdate event
-  // ═══════════════════════════════════════════════════════════════
-
-  const MODEL_UID  = '791844e912d0460d8e8951891158c696';
-
-
-  // State cycling: normal → monitoring → serious → normal
-  const DOT_STATES = ['monitoring', 'serious', 'normal'];
-  const DOT_COLOR  = { monitoring: '#dd6b20', serious: '#e53e3e', normal: '#4a9e6b' };
-  const DOT_LABEL  = { monitoring: 'Cần theo dõi', serious: 'Nghiêm trọng', normal: 'Bình thường' };
-
-  let sketchfabAPI  = null;   // Viewer API instance
-  let viewerLive    = false;  // true khi 'viewerready' fired
-  let viewerInited  = false;  // guard: chỉ init 1 lần
-  let isMarkMode    = false;  // true khi đang ở chế độ đặt điểm
-  let dotCounter    = 0;
-  let dotMap        = {};     // id → { id, name, state, pos3d }
-
-  // ── DOM refs ─────────────────────────────────
-  const vStatus    = document.getElementById('viewer3d-status');
-  const vText      = document.getElementById('viewer-status-text');
-  const vFrame     = document.getElementById('api-frame');
-  const vOverlay   = document.getElementById('dot-overlay');
-  const vHintBar   = document.getElementById('viewer-hint-bar');
-  const vFallback  = document.getElementById('viewer-fallback');
-  const vDotList   = document.getElementById('injury-dot-list');
-  const markBanner = document.getElementById('mark-banner');
-  const markBtn    = document.getElementById('btn3dMark');
-  const resetBtn   = document.getElementById('btn3dReset');
-
-  // ── Inject CSS cho dots & animation ──────────
-  (function() {
-    const s = document.createElement('style');
-    s.textContent = `
-      @keyframes _spin3d { to { transform: rotate(360deg); } }
-      @keyframes dotPulse {
-        0%   { transform: scale(1);   opacity: .7; }
-        60%  { transform: scale(2.2); opacity: 0;  }
-        100% { transform: scale(1);   opacity: 0;  }
-      }
-      .inj-dot {
-        position: absolute;
-        width: 18px; height: 18px;
-        border-radius: 50%;
-        border: 2px solid rgba(255,255,255,.75);
-        transform: translate(-50%, -50%);
-        cursor: pointer;
-        pointer-events: all;
-        display: flex; align-items: center; justify-content: center;
-        transition: border-color .2s;
-        z-index: 2;
-      }
-      .inj-dot:hover { border-color: #fff; filter: brightness(1.25); }
-      .inj-dot::before {
-        content: '';
-        position: absolute;
-        inset: -2px;
-        border-radius: 50%;
-        background: inherit;
-        animation: dotPulse 1.6s ease-out infinite;
-        z-index: -1;
-      }
-      .inj-dot-tooltip {
-        position: absolute;
-        bottom: calc(100% + 10px);
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(14,18,30,.95);
-        border: 1px solid rgba(255,255,255,.12);
-        border-radius: 8px;
-        padding: .45rem .75rem;
-        white-space: nowrap;
-        font-size: .75rem;
-        color: #f1efe6;
-        pointer-events: none;
-        opacity: 0;
-        transition: opacity .15s;
-        box-shadow: 0 4px 16px rgba(0,0,0,.5);
-        z-index: 10;
-      }
-      .inj-dot-tooltip::after {
-        content: '';
-        position: absolute;
-        top: 100%; left: 50%;
-        transform: translateX(-50%);
-        border: 5px solid transparent;
-        border-top-color: rgba(14,18,30,.95);
-      }
-      .inj-dot:hover .inj-dot-tooltip { opacity: 1; }
-    `;
-    document.head.appendChild(s);
-  })();
-
-  // ── Tạo DOM cho 1 dot ─────────────────────────
-  function createDotElement(pt) {
-    const el = document.createElement('div');
-    el.className = 'inj-dot';
-    el.id = 'dot-el-' + pt.id;
-    el.style.background = DOT_COLOR[pt.state];
-    el.style.boxShadow  = `0 0 8px ${DOT_COLOR[pt.state]}, 0 0 16px ${DOT_COLOR[pt.state]}55`;
-
-    // Tooltip
-    const tip = document.createElement('div');
-    tip.className = 'inj-dot-tooltip';
-    tip.innerHTML = `<b>${pt.name}</b><br><span style="color:${DOT_COLOR[pt.state]}">${DOT_LABEL[pt.state]}</span><br><span style="opacity:.6;font-size:.7rem">Click để đổi trạng thái</span>`;
-    el.appendChild(tip);
-
-    // Click → cycle state
-    el.addEventListener('click', function(e) {
-      e.stopPropagation();
-      const cur = dotMap[pt.id].state;
-      const nxt = DOT_STATES[(DOT_STATES.indexOf(cur) + 1) % DOT_STATES.length];
-      dotMap[pt.id].state = nxt;
-      el.style.background = DOT_COLOR[nxt];
-      el.style.boxShadow  = `0 0 8px ${DOT_COLOR[nxt]}, 0 0 16px ${DOT_COLOR[nxt]}55`;
-      tip.innerHTML = `<b>${pt.name}</b><br><span style="color:${DOT_COLOR[nxt]}">${DOT_LABEL[nxt]}</span><br><span style="opacity:.6;font-size:.7rem">Click để đổi trạng thái</span>`;
-      renderDotList();
-    });
-
-    // Right-click → xóa dot
-    el.addEventListener('contextmenu', function(e) {
-      e.preventDefault();
-      el.remove();
-      delete dotMap[pt.id];
-      renderDotList();
-    });
-
-    vOverlay.appendChild(el);
-    return el;
+  // 1. Tải danh sách ngựa
+  async function loadHorses() {
+    try {
+      const data = await apiFetch('/api/horses?size=100');
+      allHorses = data?.content ?? data ?? [];
+      renderHorseList(allHorses);
+    } catch (err) {
+      console.error('Lỗi load danh sách ngựa:', err);
+      document.getElementById('horseList').innerHTML = '<p style="color:red;padding:1rem;">Không thể tải dữ liệu.</p>';
+    }
   }
 
-  // ── Cập nhật vị trí 1 dot từ 3D → 2D screen ──
-  function updateDotPos(pt) {
-    if (!sketchfabAPI || !viewerLive) return;
-    const el = document.getElementById('dot-el-' + pt.id);
-    if (!el) return;
-
-    sketchfabAPI.getWorldToScreen(pt.pos3d, function(err, screenPos) {
-      if (err || !screenPos) { el.style.display = 'none'; return; }
-      const [x, y] = screenPos;
-      // Ẩn nếu nằm ngoài viewport canvas
-      const W = vFrame.clientWidth, H = vFrame.clientHeight;
-      if (x < 0 || y < 0 || x > W || y > H) {
-        el.style.display = 'none';
-      } else {
-        el.style.display = 'flex';
-        el.style.left = x + 'px';
-        el.style.top  = y + 'px';
-      }
-    });
-  }
-
-  // Cập nhật tất cả dots
-  function updateAllDots() {
-    Object.values(dotMap).forEach(updateDotPos);
-  }
-
-  // ── Render danh sách điểm chấn thương bên dưới ─
-  function renderDotList() {
-    if (!vDotList) return;
-    const pts = Object.values(dotMap);
-    if (!pts.length) {
-      vDotList.innerHTML = `<p style="font-size:.82rem;color:#7a7258;text-align:center;padding:.4rem 0">
-        Chưa có điểm chấn thương nào. Bật <b>Thêm điểm chấn thương</b> rồi click thẳng lên model.
-        <br><span style="opacity:.6;font-size:.75rem">Chuột phải lên chấm để xóa.</span>
-      </p>`;
+  // 2. Render cột trái (Danh sách)
+  function renderHorseList(list) {
+    const listEl = document.getElementById('horseList');
+    if (!list.length) {
+      listEl.innerHTML = '<div style="padding: 1rem; color: #7a7258;">Không tìm thấy ngựa nào.</div>';
       return;
     }
-    vDotList.innerHTML = pts.map(pt => {
-      const col = DOT_COLOR[pt.state];
+    
+    listEl.innerHTML = list.map(h => {
+      const initials = h.name ? h.name.substring(0, 2).toUpperCase() : '??';
+      const isActive = h.id === selectedHorseId ? 'active' : '';
+      const dotColor = h.status === 'INJURED' ? '#e53e3e' : (h.status === 'ACTIVE' ? '#48bb78' : '#a89e7a');
+      
       return `
-        <div style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;
-          border-radius:9px;border:1px solid ${col}40;background:${col}0d;">
-          <span style="width:11px;height:11px;border-radius:50%;flex-shrink:0;
-            background:${col};box-shadow:0 0 8px ${col}88;"></span>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.88rem;font-weight:600;color:#f1efe6">${pt.name}</div>
-            <div style="font-size:.75rem;color:${col};font-weight:700;text-transform:uppercase;letter-spacing:.05em">${DOT_LABEL[pt.state]}</div>
+        <div class="md-item ${isActive}" data-id="${h.id}" onclick="window.selectHorse(${h.id})">
+          <div class="md-item-avatar">${initials}</div>
+          <div class="md-item-info">
+            <div class="md-item-name">${h.name}</div>
+            <div class="md-item-meta">${h.registrationCode || h.id}</div>
           </div>
-          <button onclick="window._cycleDot('${pt.id}')"
-            style="font-size:.72rem;padding:.2rem .55rem;border-radius:5px;border:1px solid rgba(255,255,255,.15);
-            background:transparent;color:#a89e7a;cursor:pointer;">Đổi ↺</button>
-          <button onclick="window._removeDot('${pt.id}')"
-            style="font-size:.72rem;padding:.2rem .55rem;border-radius:5px;border:1px solid rgba(229,62,62,.3);
-            background:transparent;color:#fc8181;cursor:pointer;">Xóa</button>
-        </div>`;
+          <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};box-shadow:0 0 6px ${dotColor}88"></span>
+        </div>
+      `;
     }).join('');
   }
 
-  // Helpers cho buttons trong list
-  window._cycleDot = function(id) {
-    const pt = dotMap[id]; if (!pt) return;
-    const nxt = DOT_STATES[(DOT_STATES.indexOf(pt.state) + 1) % DOT_STATES.length];
-    pt.state = nxt;
-    const el = document.getElementById('dot-el-' + id);
-    if (el) {
-      el.style.background = DOT_COLOR[nxt];
-      el.style.boxShadow  = `0 0 8px ${DOT_COLOR[nxt]}, 0 0 16px ${DOT_COLOR[nxt]}55`;
-      const tip = el.querySelector('.inj-dot-tooltip');
-      if (tip) tip.innerHTML = `<b>${pt.name}</b><br><span style="color:${DOT_COLOR[nxt]}">${DOT_LABEL[nxt]}</span><br><span style="opacity:.6;font-size:.7rem">Click để đổi trạng thái</span>`;
+  // Lọc danh sách
+  document.getElementById('searchHorse').addEventListener('input', (e) => {
+    const term = e.target.value.toLowerCase();
+    const filtered = allHorses.filter(h => 
+      (h.name || '').toLowerCase().includes(term) || 
+      (h.registrationCode || '').toLowerCase().includes(term)
+    );
+    renderHorseList(filtered);
+  });
+
+  // 3. Xử lý khi chọn 1 con ngựa
+  window.selectHorse = async function(id) {
+    selectedHorseId = id;
+    renderHorseList(allHorses); // Update class active
+    
+    const horse = allHorses.find(h => h.id === id);
+    if (!horse) return;
+
+    const mainArea = document.getElementById('horseDetailArea');
+    const template = document.getElementById('detailTemplate').content.cloneNode(true);
+    
+    // Xóa nội dung cũ và chèn template mới
+    mainArea.innerHTML = '';
+    mainArea.appendChild(template);
+
+    // Điền thông tin cơ bản
+    document.getElementById('dt-name').textContent = horse.name;
+    document.getElementById('dt-meta').textContent = `${horse.registrationCode || 'Chưa có mã'} · ${horse.breed || 'Không rõ'} · Chuồng ${horse.stableLocation || '—'}`;
+    
+    if (horse.status === 'INJURED') {
+      document.getElementById('dt-badge').innerHTML = '<span class="badge locked" style="font-size:0.9rem"><i></i>Đang bị khóa</span>';
+      document.getElementById('dt-lock-content').innerHTML = `
+        <p style="font-size:0.85rem; color:#f1efe6; margin:0 0 0.5rem 0;"><b>Lý do:</b> ${horse.injuryNote || 'Không có ghi chú.'}</p>
+        <p style="font-size:0.8rem; color:#e53e3e; margin:0;">Ngựa không thể nhận giáo án tập luyện nặng.</p>
+      `;
+      if(canEditHealth) document.getElementById('btnActionLock').textContent = 'Gỡ khóa';
+    } else {
+      document.getElementById('dt-badge').innerHTML = '<span class="badge completed" style="font-size:0.9rem"><i></i>Sẵn sàng</span>';
+      if(canEditHealth) document.getElementById('btnActionLock').textContent = 'Phát lệnh Khóa';
     }
-    renderDotList();
-  };
-  window._removeDot = function(id) {
-    const el = document.getElementById('dot-el-' + id);
-    if (el) el.remove();
-    delete dotMap[id];
-    renderDotList();
+    if(!canEditHealth) document.getElementById('btnActionLock').style.display = 'none';
+
+    // Bật/Tắt quyền tương tác mô hình
+    if (canEditHealth) {
+      document.getElementById('txtRoleHint').innerHTML = 'Bạn có quyền đánh dấu. <b style="color:#68d391">Click vào điểm chấn thương</b> để đổi trạng thái.';
+    } else {
+      document.getElementById('txtRoleHint').innerHTML = 'Bạn đang xem ở chế độ <b style="color:#e2e8f0">Chỉ Xem</b>. Không thể sửa chấn thương.';
+      document.getElementById('btnActionCare').style.display = 'none';
+    }
+
+    // Load API Lịch chăm sóc (hoặc dùng Mock nếu API chưa có endpoints riêng)
+    loadPreventiveCareForHorse(horse.id);
+
+    // Thiết lập Mô hình 3D và dữ liệu chấn thương
+    setup3DModel(horse.id);
   };
 
-  // ── Toggle Mark Mode ──────────────────────────
-  if (markBtn) {
-    markBtn.addEventListener('click', function() {
-      if (!viewerLive) {
-        alert('Hãy đợi model tải xong rồi mới bật chế độ đánh dấu.');
-        return;
+  // 4. Lịch chăm sóc
+  async function loadPreventiveCareForHorse(horseId) {
+    const listBody = document.getElementById('dt-care-list');
+    try {
+      // Giả sử API hỗ trợ query theo horseId
+      const data = await apiFetch(`/api/horses/preventive-care?horseId=${horseId}`);
+      let records = data?.content ?? data ?? [];
+      
+      // Nếu API trả về mảng rỗng, ta mock 1-2 record cho đẹp màn test
+      if (records.length === 0) {
+        records = [
+          { careType: 'VACCINATION', careTypeName: 'Tiêm phòng Cúm', scheduledDate: '2026-09-30', status: 'SCHEDULED' },
+          { careType: 'CHECKUP', careTypeName: 'Khám tổng quát', scheduledDate: '2026-08-15', status: 'COMPLETED' }
+        ];
       }
-      isMarkMode = !isMarkMode;
-      markBtn.style.background = isMarkMode ? '#e53e3e' : '#2f6b57';
-      markBtn.innerHTML = isMarkMode
-        ? `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Tắt đánh dấu`
-        : `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Thêm điểm chấn thương`;
-      if (markBanner) markBanner.style.display = isMarkMode ? 'flex' : 'none';
-    });
-  }
 
-  // ── Nút Xóa tất cả ────────────────────────────
-  if (resetBtn) {
-    resetBtn.addEventListener('click', function() {
-      Object.keys(dotMap).forEach(id => {
-        const el = document.getElementById('dot-el-' + id);
-        if (el) el.remove();
-      });
-      dotMap = {};
-      renderDotList();
-    });
-  }
-
-  // ── Khởi tạo Sketchfab Viewer API ─────────────
-  function initViewer() {
-    if (viewerInited) return;
-    viewerInited = true;
-
-    if (!window.Sketchfab) {
-      // Sketchfab script chưa load (mạng chậm), thử lại sau 1.5s
-      setTimeout(initViewer, 1500);
-      viewerInited = false;
-      return;
+      const CARE_EMOJI = { VACCINATION: '💉', DEWORMING: '🪱', FARRIER: '🔨', CHECKUP: '🩺' };
+      listBody.innerHTML = records.map(r => `
+        <tr>
+          <td style="padding:0.5rem 0; font-size:0.85rem">${CARE_EMOJI[r.careType] || '🩺'} ${r.careTypeName}</td>
+          <td style="padding:0.5rem 0; font-size:0.85rem; color:#a89e7a;">${r.scheduledDate || ''}</td>
+          <td style="padding:0.5rem 0; text-align:right;">
+            <span class="badge ${r.status === 'COMPLETED' ? 'completed' : 'draft'}">${r.status === 'COMPLETED' ? 'Hoàn thành' : 'Đã lên lịch'}</span>
+          </td>
+        </tr>
+      `).join('');
+    } catch (e) {
+      listBody.innerHTML = '<tr><td colspan="3" style="color:#a89e7a;text-align:center;padding:1rem;">Chưa có dữ liệu.</td></tr>';
     }
+  }
 
-    const client = new window.Sketchfab(vFrame);
-    client.init(MODEL_UID, {
-      success: function(api) {
-        sketchfabAPI = api;
-        api.start();
-
-        api.addEventListener('viewerready', function() {
-          viewerLive = true;
-
-          // Hiện iframe, ẩn spinner
-          vStatus.style.display = 'none';
-          vFrame.style.display  = 'block';
-          if (vHintBar) vHintBar.style.display = 'block';
-
-          // Theo dõi camera → cập nhật vị trí dots
-          api.addEventListener('cameraupdate', updateAllDots);
-
-          // Click trên model → đặt điểm chấn thương
-          api.addEventListener('click', function(info) {
-            if (!isMarkMode) return;
-            if (!info || !info.position3D) return;
-
-            dotCounter++;
-            const id  = 'dot_' + dotCounter;
-            const pt  = {
-              id,
-              name:  'Vùng chấn thương #' + dotCounter,
-              state: 'monitoring',
-              pos3d: [...info.position3D]
-            };
-            dotMap[id] = pt;
-            createDotElement(pt);
-            updateDotPos(pt);
-            renderDotList();
+  // 5. Quản lý bản đồ chấn thương 3D
+  function setup3DModel(horseId) {
+    const viewer = document.getElementById('horseModelViewer');
+    if (!viewer) return;
+    
+    // Chờ viewer load xong mới gán sự kiện click để mượt hơn
+    viewer.addEventListener('load', () => {
+      // Load dữ liệu cũ từ LocalStorage (Mock API)
+      const savedData = JSON.parse(localStorage.getItem('horseInjuries_' + horseId) || '{}');
+      
+      // Lấy tất cả hotspot
+      const hotspots = viewer.querySelectorAll('.Hotspot');
+      
+      hotspots.forEach(btn => {
+        const partId = btn.getAttribute('slot'); // vd: hotspot-head
+        
+        // 1. Phục hồi trạng thái cũ
+        if (savedData[partId]) {
+          btn.setAttribute('data-status', savedData[partId]);
+          btn.querySelector('.sts').textContent = STATUS_LABELS[savedData[partId]];
+        }
+        
+        // 2. Gán sự kiện click đổi màu (nếu có quyền)
+        if (canEditHealth) {
+          btn.addEventListener('click', (e) => {
+            // Ngăn chặn sự kiện truyền xuống model viewer (tránh bị xoay cam)
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Xoay vòng trạng thái
+            const currentStatus = btn.getAttribute('data-status');
+            const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
+            const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
+            
+            // Cập nhật DOM
+            btn.setAttribute('data-status', nextStatus);
+            btn.querySelector('.sts').textContent = STATUS_LABELS[nextStatus];
+            
+            // Lưu ngầm xuống LocalStorage (Mock API PUT)
+            const currentData = JSON.parse(localStorage.getItem('horseInjuries_' + horseId) || '{}');
+            currentData[partId] = nextStatus;
+            localStorage.setItem('horseInjuries_' + horseId, JSON.stringify(currentData));
+            
+            console.log(`[API MOCK] Đã lưu chấn thương cho ngựa ${horseId}: ${partId} = ${nextStatus}`);
           });
-
-          renderDotList(); // hiện thông điệp hướng dẫn
-        });
-      },
-
-      error: function() {
-        // Xảy ra khi VS Code webview chặn postMessage
-        vStatus.innerHTML = `
-          <svg width="28" height="28" fill="none" stroke="#dd6b20" stroke-width="1.5" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#dd6b20"/>
-          </svg>
-          <span style="color:#dd6b20;font-weight:600">Cần mở qua Live Server để dùng dot tracking</span>
-        `;
-        if (vFallback) vFallback.style.display = 'block';
-        renderDotList();
-      },
-
-      // Viewer options
-      autostart:    1,
-      ui_theme:    'dark',
-      ui_infos:     0,
-      ui_watermark: 0,
-      ui_controls:  1,
-      ui_help:      0,
-      ui_settings:  0,
-      ui_inspector: 0,
-      ui_annotations: 0,
-      ui_stop:      0,
-      preload:      1
+        } else {
+          // Disable click nếu không có quyền
+          btn.style.cursor = 'default';
+        }
+      });
+      
+      // Tool Dev ẩn (Bác sĩ không cần dùng, chỉ dev dùng để lấy toạ độ chuẩn)
+      setupDevMode(viewer);
     });
   }
 
-  // Gọi initViewer khi click tab "Bản đồ chấn thương"
-  // (đã bind trong phần tab switching ở trên qua if (btn.dataset.htab === 'model') initViewer())
-  renderDotList(); // show hướng dẫn ngay từ đầu
-</script>
+  // TOOL DEV MỞ RỘNG (Giúp tìm tọa độ chuẩn của 12 điểm trên mô hình thực tế)
+  function setupDevMode(viewer) {
+    const btnDev = document.getElementById('btnDevMode');
+    if (hasRole('CLUB_MANAGER')) btnDev.style.display = 'inline-block';
+    
+    let isDevMode = false;
+    btnDev.addEventListener('click', () => {
+      isDevMode = !isDevMode;
+      document.getElementById('devOverlayMsg').style.display = isDevMode ? 'block' : 'none';
+      btnDev.textContent = isDevMode ? 'Tắt tool tọa độ' : 'Bật tool lấy tọa độ 3D';
+    });
 
+    viewer.addEventListener('click', (event) => {
+      if (!isDevMode) return;
+      const hit = viewer.positionAndNormalFromPoint(event.clientX, event.clientY);
+      if (hit) {
+        const txt = `data-position="${hit.position.x.toFixed(3)} ${hit.position.y.toFixed(3)} ${hit.position.z.toFixed(3)}" data-normal="${hit.normal.x.toFixed(3)} ${hit.normal.y.toFixed(3)} ${hit.normal.z.toFixed(3)}"`;
+        document.getElementById('devCoordTxt').textContent = txt;
+        console.log("Toạ độ click:", txt);
+        // Có thể copy text vào clipboard ở đây
+        navigator.clipboard.writeText(txt).catch(()=>{});
+      }
+    });
+  }
+
+  // Khởi chạy
+  loadHorses();
+
+</script>
 </body>
 </html>

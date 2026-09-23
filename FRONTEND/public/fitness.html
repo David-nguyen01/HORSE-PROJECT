@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Thể lực & Đánh giá — Turfline Stable Manager</title>
+<title>Thể lực &amp; Đánh giá — Turfline Stable Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app-shell.css">
@@ -22,23 +22,29 @@
       <a href="horses.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
       <span class="nav-section-label">Huấn luyện</span>
       <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
-      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
-      <a href="fitness.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
+      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập &amp; Phân công</a>
+      <a href="fitness.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực &amp; Đánh giá</a>
       <span class="nav-section-label">Y tế</span>
-      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
+      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe &amp; Y tế</a>
       <span class="nav-section-label">Quản trị</span>
-      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng &amp; Vai trò</a>
     </nav>
     <div class="sidebar-foot">
-      <div class="user-chip"><span class="avatar">NT</span><div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div></div>
-      <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+      <div class="user-chip">
+        <span class="avatar" id="userAvatar">NT</span>
+        <div class="user-info">
+          <b id="userName">Nguyễn Thắng</b>
+          <small id="userRole">Huấn luyện viên Trưởng</small>
+        </div>
+      </div>
+      <a href="login.html" class="btn-logout" id="btnLogout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
     </div>
   </aside>
 
   <!-- TOPBAR -->
   <header class="topbar">
     <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-    <span class="topbar-title">Thể lực & Đánh giá</span>
+    <span class="topbar-title">Thể lực &amp; Đánh giá</span>
     <div class="topbar-right">
       <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
       <button class="notif-btn"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge">3</span></button>
@@ -63,7 +69,7 @@
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
           Xuất PDF
         </button>
-        <button class="btn btn-primary" id="btnNewEval">
+        <button class="btn btn-primary" id="btnNewEval" style="display:none">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Nhập buổi tập
         </button>
@@ -74,72 +80,39 @@
     <div class="toolbar card">
       <label class="search-box" style="flex:1;min-width:160px;">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input placeholder="Tên hoặc mã ngựa…">
+        <input id="searchInput" placeholder="Tên hoặc mã ngựa…">
       </label>
-      <select class="filter-select">
+      <select class="filter-select" id="filterHorse">
         <option value="">Tất cả ngựa</option>
-        <option>Storm Thunder — HM-001</option>
-        <option>Night Runner — HM-005</option>
-        <option>Red Fury — HM-007</option>
       </select>
-      <select class="filter-select">
+      <select class="filter-select" id="filterStatus">
         <option value="">Tất cả thể trạng</option>
-        <option>Thể lực tốt (GREEN)</option>
-        <option>Cần theo dõi (YELLOW)</option>
-        <option>Cần chú ý (RED)</option>
+        <option value="GREEN">Thể lực tốt (GREEN)</option>
+        <option value="YELLOW">Cần theo dõi (YELLOW)</option>
+        <option value="RED">Cần chú ý (RED)</option>
       </select>
-      <input type="date" class="filter-select" value="2026-08-18">
+      <input type="date" class="filter-select" id="filterDateFrom">
       <span style="color:#a89e7a;font-size:.85rem;">đến</span>
-      <input type="date" class="filter-select" value="2026-09-17">
-      <button class="btn btn-secondary">Áp dụng</button>
+      <input type="date" class="filter-select" id="filterDateTo">
+      <button class="btn btn-secondary" id="btnApplyFilter">Áp dụng</button>
     </div>
 
     <!-- Horse fitness cards -->
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1.4rem;">
-      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
-        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(111,191,122,.18);display:flex;align-items:center;justify-content:center;color:#3a8a4a;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        </div>
-        <div style="flex:1"><b style="font-size:.9rem;display:block">Storm Thunder</b><small style="color:#a89e7a">HM-001 · A-12</small></div>
-        <span class="badge green">Tốt</span>
-      </div>
-      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
-        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(214,163,59,.15);display:flex;align-items:center;justify-content:center;color:#8a6a10;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        </div>
-        <div style="flex:1"><b style="font-size:.9rem;display:block">Silver Blaze</b><small style="color:#a89e7a">HM-003 · C-07</small></div>
-        <span class="badge yellow">Theo dõi</span>
-      </div>
-      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
-        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(111,191,122,.18);display:flex;align-items:center;justify-content:center;color:#3a8a4a;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        </div>
-        <div style="flex:1"><b style="font-size:.9rem;display:block">Night Runner</b><small style="color:#a89e7a">HM-005 · A-08</small></div>
-        <span class="badge green">Tốt</span>
-      </div>
-      <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
-        <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:rgba(196,87,63,.15);display:flex;align-items:center;justify-content:center;color:#a83820;flex-shrink:0;">
-          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        </div>
-        <div style="flex:1"><b style="font-size:.9rem;display:block">Red Fury</b><small style="color:#a89e7a">HM-007 · A-15</small></div>
-        <span class="badge red">Cần chú ý</span>
-      </div>
+    <div id="fitnessCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem;margin-bottom:1.4rem;">
+      <!-- Rendered by JS -->
     </div>
 
-    <!-- Charts -->
+    <!-- Charts (static decorative, kept as-is) -->
     <div class="chart-grid" style="margin-bottom:1.2rem;">
       <div class="chart-card">
         <h4>Khối lượng tập luyện</h4>
         <p class="sub">Giá trị nhập trực tiếp</p>
-        <!-- SVG bar chart mock -->
         <svg viewBox="0 0 280 140" height="140" width="100%" style="display:block">
           <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2f6b57" stop-opacity=".7"/><stop offset="100%" stop-color="#2f6b57" stop-opacity=".15"/></linearGradient></defs>
-          <!-- Grid lines -->
           <line x1="30" y1="10" x2="275" y2="10" stroke="#e4e0d2" stroke-width="1"/>
           <line x1="30" y1="40" x2="275" y2="40" stroke="#e4e0d2" stroke-width="1"/>
           <line x1="30" y1="70" x2="275" y2="70" stroke="#e4e0d2" stroke-width="1"/>
           <line x1="30" y1="100" x2="275" y2="100" stroke="#e4e0d2" stroke-width="1"/>
-          <!-- Bars -->
           <rect x="40"  y="45" width="22" height="55" fill="url(#g1)" rx="3"/>
           <rect x="72"  y="30" width="22" height="70" fill="url(#g1)" rx="3"/>
           <rect x="104" y="55" width="22" height="45" fill="url(#g1)" rx="3"/>
@@ -147,7 +120,6 @@
           <rect x="168" y="38" width="22" height="62" fill="url(#g1)" rx="3"/>
           <rect x="200" y="15" width="22" height="85" fill="url(#g1)" rx="3"/>
           <rect x="232" y="42" width="22" height="58" fill="#2f6b57" rx="3"/>
-          <!-- Labels -->
           <text x="51" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T9/8</text>
           <text x="83" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T11/8</text>
           <text x="115" y="115" font-size="8" fill="#a89e7a" text-anchor="middle">T14/8</text>
@@ -201,49 +173,15 @@
     <div class="card">
       <div class="card-head">
         <h3>Dữ liệu buổi tập gốc</h3>
-        <span style="font-size:.83rem;color:#a89e7a;">7 điểm dữ liệu</span>
+        <span id="tableCount" style="font-size:.83rem;color:#a89e7a;">0 điểm dữ liệu</span>
       </div>
       <div class="table-wrap">
         <table>
           <thead><tr>
             <th>Ngày</th><th>Ngựa</th><th>Khối lượng</th><th>Tốc độ</th><th>Hồi phục</th><th>Thể trạng</th><th>Ghi chú</th>
           </tr></thead>
-          <tbody>
-            <tr>
-              <td>14/09/2026</td>
-              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
-              <td>341.0</td><td>52.4 km/h</td><td>48 BPM</td>
-              <td><span class="badge green">Thể lực tốt</span></td>
-              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Ngựa giữ tốc độ ổn định. Nhịp tim hồi phục nhanh.</td>
-            </tr>
-            <tr>
-              <td>12/09/2026</td>
-              <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005</small></div></div></td>
-              <td>285.0</td><td>49.2 km/h</td><td>51 BPM</td>
-              <td><span class="badge green">Thể lực tốt</span></td>
-              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Phản xạ tốt, ổn định qua đoạn cong.</td>
-            </tr>
-            <tr>
-              <td>11/09/2026</td>
-              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
-              <td>243.0</td><td>48.6 km/h</td><td>52 BPM</td>
-              <td><span class="badge green">Thể lực tốt</span></td>
-              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Buổi phục hồi. Ngựa hào hứng.</td>
-            </tr>
-            <tr>
-              <td>08/09/2026</td>
-              <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007</small></div></div></td>
-              <td>458.5</td><td>55.1 km/h</td><td>68 BPM</td>
-              <td><span class="badge yellow">Cần theo dõi</span></td>
-              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Cường độ cao, hơi chậm đoạn cuối. Theo dõi nhịp tim.</td>
-            </tr>
-            <tr>
-              <td>05/09/2026</td>
-              <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003</small></div></div></td>
-              <td>210.0</td><td>44.3 km/h</td><td>72 BPM</td>
-              <td><span class="badge red">Cần chú ý</span></td>
-              <td style="max-width:180px;font-size:.82rem;color:#55503f;">Nhịp tim hồi phục chậm. Cần giảm cường độ.</td>
-            </tr>
+          <tbody id="fitnessTableBody">
+            <tr id="loadingRow"><td colspan="7" style="text-align:center;color:#a89e7a;padding:2rem;">Đang tải dữ liệu…</td></tr>
           </tbody>
         </table>
       </div>
@@ -265,45 +203,41 @@
       <div class="form-grid">
         <div class="form-field full">
           <label>Ngựa *</label>
-          <select>
+          <select id="modalHorseSelect">
             <option value="">Chọn ngựa…</option>
-            <option>Storm Thunder — HM-001</option>
-            <option>Night Runner — HM-005</option>
-            <option>Red Fury — HM-007</option>
-            <option>Silver Blaze — HM-003</option>
           </select>
         </div>
         <div class="form-field">
           <label>Ngày buổi tập *</label>
-          <input type="date" value="2026-09-17">
+          <input type="date" id="modalDate">
         </div>
         <div class="form-field">
           <label>Thời lượng (phút) *</label>
-          <input type="number" min="1" placeholder="VD: 65">
+          <input type="number" min="1" placeholder="VD: 65" id="modalDuration">
         </div>
         <div class="form-field">
           <label>Cự ly đã chạy (mét) *</label>
-          <input type="number" min="1" step="0.01" placeholder="VD: 1200">
+          <input type="number" min="1" step="0.01" placeholder="VD: 1200" id="modalDistance">
         </div>
         <div class="form-field">
           <label>Tốc độ trung bình (km/h) *</label>
-          <input type="number" min="1" step="0.01" placeholder="VD: 52.4">
+          <input type="number" min="1" step="0.01" placeholder="VD: 52.4" id="modalSpeed">
         </div>
         <div class="form-field">
           <label>Khối lượng tập luyện *</label>
-          <input type="number" min="0" step="0.01" placeholder="VD: 341.0">
+          <input type="number" min="0" step="0.01" placeholder="VD: 341.0" id="modalLoad">
         </div>
         <div class="form-field">
           <label>Hồi phục nhịp tim (BPM) *</label>
-          <input type="number" min="0" max="300" placeholder="VD: 48">
+          <input type="number" min="0" max="300" placeholder="VD: 48" id="modalHeartRate">
         </div>
         <div class="form-field">
           <label>Mức gắng sức cảm nhận (1–10) *</label>
-          <input type="number" min="1" max="10" value="5">
+          <input type="number" min="1" max="10" value="5" id="modalRPE">
         </div>
         <div class="form-field">
           <label>Trạng thái thể lực *</label>
-          <select>
+          <select id="modalStatus">
             <option value="GREEN">Thể lực tốt (GREEN)</option>
             <option value="YELLOW">Cần theo dõi (YELLOW)</option>
             <option value="RED">Cần chú ý (RED)</option>
@@ -311,11 +245,11 @@
         </div>
         <div class="form-field">
           <label>Liên kết video</label>
-          <input type="url" placeholder="https://…">
+          <input type="url" placeholder="https://…" id="modalVideo">
         </div>
         <div class="form-field full">
           <label>Ghi chú huấn luyện viên *</label>
-          <textarea rows="3" placeholder="Nhận xét sau buổi tập…"></textarea>
+          <textarea rows="3" placeholder="Nhận xét sau buổi tập…" id="modalNotes"></textarea>
         </div>
       </div>
       <div class="notice info" style="margin-top:.8rem;">
@@ -325,7 +259,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="cancelEvalModal">Hủy</button>
-      <button class="btn btn-primary">
+      <button class="btn btn-primary" id="btnSubmitEval">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>
         Hoàn tất đánh giá
       </button>
@@ -333,18 +267,280 @@
   </div>
 </div>
 
-<script>
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
-  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+<script type="module">
+  import { initShell, apiFetch } from './auth.js';
 
+  // ── 1. Auth guard ──────────────────────────────────────────────────────────
+  const user = await initShell(['CLUB_MANAGER', 'HEAD_TRAINER']);
+
+  // ── 2. Sidebar user info ───────────────────────────────────────────────────
+  if (user) {
+    const fullName  = user.fullName  || user.name  || user.username || '';
+    const roleName  = user.roleName  || user.role  || '';
+    const initials  = fullName.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2) || '?';
+    document.getElementById('userAvatar').textContent = initials;
+    document.getElementById('userName').textContent   = fullName;
+    document.getElementById('userRole').textContent   = roleName;
+
+    // Show 'Nhập buổi tập' only for privileged roles
+    const allowed = ['HEAD_TRAINER', 'CLUB_MANAGER'];
+    const userRole = user.role || user.roleName || '';
+    if (allowed.includes(userRole)) {
+      document.getElementById('btnNewEval').style.display = '';
+    }
+  }
+
+  // ── 3. Logout ──────────────────────────────────────────────────────────────
+  document.getElementById('btnLogout').addEventListener('click', e => {
+    e.preventDefault();
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = 'login.html';
+  });
+
+  // ── 4. Mobile sidebar toggle ───────────────────────────────────────────────
+  const sidebarEl  = document.getElementById('sidebar');
+  const backdropEl = document.getElementById('sidebarBackdrop');
+  document.getElementById('sidebarToggle').addEventListener('click', () => {
+    sidebarEl.classList.toggle('open');
+    backdropEl.classList.toggle('active');
+  });
+  backdropEl.addEventListener('click', () => {
+    sidebarEl.classList.remove('open');
+    backdropEl.classList.remove('active');
+  });
+
+  // ── 5. Modal logic ─────────────────────────────────────────────────────────
   const modal = document.getElementById('evalModal');
-  document.getElementById('btnNewEval').addEventListener('click', () => modal.style.display = 'flex');
-  document.getElementById('closeEvalModal').addEventListener('click', () => modal.style.display = 'none');
-  document.getElementById('cancelEvalModal').addEventListener('click', () => modal.style.display = 'none');
-  modal.addEventListener('mousedown', e => { if (e.target === modal) modal.style.display = 'none'; });
+  const openModal  = () => { modal.style.display = 'flex'; };
+  const closeModal = () => { modal.style.display = 'none'; };
+  document.getElementById('btnNewEval').addEventListener('click', openModal);
+  document.getElementById('closeEvalModal').addEventListener('click', closeModal);
+  document.getElementById('cancelEvalModal').addEventListener('click', closeModal);
+  modal.addEventListener('mousedown', e => { if (e.target === modal) closeModal(); });
+
+  // ── 6. Helpers ─────────────────────────────────────────────────────────────
+  const STATUS_LABEL = { GREEN: 'Thể lực tốt', YELLOW: 'Cần theo dõi', RED: 'Cần chú ý' };
+  const STATUS_BADGE = { GREEN: 'green',        YELLOW: 'yellow',       RED: 'red'        };
+  const STATUS_ICON_BG = {
+    GREEN:  'rgba(111,191,122,.18)',
+    YELLOW: 'rgba(214,163,59,.15)',
+    RED:    'rgba(196,87,63,.15)',
+  };
+  const STATUS_ICON_COLOR = { GREEN: '#3a8a4a', YELLOW: '#8a6a10', RED: '#a83820' };
+
+  function initials2(name = '') {
+    return name.split(' ').filter(Boolean).map(w => w[0]).join('').toUpperCase().slice(0, 2) || '--';
+  }
+
+  function formatDate(raw) {
+    if (!raw) return '—';
+    const d = new Date(raw);
+    if (isNaN(d)) return raw;
+    return d.toLocaleDateString('vi-VN');
+  }
+
+  // ── 7. Render fitness cards ────────────────────────────────────────────────
+  /** Deduplicate horses from sessions — keep the latest status per horse */
+  function buildHorseMap(sessions) {
+    const map = new Map();
+    sessions.forEach(s => {
+      const key = s.horseId || s.id || s.name;
+      if (!map.has(key) || new Date(s.date || 0) > new Date(map.get(key).date || 0)) {
+        map.set(key, s);
+      }
+    });
+    return [...map.values()];
+  }
+
+  function renderCards(horses) {
+    const wrap = document.getElementById('fitnessCards');
+    if (!horses.length) {
+      wrap.innerHTML = '<p style="color:#a89e7a;grid-column:1/-1;">Chưa có dữ liệu thể lực.</p>';
+      return;
+    }
+    wrap.innerHTML = horses.map(h => {
+      const status = (h.status || 'GREEN').toUpperCase();
+      const badge  = STATUS_BADGE[status]      || 'green';
+      const bgCol  = STATUS_ICON_BG[status]    || STATUS_ICON_BG.GREEN;
+      const icCol  = STATUS_ICON_COLOR[status] || STATUS_ICON_COLOR.GREEN;
+      const label  = STATUS_LABEL[status]      || status;
+      const name   = h.name || h.horseName || '—';
+      const code   = h.code || h.horseCode || h.id || '';
+      return `
+        <div style="background:var(--parchment);border:1px solid var(--parchment-2);border-radius:var(--radius-lg);padding:1rem 1.2rem;display:flex;align-items:center;gap:.8rem;box-shadow:var(--shadow-card);">
+          <div style="width:2.4rem;height:2.4rem;border-radius:8px;background:${bgCol};display:flex;align-items:center;justify-content:center;color:${icCol};flex-shrink:0;">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
+          </div>
+          <div style="flex:1"><b style="font-size:.9rem;display:block">${name}</b><small style="color:#a89e7a">${code}</small></div>
+          <span class="badge ${badge}">${label}</span>
+        </div>`;
+    }).join('');
+  }
+
+  // ── 8. Render table rows ───────────────────────────────────────────────────
+  function renderTable(sessions) {
+    const tbody = document.getElementById('fitnessTableBody');
+    document.getElementById('tableCount').textContent = `${sessions.length} điểm dữ liệu`;
+    if (!sessions.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#a89e7a;padding:2rem;">Chưa có dữ liệu thể lực.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = sessions.map(s => {
+      const status   = (s.status || 'GREEN').toUpperCase();
+      const badge    = STATUS_BADGE[status]  || 'green';
+      const label    = STATUS_LABEL[status]  || status;
+      const name     = s.name  || s.horseName || '—';
+      const code     = s.code  || s.horseCode || s.horseId || '';
+      const abbr     = initials2(name);
+      const load     = s.fitnessScore ?? s.load ?? s.trainingLoad ?? '—';
+      const speed    = s.avgSpeed    != null ? `${s.avgSpeed} km/h`  : (s.speed != null ? `${s.speed} km/h` : '—');
+      const hr       = s.heartRate   != null ? `${s.heartRate} BPM`  : (s.heartRateRecovery != null ? `${s.heartRateRecovery} BPM` : '—');
+      const note     = s.note || s.notes || s.trainerNote || '';
+      const dateStr  = formatDate(s.date || s.sessionDate || s.createdAt);
+      return `
+        <tr data-name="${name.toLowerCase()}" data-code="${code.toLowerCase()}" data-status="${status}" data-date="${s.date || s.sessionDate || ''}">
+          <td>${dateStr}</td>
+          <td><div class="td-horse"><span class="horse-mono">${abbr}</span><div><b>${name}</b><small>${code}</small></div></div></td>
+          <td>${load}</td>
+          <td>${speed}</td>
+          <td>${hr}</td>
+          <td><span class="badge ${badge}">${label}</span></td>
+          <td style="max-width:180px;font-size:.82rem;color:#55503f;">${note}</td>
+        </tr>`;
+    }).join('');
+  }
+
+  // ── 9. Populate filter dropdowns from data ─────────────────────────────────
+  function populateFilters(sessions) {
+    const horseSelect = document.getElementById('filterHorse');
+    const seen = new Set();
+    sessions.forEach(s => {
+      const name = s.name || s.horseName || '';
+      const code = s.code || s.horseCode || '';
+      const key  = code || name;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        const opt = document.createElement('option');
+        opt.value = key.toLowerCase();
+        opt.textContent = code ? `${name} — ${code}` : name;
+        horseSelect.appendChild(opt);
+      }
+    });
+
+    // Also populate modal horse select
+    const modalSel = document.getElementById('modalHorseSelect');
+    seen.forEach(key => {
+      const s = sessions.find(x => (x.code || x.horseCode || x.name || x.horseName || '').toLowerCase() === key);
+      if (!s) return;
+      const name = s.name || s.horseName || '';
+      const code = s.code || s.horseCode || '';
+      const opt  = document.createElement('option');
+      opt.value  = code || name;
+      opt.textContent = code ? `${name} — ${code}` : name;
+      modalSel.appendChild(opt);
+    });
+  }
+
+  // ── 10. Client-side filtering ──────────────────────────────────────────────
+  function applyFilters() {
+    const q          = document.getElementById('searchInput').value.trim().toLowerCase();
+    const horseVal   = document.getElementById('filterHorse').value.toLowerCase();
+    const statusVal  = document.getElementById('filterStatus').value.toUpperCase();
+    const dateFrom   = document.getElementById('filterDateFrom').value;
+    const dateTo     = document.getElementById('filterDateTo').value;
+
+    const rows = document.querySelectorAll('#fitnessTableBody tr[data-name]');
+    let visible = 0;
+    rows.forEach(tr => {
+      const name   = tr.dataset.name   || '';
+      const code   = tr.dataset.code   || '';
+      const status = tr.dataset.status || '';
+      const date   = tr.dataset.date   || '';
+
+      const matchQ      = !q         || name.includes(q) || code.includes(q);
+      const matchHorse  = !horseVal  || name.includes(horseVal) || code.includes(horseVal);
+      const matchStatus = !statusVal || status === statusVal;
+      const matchFrom   = !dateFrom  || date >= dateFrom;
+      const matchTo     = !dateTo    || date <= dateTo;
+
+      const show = matchQ && matchHorse && matchStatus && matchFrom && matchTo;
+      tr.style.display = show ? '' : 'none';
+      if (show) visible++;
+    });
+    document.getElementById('tableCount').textContent = `${visible} điểm dữ liệu`;
+  }
+
+  document.getElementById('searchInput').addEventListener('input', applyFilters);
+  document.getElementById('btnApplyFilter').addEventListener('click', applyFilters);
+
+  // ── 11. Load dashboard data ────────────────────────────────────────────────
+  async function loadDashboard() {
+    let sessions = [];
+    try {
+      const data = await apiFetch('/api/fitness/dashboard');
+
+      // Flexible response handling
+      if (Array.isArray(data)) {
+        sessions = data;
+      } else if (data && Array.isArray(data.horses)) {
+        sessions = data.horses;
+      } else if (data && Array.isArray(data.sessions)) {
+        sessions = data.sessions;
+      } else if (data && Array.isArray(data.items)) {
+        sessions = data.items;
+      } else if (data && Array.isArray(data.data)) {
+        sessions = data.data;
+      } else {
+        console.warn('[fitness] Unexpected API shape:', data);
+        sessions = [];
+      }
+    } catch (err) {
+      console.error('[fitness] API error:', err);
+      sessions = [];
+    }
+
+    // Render horse summary cards (latest status per horse)
+    const latestPerHorse = buildHorseMap(sessions);
+    renderCards(latestPerHorse);
+
+    // Render table
+    renderTable(sessions);
+
+    // Populate filter dropdowns
+    populateFilters(sessions);
+  }
+
+  // Set today's date as default for modal date field
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('modalDate').value = today;
+
+  await loadDashboard();
+
+  // ── 12. Modal submit (POST) ────────────────────────────────────────────────
+  document.getElementById('btnSubmitEval').addEventListener('click', async () => {
+    const payload = {
+      horseId:          document.getElementById('modalHorseSelect').value,
+      date:             document.getElementById('modalDate').value,
+      duration:         Number(document.getElementById('modalDuration').value),
+      distance:         Number(document.getElementById('modalDistance').value),
+      avgSpeed:         Number(document.getElementById('modalSpeed').value),
+      trainingLoad:     Number(document.getElementById('modalLoad').value),
+      heartRate:        Number(document.getElementById('modalHeartRate').value),
+      perceivedExertion:Number(document.getElementById('modalRPE').value),
+      status:           document.getElementById('modalStatus').value,
+      videoUrl:         document.getElementById('modalVideo').value,
+      notes:            document.getElementById('modalNotes').value,
+    };
+
+    try {
+      await apiFetch('/api/fitness/sessions', { method: 'POST', body: JSON.stringify(payload) });
+      closeModal();
+      await loadDashboard();
+    } catch (err) {
+      alert('Không thể lưu buổi tập: ' + (err.message || err));
+    }
+  });
 </script>
 
 </body>

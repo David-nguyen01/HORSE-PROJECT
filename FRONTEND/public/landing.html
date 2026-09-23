@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Turfline Stable Manager — Hệ thống Quản lý Huấn luyện Ngựa đua</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand-mark">
+    <span class="glyph">◆</span>
+    <span class="wordmark">Turfline Stable Manager</span>
+  </div>
+  <nav class="site-nav">
+    <a href="#roles">Vai trò</a>
+    <a href="#stats">Vận hành</a>
+    <a href="#cta">Tham gia</a>
+  </nav>
+  <div class="header-actions">
+    <a class="btn-ghost" href="login.html">Đăng nhập</a>
+    <a class="btn-brass" href="register.html">Đăng ký</a>
+  </div>
+  <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="mobileMenu" aria-label="Mở menu">
+    <span></span><span></span><span></span>
+  </button>
+</header>
+
+<div class="mobile-menu" id="mobileMenu">
+  <a href="#roles">Vai trò</a>
+  <a href="#stats">Vận hành</a>
+  <a href="#cta">Tham gia</a>
+  <div class="mobile-menu-actions">
+    <a class="btn-ghost" href="login.html">Đăng nhập</a>
+    <a class="btn-brass" href="register.html">Đăng ký</a>
+  </div>
+</div>
+
+<script>
+  const navToggle = document.getElementById('navToggle');
+  const mobileMenu = document.getElementById('mobileMenu');
+  navToggle.addEventListener('click', () => {
+    const isOpen = mobileMenu.classList.toggle('is-open');
+    navToggle.classList.toggle('is-open', isOpen);
+    navToggle.setAttribute('aria-expanded', String(isOpen));
+  });
+  mobileMenu.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      mobileMenu.classList.remove('is-open');
+      navToggle.classList.remove('is-open');
+      navToggle.setAttribute('aria-expanded', 'false');
+    });
+  });
+</script>
+
+<section class="hero">
+  <div class="hero-grid">
+    <div>
+      <span class="hero-badge"><span class="dot"></span>Đang mở đăng ký</span>
+      <h1>Một hồ sơ cho mỗi chiến mã, từ giáo án đến bệnh án.</h1>
+      <p class="lede">Turfline nối liền huấn luyện viên, bác sĩ thú y, nhân viên chuồng trại và chủ sở hữu trên cùng một dữ liệu — để không buổi tập nào diễn ra khi một con ngựa chưa đủ điều kiện.</p>
+      <div class="hero-cta">
+        <a class="btn-brass" href="register.html">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>
+          Tạo tài khoản
+        </a>
+        <a class="btn-outline" href="login.html">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          Tôi đã có tài khoản
+        </a>
+      </div>
+    </div>
+
+    <aside class="form-guide">
+      <div class="fg-head">
+        <h3>Bảng theo dõi hôm nay</h3>
+        <span class="fg-pill">Cập nhật 5 phút trước</span>
+      </div>
+      <dl>
+        <dt>Đủ điều kiện tập luyện</dt><dd>41 / 48</dd>
+        <dt>Đang theo dõi y tế</dt><dd>5</dd>
+        <dt>Khóa huấn luyện</dt><dd>2</dd>
+        <dt>Buổi chạy thử hôm nay</dt><dd>9</dd>
+      </dl>
+    </aside>
+  </div>
+</section>
+
+<section id="roles">
+  <div class="section-head">
+    <h2>Mỗi vai trò, một góc nhìn riêng</h2>
+    <p>Cùng một con ngựa, nhưng dữ liệu hiển thị khác nhau tùy vào việc bạn đang huấn luyện, điều trị, chăm sóc hay theo dõi từ xa.</p>
+  </div>
+
+  <div class="role-list">
+    <div class="role-row">
+      <div>
+        <h3>Head Trainer</h3>
+        <p class="role-tag">Huấn luyện viên Trưởng</p>
+      </div>
+      <p>Lập giáo án theo giai đoạn, phân công lịch tập và theo dõi cảnh báo thể lực theo thời gian thực.</p>
+      <p>Xem tiến độ toàn câu lạc bộ, ghi nhận nhận xét sau mỗi buổi tập, đăng ký chiến mã tham gia giải đấu.</p>
+    </div>
+
+    <div class="role-row">
+      <div>
+        <h3>Veterinarian</h3>
+        <p class="role-tag">Bác sĩ Thú y</p>
+      </div>
+      <p>Ghi nhận khám bệnh, cập nhật phác đồ điều trị và đánh dấu vị trí chấn thương để theo dõi phục hồi.</p>
+      <p>Ra lệnh khóa huấn luyện khẩn cấp, quản lý lịch tiêm phòng và kiểm tra móng định kỳ.</p>
+    </div>
+
+    <div class="role-row">
+      <div>
+        <h3>Groom / Stable Hand</h3>
+        <p class="role-tag">Chăm sóc &amp; Chuồng trại</p>
+      </div>
+      <p>Theo dõi khẩu phần ăn, xác nhận hoàn thành công việc chăm sóc hàng ngày cho từng con ngựa.</p>
+      <p>Gửi báo cáo sự cố kèm hình ảnh, đề xuất bổ sung vật tư khi khu vực phụ trách sắp cạn.</p>
+    </div>
+
+    <div class="role-row">
+      <div>
+        <h3>Horse Owner</h3>
+        <p class="role-tag">Chủ sở hữu Ngựa</p>
+      </div>
+      <p>Xem lý lịch, dòng dõi và thành tích thi đấu của ngựa sở hữu, theo dõi sức khỏe theo thời gian thực.</p>
+      <p>Nhận báo cáo chi phí nuôi dưỡng, y tế và doanh thu tiền thưởng định kỳ.</p>
+    </div>
+
+    <div class="role-row">
+      <div>
+        <h3>Club Manager</h3>
+        <p class="role-tag">Quản lý Câu lạc bộ</p>
+      </div>
+      <p>Quản lý danh mục ngựa, nhân sự và vật tư; phân quyền truy cập cho từng vai trò trong hệ thống.</p>
+      <p>Theo dõi báo cáo vận hành, chi phí và nhật ký thao tác để đảm bảo minh bạch toàn hệ thống.</p>
+    </div>
+  </div>
+</section>
+
+<section id="stats" style="padding-top:0;">
+  <div class="stat-strip">
+    <div class="stat-cell"><b>48</b><span>Chiến mã đang quản lý</span></div>
+    <div class="stat-cell"><b>6</b><span>Buổi tập trung bình / ngựa / tuần</span></div>
+    <div class="stat-cell"><b>24/7</b><span>Cảnh báo nhịp tim &amp; vận tốc</span></div>
+    <div class="stat-cell"><b>5</b><span>Vai trò được phân quyền riêng</span></div>
+  </div>
+</section>
+
+<section id="cta" class="cta-band">
+  <h2>Sẵn sàng đưa chuồng trại của bạn lên Turfline?</h2>
+  <a class="btn-brass" href="register.html">Đăng ký tài khoản</a>
+</section>
+
+<footer class="site-footer">
+  <span>© 2026 Turfline Stable Manager</span>
+  <span>Hệ thống Quản lý Huấn luyện Ngựa đua</span>
+</footer>
+
+</body>
+</html>

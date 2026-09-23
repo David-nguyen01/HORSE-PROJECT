@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lịch tập & Phân công — Turfline Stable Manager</title>
+<title>Lịch tập &amp; Phân công — Turfline Stable Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app-shell.css">
@@ -22,23 +22,32 @@
       <a href="horses.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
       <span class="nav-section-label">Huấn luyện</span>
       <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
-      <a href="training-schedule.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
-      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
+      <a href="training-schedule.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập &amp; Phân công</a>
+      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực &amp; Đánh giá</a>
       <span class="nav-section-label">Y tế</span>
-      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
+      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe &amp; Y tế</a>
       <span class="nav-section-label">Quản trị</span>
-      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng &amp; Vai trò</a>
     </nav>
     <div class="sidebar-foot">
-      <div class="user-chip"><span class="avatar">NT</span><div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div></div>
-      <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+      <div class="user-chip">
+        <span class="avatar" id="userAvatar">?</span>
+        <div class="user-info">
+          <b id="userName">Đang tải…</b>
+          <small id="userRole"></small>
+        </div>
+      </div>
+      <a href="login.html" class="btn-logout">
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Đăng xuất
+      </a>
     </div>
   </aside>
 
   <!-- TOPBAR -->
   <header class="topbar">
     <button class="mobile-sidebar-toggle" id="sidebarToggle" aria-label="Mở menu"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-    <span class="topbar-title">Lịch tập & Phân công</span>
+    <span class="topbar-title">Lịch tập &amp; Phân công</span>
     <div class="topbar-right">
       <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
       <button class="notif-btn"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="notif-badge">3</span></button>
@@ -51,11 +60,11 @@
     <div class="page-heading">
       <div>
         <p class="eyebrow">FLOW 2 · PHÂN CÔNG LỊCH TẬP</p>
-        <h1>Lịch tập & Phân công</h1>
+        <h1>Lịch tập &amp; Phân công</h1>
         <p class="sub">Xếp lịch, phân công nhân viên và theo dõi tiến độ từng buổi tập.</p>
       </div>
       <div class="heading-actions">
-        <button class="btn btn-primary" id="btnNewSchedule">
+        <button class="btn btn-primary" id="btnNewSchedule" style="display:none">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Tạo lịch tập
         </button>
@@ -64,117 +73,28 @@
 
     <!-- Filter toolbar -->
     <div class="toolbar card">
-      <input type="date" class="filter-select" value="2026-09-17" title="Ngày bắt đầu">
+      <input type="date" class="filter-select" id="filterDateFrom" title="Ngày bắt đầu">
       <span style="color:#a89e7a;font-size:.85rem;">đến</span>
-      <input type="date" class="filter-select" value="2026-09-23" title="Ngày kết thúc">
-      <select class="filter-select">
+      <input type="date" class="filter-select" id="filterDateTo" title="Ngày kết thúc">
+      <select class="filter-select" id="filterHorse">
         <option value="">Tất cả ngựa</option>
-        <option>Storm Thunder</option>
-        <option>Night Runner</option>
-        <option>Red Fury</option>
-        <option>Silver Blaze</option>
       </select>
-      <select class="filter-select">
+      <select class="filter-select" id="filterStatus">
         <option value="">Tất cả trạng thái</option>
-        <option>Đã công bố</option>
-        <option>Nháp</option>
-        <option>Đã hủy</option>
-        <option>Hoàn thành</option>
+        <option value="PUBLISHED">Đã công bố</option>
+        <option value="DRAFT">Nháp</option>
+        <option value="CANCELLED">Đã hủy</option>
+        <option value="COMPLETED">Hoàn thành</option>
       </select>
-      <button class="btn btn-secondary">Áp dụng</button>
+      <input type="text" class="filter-select" id="filterSearch" placeholder="Tìm theo mô tả, ngựa…" style="min-width:180px;">
+      <button class="btn btn-secondary" id="btnApplyFilter">Áp dụng</button>
     </div>
 
-    <!-- Notice: training lock -->
-    <div class="notice warning">
-      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span><b>Gold Wind (HM-002)</b> đang bị Khóa huấn luyện. Không thể xếp lịch cường độ cao cho ngựa này. <a href="health.html" style="color:var(--brass);font-weight:600">Xem chi tiết →</a></span>
-    </div>
-
-    <!-- Schedule list -->
-    <div class="card" style="margin-bottom:1rem;">
-      <div class="card-head">
-        <h3>Thứ Tư, 17/09/2026</h3>
-        <span style="font-size:.83rem;color:#a89e7a;">3 lịch tập</span>
-      </div>
-      <div>
-        <div class="schedule-row">
-          <div class="schedule-time-col">06<br><small style="font-size:.7rem;color:#a89e7a">:00</small></div>
-          <div class="schedule-detail">
-            <b>Chạy đường dài — Storm Thunder</b>
-            <small>HM-001 · Giai đoạn 3 — Race-ready · Cỏ · 1400m</small>
-          </div>
-          <div style="font-size:.83rem;color:#6b6349;">Nguyễn Văn An</div>
-          <span class="badge red" style="font-size:.75rem;">Cao</span>
-          <span class="badge published"><i></i>Đã công bố</span>
-          <div style="display:flex;gap:.4rem;">
-            <button class="btn btn-ghost btn-icon" title="Đánh dấu hoàn thành"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></button>
-            <button class="btn btn-ghost btn-icon" title="Hủy lịch"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-        </div>
-        <div class="schedule-row">
-          <div class="schedule-time-col">07<br><small style="font-size:.7rem;color:#a89e7a">:30</small></div>
-          <div class="schedule-detail">
-            <b>Khởi động nhẹ + phản xạ — Night Runner</b>
-            <small>HM-005 · Giai đoạn 1 — Nền tảng · Đất mềm · 800m</small>
-          </div>
-          <div style="font-size:.83rem;color:#6b6349;">Trần Thị Lan</div>
-          <span class="badge green" style="font-size:.75rem;">Thấp</span>
-          <span class="badge published"><i></i>Đã công bố</span>
-          <div style="display:flex;gap:.4rem;">
-            <button class="btn btn-ghost btn-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></button>
-            <button class="btn btn-ghost btn-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-        </div>
-        <div class="schedule-row">
-          <div class="schedule-time-col">09<br><small style="font-size:.7rem;color:#a89e7a">:00</small></div>
-          <div class="schedule-detail">
-            <b>Bài tập tốc độ 600m × 3 — Red Fury</b>
-            <small>HM-007 · Giai đoạn 2 — Xây dựng tốc độ · Cỏ · 1800m tổng</small>
-          </div>
-          <div style="font-size:.83rem;color:#6b6349;">Nguyễn Văn An</div>
-          <span class="badge yellow" style="font-size:.75rem;">Trung bình</span>
-          <span class="badge draft"><i></i>Nháp</span>
-          <div style="display:flex;gap:.4rem;">
-            <button class="btn btn-primary" style="font-size:.78rem;padding:.35rem .7rem;">Công bố</button>
-            <button class="btn btn-ghost btn-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-head">
-        <h3>Thứ Năm, 18/09/2026</h3>
-        <span style="font-size:.83rem;color:#a89e7a;">2 lịch tập</span>
-      </div>
-      <div>
-        <div class="schedule-row">
-          <div class="schedule-time-col">06<br><small style="font-size:.7rem;color:#a89e7a">:30</small></div>
-          <div class="schedule-detail">
-            <b>Chạy hồi phục — Silver Blaze</b>
-            <small>HM-003 · Giai đoạn 1 · Đất mềm · 600m</small>
-          </div>
-          <div style="font-size:.83rem;color:#6b6349;">Lê Văn Hùng</div>
-          <span class="badge green" style="font-size:.75rem;">Thấp</span>
-          <span class="badge draft"><i></i>Nháp</span>
-          <div style="display:flex;gap:.4rem;">
-            <button class="btn btn-primary" style="font-size:.78rem;padding:.35rem .7rem;">Công bố</button>
-            <button class="btn btn-ghost btn-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
-          </div>
-        </div>
-        <div class="schedule-row">
-          <div class="schedule-time-col">08<br><small style="font-size:.7rem;color:#a89e7a">:00</small></div>
-          <div class="schedule-detail">
-            <b>Bài kiểm tra tốc độ — Storm Thunder</b>
-            <small>HM-001 · Giai đoạn 3 · Cỏ · 1000m</small>
-          </div>
-          <div style="font-size:.83rem;color:#6b6349;">Nguyễn Văn An</div>
-          <span class="badge red" style="font-size:.75rem;">Cao</span>
-          <span class="badge completed"><i></i>Hoàn thành</span>
-          <div style="display:flex;gap:.4rem;">
-            <button class="btn btn-secondary" style="font-size:.78rem;padding:.35rem .7rem;" onclick="location.href='fitness.html'">Nhập đánh giá</button>
-          </div>
-        </div>
+    <!-- Schedule list container -->
+    <div id="scheduleContainer">
+      <div style="text-align:center;padding:3rem;color:#a89e7a;">
+        <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="animation:spin 1s linear infinite;display:inline-block"><path d="M21 12a9 9 0 1 1-6.22-8.56"/></svg>
+        <p style="margin-top:.5rem;">Đang tải lịch tập…</p>
       </div>
     </div>
 
@@ -197,33 +117,35 @@
       </div>
       <div class="form-grid">
         <div class="form-field full">
-          <label>Giai đoạn huấn luyện *</label>
-          <select>
-            <option value="">Chọn giai đoạn từ giáo án…</option>
-            <option>Storm Thunder — Giai đoạn 3: Race-ready (12/09–02/10)</option>
-            <option>Night Runner — Giai đoạn 1: Nền tảng (01/08–21/08)</option>
-            <option>Red Fury — Giai đoạn 2: Tốc độ (22/08–11/09)</option>
+          <label>Ngựa *</label>
+          <select id="formHorse">
+            <option value="">Chọn ngựa…</option>
           </select>
         </div>
         <div class="form-field full">
           <label>Nội dung buổi tập *</label>
-          <input placeholder="VD: Chạy đường dài 1200m">
+          <input id="formDescription" placeholder="VD: Chạy đường dài 1200m">
         </div>
         <div class="form-field">
           <label>Thời gian bắt đầu *</label>
-          <input type="datetime-local">
+          <input type="datetime-local" id="formStartTime">
         </div>
         <div class="form-field">
           <label>Thời gian kết thúc *</label>
-          <input type="datetime-local">
+          <input type="datetime-local" id="formEndTime">
+        </div>
+        <div class="form-field">
+          <label>Cường độ *</label>
+          <select id="formIntensity">
+            <option value="LOW">Thấp</option>
+            <option value="MEDIUM" selected>Trung bình</option>
+            <option value="HIGH">Cao</option>
+          </select>
         </div>
         <div class="form-field full">
           <label>Phân công nhân viên *</label>
-          <select>
+          <select id="formStaff">
             <option value="">Chọn nhân viên chuồng trại…</option>
-            <option>Nguyễn Văn An (Stable Staff)</option>
-            <option>Trần Thị Lan (Stable Staff)</option>
-            <option>Lê Văn Hùng (Stable Staff)</option>
           </select>
           <span class="hint">Hệ thống sẽ kiểm tra xung đột lịch của nhân viên.</span>
         </div>
@@ -231,24 +153,295 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="cancelNewSchedule">Hủy</button>
-      <button class="btn btn-secondary">Lưu nháp</button>
-      <button class="btn btn-primary">Lưu & Công bố</button>
+      <button class="btn btn-secondary" id="btnSaveDraft">Lưu nháp</button>
+      <button class="btn btn-primary" id="btnSavePublish">Lưu &amp; Công bố</button>
     </div>
   </div>
 </div>
 
-<script>
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
-  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 
-  const modal = document.getElementById('newScheduleModal');
-  document.getElementById('btnNewSchedule').addEventListener('click', () => modal.style.display = 'flex');
-  document.getElementById('closeNewSchedule').addEventListener('click', () => modal.style.display = 'none');
-  document.getElementById('cancelNewSchedule').addEventListener('click', () => modal.style.display = 'none');
-  modal.addEventListener('mousedown', e => { if (e.target === modal) modal.style.display = 'none'; });
+<script type="module">
+import { initShell, apiFetch, hasRole } from './auth.js';
+
+/* ── 1. Shell init (auth guard + sidebar user info + toggle + logout) ── */
+initShell(['CLUB_MANAGER', 'HEAD_TRAINER', 'STABLE_STAFF']);
+
+/* ── 5. Role flags ── */
+const isManager = hasRole('CLUB_MANAGER');
+const isTrainer = hasRole('HEAD_TRAINER');
+const isStaff   = hasRole('STABLE_STAFF');
+const canCreate = isManager || isTrainer;
+const staffOnly = isStaff && !isManager && !isTrainer;
+
+/* ── 6. Show/hide "Tạo lịch" button ── */
+if (canCreate) {
+  document.getElementById('btnNewSchedule').style.display = '';
+}
+
+/* ── 7. Helper: badge markup ── */
+function statusBadge(status) {
+  const map = {
+    PUBLISHED:  { cls: 'published', label: 'Đã công bố' },
+    DRAFT:      { cls: 'draft',     label: 'Nháp' },
+    CANCELLED:  { cls: 'draft',     label: 'Đã hủy' },
+    COMPLETED:  { cls: 'completed', label: 'Hoàn thành' },
+  };
+  const s = map[status] || { cls: 'draft', label: status };
+  return `<span class="badge ${s.cls}"><i></i>${s.label}</span>`;
+}
+
+function intensityBadge(intensity) {
+  const map = {
+    HIGH:   { cls: 'red',    label: 'Cao' },
+    MEDIUM: { cls: 'yellow', label: 'Trung bình' },
+    LOW:    { cls: 'green',  label: 'Thấp' },
+  };
+  const s = map[intensity] || { cls: 'draft', label: intensity };
+  return `<span class="badge ${s.cls}" style="font-size:.75rem;">${s.label}</span>`;
+}
+
+/* ── 8. Format helpers ── */
+function fmtTime(dt) {
+  if (!dt) return '—';
+  const d = new Date(dt);
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDate(dt) {
+  if (!dt) return '';
+  const d = new Date(dt);
+  return d.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+function isoDate(dt) {
+  if (!dt) return '';
+  return new Date(dt).toISOString().slice(0, 10);
+}
+
+/* ── 9. State ── */
+let allSchedules = [];
+
+/* ── 10. Fetch schedules from API ── */
+async function loadSchedules() {
+  try {
+    const endpoint = staffOnly
+      ? '/api/training-schedules/mine?page=0&size=100'
+      : '/api/training-schedules?page=0&size=100';
+
+    const res = await apiFetch(endpoint);
+    // Support both paginated { content: [...] } and plain array
+    allSchedules = Array.isArray(res) ? res : (res.content || []);
+    applyFilter();
+  } catch (err) {
+    document.getElementById('scheduleContainer').innerHTML =
+      `<div class="notice warning">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        <span>Không thể tải lịch tập: <b>${err.message || err}</b></span>
+      </div>`;
+  }
+}
+
+/* ── 11. Client-side filter ── */
+function applyFilter() {
+  const fromVal   = document.getElementById('filterDateFrom').value;
+  const toVal     = document.getElementById('filterDateTo').value;
+  const horseVal  = document.getElementById('filterHorse').value.toLowerCase();
+  const statusVal = document.getElementById('filterStatus').value;
+  const searchVal = document.getElementById('filterSearch').value.toLowerCase().trim();
+
+  let filtered = allSchedules.filter(s => {
+    const dateStr = isoDate(s.date || s.startTime);
+    if (fromVal && dateStr < fromVal) return false;
+    if (toVal   && dateStr > toVal)   return false;
+    const horseName = (s.horse?.name || '').toLowerCase();
+    if (horseVal && !horseName.includes(horseVal)) return false;
+    if (statusVal && s.status !== statusVal) return false;
+    if (searchVal) {
+      const haystack = [
+        s.description, s.horse?.name, s.assignedStaff?.username
+      ].join(' ').toLowerCase();
+      if (!haystack.includes(searchVal)) return false;
+    }
+    return true;
+  });
+
+  renderSchedules(filtered);
+}
+
+/* ── 12. Render schedules grouped by date ── */
+function renderSchedules(list) {
+  const container = document.getElementById('scheduleContainer');
+
+  if (!list.length) {
+    container.innerHTML =
+      `<div class="card" style="text-align:center;padding:2.5rem;color:#a89e7a;">
+        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        <p style="margin-top:.75rem;">Không có lịch tập nào.</p>
+      </div>`;
+    return;
+  }
+
+  // Group by date
+  const groups = {};
+  list.forEach(s => {
+    const key = isoDate(s.date || s.startTime);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(s);
+  });
+
+  const sortedKeys = Object.keys(groups).sort();
+  container.innerHTML = sortedKeys.map(dateKey => {
+    const items = groups[dateKey];
+    const dateLabel = fmtDate(dateKey + 'T00:00:00');
+    const rows = items.map(s => buildScheduleRow(s)).join('');
+    return `
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-head">
+          <h3>${dateLabel}</h3>
+          <span style="font-size:.83rem;color:#a89e7a;">${items.length} lịch tập</span>
+        </div>
+        <div>${rows}</div>
+      </div>`;
+  }).join('');
+
+  // Populate horse filter options
+  populateHorseFilter(list);
+}
+
+function buildScheduleRow(s) {
+  const hour  = fmtTime(s.startTime).split(':')[0];
+  const min   = fmtTime(s.startTime).split(':')[1] || '00';
+  const horse = s.horse?.name || '—';
+  const desc  = s.description || '';
+  const staff = s.assignedStaff?.username || '—';
+  const actions = buildActions(s);
+
+  return `
+    <div class="schedule-row" data-id="${s.id}">
+      <div class="schedule-time-col">${hour}<br><small style="font-size:.7rem;color:#a89e7a">:${min}</small></div>
+      <div class="schedule-detail">
+        <b>${desc || horse}</b>
+        <small>${horse}${s.startTime && s.endTime ? ' · ' + fmtTime(s.startTime) + '–' + fmtTime(s.endTime) : ''}</small>
+      </div>
+      <div style="font-size:.83rem;color:#6b6349;">${staff}</div>
+      ${intensityBadge(s.intensity)}
+      ${statusBadge(s.status)}
+      <div style="display:flex;gap:.4rem;">${actions}</div>
+    </div>`;
+}
+
+function buildActions(s) {
+  if (s.status === 'COMPLETED') {
+    return `<button class="btn btn-secondary" style="font-size:.78rem;padding:.35rem .7rem;" onclick="location.href='fitness.html'">Nhập đánh giá</button>`;
+  }
+  if (s.status === 'DRAFT' && canCreate) {
+    return `
+      <button class="btn btn-primary" style="font-size:.78rem;padding:.35rem .7rem;" data-action="publish" data-id="${s.id}">Công bố</button>
+      <button class="btn btn-ghost btn-icon" data-action="cancel" data-id="${s.id}" title="Hủy lịch"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+  }
+  if (s.status === 'PUBLISHED' && canCreate) {
+    return `
+      <button class="btn btn-ghost btn-icon" title="Đánh dấu hoàn thành" data-action="complete" data-id="${s.id}"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></button>
+      <button class="btn btn-ghost btn-icon" title="Hủy lịch" data-action="cancel" data-id="${s.id}"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+  }
+  // Staff view: published
+  if (s.status === 'PUBLISHED') {
+    return `<button class="btn btn-ghost btn-icon" title="Đánh dấu hoàn thành" data-action="complete" data-id="${s.id}"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg></button>`;
+  }
+  return '';
+}
+
+/* ── 13. Populate horse filter ── */
+function populateHorseFilter(list) {
+  const sel = document.getElementById('filterHorse');
+  const current = sel.value;
+  const horses = [...new Map(list.map(s => [s.horse?.id, s.horse?.name]).filter(([id]) => id)).values()];
+  sel.innerHTML = '<option value="">Tất cả ngựa</option>' +
+    horses.map(name => `<option value="${(name||'').toLowerCase()}">${name}</option>`).join('');
+  sel.value = current;
+}
+
+/* ── 14. Action delegation (publish / complete / cancel) ── */
+document.getElementById('scheduleContainer').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const id     = btn.dataset.id;
+  if (!id) return;
+
+  const actionMap = {
+    publish:  { method: 'PUT', url: `/api/training-schedules/${id}/publish`,  confirm: null },
+    complete: { method: 'PUT', url: `/api/training-schedules/${id}/complete`, confirm: 'Đánh dấu buổi tập này là Hoàn thành?' },
+    cancel:   { method: 'PUT', url: `/api/training-schedules/${id}/cancel`,   confirm: 'Hủy lịch tập này?' },
+  };
+  const cfg = actionMap[action];
+  if (!cfg) return;
+  if (cfg.confirm && !confirm(cfg.confirm)) return;
+
+  btn.disabled = true;
+  try {
+    await apiFetch(cfg.url, { method: cfg.method });
+    await loadSchedules();
+  } catch (err) {
+    alert('Lỗi: ' + (err.message || err));
+    btn.disabled = false;
+  }
+});
+
+/* ── 15. Filter apply button ── */
+document.getElementById('btnApplyFilter').addEventListener('click', applyFilter);
+['filterDateFrom','filterDateTo','filterSearch'].forEach(id => {
+  document.getElementById(id)?.addEventListener('keyup', applyFilter);
+});
+['filterHorse','filterStatus'].forEach(id => {
+  document.getElementById(id)?.addEventListener('change', applyFilter);
+});
+
+/* ── 16. Modal: open / close ── */
+const modal = document.getElementById('newScheduleModal');
+document.getElementById('btnNewSchedule')?.addEventListener('click', () => modal.style.display = 'flex');
+document.getElementById('closeNewSchedule')?.addEventListener('click', () => modal.style.display = 'none');
+document.getElementById('cancelNewSchedule')?.addEventListener('click', () => modal.style.display = 'none');
+modal.addEventListener('mousedown', e => { if (e.target === modal) modal.style.display = 'none'; });
+
+/* ── 17. Modal: save draft / publish ── */
+async function submitSchedule(status) {
+  const horse     = document.getElementById('formHorse').value;
+  const desc      = document.getElementById('formDescription').value.trim();
+  const startTime = document.getElementById('formStartTime').value;
+  const endTime   = document.getElementById('formEndTime').value;
+  const intensity = document.getElementById('formIntensity').value;
+  const staff     = document.getElementById('formStaff').value;
+
+  if (!horse || !desc || !startTime || !endTime) {
+    alert('Vui lòng điền đầy đủ thông tin bắt buộc.');
+    return;
+  }
+
+  const body = {
+    horseId:         horse,
+    description:     desc,
+    startTime:       startTime,
+    endTime:         endTime,
+    intensity:       intensity,
+    assignedStaffId: staff || undefined,
+    status:          status,
+  };
+
+  try {
+    await apiFetch('/api/training-schedules', { method: 'POST', body: JSON.stringify(body) });
+    modal.style.display = 'none';
+    await loadSchedules();
+  } catch (err) {
+    alert('Lỗi khi lưu lịch tập: ' + (err.message || err));
+  }
+}
+document.getElementById('btnSaveDraft')?.addEventListener('click',   () => submitSchedule('DRAFT'));
+document.getElementById('btnSavePublish')?.addEventListener('click', () => submitSchedule('PUBLISHED'));
+
+/* ── 18. Initial load ── */
+await loadSchedules();
 </script>
 
 </body>

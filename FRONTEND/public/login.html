@@ -18,14 +18,16 @@
       <span class="wordmark"><b>Turfline</b>Stable Manager</span>
     </div>
 
-    <form class="auth-form" action="#" method="post">
+    <form class="auth-form" id="loginForm" novalidate>
       <p class="kicker">Sign in</p>
       <h2>Chào mừng trở lại</h2>
       <p class="lede">Đăng nhập để tiếp tục vào không gian làm việc của bạn.</p>
 
+      <div id="loginError" style="display:none;background:#fff0ee;border:1px solid rgba(229,62,62,.25);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;color:#c53030;margin-bottom:1rem;"></div>
+
       <div class="field">
-        <label for="login-email">Email hoặc mã nhân sự</label>
-        <input id="login-email" name="email" type="text" autocomplete="username" required placeholder="ten.ban@turfline.vn">
+        <label for="login-email">Email</label>
+        <input id="login-email" name="email" type="email" autocomplete="username" required placeholder="ten.ban@turfline.vn">
       </div>
 
       <div class="field">
@@ -41,7 +43,7 @@
         <a href="#">Quên mật khẩu?</a>
       </div>
 
-      <button type="submit" class="btn-primary">Đăng nhập</button>
+      <button type="submit" class="btn-primary" id="submitBtn">Đăng nhập</button>
 
       <p class="auth-switch">Chưa có tài khoản? <a href="register.html">Đăng ký</a></p>
     </form>
@@ -85,6 +87,77 @@
   </div>
 
 </div>
+
+<script type="module">
+  import { getAuth, saveAuth } from './auth.js';
+
+  // Nếu đã đăng nhập, redirect thẳng về dashboard
+  if (getAuth()?.accessToken) {
+    window.location.replace('/dashboard.html');
+  }
+
+  const form = document.getElementById('loginForm');
+  const errorBox = document.getElementById('loginError');
+  const submitBtn = document.getElementById('submitBtn');
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+  }
+  function hideError() { errorBox.style.display = 'none'; }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideError();
+
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) {
+      showError('Vui lòng nhập email và mật khẩu.');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Đang đăng nhập…';
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (res.status === 401 || res.status === 400) {
+        showError('Email hoặc mật khẩu không đúng. Vui lòng thử lại.');
+        return;
+      }
+      if (!res.ok) {
+        showError(`Lỗi hệ thống (${res.status}). Vui lòng thử lại sau.`);
+        return;
+      }
+
+      const data = await res.json();
+      saveAuth({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: data.user ?? {
+          id: data.id,
+          username: data.username,
+          email: data.email,
+          roles: data.roles ?? [],
+        },
+      });
+
+      window.location.replace('/dashboard.html');
+    } catch (err) {
+      showError('Không kết nối được đến máy chủ. Vui lòng kiểm tra backend đang chạy.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Đăng nhập';
+    }
+  });
+</script>
 
 </body>
 </html>

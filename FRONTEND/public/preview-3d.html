@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Preview Mô Hình Ngựa 3D</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #0d1017;
+      color: #f1efe6;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+    }
+    .header {
+      padding: 20px;
+      text-align: center;
+    }
+    .viewer-container {
+      width: 100%;
+      max-width: 800px;
+      height: 600px;
+      border: 1px solid #333;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    model-viewer {
+      width: 100%;
+      height: 100%;
+      background-color: #1a1e29;
+    }
+    p { color: #a89e7a; }
+  </style>
+  <!-- Import library model-viewer của Google -->
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+</head>
+<body>
+
+  <div class="header">
+    <h2>Xem trước Mô hình Ngựa 3D (Phương án 2)</h2>
+    <p>Bạn hãy dùng chuột/cảm ứng để xoay, kéo, zoom mô hình này.</p>
+    <p>Đây là mô hình tĩnh (Low-poly) rất nhẹ (chỉ vài chục KB), tải ngay lập tức. Trong health.html, tôi sẽ cho nó đứng yên và gắn các chấm đỏ chấn thương lên thân.</p>
+  </div>
+
+  <div class="viewer-container">
+    <model-viewer 
+      src="./assets/Horse.glb" 
+      alt="Mô hình ngựa 3D" 
+      camera-controls 
+      auto-rotate 
+      shadow-intensity="1">
+    </model-viewer>
+  </div>
+
+</body>
+</html>

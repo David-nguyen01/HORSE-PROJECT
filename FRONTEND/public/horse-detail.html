@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Storm Thunder — Hồ sơ ngựa | Turfline</title>
+<title>Hồ sơ ngựa | Turfline</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="app-shell.css">
@@ -22,15 +22,21 @@
       <a href="horses.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
       <span class="nav-section-label">Huấn luyện</span>
       <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
-      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
-      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
+      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập &amp; Phân công</a>
+      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực &amp; Đánh giá</a>
       <span class="nav-section-label">Y tế</span>
-      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
+      <a href="health.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe &amp; Y tế</a>
       <span class="nav-section-label">Quản trị</span>
-      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng &amp; Vai trò</a>
     </nav>
     <div class="sidebar-foot">
-      <div class="user-chip"><span class="avatar">NT</span><div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div></div>
+      <div class="user-chip">
+        <span class="avatar" id="userAvatar">?</span>
+        <div class="user-info">
+          <b id="userName">—</b>
+          <small id="userRole">—</small>
+        </div>
+      </div>
       <a href="login.html" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
     </div>
   </aside>
@@ -41,7 +47,7 @@
     <div style="display:flex;align-items:center;gap:.5rem;font-size:.88rem;color:#a89e7a;">
       <a href="horses.html" style="color:var(--brass)">Hồ sơ ngựa</a>
       <span>›</span>
-      <span>Storm Thunder</span>
+      <span id="breadcrumbName">—</span>
     </div>
     <div class="topbar-right">
       <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
@@ -50,7 +56,7 @@
   </header>
 
   <!-- MAIN -->
-  <main class="main-content">
+  <main class="main-content" id="mainContent">
 
     <a href="horses.html" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.88rem;color:var(--brass);margin-bottom:1.2rem;text-decoration:none;">
       <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12,19 5,12 12,5"/></svg>
@@ -61,15 +67,15 @@
     <div class="card" style="margin-bottom:1.2rem;">
       <div class="card-body" style="padding:1.6rem;">
         <div class="horse-hero">
-          <div class="profile-media">ST</div>
+          <div class="profile-media" id="heroAvatar">—</div>
           <div class="horse-title">
-            <p class="code">HM-001</p>
-            <h1>Storm Thunder</h1>
+            <p class="code" id="heroCode">—</p>
+            <h1 id="heroName">—</h1>
             <div class="meta">
-              <span class="badge active"><i></i>Đang hoạt động</span>
-              <span style="font-size:.88rem;color:#6b6349;">Thoroughbred</span>
-              <span style="font-size:.88rem;color:#6b6349;">Ngựa đực</span>
-              <span style="font-size:.88rem;color:#6b6349;">Chuồng A-12</span>
+              <span class="badge" id="heroStatusBadge"><i></i><span id="heroStatusText">—</span></span>
+              <span style="font-size:.88rem;color:#6b6349;" id="heroBreed">—</span>
+              <span style="font-size:.88rem;color:#6b6349;" id="heroGender">—</span>
+              <span style="font-size:.88rem;color:#6b6349;" id="heroStable">—</span>
             </div>
           </div>
           <div class="hero-actions">
@@ -78,7 +84,7 @@
               Tải file hồ sơ
               <input type="file" hidden accept="image/*,.pdf,.docx">
             </label>
-            <button class="btn btn-secondary" id="btnEditHorse">
+            <button class="btn btn-secondary" id="btnEditHorse" style="display:none;">
               <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               Chỉnh sửa
             </button>
@@ -100,14 +106,14 @@
     <div class="tab-panel active card" id="tab-info">
       <div class="card-body">
         <dl class="info-grid">
-          <div><dt>Số chip / hộ chiếu</dt><dd>956000012345678</dd></div>
-          <div><dt>Ngày sinh</dt><dd>12/03/2019 (5 tuổi)</dd></div>
-          <div><dt>Giới tính</dt><dd>Ngựa đực (Stallion)</dd></div>
-          <div><dt>Giống</dt><dd>Thoroughbred</dd></div>
-          <div><dt>Màu sắc / nhận dạng</dt><dd>Nâu hung, sao trắng trán, chân trắng sau trái</dd></div>
-          <div><dt>Vị trí chuồng</dt><dd>Chuồng A-12</dd></div>
-          <div><dt>Huấn luyện viên hiện tại</dt><dd>Nguyễn Thắng</dd></div>
-          <div><dt>Cập nhật lần cuối</dt><dd>15/09/2026, 14:32</dd></div>
+          <div><dt>Số chip / hộ chiếu</dt><dd id="infoChip">—</dd></div>
+          <div><dt>Ngày sinh</dt><dd id="infoDob">—</dd></div>
+          <div><dt>Giới tính</dt><dd id="infoGender">—</dd></div>
+          <div><dt>Giống</dt><dd id="infoBreed">—</dd></div>
+          <div><dt>Màu sắc / nhận dạng</dt><dd id="infoColor">—</dd></div>
+          <div><dt>Vị trí chuồng</dt><dd id="infoStable">—</dd></div>
+          <div><dt>Huấn luyện viên hiện tại</dt><dd id="infoTrainer">—</dd></div>
+          <div><dt>Ghi chú</dt><dd id="infoNotes">—</dd></div>
         </dl>
       </div>
     </div>
@@ -118,55 +124,16 @@
         <h3>Chủ sở hữu</h3>
         <button class="btn btn-secondary" style="font-size:.82rem;" id="btnAddOwner">+ Liên kết chủ</button>
       </div>
-      <div class="card-body">
-        <div class="owner-row">
-          <span class="owner-avatar">PL</span>
-          <div class="owner-name"><b>Phạm Long</b><small>phong.long@email.com</small></div>
-          <span class="share">60%</span>
-        </div>
-        <div class="owner-row">
-          <span class="owner-avatar">TH</span>
-          <div class="owner-name"><b>Trần Hoa</b><small>tran.hoa@email.com</small></div>
-          <span class="share">40%</span>
-        </div>
+      <div class="card-body" id="ownersBody">
+        <!-- populated dynamically -->
       </div>
     </div>
 
     <!-- Tab: Pedigree -->
     <div class="tab-panel card" id="tab-pedigree">
       <div class="card-head"><h3>Phả hệ 3 thế hệ</h3></div>
-      <div class="card-body">
-        <div class="pedigree">
-          <div class="pedigree-main">
-            <small>Hồ sơ hiện tại</small>
-            <b>Storm Thunder</b>
-            <span style="font-size:.75rem;color:rgba(237,230,214,.5)">HM-001</span>
-          </div>
-          <div class="pedigree-branches">
-            <div class="pedigree-branch">
-              <div class="pedigree-node">
-                <small>Ngựa bố (Sire)</small>
-                <b>Thunder King</b>
-                <span style="font-size:.75rem;color:#a89e7a">TK-IRE-2010</span>
-              </div>
-              <div class="pedigree-grandparents">
-                <div class="pedigree-node"><small>Ông nội</small><b>Royal Flame</b></div>
-                <div class="pedigree-node"><small>Bà nội</small><b>Silk Cloud</b></div>
-              </div>
-            </div>
-            <div class="pedigree-branch">
-              <div class="pedigree-node">
-                <small>Ngựa mẹ (Dam)</small>
-                <b>Silver Star</b>
-                <span style="font-size:.75rem;color:#a89e7a">SS-AUS-2012</span>
-              </div>
-              <div class="pedigree-grandparents">
-                <div class="pedigree-node"><small>Ông ngoại</small><b>Desert Wind</b></div>
-                <div class="pedigree-node unknown"><small>Bà ngoại</small><b>—</b></div>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div class="card-body" id="pedigreeBody">
+        <!-- populated dynamically -->
       </div>
     </div>
 
@@ -175,27 +142,12 @@
       <div class="card-head">
         <h3>Thành tích thi đấu</h3>
         <div style="display:flex;gap:1rem;">
-          <span style="font-size:.9rem;color:#6b6349;"><b style="color:var(--ink);font-family:var(--serif);font-size:1.1rem;">3</b> Chiến thắng</span>
-          <span style="font-size:.9rem;color:#6b6349;"><b style="color:var(--ink);font-family:var(--serif);font-size:1.1rem;">8</b> Cuộc đua</span>
+          <span style="font-size:.9rem;color:#6b6349;"><b style="color:var(--ink);font-family:var(--serif);font-size:1.1rem;" id="raceWins">—</b> Chiến thắng</span>
+          <span style="font-size:.9rem;color:#6b6349;"><b style="color:var(--ink);font-family:var(--serif);font-size:1.1rem;" id="raceTotal">—</b> Cuộc đua</span>
         </div>
       </div>
-      <div class="card-body" style="padding:0 1.4rem;">
-        <div class="race-row">
-          <div class="race-pos first">1</div>
-          <div class="race-info"><b>Giải mùa Xuân 2026</b><small>15/03/2026 · Trường đua Phú Thọ · 1400m</small></div>
-        </div>
-        <div class="race-row">
-          <div class="race-pos second">2</div>
-          <div class="race-info"><b>Cup Tháng 12 — 2025</b><small>10/12/2025 · Trường đua Đại Nam · 1200m</small></div>
-        </div>
-        <div class="race-row">
-          <div class="race-pos first">1</div>
-          <div class="race-info"><b>Giải mở rộng — Thu 2025</b><small>22/09/2025 · Trường đua Phú Thọ · 1600m</small></div>
-        </div>
-        <div class="race-row">
-          <div class="race-pos" style="">3</div>
-          <div class="race-info"><b>Cup Chào Hè 2025</b><small>05/06/2025 · Trường đua Đại Nam · 1000m</small></div>
-        </div>
+      <div class="card-body" style="padding:0 1.4rem;" id="racesBody">
+        <!-- populated dynamically -->
       </div>
     </div>
 
@@ -237,9 +189,9 @@
     </div>
 
     <!-- Danger zone -->
-    <div class="danger-zone">
+    <div class="danger-zone" id="dangerZone" style="display:none;">
       <div><b>Lưu trữ hồ sơ</b><span>Hồ sơ sẽ ẩn khỏi danh mục; file Cloudinary không bị xóa.</span></div>
-      <button class="btn btn-danger">Lưu trữ</button>
+      <button class="btn btn-danger" id="btnDeleteHorse">Lưu trữ</button>
     </div>
 
   </main>
@@ -247,15 +199,26 @@
 
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-<script>
-  // Sidebar toggle
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
-  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+<script type="module">
+  import { initShell, apiFetch, hasRole } from './auth.js';
 
-  // Tabs
+  // ─── App Shell ────────────────────────────────────────────────────────────
+  initShell(['CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN']);
+
+  // ─── Sidebar toggle (mobile) ──────────────────────────────────────────────
+  const toggle   = document.getElementById('sidebarToggle');
+  const sidebar  = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  toggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    backdrop.classList.toggle('active');
+  });
+  backdrop.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('active');
+  });
+
+  // ─── Tabs ─────────────────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -264,6 +227,211 @@
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     });
   });
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const txt = (id, val) => { const el = $(id); if (el) el.textContent = val ?? '—'; };
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return dateStr;
+    return d.toLocaleDateString('vi-VN');
+  }
+
+  function calcAge(dateStr) {
+    if (!dateStr) return '';
+    const birth = new Date(dateStr);
+    if (isNaN(birth)) return '';
+    const age = Math.floor((Date.now() - birth) / (365.25 * 24 * 3600 * 1000));
+    return ` (${age} tuổi)`;
+  }
+
+  function statusLabel(status) {
+    const map = {
+      ACTIVE:   'Đang hoạt động',
+      INACTIVE: 'Không hoạt động',
+      RETIRED:  'Đã nghỉ hưu',
+      INJURED:  'Đang chấn thương',
+    };
+    return map[status] || status || '—';
+  }
+
+  function statusClass(status) {
+    const map = {
+      ACTIVE:   'active',
+      INACTIVE: 'inactive',
+      RETIRED:  'retired',
+      INJURED:  'injured',
+    };
+    return map[status] || '';
+  }
+
+  function initials(name) {
+    if (!name) return '?';
+    return name.split(' ').map(w => w[0]).slice(-2).join('').toUpperCase();
+  }
+
+  function posClass(pos) {
+    if (pos === 1) return 'race-pos first';
+    if (pos === 2) return 'race-pos second';
+    if (pos === 3) return 'race-pos third';
+    return 'race-pos';
+  }
+
+  // ─── Horse ID from URL ────────────────────────────────────────────────────
+  const horseId = new URLSearchParams(location.search).get('id');
+
+  if (!horseId) {
+    $('mainContent').innerHTML = '<p style="padding:2rem;">Không tìm thấy ID ngựa trong URL</p>';
+    throw new Error('No horse ID in URL');
+  }
+
+  // ─── Load data in parallel ────────────────────────────────────────────────
+  const [horseRes, pedigreeRes, racesRes] = await Promise.allSettled([
+    apiFetch(`/api/horses/${horseId}`),
+    apiFetch(`/api/horses/${horseId}/pedigree`),
+    apiFetch(`/api/horses/${horseId}/race-results`),
+  ]);
+
+  // ─── Horse basic info ─────────────────────────────────────────────────────
+  if (horseRes.status === 'fulfilled') {
+    const h = horseRes.value;
+    // Breadcrumb & page title
+    txt('breadcrumbName', h.name);
+    document.title = `${h.name} — Hồ sơ ngựa | Turfline`;
+
+    // Hero section
+    txt('heroAvatar', initials(h.name));
+    txt('heroCode', h.registrationCode);
+    txt('heroName', h.name);
+    txt('heroBreed', h.breed);
+    txt('heroGender', h.gender);
+    txt('heroStable', h.stableLocation);
+
+    const badge = $('heroStatusBadge');
+    badge.className = 'badge ' + statusClass(h.status);
+    txt('heroStatusText', statusLabel(h.status));
+
+    // Info tab
+    txt('infoChip',    h.chipNumber);
+    txt('infoDob',     formatDate(h.dateOfBirth) + calcAge(h.dateOfBirth));
+    txt('infoGender',  h.gender);
+    txt('infoBreed',   h.breed);
+    txt('infoColor',   h.color);
+    txt('infoStable',  h.stableLocation);
+    txt('infoTrainer', h.trainer);
+    txt('infoNotes',   h.notes || 'Không có');
+
+    // Owners tab — owner field from horse object
+    const ownersBody = $('ownersBody');
+    if (h.owner) {
+      const av = initials(h.owner);
+      ownersBody.innerHTML = `
+        <div class="owner-row">
+          <span class="owner-avatar">${av}</span>
+          <div class="owner-name"><b>${h.owner}</b></div>
+          <span class="share">100%</span>
+        </div>`;
+    } else {
+      ownersBody.innerHTML = '<p style="padding:1rem;color:#a89e7a;">Chưa có dữ liệu chủ sở hữu</p>';
+    }
+
+    // Role-gated buttons
+    if (hasRole(['CLUB_MANAGER', 'HEAD_TRAINER'])) {
+      $('btnEditHorse').style.display = '';
+      $('dangerZone').style.display = '';
+    }
+
+    // Edit button → redirect to edit page
+    $('btnEditHorse').addEventListener('click', () => {
+      location.href = `horse-edit.html?id=${h.id}`;
+    });
+
+    // Delete / Archive button
+    $('btnDeleteHorse').addEventListener('click', async () => {
+      if (!confirm(`Bạn có chắc muốn lưu trữ hồ sơ ngựa "${h.name}"?`)) return;
+      try {
+        await apiFetch(`/api/horses/${h.id}`, { method: 'DELETE' });
+        alert('Đã lưu trữ hồ sơ ngựa.');
+        location.href = 'horses.html';
+      } catch (err) {
+        alert('Lỗi: ' + (err.message || 'Không thể lưu trữ hồ sơ.'));
+      }
+    });
+
+  } else {
+    $('mainContent').innerHTML = `<p style="padding:2rem;">Không thể tải thông tin ngựa. ${horseRes.reason?.message ?? ''}</p>`;
+  }
+
+  // ─── Pedigree ─────────────────────────────────────────────────────────────
+  const pedigreeBody = $('pedigreeBody');
+  if (pedigreeRes.status === 'fulfilled') {
+    const p = pedigreeRes.value;
+    // p: { sire:{name,code}, dam:{name,code}, sireGrandsire:{name}, sireDam:{name}, damGrandsire:{name}, damDam:{name} }
+    const node = (label, name, code) => `
+      <div class="pedigree-node">
+        <small>${label}</small>
+        <b>${name || '—'}</b>
+        ${code ? `<span style="font-size:.75rem;color:#a89e7a">${code}</span>` : ''}
+      </div>`;
+
+    const horseName = horseRes.status === 'fulfilled' ? horseRes.value.name : '—';
+    const horseCode = horseRes.status === 'fulfilled' ? horseRes.value.registrationCode : '—';
+
+    pedigreeBody.innerHTML = `
+      <div class="pedigree">
+        <div class="pedigree-main">
+          <small>Hồ sơ hiện tại</small>
+          <b>${horseName}</b>
+          <span style="font-size:.75rem;color:rgba(237,230,214,.5)">${horseCode}</span>
+        </div>
+        <div class="pedigree-branches">
+          <div class="pedigree-branch">
+            ${node('Ngựa bố (Sire)', p.sire?.name, p.sire?.code)}
+            <div class="pedigree-grandparents">
+              ${node('Ông nội', p.sireGrandsire?.name)}
+              ${node('Bà nội',  p.sireDam?.name)}
+            </div>
+          </div>
+          <div class="pedigree-branch">
+            ${node('Ngựa mẹ (Dam)', p.dam?.name, p.dam?.code)}
+            <div class="pedigree-grandparents">
+              ${node('Ông ngoại', p.damGrandsire?.name)}
+              ${node('Bà ngoại',  p.damDam?.name)}
+            </div>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    pedigreeBody.innerHTML = '<p style="padding:1rem;color:#a89e7a;">Chưa có dữ liệu</p>';
+  }
+
+  // ─── Race results ─────────────────────────────────────────────────────────
+  const racesBody = $('racesBody');
+  if (racesRes.status === 'fulfilled') {
+    const races = racesRes.value; // array of race result objects
+    const wins  = races.filter(r => r.position === 1).length;
+    txt('raceWins',  wins);
+    txt('raceTotal', races.length);
+
+    if (races.length === 0) {
+      racesBody.innerHTML = '<p style="padding:1rem;color:#a89e7a;">Chưa có dữ liệu</p>';
+    } else {
+      racesBody.innerHTML = races.map(r => `
+        <div class="race-row">
+          <div class="${posClass(r.position)}">${r.position ?? '—'}</div>
+          <div class="race-info">
+            <b>${r.raceName ?? '—'}</b>
+            <small>${formatDate(r.date)}${r.venue ? ' · ' + r.venue : ''}${r.distance ? ' · ' + r.distance + 'm' : ''}</small>
+          </div>
+        </div>`).join('');
+    }
+  } else {
+    txt('raceWins',  '—');
+    txt('raceTotal', '—');
+    racesBody.innerHTML = '<p style="padding:1rem;color:#a89e7a;">Chưa có dữ liệu</p>';
+  }
 </script>
 
 </body>

@@ -41,35 +41,35 @@
       </a>
       <a href="training-schedule.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        Lịch tập & Phân công
+        Lịch tập &amp; Phân công
       </a>
       <a href="fitness.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        Thể lực & Đánh giá
+        Thể lực &amp; Đánh giá
       </a>
 
       <span class="nav-section-label">Y tế</span>
       <a href="health.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        Sức khỏe & Y tế
+        Sức khỏe &amp; Y tế
       </a>
 
       <span class="nav-section-label">Quản trị</span>
       <a href="users.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Người dùng & Vai trò
+        Người dùng &amp; Vai trò
       </a>
     </nav>
 
     <div class="sidebar-foot">
       <div class="user-chip">
-        <span class="avatar">NT</span>
+        <span class="avatar" id="userAvatar">?</span>
         <div class="user-info">
-          <b>Nguyễn Thắng</b>
-          <small>Huấn luyện viên Trưởng</small>
+          <b id="userName">Đang tải…</b>
+          <small id="userRole"></small>
         </div>
       </div>
-      <a href="login.html" class="btn-logout">
+      <a href="#" class="btn-logout">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
         Đăng xuất
       </a>
@@ -86,7 +86,7 @@
       <div class="online-pill"><span class="online-dot"></span>Hệ thống hoạt động</div>
       <button class="notif-btn" aria-label="Thông báo">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        <span class="notif-badge">3</span>
+        <span class="notif-badge" id="notifBadge" style="display:none">0</span>
       </button>
     </div>
   </header>
@@ -97,7 +97,7 @@
     <div class="page-heading">
       <div>
         <p class="eyebrow">TRUNG TÂM ĐIỀU HÀNH</p>
-        <h1>Chào Nguyễn Thắng</h1>
+        <h1 id="greetingTitle">Xin chào</h1>
         <p class="sub">Toàn cảnh hoạt động câu lạc bộ hôm nay.</p>
       </div>
     </div>
@@ -108,25 +108,25 @@
         <span class="stat-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
         </span>
-        <div><strong>48</strong><span>Tổng số ngựa</span></div>
+        <div><strong id="statTotal">—</strong><span>Tổng số ngựa</span></div>
       </div>
       <div class="stat-card gold">
         <span class="stat-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
         </span>
-        <div><strong>41</strong><span>Đang hoạt động</span></div>
+        <div><strong id="statActive">—</strong><span>Đang hoạt động</span></div>
       </div>
       <div class="stat-card rose">
         <span class="stat-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </span>
-        <div><strong>5</strong><span>Đang chấn thương</span></div>
+        <div><strong id="statInjured">—</strong><span>Đang chấn thương</span></div>
       </div>
       <div class="stat-card blue">
         <span class="stat-icon">
           <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
         </span>
-        <div><strong>9</strong><span>Lịch tập hôm nay</span></div>
+        <div><strong id="statSchedule">—</strong><span>Lịch tập hôm nay</span></div>
       </div>
     </div>
 
@@ -144,37 +144,8 @@
             <thead><tr>
               <th>Ngựa</th><th>Trạng thái</th><th>Chuồng</th><th>Trainer</th>
             </tr></thead>
-            <tbody>
-              <tr onclick="location.href='horse-detail.html'" style="cursor:pointer">
-                <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001 · Thoroughbred</small></div></div></td>
-                <td><span class="badge active"><i></i>Hoạt động</span></td>
-                <td>A-12</td>
-                <td>Nguyễn Thắng</td>
-              </tr>
-              <tr onclick="location.href='horse-detail.html'" style="cursor:pointer">
-                <td><div class="td-horse"><span class="horse-mono">GW</span><div><b>Gold Wind</b><small>HM-002 · Arabian</small></div></div></td>
-                <td><span class="badge injured"><i></i>Chấn thương</span></td>
-                <td>B-03</td>
-                <td>Trần Minh</td>
-              </tr>
-              <tr onclick="location.href='horse-detail.html'" style="cursor:pointer">
-                <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003 · Quarter Horse</small></div></div></td>
-                <td><span class="badge resting"><i></i>Nghỉ ngơi</span></td>
-                <td>C-07</td>
-                <td>Nguyễn Thắng</td>
-              </tr>
-              <tr onclick="location.href='horse-detail.html'" style="cursor:pointer">
-                <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005 · Thoroughbred</small></div></div></td>
-                <td><span class="badge active"><i></i>Hoạt động</span></td>
-                <td>A-08</td>
-                <td>Nguyễn Thắng</td>
-              </tr>
-              <tr onclick="location.href='horse-detail.html'" style="cursor:pointer">
-                <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007 · Arabian</small></div></div></td>
-                <td><span class="badge active"><i></i>Hoạt động</span></td>
-                <td>A-15</td>
-                <td>Lê Hoàng</td>
-              </tr>
+            <tbody id="recentHorsesBody">
+              <tr><td colspan="4" style="text-align:center;color:#a89e7a;padding:1.5rem;">Đang tải…</td></tr>
             </tbody>
           </table>
         </div>
@@ -188,9 +159,7 @@
           <div class="card-head"><h3>Phiên làm việc</h3></div>
           <div class="card-body">
             <p style="font-size:.85rem;color:#6b6349;margin-bottom:.8rem;">Hệ thống chỉ hiển thị dữ liệu và thao tác thuộc phạm vi vai trò của bạn.</p>
-            <div class="role-pills">
-              <span class="role-pill">Huấn luyện viên Trưởng</span>
-            </div>
+            <div class="role-pills" id="rolePills"></div>
           </div>
         </div>
 
@@ -198,17 +167,10 @@
         <div class="card">
           <div class="card-head">
             <h3>Khóa huấn luyện</h3>
-            <span class="badge locked"><i></i>2 đang khóa</span>
+            <span class="badge locked" id="lockCountBadge" style="display:none"></span>
           </div>
-          <div class="card-body" style="display:flex;flex-direction:column;gap:.8rem;">
-            <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;background:#fff8f6;border-radius:8px;border:1px solid rgba(196,87,63,.15)">
-              <div style="flex:1"><b style="font-size:.88rem">Gold Wind</b><p style="font-size:.78rem;color:#a89e7a;">Chấn thương gân chân phải</p></div>
-              <a href="health.html" class="badge locked" style="text-decoration:none">Chi tiết</a>
-            </div>
-            <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;background:#fff8f6;border-radius:8px;border:1px solid rgba(196,87,63,.15)">
-              <div style="flex:1"><b style="font-size:.88rem">Moonlight Dancer</b><p style="font-size:.78rem;color:#a89e7a;">Đang phục hồi sau mổ</p></div>
-              <a href="health.html" class="badge locked" style="text-decoration:none">Chi tiết</a>
-            </div>
+          <div class="card-body" id="lockBody" style="display:flex;flex-direction:column;gap:.8rem;">
+            <p style="font-size:.85rem;color:#a89e7a;">Đang tải…</p>
           </div>
         </div>
 
@@ -224,31 +186,8 @@
       <div class="table-wrap">
         <table>
           <thead><tr><th>Giờ</th><th>Ngựa</th><th>Nội dung</th><th>Nhân viên</th><th>Cường độ</th><th>Trạng thái</th></tr></thead>
-          <tbody>
-            <tr>
-              <td style="font-family:var(--serif);color:var(--brass);">06:00</td>
-              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b></div></div></td>
-              <td>Chạy đường dài 1200m</td>
-              <td>Nguyễn Văn An</td>
-              <td><span class="badge red" style="font-size:.75rem;">Cao</span></td>
-              <td><span class="badge published"><i></i>Đã công bố</span></td>
-            </tr>
-            <tr>
-              <td style="font-family:var(--serif);color:var(--brass);">07:30</td>
-              <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b></div></div></td>
-              <td>Khởi động nhẹ + tập phản xạ</td>
-              <td>Trần Thị Lan</td>
-              <td><span class="badge green" style="font-size:.75rem;">Thấp</span></td>
-              <td><span class="badge published"><i></i>Đã công bố</span></td>
-            </tr>
-            <tr>
-              <td style="font-family:var(--serif);color:var(--brass);">09:00</td>
-              <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b></div></div></td>
-              <td>Bài tập tốc độ 600m × 3</td>
-              <td>Nguyễn Văn An</td>
-              <td><span class="badge yellow" style="font-size:.75rem;">Trung bình</span></td>
-              <td><span class="badge draft"><i></i>Nháp</span></td>
-            </tr>
+          <tbody id="scheduleBody">
+            <tr><td colspan="6" style="text-align:center;color:#a89e7a;padding:1.5rem;">Đang tải…</td></tr>
           </tbody>
         </table>
       </div>
@@ -259,18 +198,182 @@
 
 <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
-<script>
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    backdrop.classList.toggle('active');
+<script type="module">
+  import { initShell, apiFetch, hasRole } from './auth.js';
+
+  const ROLE_LABELS = {
+    CLUB_MANAGER: 'Quản lý câu lạc bộ',
+    HEAD_TRAINER: 'Huấn luyện viên Trưởng',
+    HORSE_OWNER: 'Chủ sở hữu ngựa',
+    STABLE_STAFF: 'Nhân viên chuồng',
+    VETERINARIAN: 'Bác sĩ thú y',
+  };
+
+  const STATUS_BADGE = {
+    ACTIVE: '<span class="badge active"><i></i>Hoạt động</span>',
+    INJURED: '<span class="badge injured"><i></i>Chấn thương</span>',
+    RESTING: '<span class="badge resting"><i></i>Nghỉ ngơi</span>',
+    RETIRED: '<span class="badge draft"><i></i>Đã nghỉ hưu</span>',
+  };
+
+  const INTENSITY_BADGE = {
+    HIGH: '<span class="badge red" style="font-size:.75rem;">Cao</span>',
+    MEDIUM: '<span class="badge yellow" style="font-size:.75rem;">Trung bình</span>',
+    LOW: '<span class="badge green" style="font-size:.75rem;">Thấp</span>',
+  };
+
+  // ─── Init shell (kiểm tra auth, render user info, sidebar) ───────────────
+  const auth = initShell(); // tất cả role đều vào được dashboard
+  if (!auth) throw new Error('Not authenticated');
+
+  const { user } = auth;
+  const displayName = user.username || user.email || 'Người dùng';
+  document.getElementById('greetingTitle').textContent = `Chào ${displayName}`;
+
+  // Role pills
+  const rolePillsEl = document.getElementById('rolePills');
+  (user.roles || []).forEach(r => {
+    const span = document.createElement('span');
+    span.className = 'role-pill';
+    span.textContent = ROLE_LABELS[r] || r;
+    rolePillsEl.appendChild(span);
   });
-  backdrop.addEventListener('click', () => {
-    sidebar.classList.remove('open');
-    backdrop.classList.remove('active');
-  });
+
+  // ─── Load ngựa gần đây ───────────────────────────────────────────────────
+  async function loadRecentHorses() {
+    const tbody = document.getElementById('recentHorsesBody');
+    try {
+      const isOwner = hasRole('HORSE_OWNER') && !hasRole('CLUB_MANAGER', 'HEAD_TRAINER', 'VETERINARIAN');
+      const endpoint = isOwner ? '/api/horses/mine?page=0&size=5' : '/api/horses?page=0&size=5';
+      const data = await apiFetch(endpoint);
+      const horses = data?.content ?? data ?? [];
+
+      if (!horses.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#a89e7a;padding:1.5rem;">Chưa có hồ sơ ngựa.</td></tr>';
+        document.getElementById('statTotal').textContent = '0';
+        document.getElementById('statActive').textContent = '0';
+        document.getElementById('statInjured').textContent = '0';
+        return;
+      }
+
+      // Cập nhật thống kê tổng
+      const total = data?.totalElements ?? horses.length;
+      const active = horses.filter(h => h.status === 'ACTIVE').length;
+      const injured = horses.filter(h => h.status === 'INJURED').length;
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statActive').textContent = isOwner ? active : (data?.activeCount ?? active);
+      document.getElementById('statInjured').textContent = isOwner ? injured : (data?.injuredCount ?? injured);
+
+      tbody.innerHTML = horses.map(h => {
+        const initials = (h.name || 'NN').split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+        const statusBadge = STATUS_BADGE[h.status] || `<span class="badge">${h.status}</span>`;
+        const trainerName = h.trainer?.username || h.trainer?.email || '—';
+        const stable = h.stableLocation || h.stable || '—';
+        return `<tr onclick="location.href='horse-detail.html?id=${h.id}'" style="cursor:pointer">
+          <td><div class="td-horse"><span class="horse-mono">${initials}</span><div><b>${h.name}</b><small>${h.registrationCode ?? ''} · ${h.breed ?? ''}</small></div></div></td>
+          <td>${statusBadge}</td>
+          <td>${stable}</td>
+          <td>${trainerName}</td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#c53030;padding:1.5rem;">Lỗi tải dữ liệu ngựa.</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  // ─── Load lịch tập hôm nay ───────────────────────────────────────────────
+  async function loadTodaySchedule() {
+    const tbody = document.getElementById('scheduleBody');
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+      const isStaff = hasRole('STABLE_STAFF') && !hasRole('CLUB_MANAGER', 'HEAD_TRAINER');
+      const endpoint = isStaff
+        ? `/api/training-schedules/mine?date=${today}&size=10`
+        : `/api/training-schedules?date=${today}&size=10`;
+      const data = await apiFetch(endpoint);
+      const schedules = data?.content ?? data ?? [];
+
+      document.getElementById('statSchedule').textContent = schedules.length || 0;
+
+      if (!schedules.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#a89e7a;padding:1.5rem;">Không có lịch tập hôm nay.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = schedules.map(s => {
+        const time = s.startTime ? s.startTime.slice(0, 5) : '—';
+        const horseName = s.horse?.name || s.horseName || '—';
+        const horseInitials = horseName.split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
+        const content = s.description || s.exerciseType || '—';
+        const staff = s.assignedStaff?.username || s.staffName || '—';
+        const intensity = INTENSITY_BADGE[s.intensity] || s.intensity || '—';
+        const statusLabel = s.status === 'PUBLISHED' ? '<span class="badge published"><i></i>Đã công bố</span>'
+          : s.status === 'DRAFT' ? '<span class="badge draft"><i></i>Nháp</span>'
+          : `<span class="badge">${s.status || '—'}</span>`;
+        return `<tr>
+          <td style="font-family:var(--serif);color:var(--brass);">${time}</td>
+          <td><div class="td-horse"><span class="horse-mono">${horseInitials}</span><div><b>${horseName}</b></div></div></td>
+          <td>${content}</td>
+          <td>${staff}</td>
+          <td>${intensity}</td>
+          <td>${statusLabel}</td>
+        </tr>`;
+      }).join('');
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#c53030;padding:1.5rem;">Lỗi tải lịch tập.</td></tr>`;
+      console.error(err);
+    }
+  }
+
+  // ─── Load thông báo ──────────────────────────────────────────────────────
+  async function loadNotifications() {
+    try {
+      const data = await apiFetch('/api/notifications?size=20&read=false');
+      const count = data?.totalElements ?? (data?.content ?? data ?? []).length;
+      const badge = document.getElementById('notifBadge');
+      if (count > 0) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = '';
+      }
+    } catch (_) {}
+  }
+
+  // ─── Load khóa huấn luyện (chỉ MANAGER, TRAINER, VET) ──────────────────
+  async function loadTrainingLocks() {
+    if (!hasRole('CLUB_MANAGER', 'HEAD_TRAINER', 'VETERINARIAN')) {
+      document.getElementById('lockBody').innerHTML = '<p style="font-size:.85rem;color:#a89e7a;">Không có dữ liệu.</p>';
+      return;
+    }
+    try {
+      const horses = await apiFetch('/api/horses?status=INJURED&size=10');
+      const injured = horses?.content ?? horses ?? [];
+      const lockBody = document.getElementById('lockBody');
+      const badge = document.getElementById('lockCountBadge');
+
+      if (!injured.length) {
+        lockBody.innerHTML = '<p style="font-size:.85rem;color:#a89e7a;">Không có ngựa đang bị khóa huấn luyện.</p>';
+        return;
+      }
+
+      badge.textContent = `${injured.length} đang khóa`;
+      badge.style.display = '';
+
+      lockBody.innerHTML = injured.map(h => `
+        <div style="display:flex;align-items:center;gap:.7rem;padding:.6rem .8rem;background:#fff8f6;border-radius:8px;border:1px solid rgba(196,87,63,.15)">
+          <div style="flex:1"><b style="font-size:.88rem">${h.name}</b><p style="font-size:.78rem;color:#a89e7a;">${h.injuryNote || 'Đang chấn thương / phục hồi'}</p></div>
+          <a href="health.html?id=${h.id}" class="badge locked" style="text-decoration:none">Chi tiết</a>
+        </div>`).join('');
+    } catch (_) {
+      document.getElementById('lockBody').innerHTML = '<p style="font-size:.85rem;color:#c53030;">Lỗi tải dữ liệu.</p>';
+    }
+  }
+
+  // ─── Chạy tất cả ─────────────────────────────────────────────────────────
+  loadRecentHorses();
+  loadTodaySchedule();
+  loadNotifications();
+  loadTrainingLocks();
 </script>
 
 </body>

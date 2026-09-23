@@ -1,14 +1,29 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="vi">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#113f32" />
-    <meta name="description" content="Hệ thống quản lý huấn luyện ngựa đua" />
-    <title>Stride — Racehorse Club</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <title>Chuyển hướng...</title>
+  <script>
+    const token = localStorage.getItem('stride_auth');
+    const dest = token ? 'dashboard.html' : 'login.html';
+    
+    // Khi dùng Vite (npm run dev), các file trong 'public' được đưa ra thư mục gốc '/'
+    // Khi dùng Live Server (Run & Debug VSCode), thư mục gốc chứa thư mục 'public' nên đường dẫn là '/public/...'
+    
+    fetch('/' + dest, { method: 'HEAD' })
+      .then(res => {
+        if (res.ok) {
+          window.location.replace('/' + dest);
+        } else {
+          window.location.replace('/public/' + dest);
+        }
+      })
+      .catch(() => {
+        window.location.replace('/public/' + dest);
+      });
+  </script>
+</head>
+<body>
+  <p>Đang chuyển hướng đến trang giao diện...</p>
+</body>
 </html>

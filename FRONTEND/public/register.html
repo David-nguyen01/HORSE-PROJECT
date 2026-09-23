@@ -21,7 +21,10 @@
     <form class="auth-form" action="#" method="post">
       <p class="kicker">Get started</p>
       <h2>Tạo tài khoản</h2>
-      <p class="lede">Điền thông tin bên dưới, hệ thống sẽ gửi yêu cầu phê duyệt đến quản lý câu lạc bộ.</p>
+      <p class="lede">Điền thông tin bên dưới để đăng ký tài khoản vào hệ thống.</p>
+
+      <div id="regError" style="display:none;background:#fff0ee;border:1px solid rgba(229,62,62,.25);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;color:#c53030;margin-bottom:1rem;"></div>
+      <div id="regSuccess" style="display:none;background:#f0fff4;border:1px solid rgba(56,161,105,.25);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;color:#276749;margin-bottom:1rem;"></div>
 
       <div class="field-row">
         <div class="field">
@@ -47,11 +50,10 @@
             <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           <ul class="select-options" id="roleOptions" role="listbox" tabindex="-1">
-            <li role="option" data-value="head_trainer">Head Trainer — Huấn luyện viên Trưởng</li>
-            <li role="option" data-value="veterinarian">Veterinarian — Bác sĩ Thú y</li>
-            <li role="option" data-value="groom">Groom / Stable Hand — Chăm sóc &amp; Chuồng trại</li>
-            <li role="option" data-value="owner">Horse Owner — Chủ sở hữu Ngựa</li>
-            <li role="option" data-value="manager">Club Manager — Quản lý Câu lạc bộ</li>
+            <li role="option" data-value="HEAD_TRAINER">Head Trainer — Huấn luyện viên Trưởng</li>
+            <li role="option" data-value="VETERINARIAN">Veterinarian — Bác sĩ Thú y</li>
+            <li role="option" data-value="STABLE_STAFF">Stable Staff — Chăm sóc &amp; Chuồng trại</li>
+            <li role="option" data-value="HORSE_OWNER">Horse Owner — Chủ sở hữu Ngựa</li>
           </ul>
           <input type="hidden" id="reg-role" name="role">
         </div>
@@ -168,11 +170,90 @@
     if (e.key === 'Escape') closeRoleDropdown();
   });
 
-  document.querySelector('.auth-form').addEventListener('submit', (e) => {
+  const form = document.querySelector('.auth-form');
+  const errorBox = document.getElementById('regError');
+  const successBox = document.getElementById('regSuccess');
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.style.display = 'block';
+    successBox.style.display = 'none';
+  }
+  function showSuccess(msg) {
+    successBox.textContent = msg;
+    successBox.style.display = 'block';
+    errorBox.style.display = 'none';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.style.display = 'none';
+    successBox.style.display = 'none';
+
     if (!roleHiddenInput.value) {
-      e.preventDefault();
       roleFieldWrap.classList.add('has-error');
       roleTrigger.focus();
+      showError('Vui lòng chọn vai trò của bạn.');
+      return;
+    }
+
+    const firstname = document.getElementById('reg-firstname').value.trim();
+    const lastname = document.getElementById('reg-lastname').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const role = roleHiddenInput.value;
+    const password = document.getElementById('reg-password').value;
+    const password2 = document.getElementById('reg-password2').value;
+
+    if (password !== password2) {
+      showError('Mật khẩu nhập lại không khớp.');
+      return;
+    }
+    if (password.length < 8) {
+      showError('Mật khẩu phải có tối thiểu 8 ký tự.');
+      return;
+    }
+
+    const username = `${firstname} ${lastname}`.trim();
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Đang xử lý…';
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username,
+          email,
+          password,
+          confirmPassword: password2,
+          role,
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        let msg = `Đăng ký không thành công (${res.status}).`;
+        try {
+          const json = JSON.parse(text);
+          if (json.message) msg = json.message;
+          else if (json.error) msg = json.error;
+        } catch (_) {
+          if (text) msg = text;
+        }
+        showError(msg);
+        return;
+      }
+
+      showSuccess('Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập…');
+      setTimeout(() => {
+        window.location.href = 'login.html';
+      }, 1500);
+    } catch (err) {
+      showError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra backend.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Gửi yêu cầu đăng ký';
     }
   });
 </script>
@@ -183,7 +264,7 @@
   const roleKeyInput = document.getElementById('reg-rolekey');
 
   function toggleRoleKey() {
-    const isOwner = roleSelect.value === 'owner';
+    const isOwner = roleSelect.value === 'HORSE_OWNER';
     roleKeyField.hidden = isOwner;
     roleKeyInput.required = !isOwner;
     if (isOwner) roleKeyInput.value = '';

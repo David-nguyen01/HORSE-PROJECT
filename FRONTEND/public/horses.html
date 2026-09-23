@@ -38,27 +38,27 @@
       </a>
       <a href="training-schedule.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-        Lịch tập & Phân công
+        Lịch tập &amp; Phân công
       </a>
       <a href="fitness.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>
-        Thể lực & Đánh giá
+        Thể lực &amp; Đánh giá
       </a>
       <span class="nav-section-label">Y tế</span>
       <a href="health.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        Sức khỏe & Y tế
+        Sức khỏe &amp; Y tế
       </a>
       <span class="nav-section-label">Quản trị</span>
       <a href="users.html" class="nav-link">
         <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Người dùng & Vai trò
+        Người dùng &amp; Vai trò
       </a>
     </nav>
     <div class="sidebar-foot">
       <div class="user-chip">
-        <span class="avatar">NT</span>
-        <div class="user-info"><b>Nguyễn Thắng</b><small>Huấn luyện viên Trưởng</small></div>
+        <span class="avatar" id="userAvatar"></span>
+        <div class="user-info"><b id="userName"></b><small id="userRole"></small></div>
       </div>
       <a href="login.html" class="btn-logout">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -118,7 +118,7 @@
         <option value="Arabian">Arabian</option>
         <option value="Quarter Horse">Quarter Horse</option>
       </select>
-      <span class="record-count" id="recordCount">48 hồ sơ</span>
+      <span class="record-count" id="recordCount">0 hồ sơ</span>
     </div>
 
     <!-- Table -->
@@ -138,78 +138,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">ST</span><div><b>Storm Thunder</b><small>HM-001</small></div></div></td>
-              <td>Thoroughbred</td><td>Ngựa đực</td><td>12/03/2019</td><td>A-12</td>
-              <td><span class="badge active"><i></i>Hoạt động</span></td>
-              <td>Nguyễn Thắng</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">GW</span><div><b>Gold Wind</b><small>HM-002</small></div></div></td>
-              <td>Arabian</td><td>Ngựa cái</td><td>07/09/2020</td><td>B-03</td>
-              <td><span class="badge injured"><i></i>Chấn thương</span></td>
-              <td>Trần Minh</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">SB</span><div><b>Silver Blaze</b><small>HM-003</small></div></div></td>
-              <td>Quarter Horse</td><td>Ngựa đực</td><td>22/01/2018</td><td>C-07</td>
-              <td><span class="badge resting"><i></i>Nghỉ ngơi</span></td>
-              <td>Nguyễn Thắng</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">MD</span><div><b>Moonlight Dancer</b><small>HM-004</small></div></div></td>
-              <td>Thoroughbred</td><td>Ngựa cái</td><td>14/06/2021</td><td>B-11</td>
-              <td><span class="badge injured"><i></i>Chấn thương</span></td>
-              <td>Lê Hoàng</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">NR</span><div><b>Night Runner</b><small>HM-005</small></div></div></td>
-              <td>Thoroughbred</td><td>Ngựa đực</td><td>03/11/2019</td><td>A-08</td>
-              <td><span class="badge active"><i></i>Hoạt động</span></td>
-              <td>Nguyễn Thắng</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">SW</span><div><b>Summer Wind</b><small>HM-006</small></div></div></td>
-              <td>Arabian</td><td>Ngựa cái</td><td>28/04/2020</td><td>C-02</td>
-              <td><span class="badge active"><i></i>Hoạt động</span></td>
-              <td>Trần Minh</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">RF</span><div><b>Red Fury</b><small>HM-007</small></div></div></td>
-              <td>Arabian</td><td>Ngựa đực</td><td>17/08/2018</td><td>A-15</td>
-              <td><span class="badge active"><i></i>Hoạt động</span></td>
-              <td>Lê Hoàng</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
-            <tr>
-              <td><div class="td-horse"><span class="horse-mono">BK</span><div><b>Black Knight</b><small>HM-008</small></div></div></td>
-              <td>Quarter Horse</td><td>Ngựa đực</td><td>09/02/2017</td><td>D-01</td>
-              <td><span class="badge retired"><i></i>Đã nghỉ hưu</span></td>
-              <td>—</td>
-              <td><a href="horse-detail.html" class="btn btn-ghost btn-icon" title="Xem chi tiết">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-              </a></td>
-            </tr>
+            <!-- Dữ liệu được render bằng JS -->
           </tbody>
         </table>
       </div>
@@ -282,44 +211,216 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="cancelAddModal">Hủy</button>
-      <button class="btn btn-primary" onclick="document.getElementById('addHorseForm').submit()">Lưu hồ sơ</button>
+      <button class="btn btn-primary" id="submitAddHorse">Lưu hồ sơ</button>
     </div>
   </div>
 </div>
 
-<script>
-  // Sidebar toggle
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
-  backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
+<script type="module">
+  import { initShell, apiFetch, hasRole } from './auth.js';
 
-  // Modal
-  const modal = document.getElementById('addHorseModal');
-  document.getElementById('btnAddHorse').addEventListener('click', () => modal.style.display = 'flex');
-  document.getElementById('closeAddModal').addEventListener('click', () => modal.style.display = 'none');
-  document.getElementById('cancelAddModal').addEventListener('click', () => modal.style.display = 'none');
-  modal.addEventListener('mousedown', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+  // ── 1. Khởi tạo shell (kiểm tra auth, điền user-chip, xử lý logout)
+  // STABLE_STAFF không có trong danh sách → bị redirect 403
+  await initShell(['CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN']);
 
-  // Simple search/filter
-  const searchInput = document.getElementById('searchInput');
-  const filterStatus = document.getElementById('filterStatus');
-  const rows = document.querySelectorAll('#horsesTable tbody tr');
-  function applyFilter() {
-    const q = searchInput.value.toLowerCase();
-    let visible = 0;
-    rows.forEach(row => {
-      const text = row.textContent.toLowerCase();
-      const matchQ = !q || text.includes(q);
-      const matchStatus = !filterStatus.value || text.includes(filterStatus.value === 'ACTIVE' ? 'hoạt động' : filterStatus.value === 'RESTING' ? 'nghỉ ngơi' : filterStatus.value === 'INJURED' ? 'chấn thương' : 'nghỉ hưu');
-      row.style.display = (matchQ && matchStatus) ? '' : 'none';
-      if (matchQ && matchStatus) visible++;
-    });
-    document.getElementById('recordCount').textContent = visible + ' hồ sơ';
+  // ── 2. Sidebar toggle (mobile)
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebar       = document.getElementById('sidebar');
+  const backdrop      = document.getElementById('sidebarBackdrop');
+  sidebarToggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    backdrop.classList.toggle('active');
+  });
+  backdrop.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    backdrop.classList.remove('active');
+  });
+
+  // ── 3. Ẩn nút "Thêm ngựa" nếu là HORSE_OWNER
+  if (hasRole('HORSE_OWNER')) {
+    document.getElementById('btnAddHorse').style.display = 'none';
   }
-  searchInput.addEventListener('input', applyFilter);
-  filterStatus.addEventListener('change', applyFilter);
+
+  // ── 4. Modal: Thêm ngựa
+  const modal = document.getElementById('addHorseModal');
+  document.getElementById('btnAddHorse').addEventListener('click', () => {
+    modal.style.display = 'flex';
+  });
+  document.getElementById('closeAddModal').addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+  document.getElementById('cancelAddModal').addEventListener('click', () => {
+    modal.style.display = 'none';
+  });
+  modal.addEventListener('mousedown', (e) => {
+    if (e.target === modal) modal.style.display = 'none';
+  });
+
+  // ── 5. Helpers
+  /**
+   * Lấy 2 chữ cái đầu (initials) từ tên ngựa
+   */
+  function getInitials(name = '') {
+    const words = name.trim().split(/\s+/);
+    if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+    return (words[0][0] + words[1][0]).toUpperCase();
+  }
+
+  /**
+   * Chuyển giới tính enum → tiếng Việt
+   */
+  const GENDER_MAP = {
+    STALLION: 'Ngựa đực',
+    MARE:     'Ngựa cái',
+    GELDING:  'Ngựa thiến',
+  };
+
+  /**
+   * Chuyển status enum → { cssClass, label }
+   */
+  const STATUS_MAP = {
+    ACTIVE:  { cls: 'active',  label: 'Hoạt động' },
+    INJURED: { cls: 'injured', label: 'Chấn thương' },
+    RESTING: { cls: 'resting', label: 'Nghỉ ngơi' },
+    RETIRED: { cls: 'retired', label: 'Đã nghỉ hưu' },
+  };
+
+  /**
+   * Format ISO date → dd/MM/yyyy
+   */
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return iso;
+    const dd   = String(d.getDate()).padStart(2, '0');
+    const mm   = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // ── 6. Biến lưu toàn bộ dữ liệu ngựa đã tải
+  let allHorses = [];
+
+  // ── 7. Tải danh sách ngựa từ API
+  async function loadHorses() {
+    const isOwnerOnly =
+      hasRole('HORSE_OWNER') &&
+      !hasRole('CLUB_MANAGER') &&
+      !hasRole('HEAD_TRAINER');
+
+    const statusVal = document.getElementById('filterStatus').value;
+    const statusQS  = statusVal ? `&status=${statusVal}` : '';
+
+    const endpoint = isOwnerOnly
+      ? `/api/horses/mine?page=0&size=100${statusQS}`
+      : `/api/horses?page=0&size=100${statusQS}`;
+
+    try {
+      const data = await apiFetch(endpoint);
+      // Hỗ trợ cả dạng Page (Spring) { content: [...] } và dạng mảng thuần
+      allHorses = Array.isArray(data) ? data : (data.content ?? []);
+      renderTable(allHorses);
+    } catch (err) {
+      console.error('Không tải được danh sách ngựa:', err);
+      document.querySelector('#horsesTable tbody').innerHTML =
+        `<tr><td colspan="8" style="text-align:center;color:var(--red,#c0392b)">
+          Lỗi tải dữ liệu: ${err.message}
+        </td></tr>`;
+      document.getElementById('recordCount').textContent = '0 hồ sơ';
+    }
+  }
+
+  // ── 8. Render bảng
+  function renderTable(horses) {
+    const q           = document.getElementById('searchInput').value.toLowerCase();
+    const breedFilter = document.getElementById('filterBreed').value.toLowerCase();
+    const tbody       = document.querySelector('#horsesTable tbody');
+
+    // Lọc client-side theo search text và breed
+    const filtered = horses.filter(h => {
+      const text = `${h.name ?? ''} ${h.horseCode ?? ''} ${h.chipNumber ?? ''}`.toLowerCase();
+      const matchQ     = !q || text.includes(q);
+      const matchBreed = !breedFilter || (h.breed ?? '').toLowerCase().includes(breedFilter);
+      return matchQ && matchBreed;
+    });
+
+    tbody.innerHTML = filtered.map(h => {
+      const initials  = getInitials(h.name);
+      const gender    = GENDER_MAP[h.gender] ?? h.gender ?? '—';
+      const dob       = fmtDate(h.dateOfBirth);
+      const stable    = h.stableLocation ?? '—';
+      const st        = STATUS_MAP[h.status] ?? { cls: '', label: h.status ?? '—' };
+      const trainer   = h.trainer?.username ?? h.trainerUsername ?? '—';
+      const detailUrl = `horse-detail.html?id=${h.id}`;
+
+      return `
+        <tr>
+          <td>
+            <div class="td-horse">
+              <span class="horse-mono">${initials}</span>
+              <div><b>${h.name ?? '—'}</b><small>${h.horseCode ?? ''}</small></div>
+            </div>
+          </td>
+          <td>${h.breed ?? '—'}</td>
+          <td>${gender}</td>
+          <td>${dob}</td>
+          <td>${stable}</td>
+          <td><span class="badge ${st.cls}"><i></i>${st.label}</span></td>
+          <td>${trainer}</td>
+          <td>
+            <a href="${detailUrl}" class="btn btn-ghost btn-icon" title="Xem chi tiết">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </a>
+          </td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('recordCount').textContent = `${filtered.length} hồ sơ`;
+  }
+
+  // ── 9. Search & filter client-side
+  document.getElementById('searchInput').addEventListener('input',  () => renderTable(allHorses));
+  document.getElementById('filterBreed').addEventListener('change', () => renderTable(allHorses));
+
+  // filterStatus thay đổi → reload từ API (server-side filter)
+  document.getElementById('filterStatus').addEventListener('change', () => loadHorses());
+
+  // ── 10. Submit form Thêm ngựa
+  document.getElementById('submitAddHorse').addEventListener('click', async () => {
+    const form = document.getElementById('addHorseForm');
+    if (!form.reportValidity()) return;
+
+    const payload = {
+      horseCode:      document.getElementById('hCode').value.trim(),
+      name:           document.getElementById('hName').value.trim(),
+      chipNumber:     document.getElementById('hChip').value.trim() || null,
+      dateOfBirth:    document.getElementById('hBirth').value || null,
+      gender:         document.getElementById('hGender').value,
+      breed:          document.getElementById('hBreed').value.trim(),
+      colorMarkings:  document.getElementById('hColor').value.trim(),
+      stableLocation: document.getElementById('hStable').value.trim(),
+      status:         document.getElementById('hStatus').value,
+    };
+
+    try {
+      await apiFetch('/api/horses', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+      modal.style.display = 'none';
+      form.reset();
+      await loadHorses();
+    } catch (err) {
+      alert('Lỗi khi thêm ngựa: ' + err.message);
+    }
+  });
+
+  // ── 11. Tải dữ liệu lần đầu
+  await loadHorses();
 </script>
 
 </body>
