@@ -436,14 +436,14 @@
 
 <script src="https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js"></script>
 <script>
-  // ── Sidebar & basic UI ──────────────────────
-  const toggle = document.getElementById('sidebarToggle');
-  const sidebar = document.getElementById('sidebar');
+  // ── Sidebar ──────────────────────────────────
+  const toggle   = document.getElementById('sidebarToggle');
+  const sidebar  = document.getElementById('sidebar');
   const backdrop = document.getElementById('sidebarBackdrop');
-  toggle.addEventListener('click', () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
+  toggle.addEventListener('click',   () => { sidebar.classList.toggle('open'); backdrop.classList.toggle('active'); });
   backdrop.addEventListener('click', () => { sidebar.classList.remove('open'); backdrop.classList.remove('active'); });
 
-  // ── Tab switching ───────────────────────────
+  // ── Tab switching ────────────────────────────
   document.querySelectorAll('[data-htab]').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-htab]').forEach(b => b.classList.remove('active'));
@@ -458,214 +458,342 @@
   const lockModal    = document.getElementById('lockModal');
   const releaseModal = document.getElementById('releaseModal');
   const careModal    = document.getElementById('careModal');
-  document.getElementById('btnNewLock').addEventListener('click', () => lockModal.style.display = 'flex');
-  document.getElementById('closeLockModal').addEventListener('click', () => lockModal.style.display = 'none');
-  document.getElementById('cancelLockModal').addEventListener('click', () => lockModal.style.display = 'none');
-  lockModal.addEventListener('mousedown', e => { if (e.target === lockModal) lockModal.style.display = 'none'; });
-  document.getElementById('btnRelease1').addEventListener('click', () => releaseModal.style.display = 'flex');
-  document.getElementById('closeReleaseModal').addEventListener('click', () => releaseModal.style.display = 'none');
-  document.getElementById('cancelReleaseModal').addEventListener('click', () => releaseModal.style.display = 'none');
+  document.getElementById('btnNewLock').addEventListener('click',       () => lockModal.style.display    = 'flex');
+  document.getElementById('closeLockModal').addEventListener('click',   () => lockModal.style.display    = 'none');
+  document.getElementById('cancelLockModal').addEventListener('click',  () => lockModal.style.display    = 'none');
+  lockModal.addEventListener('mousedown',    e => { if (e.target === lockModal)    lockModal.style.display    = 'none'; });
+  document.getElementById('btnRelease1').addEventListener('click',      () => releaseModal.style.display = 'flex');
+  document.getElementById('closeReleaseModal').addEventListener('click',() => releaseModal.style.display = 'none');
+  document.getElementById('cancelReleaseModal').addEventListener('click',() => releaseModal.style.display= 'none');
   releaseModal.addEventListener('mousedown', e => { if (e.target === releaseModal) releaseModal.style.display = 'none'; });
-  document.getElementById('btnNewCare').addEventListener('click', () => careModal.style.display = 'flex');
-  document.getElementById('closeCareModal').addEventListener('click', () => careModal.style.display = 'none');
-  document.getElementById('cancelCareModal').addEventListener('click', () => careModal.style.display = 'none');
-  careModal.addEventListener('mousedown', e => { if (e.target === careModal) careModal.style.display = 'none'; });
+  document.getElementById('btnNewCare').addEventListener('click',       () => careModal.style.display    = 'flex');
+  document.getElementById('closeCareModal').addEventListener('click',   () => careModal.style.display    = 'none');
+  document.getElementById('cancelCareModal').addEventListener('click',  () => careModal.style.display    = 'none');
+  careModal.addEventListener('mousedown',    e => { if (e.target === careModal)    careModal.style.display    = 'none'; });
 
-  // ═══════════════════════════════════════════════════════════
-  //  ANATOMICAL INJURY SYSTEM & 3D VIEWER CONTROLLER
-  //  Model: https://sketchfab.com/3d-models/horse-791844e912d0460d8e8951891158c696
-  // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  //  3D DOT TRACKING SYSTEM — SKETCHFAB VIEWER API
+  //  Chấm hiển thị trực tiếp trên model, bám theo khi xoay 360°
+  //  Kỹ thuật: getWorldToScreen() + cameraupdate event
+  // ═══════════════════════════════════════════════════════════════
 
-  const MODEL_UID = '791844e912d0460d8e8951891158c696';
+  const MODEL_UID  = '791844e912d0460d8e8951891158c696';
 
-  // Định nghĩa các vùng giải phẫu chính của ngựa đua
-  const ANATOMICAL_PARTS = [
-    { id: 'shoulder_left',     name: 'Bắp vai trái',          en: 'Left Shoulder',    zone: 'Thân trước' },
-    { id: 'shoulder_right',    name: 'Bắp vai phải',         en: 'Right Shoulder',   zone: 'Thân trước' },
-    { id: 'tendon_front_right',name: 'Gân chân trước phải',   en: 'R. Front Tendon',  zone: 'Chi trước' },
-    { id: 'knee_front_right',  name: 'Khớp gối trước phải',   en: 'R. Front Knee',    zone: 'Chi trước' },
-    { id: 'back_spine',        name: 'Lưng & Cột sống',      en: 'Back & Spine',     zone: 'Thân giữa' },
-    { id: 'stifle_back_left',  name: 'Khớp Stifle sau trái',  en: 'L. Rear Stifle',   zone: 'Chi sau' },
-    { id: 'hock_back_right',   name: 'Khớp cổ chân sau phải', en: 'R. Rear Hock',     zone: 'Chi sau' },
-    { id: 'fetlock_front',     name: 'Móng & Khớp Fetlock',   en: 'Hooves & Fetlocks',zone: 'Móng chi' }
-  ];
 
-  // Dữ liệu chấn thương mặc định theo từng ngựa
-  const HORSE_PRESETS = {
-    'gold-wind': {
-      'tendon_front_right': 'serious',
-      'knee_front_right': 'monitoring',
-      notes: 'Gold Wind: Đang bị khóa huấn luyện do tổn thương gân chân trước phải (05/09). Khớp gối cần theo dõi chườm đá sau mỗi buổi đi dạo.'
-    },
-    'moonlight': {
-      'stifle_back_left': 'serious',
-      'shoulder_left': 'monitoring',
-      notes: 'Moonlight Dancer: Hồi phục sau phẫu thuật khớp Stifle sau trái (tuần 4/6). Bắp vai trái hơi căng cơ do chịu lực bù.'
-    },
-    'storm-thunder': {
-      notes: 'Storm Thunder: Tình trạng thể lực và xương khớp hoàn hảo. Đủ điều kiện tập cường độ cao (HIGH).'
-    }
-  };
+  // State cycling: normal → monitoring → serious → normal
+  const DOT_STATES = ['monitoring', 'serious', 'normal'];
+  const DOT_COLOR  = { monitoring: '#dd6b20', serious: '#e53e3e', normal: '#4a9e6b' };
+  const DOT_LABEL  = { monitoring: 'Cần theo dõi', serious: 'Nghiêm trọng', normal: 'Bình thường' };
 
-  // Trạng thái hiện tại của từng bộ phận: 'normal' | 'monitoring' | 'serious'
-  let currentPartStates = {};
-  let activeHorse = 'gold-wind';
+  let sketchfabAPI  = null;   // Viewer API instance
+  let viewerLive    = false;  // true khi 'viewerready' fired
+  let viewerInited  = false;  // guard: chỉ init 1 lần
+  let isMarkMode    = false;  // true khi đang ở chế độ đặt điểm
+  let dotCounter    = 0;
+  let dotMap        = {};     // id → { id, name, state, pos3d }
 
-  const gridContainer = document.getElementById('body-parts-grid');
-  const summaryBox    = document.getElementById('injury-summary-box');
-  const summaryText   = document.getElementById('injury-summary-text');
-  const statSerious   = document.getElementById('stat-serious');
-  const statMonitoring= document.getElementById('stat-monitoring');
-  const statNormal    = document.getElementById('stat-normal');
+  // ── DOM refs ─────────────────────────────────
+  const vStatus    = document.getElementById('viewer3d-status');
+  const vText      = document.getElementById('viewer-status-text');
+  const vFrame     = document.getElementById('api-frame');
+  const vOverlay   = document.getElementById('dot-overlay');
+  const vHintBar   = document.getElementById('viewer-hint-bar');
+  const vFallback  = document.getElementById('viewer-fallback');
+  const vDotList   = document.getElementById('injury-dot-list');
+  const markBanner = document.getElementById('mark-banner');
+  const markBtn    = document.getElementById('btn3dMark');
+  const resetBtn   = document.getElementById('btn3dReset');
 
-  // Khởi tạo trạng thái ngựa
-  function loadHorseData(horseKey) {
-    activeHorse = horseKey;
-    currentPartStates = {};
-    const preset = HORSE_PRESETS[horseKey] || {};
+  // ── Inject CSS cho dots & animation ──────────
+  (function() {
+    const s = document.createElement('style');
+    s.textContent = `
+      @keyframes _spin3d { to { transform: rotate(360deg); } }
+      @keyframes dotPulse {
+        0%   { transform: scale(1);   opacity: .7; }
+        60%  { transform: scale(2.2); opacity: 0;  }
+        100% { transform: scale(1);   opacity: 0;  }
+      }
+      .inj-dot {
+        position: absolute;
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(255,255,255,.75);
+        transform: translate(-50%, -50%);
+        cursor: pointer;
+        pointer-events: all;
+        display: flex; align-items: center; justify-content: center;
+        transition: border-color .2s;
+        z-index: 2;
+      }
+      .inj-dot:hover { border-color: #fff; filter: brightness(1.25); }
+      .inj-dot::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: 50%;
+        background: inherit;
+        animation: dotPulse 1.6s ease-out infinite;
+        z-index: -1;
+      }
+      .inj-dot-tooltip {
+        position: absolute;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(14,18,30,.95);
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 8px;
+        padding: .45rem .75rem;
+        white-space: nowrap;
+        font-size: .75rem;
+        color: #f1efe6;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity .15s;
+        box-shadow: 0 4px 16px rgba(0,0,0,.5);
+        z-index: 10;
+      }
+      .inj-dot-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%; left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: rgba(14,18,30,.95);
+      }
+      .inj-dot:hover .inj-dot-tooltip { opacity: 1; }
+    `;
+    document.head.appendChild(s);
+  })();
 
-    ANATOMICAL_PARTS.forEach(part => {
-      currentPartStates[part.id] = preset[part.id] || 'normal';
+  // ── Tạo DOM cho 1 dot ─────────────────────────
+  function createDotElement(pt) {
+    const el = document.createElement('div');
+    el.className = 'inj-dot';
+    el.id = 'dot-el-' + pt.id;
+    el.style.background = DOT_COLOR[pt.state];
+    el.style.boxShadow  = `0 0 8px ${DOT_COLOR[pt.state]}, 0 0 16px ${DOT_COLOR[pt.state]}55`;
+
+    // Tooltip
+    const tip = document.createElement('div');
+    tip.className = 'inj-dot-tooltip';
+    tip.innerHTML = `<b>${pt.name}</b><br><span style="color:${DOT_COLOR[pt.state]}">${DOT_LABEL[pt.state]}</span><br><span style="opacity:.6;font-size:.7rem">Click để đổi trạng thái</span>`;
+    el.appendChild(tip);
+
+    // Click → cycle state
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const cur = dotMap[pt.id].state;
+      const nxt = DOT_STATES[(DOT_STATES.indexOf(cur) + 1) % DOT_STATES.length];
+      dotMap[pt.id].state = nxt;
+      el.style.background = DOT_COLOR[nxt];
+      el.style.boxShadow  = `0 0 8px ${DOT_COLOR[nxt]}, 0 0 16px ${DOT_COLOR[nxt]}55`;
+      tip.innerHTML = `<b>${pt.name}</b><br><span style="color:${DOT_COLOR[nxt]}">${DOT_LABEL[nxt]}</span><br><span style="opacity:.6;font-size:.7rem">Click để đổi trạng thái</span>`;
+      renderDotList();
     });
 
-    renderGrid();
-    updateStatsAndSummary(preset.notes);
+    // Right-click → xóa dot
+    el.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      el.remove();
+      delete dotMap[pt.id];
+      renderDotList();
+    });
+
+    vOverlay.appendChild(el);
+    return el;
   }
 
-  // Chuyển vòng trạng thái khi click: Bình thường -> Cần theo dõi -> Nghiêm trọng -> Bình thường
-  function cyclePartState(partId) {
-    const cur = currentPartStates[partId] || 'normal';
-    let next = 'normal';
-    if (cur === 'normal') next = 'monitoring';
-    else if (cur === 'monitoring') next = 'serious';
-    else if (cur === 'serious') next = 'normal';
+  // ── Cập nhật vị trí 1 dot từ 3D → 2D screen ──
+  function updateDotPos(pt) {
+    if (!sketchfabAPI || !viewerLive) return;
+    const el = document.getElementById('dot-el-' + pt.id);
+    if (!el) return;
 
-    currentPartStates[partId] = next;
-    renderGrid();
-    updateStatsAndSummary();
-  }
-
-  // Render lưới thẻ các bộ phận
-  function renderGrid() {
-    if (!gridContainer) return;
-    gridContainer.innerHTML = ANATOMICAL_PARTS.map(part => {
-      const state = currentPartStates[part.id] || 'normal';
-      
-      let badgeHtml = '';
-      let borderCol = 'rgba(255,255,255,0.08)';
-      let bgGrad    = 'background: rgba(255,255,255,0.03);';
-      let stateName = 'Bình thường';
-      let stateIcon = '🟢';
-
-      if (state === 'serious') {
-        borderCol = 'rgba(229,62,62,0.45)';
-        bgGrad    = 'background: linear-gradient(135deg, rgba(229,62,62,0.12), rgba(20,27,46,0.6)); box-shadow: 0 0 12px rgba(229,62,62,0.2);';
-        stateName = 'Nghiêm trọng';
-        stateIcon = '🔴';
-        badgeHtml = `<span style="font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#fc8181;background:rgba(229,62,62,0.18);padding:.2rem .5rem;border-radius:999px;border:1px solid rgba(229,62,62,0.3);">Nghiêm trọng</span>`;
-      } else if (state === 'monitoring') {
-        borderCol = 'rgba(221,107,32,0.45)';
-        bgGrad    = 'background: linear-gradient(135deg, rgba(221,107,32,0.12), rgba(20,27,46,0.6)); box-shadow: 0 0 12px rgba(221,107,32,0.15);';
-        stateName = 'Cần theo dõi';
-        stateIcon = '🟠';
-        badgeHtml = `<span style="font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#f6ad55;background:rgba(221,107,32,0.18);padding:.2rem .5rem;border-radius:999px;border:1px solid rgba(221,107,32,0.3);">Cần theo dõi</span>`;
+    sketchfabAPI.getWorldToScreen(pt.pos3d, function(err, screenPos) {
+      if (err || !screenPos) { el.style.display = 'none'; return; }
+      const [x, y] = screenPos;
+      // Ẩn nếu nằm ngoài viewport canvas
+      const W = vFrame.clientWidth, H = vFrame.clientHeight;
+      if (x < 0 || y < 0 || x > W || y > H) {
+        el.style.display = 'none';
       } else {
-        badgeHtml = `<span style="font-size:.7rem;font-weight:600;color:#68d391;background:rgba(74,158,107,0.12);padding:.2rem .5rem;border-radius:999px;">Bình thường</span>`;
+        el.style.display = 'flex';
+        el.style.left = x + 'px';
+        el.style.top  = y + 'px';
       }
+    });
+  }
 
+  // Cập nhật tất cả dots
+  function updateAllDots() {
+    Object.values(dotMap).forEach(updateDotPos);
+  }
+
+  // ── Render danh sách điểm chấn thương bên dưới ─
+  function renderDotList() {
+    if (!vDotList) return;
+    const pts = Object.values(dotMap);
+    if (!pts.length) {
+      vDotList.innerHTML = `<p style="font-size:.82rem;color:#7a7258;text-align:center;padding:.4rem 0">
+        Chưa có điểm chấn thương nào. Bật <b>Thêm điểm chấn thương</b> rồi click thẳng lên model.
+        <br><span style="opacity:.6;font-size:.75rem">Chuột phải lên chấm để xóa.</span>
+      </p>`;
+      return;
+    }
+    vDotList.innerHTML = pts.map(pt => {
+      const col = DOT_COLOR[pt.state];
       return `
-        <div onclick="cyclePartState('${part.id}')"
-             style="cursor:pointer;padding:.85rem 1rem;border-radius:10px;border:1px solid ${borderCol};${bgGrad}transition:all .2s ease;display:flex;flex-direction:column;gap:.4rem;"
-             onmouseover="this.style.transform='translateY(-2px)'"
-             onmouseout="this.style.transform='none'">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
-            <div>
-              <span style="font-size:.7rem;color:#8a8167;text-transform:uppercase;letter-spacing:.06em;">${part.zone}</span>
-              <div style="font-size:.9rem;font-weight:600;color:#f1efe6;margin-top:.1rem;">${part.name}</div>
-              <div style="font-size:.75rem;color:#7a7258;">${part.en}</div>
-            </div>
-            ${badgeHtml}
+        <div style="display:flex;align-items:center;gap:.75rem;padding:.7rem 1rem;
+          border-radius:9px;border:1px solid ${col}40;background:${col}0d;">
+          <span style="width:11px;height:11px;border-radius:50%;flex-shrink:0;
+            background:${col};box-shadow:0 0 8px ${col}88;"></span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.88rem;font-weight:600;color:#f1efe6">${pt.name}</div>
+            <div style="font-size:.75rem;color:${col};font-weight:700;text-transform:uppercase;letter-spacing:.05em">${DOT_LABEL[pt.state]}</div>
           </div>
-          <div style="margin-top:.3rem;padding-top:.4rem;border-top:1px dashed rgba(255,255,255,0.06);display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:#8a8167;">
-            <span>${stateIcon} ${stateName}</span>
-            <span style="color:#c1663f;font-weight:600;">Nhấp để đổi ↺</span>
-          </div>
-        </div>
-      `;
+          <button onclick="window._cycleDot('${pt.id}')"
+            style="font-size:.72rem;padding:.2rem .55rem;border-radius:5px;border:1px solid rgba(255,255,255,.15);
+            background:transparent;color:#a89e7a;cursor:pointer;">Đổi ↺</button>
+          <button onclick="window._removeDot('${pt.id}')"
+            style="font-size:.72rem;padding:.2rem .55rem;border-radius:5px;border:1px solid rgba(229,62,62,.3);
+            background:transparent;color:#fc8181;cursor:pointer;">Xóa</button>
+        </div>`;
     }).join('');
   }
 
-  // Cập nhật số liệu đếm và tóm tắt
-  function updateStatsAndSummary(customNote) {
-    let seriousCount = 0;
-    let monitoringCount = 0;
-    let normalCount = 0;
-
-    Object.values(currentPartStates).forEach(st => {
-      if (st === 'serious') seriousCount++;
-      else if (st === 'monitoring') monitoringCount++;
-      else normalCount++;
-    });
-
-    if (statSerious) statSerious.innerHTML = `<i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#e53e3e;margin-right:4px;"></i>Nghiêm trọng: ${seriousCount}`;
-    if (statMonitoring) statMonitoring.innerHTML = `<i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#dd6b20;margin-right:4px;"></i>Cần theo dõi: ${monitoringCount}`;
-    if (statNormal) statNormal.innerHTML = `<i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4a9e6b;margin-right:4px;"></i>Bình thường: ${normalCount}`;
-
-    if (summaryText) {
-      if (customNote) {
-        summaryText.innerHTML = customNote;
-      } else if (seriousCount > 0) {
-        summaryText.innerHTML = `<span style="color:#e53e3e;font-weight:600;">CẢNH BÁO:</span> Phát hiện <b>${seriousCount} vùng chấn thương nghiêm trọng</b> và <b>${monitoringCount} vùng cần theo dõi</b>. Bác sĩ thú y khuyến nghị tiếp tục duy trì lệnh Khóa huấn luyện, không cho tập nặng.`;
-      } else if (monitoringCount > 0) {
-        summaryText.innerHTML = `<span style="color:#dd6b20;font-weight:600;">LƯU Ý:</span> Có <b>${monitoringCount} vùng đang theo dõi</b>. Có thể cho ngựa đi bộ khởi động nhẹ, tránh các bài tập chạy nước rút hoặc vượt rào.`;
-      } else {
-        summaryText.innerHTML = `<span style="color:#4a9e6b;font-weight:600;">HOÀN TOÀN KHỎE MẠNH:</span> Tất cả các vùng xương khớp và gân cơ đều ở trạng thái bình thường. Ngựa đủ điều kiện tham gia giáo án tập luyện chuẩn.`;
-      }
+  // Helpers cho buttons trong list
+  window._cycleDot = function(id) {
+    const pt = dotMap[id]; if (!pt) return;
+    const nxt = DOT_STATES[(DOT_STATES.indexOf(pt.state) + 1) % DOT_STATES.length];
+    pt.state = nxt;
+    const el = document.getElementById('dot-el-' + id);
+    if (el) {
+      el.style.background = DOT_COLOR[nxt];
+      el.style.boxShadow  = `0 0 8px ${DOT_COLOR[nxt]}, 0 0 16px ${DOT_COLOR[nxt]}55`;
+      const tip = el.querySelector('.inj-dot-tooltip');
+      if (tip) tip.innerHTML = `<b>${pt.name}</b><br><span style="color:${DOT_COLOR[nxt]}">${DOT_LABEL[nxt]}</span><br><span style="opacity:.6;font-size:.7rem">Click để đổi trạng thái</span>`;
     }
-  }
+    renderDotList();
+  };
+  window._removeDot = function(id) {
+    const el = document.getElementById('dot-el-' + id);
+    if (el) el.remove();
+    delete dotMap[id];
+    renderDotList();
+  };
 
-  // Đổi ngựa từ dropdown
-  const horseSelect = document.getElementById('injuryHorseSelect');
-  if (horseSelect) {
-    horseSelect.addEventListener('change', function() {
-      loadHorseData(this.value);
+  // ── Toggle Mark Mode ──────────────────────────
+  if (markBtn) {
+    markBtn.addEventListener('click', function() {
+      if (!viewerLive) {
+        alert('Hãy đợi model tải xong rồi mới bật chế độ đánh dấu.');
+        return;
+      }
+      isMarkMode = !isMarkMode;
+      markBtn.style.background = isMarkMode ? '#e53e3e' : '#2f6b57';
+      markBtn.innerHTML = isMarkMode
+        ? `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Tắt đánh dấu`
+        : `<svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Thêm điểm chấn thương`;
+      if (markBanner) markBanner.style.display = isMarkMode ? 'flex' : 'none';
     });
   }
 
-  // Nút đặt lại tất cả
-  const resetBtn = document.getElementById('btn3dReset');
+  // ── Nút Xóa tất cả ────────────────────────────
   if (resetBtn) {
     resetBtn.addEventListener('click', function() {
-      ANATOMICAL_PARTS.forEach(part => {
-        currentPartStates[part.id] = 'normal';
+      Object.keys(dotMap).forEach(id => {
+        const el = document.getElementById('dot-el-' + id);
+        if (el) el.remove();
       });
-      renderGrid();
-      updateStatsAndSummary();
+      dotMap = {};
+      renderDotList();
     });
   }
 
-  // Khởi tạo ngay khi mở trang
-  loadHorseData('gold-wind');
+  // ── Khởi tạo Sketchfab Viewer API ─────────────
+  function initViewer() {
+    if (viewerInited) return;
+    viewerInited = true;
 
-  // Thử kết nối API Sketchfab ở background nếu trình duyệt cho phép postMessage
-  try {
-    const iframe = document.getElementById('api-frame');
-    if (window.Sketchfab && iframe) {
-      const client = new Sketchfab(iframe);
-      client.init(MODEL_UID, {
-        success: function(api) {
-          api.start();
-          console.log('Sketchfab Viewer API connected successfully.');
-        },
-        error: function(err) {
-          // Bỏ qua lỗi nếu preview trên webview nội bộ VS Code
-          console.info('Preview mode: Using direct interactive 3D embed.');
-        }
-      });
+    if (!window.Sketchfab) {
+      // Sketchfab script chưa load (mạng chậm), thử lại sau 1.5s
+      setTimeout(initViewer, 1500);
+      viewerInited = false;
+      return;
     }
-  } catch (e) {
-    // Không chặn luồng UI
+
+    const client = new window.Sketchfab(vFrame);
+    client.init(MODEL_UID, {
+      success: function(api) {
+        sketchfabAPI = api;
+        api.start();
+
+        api.addEventListener('viewerready', function() {
+          viewerLive = true;
+
+          // Hiện iframe, ẩn spinner
+          vStatus.style.display = 'none';
+          vFrame.style.display  = 'block';
+          if (vHintBar) vHintBar.style.display = 'block';
+
+          // Theo dõi camera → cập nhật vị trí dots
+          api.addEventListener('cameraupdate', updateAllDots);
+
+          // Click trên model → đặt điểm chấn thương
+          api.addEventListener('click', function(info) {
+            if (!isMarkMode) return;
+            if (!info || !info.position3D) return;
+
+            dotCounter++;
+            const id  = 'dot_' + dotCounter;
+            const pt  = {
+              id,
+              name:  'Vùng chấn thương #' + dotCounter,
+              state: 'monitoring',
+              pos3d: [...info.position3D]
+            };
+            dotMap[id] = pt;
+            createDotElement(pt);
+            updateDotPos(pt);
+            renderDotList();
+          });
+
+          renderDotList(); // hiện thông điệp hướng dẫn
+        });
+      },
+
+      error: function() {
+        // Xảy ra khi VS Code webview chặn postMessage
+        vStatus.innerHTML = `
+          <svg width="28" height="28" fill="none" stroke="#dd6b20" stroke-width="1.5" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r=".5" fill="#dd6b20"/>
+          </svg>
+          <span style="color:#dd6b20;font-weight:600">Cần mở qua Live Server để dùng dot tracking</span>
+        `;
+        if (vFallback) vFallback.style.display = 'block';
+        renderDotList();
+      },
+
+      // Viewer options
+      autostart:    1,
+      ui_theme:    'dark',
+      ui_infos:     0,
+      ui_watermark: 0,
+      ui_controls:  1,
+      ui_help:      0,
+      ui_settings:  0,
+      ui_inspector: 0,
+      ui_annotations: 0,
+      ui_stop:      0,
+      preload:      1
+    });
   }
+
+  // Gọi initViewer khi click tab "Bản đồ chấn thương"
+  // (đã bind trong phần tab switching ở trên qua if (btn.dataset.htab === 'model') initViewer())
+  renderDotList(); // show hướng dẫn ngay từ đầu
 </script>
 
 </body>
