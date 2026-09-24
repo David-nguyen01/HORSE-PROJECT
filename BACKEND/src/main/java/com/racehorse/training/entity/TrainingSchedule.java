@@ -82,6 +82,14 @@ public class TrainingSchedule extends BaseEntity {
         if (publishedAt == null) publishedAt = time;
     }
 
+    public void complete(Instant time) {
+        if (completedAt == null) completedAt = time;
+    }
+
+    public void cancel(Instant time) {
+        if (cancelledAt == null) cancelledAt = time;
+    }
+
     public TrainingPlanPhase getPhase() { return phase; }
     public Horse getHorse() { return horse; }
     public UserAccount getAssignedStaff() { return assignedStaff; }

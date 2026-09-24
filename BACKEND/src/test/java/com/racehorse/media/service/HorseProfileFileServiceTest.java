@@ -138,6 +138,26 @@ class HorseProfileFileServiceTest {
         assertThat(current.getStatus()).isEqualTo(ProfileFileStatus.DELETED);
     }
 
+    @Test
+    void rejectingProposalDeletesCloudinaryAssetAndMarksDeleted() {
+        UUID horseId = UUID.randomUUID();
+        UUID proposalId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount manager = user("manager", Role.CLUB_MANAGER);
+        UserAccount owner = user("owner", Role.HORSE_OWNER);
+        HorseProfileFile proposal = profileFile(horse, owner, ProfileFileStatus.PENDING);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(managerId)).thenReturn(Optional.of(manager));
+        when(repository.findByIdAndHorseIdAndStatus(proposalId, horseId, ProfileFileStatus.PENDING))
+                .thenReturn(Optional.of(proposal));
+
+        service.reject(horseId, proposalId, managerId);
+
+        verify(cloudStorage).delete("racehorse/horses/file", "image");
+        assertThat(proposal.getStatus()).isEqualTo(ProfileFileStatus.DELETED);
+    }
+
     private MockMultipartFile imageFile() {
         return new MockMultipartFile("file", "horse.png", "image/png", new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1});
     }

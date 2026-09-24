@@ -10,8 +10,13 @@ import com.racehorse.horse.repository.HorseRepository;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.training.dto.FitnessDashboardResponse;
 import com.racehorse.training.entity.FitnessStatus;
+import com.racehorse.training.entity.SurfaceType;
 import com.racehorse.training.entity.TrainingEvaluation;
+import com.racehorse.training.entity.TrainingPlan;
+import com.racehorse.training.entity.TrainingPlanPhase;
+import com.racehorse.training.entity.WorkloadIntensity;
 import com.racehorse.training.repository.TrainingEvaluationRepository;
+import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -38,12 +44,13 @@ class FitnessDashboardServiceTest {
     @Mock TrainingEvaluationRepository evaluationRepository;
     @Mock HorseRepository horseRepository;
     @Mock HorseAccessService horseAccessService;
+    @Mock TrainingPlanPhaseRepository phaseRepository;
     private FitnessDashboardService service;
 
     @BeforeEach
     void setUp() {
         service = new FitnessDashboardService(
-                evaluationRepository, horseRepository, horseAccessService,
+                evaluationRepository, horseRepository, horseAccessService, phaseRepository,
                 Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -55,7 +62,7 @@ class FitnessDashboardServiceTest {
         ReflectionTestUtils.setField(horse, "id", horseId);
         TrainingEvaluation evaluation = evaluation(horse, FitnessStatus.GREEN, LocalDate.of(2026, 9, 8));
         ReflectionTestUtils.setField(evaluation, "id", evaluationId);
-        when(evaluationRepository.findDashboardData(null, LocalDate.of(2026, 8, 12), LocalDate.of(2026, 9, 10), null))
+        when(evaluationRepository.findDashboardData(null, null, LocalDate.of(2026, 8, 12), LocalDate.of(2026, 9, 10), null))
                 .thenReturn(List.of(evaluation));
         when(horseRepository.findByArchivedAtIsNullOrderByNameAsc()).thenReturn(List.of(horse));
 
@@ -73,6 +80,57 @@ class FitnessDashboardServiceTest {
     }
 
     @Test
+    void dashboardFiltersByPhaseAndScopesHorse() {
+        Horse horse = horse("H-001", "Lightning");
+        UUID horseId = UUID.randomUUID();
+        ReflectionTestUtils.setField(horse, "id", horseId);
+        UUID phaseId = UUID.randomUUID();
+        TrainingPlan plan = new TrainingPlan(horse, "Speed plan", null, user("trainer", Role.HEAD_TRAINER), true);
+        TrainingPlanPhase phase = new TrainingPlanPhase(
+                1, "Phase 1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 10),
+                new BigDecimal("1200"), WorkloadIntensity.MEDIUM, SurfaceType.DIRT);
+        ReflectionTestUtils.setField(phase, "id", phaseId);
+        ReflectionTestUtils.setField(phase, "trainingPlan", plan);
+
+        when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
+        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+
+        TrainingEvaluation evaluation = evaluation(horse, FitnessStatus.GREEN, LocalDate.of(2026, 9, 5));
+        when(evaluationRepository.findDashboardData(horseId, phaseId, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 10), null))
+                .thenReturn(List.of(evaluation));
+
+        FitnessDashboardResponse response = service.get(null, phaseId, null, null, null, null);
+
+        assertThat(response.filters().horseId()).isEqualTo(horseId);
+        assertThat(response.filters().phaseId()).isEqualTo(phaseId);
+        assertThat(response.filters().from()).isEqualTo(LocalDate.of(2026, 9, 1));
+        assertThat(response.filters().to()).isEqualTo(LocalDate.of(2026, 9, 10));
+        assertThat(response.dataPoints()).hasSize(1);
+    }
+
+    @Test
+    void dashboardRejectsPhaseBelongingToDifferentHorse() {
+        Horse horse = horse("H-001", "Lightning");
+        UUID horseId = UUID.randomUUID();
+        ReflectionTestUtils.setField(horse, "id", horseId);
+        UUID otherHorseId = UUID.randomUUID();
+
+        UUID phaseId = UUID.randomUUID();
+        TrainingPlan plan = new TrainingPlan(horse, "Speed plan", null, user("trainer", Role.HEAD_TRAINER), true);
+        TrainingPlanPhase phase = new TrainingPlanPhase(
+                1, "Phase 1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 10),
+                new BigDecimal("1200"), WorkloadIntensity.MEDIUM, SurfaceType.DIRT);
+        ReflectionTestUtils.setField(phase, "id", phaseId);
+        ReflectionTestUtils.setField(phase, "trainingPlan", plan);
+
+        when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
+
+        assertThatThrownBy(() -> service.get(otherHorseId, phaseId, null, null, null, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("không thuộc về ngựa được chọn");
+    }
+
+    @Test
     void dashboardRejectsReversedDateRange() {
         assertThatThrownBy(() -> service.get(
                 null, LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 1), null, null))
@@ -83,6 +141,10 @@ class FitnessDashboardServiceTest {
     private Horse horse(String code, String name) {
         return new Horse(code, name, null, LocalDate.of(2022, 3, 10), HorseGender.STALLION,
                 "White blaze", "Thoroughbred", "A-01", HorseStatus.ACTIVE);
+    }
+
+    private UserAccount user(String name, Role role) {
+        return new UserAccount(name, name + "@test.local", "encoded", Set.of(role));
     }
 
     private TrainingEvaluation evaluation(Horse horse, FitnessStatus status, LocalDate date) {

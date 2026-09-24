@@ -1,9 +1,10 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ArrowLeft, Award, Bell, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, X, Zap } from 'lucide-react'
+import { Activity, ArrowLeft, Award, Bell, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, X, Zap } from 'lucide-react'
 import { api, authApi, clearAuth, getAuth, pageContent, saveAuth } from './api'
 
 const FitnessPage = lazy(() => import('./FitnessPage'))
+const StableCarePage = lazy(() => import('./StableCarePage'))
 
 const ROLE_LABELS = {
   CLUB_MANAGER: 'Quản lý câu lạc bộ', HEAD_TRAINER: 'Huấn luyện viên trưởng',
@@ -64,13 +65,20 @@ function AuthShell({ mode }) {
   const [form, setForm] = useState({ username: '', email: isLogin ? 'admin@gmail.com' : '', password: isLogin ? 'Admin123' : '', confirmPassword: '', role: 'HEAD_TRAINER' })
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
   useEffect(() => { if (!isLogin) authApi.roles().then(setRoles).catch(() => setRoles(Object.keys(ROLE_LABELS).filter((r) => r !== 'CLUB_MANAGER'))) }, [isLogin])
-  if (auth) return <Navigate to="/" replace />
+  if (auth) {
+    if (auth.user?.roles?.includes('STABLE_STAFF') && !auth.user?.roles?.some((r) => ['CLUB_MANAGER', 'HEAD_TRAINER'].includes(r))) {
+      return <Navigate to="/stable-care" replace />
+    }
+    return <Navigate to="/" replace />
+  }
   const submit = async (event) => {
     event.preventDefault(); setError(''); setBusy(true)
     try {
       if (isLogin) {
         const data = await authApi.login({ email: form.email, password: form.password })
-        setSession(data); navigate('/', { replace: true })
+        setSession(data)
+        const isGroomOnly = data.user?.roles?.includes('STABLE_STAFF') && !data.user?.roles?.some((r) => ['CLUB_MANAGER', 'HEAD_TRAINER'].includes(r))
+        navigate(isGroomOnly ? '/stable-care' : '/', { replace: true })
       } else {
         await authApi.register(form); navigate('/login', { replace: true, state: { registered: true } })
       }
@@ -106,6 +114,7 @@ function AppLayout() {
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/horses', label: 'Hồ sơ ngựa', icon: Activity }] : []),
     ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? [{ to: '/fitness', label: 'Thể lực & buổi tập', icon: Gauge }] : []),
+    ...(hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'CLUB_MANAGER') ? [{ to: '/stable-care', label: 'Chăm sóc chuồng', icon: Home }] : []),
     ...(hasAny(user, 'CLUB_MANAGER') ? [{ to: '/users', label: 'Người dùng', icon: UsersRound }] : []),
   ]
   const doLogout = async () => { await logout(); navigate('/login', { replace: true }) }
@@ -115,7 +124,7 @@ function AppLayout() {
       <nav>{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}><Icon size={19} /><span>{label}</span></NavLink>)}</nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="users" element={hasAny(user, 'CLUB_MANAGER') ? <Users /> : <Navigate to="/" replace />} /></Routes></Suspense></div></div>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'CLUB_MANAGER') ? <StableCarePage /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'CLUB_MANAGER') ? <StableCarePage /> : <Navigate to="/" replace />} /><Route path="users" element={hasAny(user, 'CLUB_MANAGER') ? <Users /> : <Navigate to="/" replace />} /></Routes></Suspense></div></div>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
   </div>
 }
@@ -146,6 +155,9 @@ function NotificationBell() {
 
 function Dashboard() {
   const { user } = useAuth(); const [horses, setHorses] = useState([]); const [loading, setLoading] = useState(true)
+  if (user?.roles?.includes('STABLE_STAFF') && !hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')) {
+    return <Navigate to="/stable-care" replace />
+  }
   useEffect(() => {
     if (!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')) { setLoading(false); return }
     const path = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? '/api/horses/mine?size=100' : '/api/horses?size=100'

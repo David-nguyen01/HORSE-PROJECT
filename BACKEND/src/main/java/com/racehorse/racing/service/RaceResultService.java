@@ -59,6 +59,14 @@ public class RaceResultService {
         return toResponse(result);
     }
 
+    @Transactional
+    public void delete(UUID horseId, UUID resultId) {
+        horseAccessService.requireActive(horseId);
+        RaceResult result = repository.findByIdAndHorseId(resultId, horseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy kết quả đua: " + resultId));
+        repository.delete(result);
+    }
+
     @Transactional(readOnly = true)
     public RaceHistoryResponse history(UUID horseId, UUID userId, boolean privileged) {
         horseAccessService.requireReadable(horseId, userId, privileged);

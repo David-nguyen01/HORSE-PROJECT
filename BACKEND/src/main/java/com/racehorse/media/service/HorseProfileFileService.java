@@ -123,6 +123,21 @@ public class HorseProfileFileService {
     }
 
     @Transactional
+    public void reject(
+            UUID horseId,
+            UUID proposalId,
+            UUID rejecterId) {
+        horseAccessService.requireExisting(horseId);
+        findUser(rejecterId);
+        HorseProfileFile proposal = repository.findByIdAndHorseIdAndStatus(
+                        proposalId, horseId, ProfileFileStatus.PENDING)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy đề xuất file đang chờ: " + proposalId));
+        cloudStorage.delete(proposal.getCloudinaryPublicId(), proposal.getResourceType());
+        proposal.delete();
+    }
+
+    @Transactional
     public void deleteActive(UUID horseId) {
         horseAccessService.requireExisting(horseId);
         HorseProfileFile active = repository.findFirstByHorseIdAndStatus(

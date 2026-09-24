@@ -66,6 +66,33 @@ public class StableController {
         return service.unassign(assignmentId, user(jwt));
     }
 
+    // Daily Routines (FR13)
+    @GetMapping("/horses/{horseId}/daily-routines")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    List<StableService.DailyRoutineView> listDailyRoutines(@PathVariable UUID horseId) {
+        return service.listDailyRoutines(horseId);
+    }
+
+    @PostMapping("/horses/{horseId}/daily-routines") @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    StableService.DailyRoutineView addDailyRoutine(@PathVariable UUID horseId, @AuthenticationPrincipal Jwt jwt,
+                                                   @Valid @RequestBody StableService.DailyRoutineRequest request) {
+        return service.addDailyRoutine(horseId, user(jwt), request);
+    }
+
+    @PutMapping("/daily-routines/{routineId}")
+    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    StableService.DailyRoutineView updateDailyRoutine(@PathVariable UUID routineId, @AuthenticationPrincipal Jwt jwt,
+                                                      @Valid @RequestBody StableService.DailyRoutineRequest request) {
+        return service.updateDailyRoutine(routineId, user(jwt), request);
+    }
+
+    @DeleteMapping("/daily-routines/{routineId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    void deleteDailyRoutine(@PathVariable UUID routineId) {
+        service.deleteDailyRoutine(routineId);
+    }
+
     private UUID user(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 
     public record StableRequest(@NotBlank @Size(max=150) String name, @Size(max=300) String location,

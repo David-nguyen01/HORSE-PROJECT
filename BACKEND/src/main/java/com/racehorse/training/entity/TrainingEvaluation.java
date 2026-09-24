@@ -24,6 +24,10 @@ public class TrainingEvaluation extends BaseEntity {
     @JoinColumn(name = "horse_id", nullable = false)
     private Horse horse;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "training_schedule_id")
+    private TrainingSchedule trainingSchedule;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "recorded_by_user_id", nullable = false)
     private UserAccount recordedBy;
@@ -79,7 +83,28 @@ public class TrainingEvaluation extends BaseEntity {
             String trainerNotes,
             String videoUrl,
             Instant completedAt) {
+        this(horse, null, recordedBy, sessionDate, durationMinutes, distanceMeters,
+                averageSpeedKmh, trainingLoad, heartRateRecoveryBpm, perceivedExertion,
+                fitnessStatus, trainerNotes, videoUrl, completedAt);
+    }
+
+    public TrainingEvaluation(
+            Horse horse,
+            TrainingSchedule trainingSchedule,
+            UserAccount recordedBy,
+            LocalDate sessionDate,
+            int durationMinutes,
+            BigDecimal distanceMeters,
+            BigDecimal averageSpeedKmh,
+            BigDecimal trainingLoad,
+            int heartRateRecoveryBpm,
+            int perceivedExertion,
+            FitnessStatus fitnessStatus,
+            String trainerNotes,
+            String videoUrl,
+            Instant completedAt) {
         this.horse = horse;
+        this.trainingSchedule = trainingSchedule;
         this.recordedBy = recordedBy;
         this.sessionDate = sessionDate;
         this.durationMinutes = durationMinutes;
@@ -95,6 +120,7 @@ public class TrainingEvaluation extends BaseEntity {
     }
 
     public Horse getHorse() { return horse; }
+    public TrainingSchedule getTrainingSchedule() { return trainingSchedule; }
     public UserAccount getRecordedBy() { return recordedBy; }
     public LocalDate getSessionDate() { return sessionDate; }
     public int getDurationMinutes() { return durationMinutes; }

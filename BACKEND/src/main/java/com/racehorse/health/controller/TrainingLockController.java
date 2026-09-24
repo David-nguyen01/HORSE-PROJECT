@@ -7,6 +7,7 @@ import com.racehorse.health.service.TrainingLockService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,18 +51,29 @@ public class TrainingLockController {
     }
 
     @GetMapping("/horses/{horseId}/training-locks/current")
-    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingLockResponse current(@PathVariable UUID horseId) {
-        return service.current(horseId);
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    public TrainingLockResponse current(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication auth) {
+        return service.current(horseId, userId(jwt), privileged(auth));
     }
 
     @GetMapping("/horses/{horseId}/training-locks")
-    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER')")
-    List<TrainingLockResponse> history(@PathVariable UUID horseId) {
-        return service.history(horseId);
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    public List<TrainingLockResponse> history(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication auth) {
+        return service.history(horseId, userId(jwt), privileged(auth));
     }
 
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
+    }
+
+    private boolean privileged(Authentication a) {
+        return a.getAuthorities().stream().anyMatch(
+                x -> !x.getAuthority().equals("ROLE_HORSE_OWNER") && x.getAuthority().startsWith("ROLE_"));
     }
 }
