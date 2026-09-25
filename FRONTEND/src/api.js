@@ -62,4 +62,4 @@ export const authApi = {
   },
 }
 
-export const pageContent = (page) => page?.content || []
+export const pageContent = (page) => Array.isArray(page) ? page : (page?.content || [])

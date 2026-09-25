@@ -55,7 +55,83 @@ a { color: inherit; text-decoration: none; }
 .training-history-card{grid-column:1/-1}.training-history-row{display:grid;grid-template-columns:12px 1fr auto;gap:12px;margin:0 21px;padding:15px 0;border-top:1px solid #edf0eb}.fitness-dot{width:9px;height:9px;border-radius:50%;margin-top:4px}.fitness-dot.green{background:#42a467}.fitness-dot.yellow{background:#d8a33d}.fitness-dot.red{background:#d15f57}.training-history-row>div{display:grid}.training-history-row b{font-size:11px}.training-history-row small{font-size:9px;color:var(--muted);margin-top:3px}.training-history-row p{font-size:10px;margin:8px 0;color:#40584f}.training-history-row a{font-size:9px;color:#2f755b;font-weight:700}.training-history-row dl{display:flex;gap:20px;margin:0}.training-history-row dl div{display:grid}.training-history-row dt{font-size:8px;color:var(--muted)}.training-history-row dd{font-size:12px;font-weight:700;margin:3px 0 0}
 .export-heading{display:flex!important;justify-content:space-between;align-items:center;margin:0 2px 11px;color:#607168;font-size:9px}.export-heading>div{display:grid;gap:2px}.export-heading b{color:#214b3d;letter-spacing:.12em}
 .loading-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;gap:14px;background:#f5f6f1}.loader{width:25px;height:25px;border:3px solid #d8e3dc;border-top-color:#28634d;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.menu-button,.mobile-close,.sidebar-backdrop{display:none}
+.nav-group{display:block;color:#6f9485;font-size:8px;letter-spacing:.12em;padding:4px 14px 9px}.month-picker{display:grid;gap:5px;color:var(--muted);font-size:9px}.month-picker input{border:1px solid var(--line);border-radius:9px;padding:9px 11px;color:#294b3f;background:white}.admin-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}.comparison-card{padding:19px;display:grid;gap:7px}.comparison-card>span,.comparison-card small{color:var(--muted);font-size:10px}.comparison-card strong{font-size:22px;color:#173e31}.admin-dashboard-grid{display:grid;grid-template-columns:1fr 1fr;gap:17px}.admin-section-head{display:flex;align-items:center;gap:9px;padding:18px 20px 10px;color:#285d49}.admin-section-head h3{font:700 19px 'Playfair Display';margin:0}.fitness-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 20px 22px}.fitness-summary>div{border-radius:12px;padding:16px;display:grid;gap:5px}.fitness-summary b{font-size:23px}.fitness-summary span{font-size:10px}.fitness-summary .green{background:#e8f5ec;color:#27714d}.fitness-summary .yellow{background:#fff4da;color:#986b18}.fitness-summary .red{background:#ffedeb;color:#a74842}.finance-lines{padding:5px 20px 20px}.finance-lines>div{display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #edf0eb;font-size:11px}.finance-lines .positive{color:#25734c}.finance-lines .strong{font-size:13px;color:#173e31}.admin-table{overflow:auto}.admin-table-head,.admin-table-row{min-width:790px;display:grid;grid-template-columns:1.2fr 1.5fr 120px 70px;gap:15px;align-items:center;padding:13px 18px}.admin-table-head{background:#f1f4ef;color:#7a8982;font-size:8px;text-transform:uppercase;letter-spacing:.08em}.admin-table-row{border-top:1px solid #edf0eb}.admin-table-row>div:first-child{display:grid}.admin-table-row b{font-size:11px}.admin-table-row small{font-size:9px;color:var(--muted);margin-top:3px}.role-tags{display:flex;gap:4px;flex-wrap:wrap}.role-tags span{font-size:8px;padding:4px 6px;border-radius:5px;background:#edf3ed;color:#35604f}.account-state{font-size:9px;font-weight:700}.account-state.on{color:#32805a}.account-state.off{color:#ad4e49}.admin-modal{width:min(600px,100%)}.compact-roles{display:grid;grid-template-columns:1fr 1fr;gap:7px}.compact-roles label{display:flex;align-items:center;gap:8px;border:1px solid var(--line);padding:9px;border-radius:9px;font-size:9px;cursor:pointer}.compact-roles label.chosen{background:#edf6ef;border-color:#88ad98}.compact-roles input{display:none}.compact-roles svg{margin-left:auto;color:#37805e}.inline-action{display:grid;grid-template-columns:1fr auto;gap:8px}.inline-action input,.audit-list+input,.toolbar>input{border:1px solid #d9ded6;border-radius:9px;padding:10px}.archived-list>div{display:flex;justify-content:space-between;align-items:center;padding:15px 19px;border-top:1px solid #edf0eb}.archived-list>div:first-child{border-top:0}.archived-list>div>div{display:grid}.archived-list b{font-size:12px}.archived-list small{font-size:9px;color:var(--muted);margin-top:4px}.simple-empty{padding:45px;text-align:center;color:var(--muted);font-size:11px}.audit-list{overflow:hidden}.audit-list>button{border:0;background:white;width:100%;display:grid;grid-template-columns:36px 1fr;text-align:left;gap:11px;padding:13px 18px;border-top:1px solid #edf0eb;cursor:pointer}.audit-list>button:hover{background:#f7f9f5}.audit-list>button:first-child{border-top:0}.audit-icon{width:35px;height:35px;border-radius:9px;background:#eaf2ec;color:#37715a;display:grid;place-items:center}.audit-list div{display:grid;gap:3px}.audit-list b{font-size:10px}.audit-list small{font-size:8px;color:var(--muted)}.audit-list p{font-size:9px;margin:2px 0 0;color:#50655c}.audit-detail{display:grid;gap:13px;margin:0}.audit-detail>div{display:grid;gap:5px}.audit-detail dt{font-size:9px;color:var(--muted)}.audit-detail dd{margin:0;font-size:11px}.audit-detail pre{white-space:pre-wrap;word-break:break-word;background:#eef1ec;border-radius:9px;padding:11px;max-height:180px;overflow:auto;font-size:9px}
+.permission-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.permission-card{overflow:hidden}.permission-head,.permission-row{display:grid;grid-template-columns:1fr repeat(3,48px);align-items:center;gap:7px;padding:9px 16px}.permission-head{background:#f2f4ef;font-size:8px;color:var(--muted);text-transform:uppercase}.permission-row{border-top:1px solid #edf0eb}.permission-row b{font-size:9px}.permission-row button{width:32px;height:30px;border:1px solid #e2e6e0;border-radius:8px;background:#f5f6f3;color:#a2aaa6;display:grid;place-items:center;cursor:pointer}.permission-row button.granted{background:#e7f4ea;border-color:#b8d5c1;color:#2f7a53}
+.unsupported-permission{width:32px;text-align:center;color:#b6bfba;font-size:12px}
+.fatal-error{min-height:100vh;display:grid;place-items:center;padding:24px;background:#f4f5ef}.fatal-error>div{width:min(460px,100%);padding:34px;text-align:center}.fatal-error svg{color:#a54842}.fatal-error h1{font:700 28px 'Playfair Display';color:#173e31}.fatal-error p{color:var(--muted);line-height:1.6}
 
-@media(max-width:1200px){.fitness-filter{grid-template-columns:1fr 1fr 1fr}.fitness-filter>span{display:none}.fitness-charts{grid-template-columns:1fr}.fitness-horses{grid-template-columns:1fr 1fr}}
-@media(max-width:1000px){.auth-page{grid-template-columns:1fr}.auth-story{display:none}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-grid,.detail-grid{grid-template-columns:1fr}.sidebar{transform:translateX(-100%);transition:.25s}.sidebar.open{transform:translateX(0)}.sidebar-backdrop{display:block;position:fixed;inset:0;z-index:15;border:0;background:rgba(0,0,0,.3)}.main-column{width:100%;margin-left:0}.menu-button,.mobile-close{display:grid}.mobile-close{margin-left:auto;background:rgba(255,255,255,.08);color:white}.topbar{justify-content:flex-start;gap:20px}.topbar-actions{margin-left:auto}.horse-row{grid-template-columns:43px 1fr 120px 20px}.stable{display:none}}
-@media(max-width:650px){.auth-panel{padding:35px 22px}.page-wrap{padding:25px 14px 50px}.topbar{padding:0 14px}.top-user span,.topbar>div:nth-child(2){display:none}.page-heading{align-items:flex-start;flex-direction:column}.page-heading h1{font-size:30px}.heading-actions{justify-content:flex-start}.stats-grid{grid-template-columns:1fr 1fr}.stat{padding:14px}.horse-row{grid-template-columns:40px 1fr 18px}.horse-row .status{display:none}.toolbar{flex-direction:column}.toolbar select{width:100%}.form-grid{grid-template-columns:1fr}.horse-hero{grid-template-columns:75px 1fr}.profile-media{width:75px;height:75px}.hero-actions{grid-column:1/-1;flex-wrap:wrap}.info-grid{grid-template-columns:1fr 1fr}.pedigree{grid-template-columns:1fr}.pedigree-branches>div{grid-template-columns:1fr}.story-stats{gap:18px}.fitness-filter{grid-template-columns:1fr}.fitness-horses{grid-template-columns:1fr}.training-history-row{grid-template-columns:12px 1fr}.training-history-row dl{grid-column:2}.source-table{border-radius:11px}}
+.admin-card-header-action{display:flex;justify-content:space-between;align-items:center;padding:18px 20px 10px}
+.admin-card-header-action a,.admin-card-header-action button{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#28634d;text-decoration:none;background:none;border:none;cursor:pointer}
+.admin-card-header-action a:hover,.admin-card-header-action button:hover{text-decoration:underline}
+.occupancy-metric{padding:14px 20px 22px;display:grid;gap:15px}
+.occupancy-bar-track{width:100%;height:10px;border-radius:6px;background:#e5ebe6;overflow:hidden}
+.occupancy-bar-fill{height:100%;border-radius:6px;background:#2f7a53;transition:width .3s}
+.occupancy-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.occupancy-stat-box{border-radius:11px;padding:12px 14px;background:#f5f7f3;display:grid;gap:4px}
+.occupancy-stat-box b{font-size:18px;color:#183f32}
+.occupancy-stat-box span{font-size:10px;color:var(--muted)}
+.stable-quick-list{padding:0 20px 16px;display:grid;gap:7px}
+.stable-quick-item{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#f8faf6;border:1px solid #edf0ea;font-size:11px}
+.stable-quick-item b{font-size:11px;color:#234b3e}
+.stable-quick-item span{font-size:10px;color:var(--muted)}
+.recent-audit-table{width:100%;border-collapse:collapse}
+.recent-audit-table th{background:#f1f4ef;color:#7a8982;font-size:8px;text-transform:uppercase;letter-spacing:.08em;text-align:left;padding:10px 18px}
+.recent-audit-table td{padding:12px 18px;border-top:1px solid #edf0eb;font-size:11px}
+.recent-audit-table td small{display:block;font-size:9px;color:var(--muted);margin-top:2px}
+.stables-summary-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.stable-block-card{margin-bottom:20px;overflow:hidden}
+.stable-card-top{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;background:#f9faf7;border-bottom:1px solid #edf0eb;flex-wrap:wrap;gap:10px}
+.stable-card-title{display:grid;gap:4px}
+.stable-card-title h3{font:700 18px 'Playfair Display';margin:0;color:#1c4235;display:flex;align-items:center;gap:9px}
+.stable-card-title p{margin:0;font-size:11px;color:var(--muted)}
+.stable-card-actions{display:flex;align-items:center;gap:9px}
+.stalls-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:20px}
+.stall-box{border:1px solid #e1e7de;border-radius:12px;padding:14px;background:white;display:grid;gap:10px;position:relative;transition:box-shadow .2s,border-color .2s}
+.stall-box:hover{border-color:#b4ccbe;box-shadow:0 6px 18px rgba(0,0,0,.04)}
+.stall-box.occupied{border-color:#b5d9c2;background:#f8fcf9}
+.stall-box.empty{border-color:#e4e8e1;background:#fafbf9}
+.stall-box-head{display:flex;justify-content:space-between;align-items:center}
+.stall-badge{font-size:9px;font-weight:700;padding:3px 8px;border-radius:6px}
+.stall-badge.occupied{background:#dcf2e3;color:#246a46}
+.stall-badge.empty{background:#eef1eb;color:#6d7f76}
+.stall-horse-info{background:#eff6f1;border-radius:8px;padding:10px;display:grid;gap:3px}
+.stall-horse-info b{font-size:12px;color:#1a4637}
+.stall-horse-info small{font-size:9px;color:var(--muted)}
+.stall-empty-placeholder{color:var(--muted);font-size:11px;font-style:italic;padding:6px 0}
+.stall-actions{display:flex;gap:7px;margin-top:auto}
+.stall-actions button{flex:1;font-size:10px;padding:7px 10px}
+
+.capacity-tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px}
+.capacity-tag.normal{background:#e8f4ed;color:#1e6440}
+.capacity-tag.full{background:#fde8e8;color:#b3261e;border:1px solid #f8caca}
+.badge-payment{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:700;padding:3px 7px;border-radius:6px;letter-spacing:.02em}
+.badge-payment.paid{background:#d4f3e0;color:#1a693b}
+.badge-payment.override{background:#ede9fe;color:#5b21b6}
+.badge-payment.unpaid{background:#ffebe6;color:#c03417}
+.horse-search-wrap{position:relative;display:flex;align-items:center;margin-bottom:8px}
+.horse-search-wrap svg{position:absolute;left:10px;color:var(--muted);pointer-events:none}
+.horse-search-wrap input{width:100%;padding:9px 12px 9px 34px;border:1px solid #e1e7de;border-radius:8px;font-size:12px;background:white}
+.horse-search-wrap input:focus{border-color:#205c3e;outline:none;box-shadow:0 0 0 2px rgba(32,92,62,.15)}
+.horse-scroll-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding-right:4px;border:1px solid #e5eae2;border-radius:10px;padding:8px;background:#f9faf8}
+.horse-scroll-list::-webkit-scrollbar{width:6px}
+.horse-scroll-list::-webkit-scrollbar-track{background:#edf2eb;border-radius:4px}
+.horse-scroll-list::-webkit-scrollbar-thumb{background:#b8c7be;border-radius:4px}
+.horse-select-card{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:8px;background:white;border:1px solid #edf1eb;cursor:pointer;transition:all .15s}
+.horse-select-card:hover{border-color:#2e7552;background:#f6faf7}
+.horse-select-card.selected{border-color:#205c3e;background:#edf7f0;box-shadow:0 0 0 1.5px #205c3e}
+.horse-card-meta{display:flex;align-items:center;gap:9px}
+.horse-card-avatar{width:32px;height:32px;border-radius:8px;background:#d8ece0;color:#1b503a;font-weight:700;display:grid;place-items:center;font-size:11px;flex-shrink:0}
+.horse-card-info{display:flex;flex-direction:column;gap:2px;text-align:left}
+.horse-card-info b{font-size:12px;color:#1a4234}
+.horse-card-info span{font-size:10px;color:var(--muted)}
+.service-override-box{background:#fffaf3;border:1px solid #ffe2c6;border-radius:10px;padding:12px 14px;display:grid;gap:8px;margin-top:6px}
+.service-override-header{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;color:#b24a0d}
+.service-override-checkbox{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600;color:#1e4839}
+.service-override-checkbox input{width:16px;height:16px;accent-color:#205c3e;cursor:pointer}
+.service-override-note{font-size:11px;color:#6b7e75;margin:0;line-height:1.4}
+.service-eligible-notice{display:flex;align-items:center;gap:7px;background:#eef8f2;border:1px solid #cce8d7;border-radius:8px;padding:9px 12px;font-size:11px;color:#1b633b;font-weight:500}
+
+
+@media(max-width:1200px){.fitness-filter{grid-template-columns:1fr 1fr 1fr}.fitness-filter>span{display:none}.fitness-charts{grid-template-columns:1fr}.fitness-horses{grid-template-columns:1fr 1fr}.stables-summary-cards{grid-template-columns:1fr 1fr}}
+@media(max-width:1000px){.auth-page{grid-template-columns:1fr}.auth-story{display:none}.stats-grid{grid-template-columns:repeat(2,1fr)}.dashboard-grid,.detail-grid,.admin-dashboard-grid{grid-template-columns:1fr}.admin-kpis{grid-template-columns:1fr 1fr}.permission-grid{grid-template-columns:1fr}.sidebar{transform:translateX(-100%);transition:.25s}.sidebar.open{transform:translateX(0)}.sidebar-backdrop{display:block;position:fixed;inset:0;z-index:15;border:0;background:rgba(0,0,0,.3)}.main-column{width:100%;margin-left:0}.menu-button,.mobile-close{display:grid}.mobile-close{margin-left:auto;background:rgba(255,255,255,.08);color:white}.topbar{justify-content:flex-start;gap:20px}.topbar-actions{margin-left:auto}.horse-row{grid-template-columns:43px 1fr 120px 20px}.stable{display:none}}
+@media(max-width:650px){.auth-panel{padding:35px 22px}.page-wrap{padding:25px 14px 50px}.topbar{padding:0 14px}.top-user span,.topbar>div:nth-child(2){display:none}.page-heading{align-items:flex-start;flex-direction:column}.page-heading h1{font-size:30px}.heading-actions{justify-content:flex-start}.stats-grid,.admin-kpis{grid-template-columns:1fr 1fr}.stat{padding:14px}.horse-row{grid-template-columns:40px 1fr 18px}.horse-row .status{display:none}.toolbar{flex-direction:column}.toolbar select{width:100%}.form-grid,.compact-roles{grid-template-columns:1fr}.horse-hero{grid-template-columns:75px 1fr}.profile-media{width:75px;height:75px}.hero-actions{grid-column:1/-1;flex-wrap:wrap}.info-grid{grid-template-columns:1fr 1fr}.pedigree{grid-template-columns:1fr}.pedigree-branches>div{grid-template-columns:1fr}.story-stats{gap:18px}.fitness-filter{grid-template-columns:1fr}.fitness-horses{grid-template-columns:1fr}.training-history-row{grid-template-columns:12px 1fr}.training-history-row dl{grid-column:2}.source-table{border-radius:11px}.inline-action{grid-template-columns:1fr}.fitness-summary{grid-template-columns:1fr 1fr 1fr}}

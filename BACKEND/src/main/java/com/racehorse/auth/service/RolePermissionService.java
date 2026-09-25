@@ -10,13 +10,20 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class RolePermissionService {
-    private static final List<String> MODULES = List.of("PROFILE", "TRAINING", "MEDICAL", "STABLE_CARE", "RACING", "REPORTING");
-    private static final List<String> ACTIONS = List.of("VIEW", "EDIT", "APPROVE");
+    private static final Map<String, Set<String>> SUPPORTED_ACTIONS = Map.of(
+            "PROFILE", Set.of("VIEW", "EDIT", "APPROVE"),
+            "TRAINING", Set.of("VIEW", "EDIT"),
+            "MEDICAL", Set.of("VIEW", "EDIT"),
+            "STABLE_CARE", Set.of("VIEW", "EDIT"),
+            "RACING", Set.of("VIEW", "EDIT", "APPROVE"),
+            "REPORTING", Set.of("VIEW", "EDIT"));
     private final JdbcTemplate jdbc;
 
     public RolePermissionService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -27,9 +34,13 @@ public class RolePermissionService {
                 with roles(code) as (
                     select code from (values ('CLUB_MANAGER'),('HEAD_TRAINER'),('VETERINARIAN'),('STABLE_STAFF'),('HORSE_OWNER')) r(code)
                 ), permissions(module_code,action_code) as (
-                    select module_code,action_code from
-                    (values ('PROFILE'),('TRAINING'),('MEDICAL'),('STABLE_CARE'),('RACING'),('REPORTING')) m(module_code)
-                    cross join (values ('VIEW'),('EDIT'),('APPROVE')) a(action_code)
+                    select * from (values
+                        ('PROFILE','VIEW'),('PROFILE','EDIT'),('PROFILE','APPROVE'),
+                        ('TRAINING','VIEW'),('TRAINING','EDIT'),
+                        ('MEDICAL','VIEW'),('MEDICAL','EDIT'),
+                        ('STABLE_CARE','VIEW'),('STABLE_CARE','EDIT'),
+                        ('RACING','VIEW'),('RACING','EDIT'),('RACING','APPROVE'),
+                        ('REPORTING','VIEW'),('REPORTING','EDIT')) p(module_code,action_code)
                 )
                 select r.code,p.module_code,p.action_code,coalesce(rp.granted,0)
                 from roles r cross join permissions p
@@ -46,8 +57,8 @@ public class RolePermissionService {
         }
         String module = request.module().trim().toUpperCase(Locale.ROOT);
         String action = request.action().trim().toUpperCase(Locale.ROOT);
-        if (!MODULES.contains(module) || !ACTIONS.contains(action)) {
-            throw new BusinessException("Module hoặc action không hợp lệ");
+        if (!SUPPORTED_ACTIONS.getOrDefault(module, Set.of()).contains(action)) {
+            throw new BusinessException("Quyền này không được backend hỗ trợ cho phân hệ đã chọn");
         }
         int changed = jdbc.update("""
                 merge role_permissions as target

@@ -25,7 +25,11 @@ public record HorseResponse(
         HorseStatus status,
         Instant archivedAt,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String paymentStatus,
+        Boolean serviceOverride,
+        String overrideReason,
+        LocalDate paidUntil
 ) {
     public record ParentSummary(UUID id, String code, String name) {
     }

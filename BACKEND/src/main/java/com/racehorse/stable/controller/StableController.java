@@ -42,6 +42,12 @@ public class StableController {
         return service.update(stableId, request.name(), request.location(), request.active());
     }
 
+    @DeleteMapping("/{stableId}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    void deleteStable(@PathVariable UUID stableId, @AuthenticationPrincipal Jwt jwt) {
+        service.delete(stableId, user(jwt));
+    }
+
     @PostMapping("/{stableId}/stalls") @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.StableView addStall(@PathVariable UUID stableId, @AuthenticationPrincipal Jwt jwt,
@@ -51,7 +57,9 @@ public class StableController {
 
     @DeleteMapping("/{stableId}/stalls/{stallId}") @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
-    void deactivateStall(@PathVariable UUID stableId, @PathVariable UUID stallId) { service.deactivateStall(stableId, stallId); }
+    void deleteStall(@PathVariable UUID stableId, @PathVariable UUID stallId, @AuthenticationPrincipal Jwt jwt) {
+        service.deleteStall(stableId, stallId, user(jwt));
+    }
 
     @PostMapping("/{stableId}/stalls/{stallId}/assign")
     @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")

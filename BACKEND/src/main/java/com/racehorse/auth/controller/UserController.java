@@ -5,6 +5,8 @@ import com.racehorse.auth.dto.UserResponse;
 import com.racehorse.auth.dto.UpdateUserRolesRequest;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.service.UserManagementService;
+import com.racehorse.audit.service.AuditService;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,14 +34,19 @@ import java.util.UUID;
 public class UserController {
 
     private final UserManagementService userManagementService;
+    private final AuditService auditService;
+    private final ObjectMapper json;
 
-    public UserController(UserManagementService userManagementService) {
+    public UserController(UserManagementService userManagementService,AuditService auditService,ObjectMapper json) {
         this.userManagementService = userManagementService;
+        this.auditService=auditService;
+        this.json=json;
     }
 
     @PostMapping
-    ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
+    ResponseEntity<UserResponse> create(@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CreateUserRequest request) {
         UserResponse response = userManagementService.create(request);
+        auditService.record(UUID.fromString(jwt.getSubject()),"ACCESS","CREATE","USER",response.id(),"Tạo tài khoản nhân sự",null,toJson(response),null,null);
         return ResponseEntity.created(URI.create("/api/users/" + response.id())).body(response);
     }
 
@@ -65,6 +72,10 @@ public class UserController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID id,
             @Valid @RequestBody UpdateUserRolesRequest request) {
-        return userManagementService.updateRoles(UUID.fromString(jwt.getSubject()), id, request);
+        UserResponse before=userManagementService.getById(id);
+        UserResponse response=userManagementService.updateRoles(UUID.fromString(jwt.getSubject()), id, request);
+        auditService.record(UUID.fromString(jwt.getSubject()),"ACCESS","ROLE_CHANGE","USER",id,"Thay đổi vai trò tài khoản",toJson(before.roles()),toJson(response.roles()),null,null);
+        return response;
     }
+    private String toJson(Object value){try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException("Không thể ghi dữ liệu audit",e);}}
 }

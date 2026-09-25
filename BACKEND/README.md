@@ -521,14 +521,18 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 
 ### Ma trận quyền và audit
 
-- `GET /api/admin/role-permissions` — Club Manager xem ma trận `VIEW/EDIT/APPROVE`.
-- `PUT /api/admin/role-permissions/{role}` — Club Manager bật/tắt một quyền của role khác; body gồm `module`, `action`, `granted`.
+- `GET /api/admin/role-permissions` — Club Manager xem các quyền backend thực sự hỗ trợ. `APPROVE` hiện chỉ áp dụng cho `PROFILE` và `RACING`; các module còn lại dùng `VIEW/EDIT`.
+- `PUT /api/admin/role-permissions/{role}` — Club Manager bật/tắt một quyền của role khác; body gồm `module`, `action`, `granted`. Quyền không được module hỗ trợ sẽ bị từ chối.
 - Quyền đã cấp được nạp thành authority `PERM_{MODULE}_{ACTION}` ở lần xác thực request tiếp theo. Ma trận có thể thu hồi/khôi phục quyền trong phạm vi trách nhiệm nghiệp vụ của role, nhưng không mở rộng qua các giới hạn bắt buộc như chỉ bác sĩ nhập cân nặng hoặc chỉ HLV trưởng nhập telemetry. Năm role vẫn cố định và không cho hạ quyền `CLUB_MANAGER`.
 - Mọi request tạo/sửa/xóa thành công và mọi lần login thành công được tự ghi vào `audit_logs`. Bảng audit vẫn chỉ cho thêm, không cho sửa/xóa.
 - `GET /api/admin/audit-logs` — Club Manager lọc audit theo người thao tác, module, action, entity và thời gian.
 
 ### API quản trị nghiệp vụ bổ sung
 
+- `/api/admin/accounts` — lọc tài khoản theo từ khóa, role và trạng thái; sửa thông tin, khóa/mở khóa và đặt lại mật khẩu. Khóa, đặt lại mật khẩu hoặc đổi role sẽ thu hồi các phiên hiện tại.
+- `/api/admin/horses/archived` và `/api/admin/horses/{id}/restore` — xem và khôi phục hồ sơ ngựa đã lưu trữ.
+- `/api/admin/dashboard?month=YYYY-MM&compareTo=YYYY-MM` — dashboard tháng gồm số buổi tập, số ngựa được tập, trạng thái xanh/vàng/đỏ, doanh thu, chi phí và chênh lệch VND.
+- `/api/admin/audit-logs` và `/api/admin/audit-logs/{id}` — tra cứu danh sách và chi tiết nhật ký; thao tác quản trị tài khoản lưu dữ liệu trước/sau thay đổi.
 - `/api/stables` — CRUD chuồng; thêm/ngừng ô chuồng; phân bổ hoặc kết thúc phân bổ ngựa.
 - `/api/financial-transactions` — ghi sổ thu/chi VND, tra cứu và tổng hợp. Giao dịch là sổ cái chỉ thêm, không sửa/xóa.
 - `/api/races` — CRUD giải đua; đăng ký, xác nhận và rút đăng ký ngựa.

@@ -44,7 +44,11 @@ public class HorseMapper {
                 horse.getStatus(),
                 horse.getArchivedAt(),
                 horse.getCreatedAt(),
-                horse.getUpdatedAt());
+                horse.getUpdatedAt(),
+                horse.getPaymentStatus(),
+                horse.getServiceOverride(),
+                horse.getOverrideReason(),
+                horse.getPaidUntil());
     }
 
     public HorseResponse toResponse(Horse horse) {
