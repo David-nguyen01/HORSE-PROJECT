@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -177,8 +177,21 @@
         <p class="sub">Quản lý sức khỏe, chấn thương và theo dõi y tế chi tiết theo từng cá thể ngựa.</p>
       </div>
       <!-- Tool lấy tọa độ ẩn (chỉ dành cho Dev/Admin để thiết lập tọa độ hotspot) -->
-      <button class="btn btn-secondary" id="btnDevMode" style="display:none;font-size:0.8rem">Bật tool lấy tọa độ 3D</button>
+      <div style="display:flex;gap:0.5rem;align-items:center">
+        <div style="display:flex;border:1px solid #2a303f;border-radius:8px;overflow:hidden">
+          <button id="btnViewList" onclick="window._switchView('list')"
+            style="padding:0.45rem 1rem;background:#2f6b57;color:#fff;border:none;cursor:pointer;font-size:0.82rem;font-family:inherit">
+            &#9776; Danh sach
+          </button>
+          <button id="btnViewMap" onclick="window._switchView('map')"
+            style="padding:0.45rem 1rem;background:transparent;color:#a89e7a;border:none;border-left:1px solid #2a303f;cursor:pointer;font-size:0.82rem;font-family:inherit">
+            &#9632; Ban do Chuong
+          </button>
+        </div>
+        <button class="btn btn-secondary" id="btnDevMode" style="display:none;font-size:0.8rem">Dev 3D</button>
+      </div>
     </div>
+
 
     <!-- MASTER-DETAIL LAYOUT -->
     <div class="md-layout">
@@ -337,228 +350,260 @@
 <script type="module">
   import { initShell, apiFetch, hasRole } from './auth.js';
 
-  // Yêu cầu đăng nhập, cho phép Bác sĩ, Quản lý, Head Trainer và Owner xem.
   const auth = initShell(['CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','HORSE_OWNER']);
   if (!auth) throw new Error('Not authenticated');
   
-  // Quyền thao tác sửa (Bác sĩ, Admin)
   const canEditHealth = hasRole('VETERINARIAN', 'CLUB_MANAGER');
 
   let allHorses = [];
   let selectedHorseId = null;
-  const STATUS_CYCLE = ['NORMAL', 'MONITORING', 'SEVERE'];
-  const STATUS_LABELS = { 'NORMAL': 'Bình thường', 'MONITORING': 'Cần theo dõi', 'SEVERE': 'Nghiêm trọng' };
+  let viewMode = 'list';
 
-  // 1. Tải danh sách ngựa
+  const HEALTH_DOT = { FIT: '#48bb78', MONITOR: '#ed8936', INJURED: '#e53e3e', QUARANTINED: '#a78bfa' };
+  const HEALTH_COLOR = {
+    FIT:         { bg:'rgba(72,187,120,0.12)', border:'#48bb78', dot:'#48bb78' },
+    MONITOR:     { bg:'rgba(237,137,54,0.12)', border:'#ed8936', dot:'#ed8936' },
+    INJURED:     { bg:'rgba(229,62,62,0.12)',  border:'#e53e3e', dot:'#e53e3e' },
+    QUARANTINED: { bg:'rgba(167,139,250,0.12)',border:'#a78bfa', dot:'#a78bfa' },
+  };
+  const HEALTH_BADGE = {
+    FIT:         { cls:'completed', label:'FIT - San sang' },
+    MONITOR:     { cls:'draft',     label:'MONITOR - Can theo doi' },
+    INJURED:     { cls:'locked',    label:'INJURED - Bi thuong' },
+    QUARANTINED: { cls:'locked',    label:'QUARANTINED - Cach ly' },
+  };
+  const SEVERITY_MAP = {
+    'SEVERE':'SEVERE', 'Nghiem trong':'SEVERE',
+    'MONITORING':'MONITORING', 'Theo doi':'MONITORING',
+    'NORMAL':'NORMAL', 'Binh thuong':'NORMAL'
+  };
+  const STATUS_LABELS = { NORMAL:'Binh thuong', MONITORING:'Theo doi', SEVERE:'Nghiem trong' };
+
   async function loadHorses() {
     try {
-      const data = await apiFetch('/api/horses?size=100');
+      const data = await apiFetch('/api/horses?size=200');
       allHorses = data?.content ?? data ?? [];
       renderHorseList(allHorses);
-    } catch (err) {
-      console.error('Lỗi load danh sách ngựa:', err);
-      document.getElementById('horseList').innerHTML = '<p style="color:red;padding:1rem;">Không thể tải dữ liệu.</p>';
+    } catch {
+      document.getElementById('horseList').innerHTML = '<p style="color:red;padding:1rem;">Khong the tai du lieu.</p>';
     }
   }
 
-  // 2. Render cột trái (Danh sách)
   function renderHorseList(list) {
-    const listEl = document.getElementById('horseList');
-    if (!list.length) {
-      listEl.innerHTML = '<div style="padding: 1rem; color: #7a7258;">Không tìm thấy ngựa nào.</div>';
-      return;
-    }
-    
-    listEl.innerHTML = list.map(h => {
-      const initials = h.name ? h.name.substring(0, 2).toUpperCase() : '??';
-      const isActive = h.id === selectedHorseId ? 'active' : '';
-      const dotColor = h.status === 'INJURED' ? '#e53e3e' : (h.status === 'ACTIVE' ? '#48bb78' : '#a89e7a');
-      
-      return `
-        <div class="md-item ${isActive}" data-id="${h.id}" onclick="window.selectHorse(${h.id})">
-          <div class="md-item-avatar">${initials}</div>
-          <div class="md-item-info">
-            <div class="md-item-name">${h.name}</div>
-            <div class="md-item-meta">${h.registrationCode || h.id}</div>
-          </div>
-          <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};box-shadow:0 0 6px ${dotColor}88"></span>
-        </div>
-      `;
+    const el = document.getElementById('horseList');
+    if (!list.length) { el.innerHTML = '<div style="padding:1rem;color:#7a7258;">Khong tim thay ngua nao.</div>'; return; }
+    el.innerHTML = list.map(h => {
+      const ini = h.name ? h.name.substring(0,2).toUpperCase() : '??';
+      const active = h.id === selectedHorseId ? 'active' : '';
+      const dot = HEALTH_DOT[h.healthStatus] || '#a89e7a';
+      return '<div class="md-item ' + active + '" data-id="' + h.id + '" onclick="window.selectHorse(\'' + h.id + '\')">' +
+        '<div class="md-item-avatar">' + ini + '</div>' +
+        '<div class="md-item-info"><div class="md-item-name">' + h.name + '</div><div class="md-item-meta">' + (h.registrationCode || h.id) + '</div></div>' +
+        '<span style="width:8px;height:8px;border-radius:50%;background:' + dot + ';box-shadow:0 0 6px ' + dot + '88"></span>' +
+        '</div>';
     }).join('');
   }
 
-  // Lọc danh sách
-  document.getElementById('searchHorse').addEventListener('input', (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = allHorses.filter(h => 
-      (h.name || '').toLowerCase().includes(term) || 
-      (h.registrationCode || '').toLowerCase().includes(term)
-    );
-    renderHorseList(filtered);
+  document.getElementById('searchHorse').addEventListener('input', e => {
+    const t = e.target.value.toLowerCase();
+    renderHorseList(allHorses.filter(h => (h.name||'').toLowerCase().includes(t) || (h.registrationCode||'').toLowerCase().includes(t)));
   });
 
-  // 3. Xử lý khi chọn 1 con ngựa
   window.selectHorse = async function(id) {
     selectedHorseId = id;
-    renderHorseList(allHorses); // Update class active
-    
+    renderHorseList(allHorses);
     const horse = allHorses.find(h => h.id === id);
     if (!horse) return;
 
     const mainArea = document.getElementById('horseDetailArea');
-    const template = document.getElementById('detailTemplate').content.cloneNode(true);
-    
-    // Xóa nội dung cũ và chèn template mới
+    const tmpl = document.getElementById('detailTemplate').content.cloneNode(true);
     mainArea.innerHTML = '';
-    mainArea.appendChild(template);
+    mainArea.appendChild(tmpl);
 
-    // Điền thông tin cơ bản
     document.getElementById('dt-name').textContent = horse.name;
-    document.getElementById('dt-meta').textContent = `${horse.registrationCode || 'Chưa có mã'} · ${horse.breed || 'Không rõ'} · Chuồng ${horse.stableLocation || '—'}`;
-    
-    if (horse.status === 'INJURED') {
-      document.getElementById('dt-badge').innerHTML = '<span class="badge locked" style="font-size:0.9rem"><i></i>Đang bị khóa</span>';
-      document.getElementById('dt-lock-content').innerHTML = `
-        <p style="font-size:0.85rem; color:#f1efe6; margin:0 0 0.5rem 0;"><b>Lý do:</b> ${horse.injuryNote || 'Không có ghi chú.'}</p>
-        <p style="font-size:0.8rem; color:#e53e3e; margin:0;">Ngựa không thể nhận giáo án tập luyện nặng.</p>
-      `;
-      if(canEditHealth) document.getElementById('btnActionLock').textContent = 'Gỡ khóa';
-    } else {
-      document.getElementById('dt-badge').innerHTML = '<span class="badge completed" style="font-size:0.9rem"><i></i>Sẵn sàng</span>';
-      if(canEditHealth) document.getElementById('btnActionLock').textContent = 'Phát lệnh Khóa';
-    }
-    if(!canEditHealth) document.getElementById('btnActionLock').style.display = 'none';
+    document.getElementById('dt-meta').textContent = (horse.registrationCode || 'Chua co ma') + ' - ' + (horse.breed || 'Khong ro') + ' - Chuong ' + (horse.stableLocation || '—');
 
-    // Bật/Tắt quyền tương tác mô hình
+    const badge = HEALTH_BADGE[horse.healthStatus] || { cls:'draft', label: horse.healthStatus || 'Khong ro' };
+    document.getElementById('dt-badge').innerHTML = '<span class="badge ' + badge.cls + '" style="font-size:0.9rem">' + badge.label + '</span>';
+
+    try {
+      const lk = await apiFetch('/api/horses/' + id + '/training-locks/current');
+      document.getElementById('dt-lock-content').innerHTML = '<p style="font-size:0.85rem;color:#f1efe6;margin:0 0 0.4rem 0;"><b>Ly do:</b> ' + lk.reason + '</p><p style="font-size:0.8rem;color:#e53e3e;margin:0;">Ngua khong the tap luyen cuong do cao.</p>';
+      if (canEditHealth) document.getElementById('btnActionLock').textContent = 'Go khoa';
+    } catch {
+      document.getElementById('dt-lock-content').innerHTML = '<p style="font-size:0.85rem;color:#7a7258;margin:0;">Khong co lenh khoa nao.</p>';
+      if (canEditHealth) document.getElementById('btnActionLock').textContent = 'Phat lenh Khoa';
+    }
+    if (!canEditHealth) document.getElementById('btnActionLock').style.display = 'none';
+
     if (canEditHealth) {
-      document.getElementById('txtRoleHint').innerHTML = 'Bạn có quyền đánh dấu. <b style="color:#68d391">Click vào điểm chấn thương</b> để đổi trạng thái.';
+      document.getElementById('txtRoleHint').innerHTML = 'Ban co quyen danh dau. <b style="color:#68d391">Click vao diem chan thuong</b> de xem lich su hoac them cap nhat.';
     } else {
-      document.getElementById('txtRoleHint').innerHTML = 'Bạn đang xem ở chế độ <b style="color:#e2e8f0">Chỉ Xem</b>. Không thể sửa chấn thương.';
+      document.getElementById('txtRoleHint').innerHTML = 'Che do <b style="color:#e2e8f0">Chi Xem</b>.';
       document.getElementById('btnActionCare').style.display = 'none';
     }
 
-    // Load API Lịch chăm sóc (hoặc dùng Mock nếu API chưa có endpoints riêng)
-    loadPreventiveCareForHorse(horse.id);
-
-    // Thiết lập Mô hình 3D và dữ liệu chấn thương
-    setup3DModel(horse.id);
+    loadPreventiveCare(horse.id);
+    await setup3DModel(horse.id);
   };
 
-  // 4. Lịch chăm sóc
-  async function loadPreventiveCareForHorse(horseId) {
-    const listBody = document.getElementById('dt-care-list');
+  async function loadPreventiveCare(horseId) {
+    const body = document.getElementById('dt-care-list');
     try {
-      // Giả sử API hỗ trợ query theo horseId
-      const data = await apiFetch(`/api/horses/preventive-care?horseId=${horseId}`);
-      let records = data?.content ?? data ?? [];
-      
-      // Nếu API trả về mảng rỗng, ta mock 1-2 record cho đẹp màn test
-      if (records.length === 0) {
-        records = [
-          { careType: 'VACCINATION', careTypeName: 'Tiêm phòng Cúm', scheduledDate: '2026-09-30', status: 'SCHEDULED' },
-          { careType: 'CHECKUP', careTypeName: 'Khám tổng quát', scheduledDate: '2026-08-15', status: 'COMPLETED' }
-        ];
-      }
-
-      const CARE_EMOJI = { VACCINATION: '💉', DEWORMING: '🪱', FARRIER: '🔨', CHECKUP: '🩺' };
-      listBody.innerHTML = records.map(r => `
-        <tr>
-          <td style="padding:0.5rem 0; font-size:0.85rem">${CARE_EMOJI[r.careType] || '🩺'} ${r.careTypeName}</td>
-          <td style="padding:0.5rem 0; font-size:0.85rem; color:#a89e7a;">${r.scheduledDate || ''}</td>
-          <td style="padding:0.5rem 0; text-align:right;">
-            <span class="badge ${r.status === 'COMPLETED' ? 'completed' : 'draft'}">${r.status === 'COMPLETED' ? 'Hoàn thành' : 'Đã lên lịch'}</span>
-          </td>
-        </tr>
-      `).join('');
-    } catch (e) {
-      listBody.innerHTML = '<tr><td colspan="3" style="color:#a89e7a;text-align:center;padding:1rem;">Chưa có dữ liệu.</td></tr>';
-    }
+      const data = await apiFetch('/api/horses/' + horseId + '/preventive-care');
+      const records = data?.content ?? data ?? [];
+      const EMOJI = { VACCINATION:'💉', DEWORMING:'🪱', FARRIER:'🔨', CHECKUP:'🩺' };
+      if (!records.length) { body.innerHTML = '<tr><td colspan="3" style="color:#7a7258;text-align:center;padding:1rem;">Chua co lich cham soc.</td></tr>'; return; }
+      body.innerHTML = records.map(r =>
+        '<tr><td style="padding:0.5rem 0;font-size:0.85rem">' + (EMOJI[r.careType]||'🩺') + ' ' + r.careType + '</td>' +
+        '<td style="padding:0.5rem 0;font-size:0.85rem;color:#a89e7a;">' + (r.dueDate||'') + '</td>' +
+        '<td style="padding:0.5rem 0;text-align:right;"><span class="badge ' + (r.completed?'completed':'draft') + '">' + (r.completed?'Hoan thanh':'Da len lich') + '</span></td></tr>'
+      ).join('');
+    } catch { body.innerHTML = '<tr><td colspan="3" style="color:#a89e7a;text-align:center;padding:1rem;">Chua co du lieu.</td></tr>'; }
   }
 
-  // 5. Quản lý bản đồ chấn thương 3D
-  function setup3DModel(horseId) {
+  // FR10 - 3D Injury Map
+  async function setup3DModel(horseId) {
     const viewer = document.getElementById('horseModelViewer');
     if (!viewer) return;
-    
-    // Chờ viewer load xong mới gán sự kiện click để mượt hơn
-    viewer.addEventListener('load', () => {
-      // Load dữ liệu cũ từ LocalStorage (Mock API)
-      const savedData = JSON.parse(localStorage.getItem('horseInjuries_' + horseId) || '{}');
-      
-      // Lấy tất cả hotspot
-      const hotspots = viewer.querySelectorAll('.Hotspot');
-      
-      hotspots.forEach(btn => {
-        const partId = btn.getAttribute('slot'); // vd: hotspot-head
-        
-        // 1. Phục hồi trạng thái cũ
-        if (savedData[partId]) {
-          btn.setAttribute('data-status', savedData[partId]);
-          btn.querySelector('.sts').textContent = STATUS_LABELS[savedData[partId]];
+    let markers = [];
+    try { markers = await apiFetch('/api/horses/' + horseId + '/injuries'); } catch { markers = []; }
+    const byPart = {};
+    for (const m of markers) byPart[m.bodyPartLabel] = m;
+
+    const apply = () => {
+      viewer.querySelectorAll('.Hotspot').forEach(btn => {
+        const part = btn.getAttribute('data-part');
+        const marker = byPart[part];
+        if (marker) {
+          const st = SEVERITY_MAP[marker.currentSeverity] || 'MONITORING';
+          btn.setAttribute('data-status', st);
+          btn.querySelector('.sts').textContent = STATUS_LABELS[st] || marker.currentSeverity;
         }
-        
-        // 2. Gán sự kiện click đổi màu (nếu có quyền)
-        if (canEditHealth) {
-          btn.addEventListener('click', (e) => {
-            // Ngăn chặn sự kiện truyền xuống model viewer (tránh bị xoay cam)
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Xoay vòng trạng thái
-            const currentStatus = btn.getAttribute('data-status');
-            const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
-            const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-            
-            // Cập nhật DOM
-            btn.setAttribute('data-status', nextStatus);
-            btn.querySelector('.sts').textContent = STATUS_LABELS[nextStatus];
-            
-            // Lưu ngầm xuống LocalStorage (Mock API PUT)
-            const currentData = JSON.parse(localStorage.getItem('horseInjuries_' + horseId) || '{}');
-            currentData[partId] = nextStatus;
-            localStorage.setItem('horseInjuries_' + horseId, JSON.stringify(currentData));
-            
-            console.log(`[API MOCK] Đã lưu chấn thương cho ngựa ${horseId}: ${partId} = ${nextStatus}`);
-          });
+        if (canEditHealth || marker) {
+          btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openInjuryPanel(horseId, part, marker, !canEditHealth); });
         } else {
-          // Disable click nếu không có quyền
           btn.style.cursor = 'default';
         }
       });
-      
-      // Tool Dev ẩn (Bác sĩ không cần dùng, chỉ dev dùng để lấy toạ độ chuẩn)
       setupDevMode(viewer);
+    };
+
+    if (viewer.loaded) apply(); else viewer.addEventListener('load', apply, { once:true });
+  }
+
+  function openInjuryPanel(horseId, partLabel, marker, readOnly) {
+    document.getElementById('injuryPanel')?.remove();
+    const panel = document.createElement('div');
+    panel.id = 'injuryPanel';
+    panel.style.cssText = 'position:fixed;top:0;right:0;width:380px;height:100%;background:#151923;border-left:1px solid #2a303f;z-index:999;overflow-y:auto;padding:1.5rem;box-shadow:-4px 0 24px rgba(0,0,0,0.6)';
+    const updates = marker?.recoveryUpdates ?? [];
+    const timeline = updates.length
+      ? updates.map(u =>
+          '<div style="border-left:2px solid #2a303f;padding:0.5rem 0.75rem;margin-bottom:0.75rem">' +
+          '<div style="font-size:0.8rem;color:#a89e7a">' + new Date(u.recordedAt).toLocaleString('vi-VN') + '</div>' +
+          '<div style="font-size:0.85rem;color:#f1efe6"><b>' + u.statusLabel + '</b>' + (u.severityLabel?' - '+u.severityLabel:'') + '</div>' +
+          '<div style="font-size:0.82rem;color:#c8c0a4;margin-top:0.25rem">' + u.notes + '</div>' +
+          '<div style="font-size:0.75rem;color:#7a7258;margin-top:0.25rem">— ' + (u.recordedBy?.username||'?') + '</div></div>'
+        ).join('')
+      : '<p style="color:#7a7258;font-size:0.85rem">Chua co cap nhat nao.</p>';
+
+    const form = (!readOnly && canEditHealth) ?
+      '<div style="margin-top:1rem;border-top:1px solid #2a303f;padding-top:1rem">' +
+      '<h4 style="color:#68d391;margin:0 0 0.75rem 0;font-size:0.9rem">+ Them cap nhat hoi phuc</h4>' +
+      '<select id="pnlStatus" style="width:100%;padding:0.5rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;margin-bottom:0.5rem">' +
+      '<option>Dang dieu tri</option><option>Dang hoi phuc</option><option>Da khoi</option></select>' +
+      '<select id="pnlSev" style="width:100%;padding:0.5rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;margin-bottom:0.5rem">' +
+      '<option value="SEVERE">Nghiem trong</option><option value="MONITORING">Theo doi</option><option value="NORMAL">Binh thuong</option></select>' +
+      '<textarea id="pnlNotes" placeholder="Ghi chu tien do hoi phuc..." style="width:100%;padding:0.5rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;height:80px;resize:vertical;font-family:inherit;font-size:0.85rem;box-sizing:border-box"></textarea>' +
+      '<button id="pnlSave" style="margin-top:0.5rem;width:100%;padding:0.6rem;background:#2f6b57;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.88rem">Luu cap nhat</button></div>'
+      : '';
+
+    panel.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">' +
+      '<h3 style="margin:0;color:#f1efe6;font-size:1rem">&#129459; ' + partLabel + '</h3>' +
+      '<button onclick="document.getElementById(\'injuryPanel\').remove()" style="background:none;border:none;color:#7a7258;cursor:pointer;font-size:1.2rem">&#10005;</button></div>' +
+      (marker ? '<div style="font-size:0.82rem;color:#a89e7a;margin-bottom:0.75rem">Muc do hien tai: <b style="color:#f1efe6">' + marker.currentSeverity + '</b></div>' : '') +
+      '<h4 style="color:#a89e7a;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 0.75rem 0">Dong thoi gian hoi phuc</h4>' +
+      timeline + form;
+    document.body.appendChild(panel);
+
+    document.getElementById('pnlSave')?.addEventListener('click', async () => {
+      const notes = document.getElementById('pnlNotes').value.trim();
+      if (!notes) { alert('Vui long nhap ghi chu.'); return; }
+      const btn = document.getElementById('pnlSave');
+      btn.disabled = true; btn.textContent = 'Dang luu...';
+      try {
+        let mid = marker?.id;
+        if (!mid) {
+          const c = await apiFetch('/api/horses/' + horseId + '/injuries', { method:'POST', body:JSON.stringify({ modelName:'horse', bodyPartLabel:partLabel, coordinateX:0, coordinateY:0, coordinateZ:0, initialSeverity:document.getElementById('pnlSev').value }) });
+          mid = c.id;
+        }
+        await apiFetch('/api/injuries/' + mid + '/updates', { method:'POST', body:JSON.stringify({ statusLabel:document.getElementById('pnlStatus').value, severityLabel:document.getElementById('pnlSev').value, notes }) });
+        panel.remove();
+        await setup3DModel(horseId);
+      } catch(err) { alert('Loi: '+(err.message||'Khong the luu.')); btn.disabled=false; btn.textContent='Luu cap nhat'; }
     });
   }
 
-  // TOOL DEV MỞ RỘNG (Giúp tìm tọa độ chuẩn của 12 điểm trên mô hình thực tế)
+  // FR08 - Ban do Chuong
+  async function loadStableMap(sf) {
+    const area = document.getElementById('horseDetailArea');
+    area.innerHTML = '<div style="padding:2rem;color:#7a7258;text-align:center">Dang tai ban do...</div>';
+    try {
+      const data = await apiFetch(sf ? '/api/health/stable-map?status=' + sf : '/api/health/stable-map');
+      const stalls = data?.stalls ?? [];
+      if (!stalls.length) { area.innerHTML = '<div style="padding:2rem;color:#7a7258;text-align:center">Khong co du lieu o chuong.</div>'; return; }
+      const filters = ['','FIT','MONITOR','INJURED','QUARANTINED'].map(s => {
+        const c = HEALTH_COLOR[s];
+        return '<button onclick="window._loadMap(\'' + s + '\')" style="padding:0.35rem 0.8rem;border-radius:99px;border:1px solid ' + (c?.border||'#2a303f') + ';background:' + (c?.bg||'transparent') + ';color:' + (c?.dot||'#a89e7a') + ';cursor:pointer;font-size:0.78rem">' + (s||'Tat ca') + '</button>';
+      }).join('');
+      const cards = stalls.map(s => {
+        const c = HEALTH_COLOR[s.healthStatus] || {bg:'rgba(122,114,88,0.1)',border:'#7a7258',dot:'#7a7258'};
+        return '<div onclick="window.selectHorse(\'' + s.horseId + '\');window._switchView(\'list\')" style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:10px;padding:1rem;cursor:pointer;transition:transform 0.15s" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">' +
+          '<div style="font-size:0.7rem;color:' + c.dot + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem">' + s.stableLocation + '</div>' +
+          '<div style="font-weight:600;color:#f1efe6;margin-bottom:0.2rem">' + s.horseName + '</div>' +
+          '<div style="font-size:0.75rem;color:#a89e7a;margin-bottom:0.5rem">' + (s.registrationCode||'—') + '</div>' +
+          '<span style="font-size:0.72rem;padding:0.2rem 0.5rem;border-radius:99px;background:' + c.border + '22;color:' + c.dot + ';border:1px solid ' + c.dot + '55">' + s.healthStatus + '</span></div>';
+      }).join('');
+      area.innerHTML = '<div style="padding:0.5rem 0 1rem 0;display:flex;gap:0.5rem;flex-wrap:wrap">' + filters + '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1rem">' + cards + '</div>';
+    } catch { area.innerHTML = '<div style="padding:2rem;color:#e53e3e">Loi tai ban do chuong.</div>'; }
+  }
+  window._loadMap = loadStableMap;
+
+  window._switchView = function(mode) {
+    viewMode = mode;
+    const bM = document.getElementById('btnViewMap'), bL = document.getElementById('btnViewList');
+    if (bM) bM.style.background = mode==='map' ? '#2f6b57' : 'transparent';
+    if (bL) bL.style.background = mode==='list' ? '#2f6b57' : 'transparent';
+    if (mode==='map') loadStableMap(null);
+    else document.getElementById('horseDetailArea').innerHTML = '<div class="md-empty"><svg width="48" height="48" fill="none" stroke="#2a303f" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:1rem"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><p>Vui long chon mot con ngua tu danh sach ben trai.</p></div>';
+  };
+
   function setupDevMode(viewer) {
     const btnDev = document.getElementById('btnDevMode');
+    if (!btnDev) return;
     if (hasRole('CLUB_MANAGER')) btnDev.style.display = 'inline-block';
-    
-    let isDevMode = false;
+    let dev = false;
     btnDev.addEventListener('click', () => {
-      isDevMode = !isDevMode;
-      document.getElementById('devOverlayMsg').style.display = isDevMode ? 'block' : 'none';
-      btnDev.textContent = isDevMode ? 'Tắt tool tọa độ' : 'Bật tool lấy tọa độ 3D';
+      dev = !dev;
+      document.getElementById('devOverlayMsg').style.display = dev ? 'block' : 'none';
+      btnDev.textContent = dev ? 'Tat tool toa do' : 'Bat tool lay toa do 3D';
     });
-
-    viewer.addEventListener('click', (event) => {
-      if (!isDevMode) return;
-      const hit = viewer.positionAndNormalFromPoint(event.clientX, event.clientY);
+    viewer.addEventListener('click', ev => {
+      if (!dev) return;
+      const hit = viewer.positionAndNormalFromPoint(ev.clientX, ev.clientY);
       if (hit) {
-        const txt = `data-position="${hit.position.x.toFixed(3)} ${hit.position.y.toFixed(3)} ${hit.position.z.toFixed(3)}" data-normal="${hit.normal.x.toFixed(3)} ${hit.normal.y.toFixed(3)} ${hit.normal.z.toFixed(3)}"`;
-        document.getElementById('devCoordTxt').textContent = txt;
-        console.log("Toạ độ click:", txt);
-        // Có thể copy text vào clipboard ở đây
-        navigator.clipboard.writeText(txt).catch(()=>{});
+        const t = 'data-position="' + hit.position.x.toFixed(3) + ' ' + hit.position.y.toFixed(3) + ' ' + hit.position.z.toFixed(3) + '" data-normal="' + hit.normal.x.toFixed(3) + ' ' + hit.normal.y.toFixed(3) + ' ' + hit.normal.z.toFixed(3) + '"';
+        document.getElementById('devCoordTxt').textContent = t;
+        navigator.clipboard.writeText(t).catch(()=>{});
       }
     });
   }
 
-  // Khởi chạy
   loadHorses();
-
 </script>
+
 </body>
 </html>
