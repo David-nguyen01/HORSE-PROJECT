@@ -1,7 +1,8 @@
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ArrowLeft, Award, Bell, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, X, Zap } from 'lucide-react'
+import { Activity, ArrowLeft, ArchiveRestore, Award, Bell, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, LayoutDashboard, LogOut, Menu, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Warehouse, X, Zap } from 'lucide-react'
 import { api, authApi, clearAuth, getAuth, pageContent, saveAuth } from './api'
+import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, PermissionsPage, StablesPage } from './AdminPages'
 
 const FitnessPage = lazy(() => import('./FitnessPage'))
 
@@ -61,7 +62,7 @@ function AuthShell({ mode }) {
   const isLogin = mode === 'login'
   const location = useLocation(); const navigate = useNavigate(); const { auth, setSession } = useAuth()
   const [roles, setRoles] = useState([])
-  const [form, setForm] = useState({ username: '', email: isLogin ? 'admin@gmail.com' : '', password: isLogin ? 'Admin123' : '', confirmPassword: '', role: 'HEAD_TRAINER' })
+  const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', role: 'HEAD_TRAINER' })
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
   useEffect(() => { if (!isLogin) authApi.roles().then(setRoles).catch(() => setRoles(Object.keys(ROLE_LABELS).filter((r) => r !== 'CLUB_MANAGER'))) }, [isLogin])
   if (auth) return <Navigate to="/" replace />
@@ -105,17 +106,23 @@ function AppLayout() {
   const navItems = [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/horses', label: 'Hồ sơ ngựa', icon: Activity }] : []),
-    ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? [{ to: '/fitness', label: 'Thể lực & buổi tập', icon: Gauge }] : []),
-    ...(hasAny(user, 'CLUB_MANAGER') ? [{ to: '/users', label: 'Người dùng', icon: UsersRound }] : []),
+    ...(hasAny(user, 'HEAD_TRAINER') ? [{ to: '/fitness', label: 'Thể lực & buổi tập', icon: Gauge }] : []),
+    ...(hasAny(user, 'CLUB_MANAGER') ? [
+      { to: '/admin/stables', label: 'Chuồng trại', icon: Warehouse },
+      { to: '/admin/accounts', label: 'Tài khoản', icon: UsersRound },
+      { to: '/admin/permissions', label: 'Ma trận quyền', icon: ShieldCheck },
+      { to: '/admin/archived-horses', label: 'Ngựa lưu trữ', icon: ArchiveRestore },
+      { to: '/admin/audit-logs', label: 'Nhật ký hệ thống', icon: ScrollText },
+    ] : []),
   ]
   const doLogout = async () => { await logout(); navigate('/login', { replace: true }) }
   return <div className="app-shell">
     <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="sidebar-brand"><span className="brand-mark"><Activity size={22} /></span><div><b>STRIDE</b><small>RACEHORSE CLUB</small></div><button className="icon-button mobile-close" onClick={() => setOpen(false)}><X /></button></div>
-      <nav>{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}><Icon size={19} /><span>{label}</span></NavLink>)}</nav>
+      <nav>{hasAny(user,'CLUB_MANAGER')&&<small className="nav-group">QUẢN LÝ CÂU LẠC BỘ</small>}{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}><Icon size={19} /><span>{label}</span></NavLink>)}</nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="users" element={hasAny(user, 'CLUB_MANAGER') ? <Users /> : <Navigate to="/" replace />} /></Routes></Suspense></div></div>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
   </div>
 }
@@ -162,7 +169,31 @@ function PageHeading({ eyebrow, title, description, action }) { return <div clas
 function CardHead({ title, action }) { return <div className="card-head"><h3>{title}</h3>{action}</div> }
 function Empty({ title, text }) { return <div className="empty"><Sparkles size={26} /><b>{title}</b><span>{text}</span></div> }
 function Status({ value }) { return <span className={`status ${String(value).toLowerCase()}`}><i />{STATUS_LABELS[value] || value}</span> }
-function HorseRow({ horse }) { return <Link className="horse-row" to={`/horses/${horse.id}`}><div className="horse-avatar">{initials(horse.name)}</div><div className="horse-main"><b>{horse.name}</b><span>{horse.code} · {horse.breed}</span></div><Status value={horse.status} /><span className="stable">{horse.stableLocation}</span><ChevronRight size={18} /></Link> }
+function HorseRow({ horse }) {
+  const isPaid = horse.paymentStatus === 'PAID';
+  const isOverride = Boolean(horse.serviceOverride);
+  return (
+    <Link className="horse-row" to={`/horses/${horse.id}`}>
+      <div className="horse-avatar">{initials(horse.name)}</div>
+      <div className="horse-main">
+        <b>{horse.name}</b>
+        <span>{horse.code} · {horse.breed}</span>
+      </div>
+      <Status value={horse.status} />
+      <span className="stable">
+        {horse.stableLocation || 'Chưa xếp'}
+        {isPaid ? (
+          <span className="badge-payment paid" style={{marginLeft:'6px'}}>✓ Đã trả phí</span>
+        ) : isOverride ? (
+          <span className="badge-payment override" style={{marginLeft:'6px'}} title={horse.overrideReason || 'CLB bảo lãnh'}>⭐ Bảo lãnh</span>
+        ) : (
+          <span className="badge-payment unpaid" style={{marginLeft:'6px'}}>⚠️ Chưa phí</span>
+        )}
+      </span>
+      <ChevronRight size={18} />
+    </Link>
+  );
+}
 
 function Horses() {
   const { user } = useAuth(); const canEdit = hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')
@@ -187,7 +218,7 @@ function HorseModal({ onClose, onSaved }) {
 function Modal({ title, onClose, children }) { return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={(e) => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">RACEHORSE CLUB</p><h2>{title}</h2></div><button className="icon-button" onClick={onClose}><X /></button></div>{children}</div></div> }
 
 function HorseDetail() {
-  const { id } = useParams(); const { user } = useAuth(); const navigate = useNavigate(); const canEdit = hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !canEdit
+  const { id } = useParams(); const { user } = useAuth(); const navigate = useNavigate(); const canEdit = hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !canEdit; const isManager = hasAny(user, 'CLUB_MANAGER');
   const [horse, setHorse] = useState(null); const [file, setFile] = useState(null); const [pedigree, setPedigree] = useState(null); const [history, setHistory] = useState(null); const [evaluations, setEvaluations] = useState([]); const [error, setError] = useState(''); const [uploading, setUploading] = useState(false)
   const load = useCallback(async () => {
     try {
@@ -200,12 +231,27 @@ function HorseDetail() {
   const upload = async (event) => { const picked = event.target.files?.[0]; if (!picked) return; const body = new FormData(); body.append('file', picked); setUploading(true); try { await api(`/api/horses/${id}/main-file${isOwner ? '/proposals' : ''}`, { method: isOwner ? 'POST' : 'PUT', body }); await load() } catch (e) { setError(e.message) } finally { setUploading(false); event.target.value = '' } }
   const removeFile = async () => { if (!window.confirm('Xóa file hồ sơ chính hiện tại?')) return; try { await api(`/api/horses/${id}/main-file`, { method: 'DELETE' }); setFile(null) } catch (e) { setError(e.message) } }
   const archive = async () => { if (!window.confirm('Lưu trữ hồ sơ ngựa này? File hồ sơ vẫn được giữ nguyên.')) return; try { setHorse(await api(`/api/horses/${id}/archive`, { method: 'PATCH' })) } catch (e) { setError(e.message) } }
+  const toggleServiceOverride = async (enable) => {
+    if (!enable && !window.confirm(`Bạn có chắc muốn HỦY BẢO LÃNH dịch vụ của ngựa "${horse.name}"?`)) return;
+    try {
+      await api(`/api/admin/horses/${horse.id}/service-access`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          serviceOverride: enable,
+          overrideReason: enable ? 'Quản lý CLB bảo lãnh dịch vụ' : null
+        })
+      });
+      load();
+    } catch(err) {
+      setError(err.message);
+    }
+  };
   if (error && !horse) return <><button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={17} /> Quay lại</button><Empty title="Không thể mở hồ sơ" text={error} /></>
   if (!horse) return <LoadingScreen />
   const isImage = file?.contentType?.startsWith('image/')
   return <><button className="back-link" onClick={() => navigate('/horses')}><ArrowLeft size={17} /> Danh mục ngựa</button>{error && <div className="notice error"><X size={17} />{error}</div>}
     <section className="horse-hero card"><div className="profile-media">{isImage ? <img src={file.secureUrl} alt={horse.name} /> : <div className="horse-monogram">{initials(horse.name)}</div>}</div><div className="horse-title"><p className="eyebrow">{horse.code}</p><h1>{horse.name}</h1><div><Status value={horse.status} /><span>{horse.breed}</span><span>{GENDER_LABELS[horse.gender]}</span></div></div><div className="hero-actions"><label className="button secondary"><Upload size={17} />{uploading ? 'Đang tải…' : isOwner ? 'Đề xuất file' : file ? 'Thay file' : 'Tải file'}<input hidden type="file" accept="image/*,.pdf,.docx" onChange={upload} disabled={uploading} /></label>{file && <a className="button secondary" href={file.secureUrl} target="_blank" rel="noreferrer"><FileText size={17} /> Mở file</a>}{canEdit && file && <button className="icon-button danger" title="Xóa file" onClick={removeFile}><Trash2 size={18} /></button>}</div></section>
-    <div className="detail-grid"><section className="card"><CardHead title="Thông tin định danh" /><dl className="info-grid"><Info label="Số chip / hộ chiếu" value={horse.microchipPassportNumber} /><Info label="Ngày sinh" value={formatDate(horse.birthDate)} /><Info label="Màu sắc / nhận dạng" value={horse.colorMarkings} /><Info label="Vị trí chuồng" value={horse.stableLocation} /><Info label="Huấn luyện viên" value={horse.currentTrainer?.username} /><Info label="Cập nhật" value={horse.updatedAt ? new Date(horse.updatedAt).toLocaleString('vi-VN') : '—'} /></dl></section><section className="card"><CardHead title="Chủ sở hữu" />{horse.owners?.length ? horse.owners.map((owner) => <div className="owner-row" key={owner.id}><span>{initials(owner.username)}</span><div><b>{owner.username}</b><small>{owner.email}</small></div><strong>{owner.percentage}%</strong></div>) : <Empty title="Chưa liên kết" text="Chưa có chủ sở hữu." />}</section><section className="card"><CardHead title="Phả hệ 3 thế hệ" /><Pedigree node={pedigree?.horse} /></section><section className="card"><CardHead title="Thành tích" /><div className="race-totals"><div><Award /><strong>{history?.totalWins || 0}</strong><span>Chiến thắng</span></div><div><Gauge /><strong>{history?.totalRaces || 0}</strong><span>Cuộc đua</span></div></div>{history?.results?.slice(0, 4).map((r) => <div className="race-row" key={r.id}><span>{r.finishPosition}</span><div><b>{r.raceName}</b><small>{formatDate(r.raceDate)} · {r.racecourse}</small></div></div>)}</section><section className="card training-history-card"><CardHead title="Đánh giá buổi tập" />{evaluations.length ? evaluations.map((evaluation) => <div className="training-history-row" key={evaluation.id}><span className={`fitness-dot ${evaluation.fitnessStatus.toLowerCase()}`} /><div><b>{formatDate(evaluation.sessionDate)} · {evaluation.durationMinutes} phút</b><small>{evaluation.distanceMeters} m · {evaluation.averageSpeedKmh} km/h · Gắng sức {evaluation.perceivedExertion}/10</small><p>{evaluation.trainerNotes}</p>{evaluation.videoUrl && <a href={evaluation.videoUrl} target="_blank" rel="noreferrer">Xem video</a>}</div><dl><div><dt>Khối lượng</dt><dd>{evaluation.trainingLoad}</dd></div><div><dt>Hồi phục</dt><dd>{evaluation.heartRateRecoveryBpm} BPM</dd></div></dl></div>) : <Empty title="Chưa có đánh giá" text="Bản ghi FR07 đã hoàn tất sẽ xuất hiện tại đây." />}</section></div>
+    <div className="detail-grid"><section className="card"><CardHead title="Thông tin định danh" /><dl className="info-grid"><Info label="Số chip / hộ chiếu" value={horse.microchipPassportNumber} /><Info label="Ngày sinh" value={formatDate(horse.birthDate)} /><Info label="Màu sắc / nhận dạng" value={horse.colorMarkings} /><Info label="Vị trí chuồng" value={horse.stableLocation} /><Info label="Dịch vụ chăm sóc" value={<div style={{display:'inline-flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}><span>{horse.paymentStatus === 'PAID' ? '✓ Đã thanh toán' : horse.serviceOverride ? `⭐ Bảo lãnh (${horse.overrideReason || 'CLB bảo lãnh'})` : '⚠️ Chưa thanh toán phí'}</span>{isManager && horse.serviceOverride && <button type="button" className="button secondary" style={{padding:'2px 8px',fontSize:'10px',color:'#b3261e',borderColor:'#f3c2be'}} onClick={()=>toggleServiceOverride(false)}>Hủy bảo lãnh</button>}{isManager && horse.paymentStatus !== 'PAID' && !horse.serviceOverride && <button type="button" className="button secondary" style={{padding:'2px 8px',fontSize:'10px',color:'#205c3e',borderColor:'#b5d9c2'}} onClick={()=>toggleServiceOverride(true)}>Duyệt bảo lãnh</button>}</div>} /><Info label="Huấn luyện viên" value={horse.currentTrainer?.username} /><Info label="Cập nhật" value={horse.updatedAt ? new Date(horse.updatedAt).toLocaleString('vi-VN') : '—'} /></dl></section><section className="card"><CardHead title="Chủ sở hữu" />{horse.owners?.length ? horse.owners.map((owner) => <div className="owner-row" key={owner.id}><span>{initials(owner.username)}</span><div><b>{owner.username}</b><small>{owner.email}</small></div><strong>{owner.percentage}%</strong></div>) : <Empty title="Chưa liên kết" text="Chưa có chủ sở hữu." />}</section><section className="card"><CardHead title="Phả hệ 3 thế hệ" /><Pedigree node={pedigree?.horse} /></section><section className="card"><CardHead title="Thành tích" /><div className="race-totals"><div><Award /><strong>{history?.totalWins || 0}</strong><span>Chiến thắng</span></div><div><Gauge /><strong>{history?.totalRaces || 0}</strong><span>Cuộc đua</span></div></div>{history?.results?.slice(0, 4).map((r) => <div className="race-row" key={r.id}><span>{r.finishPosition}</span><div><b>{r.raceName}</b><small>{formatDate(r.raceDate)} · {r.racecourse}</small></div></div>)}</section><section className="card training-history-card"><CardHead title="Đánh giá buổi tập" />{evaluations.length ? evaluations.map((evaluation) => <div className="training-history-row" key={evaluation.id}><span className={`fitness-dot ${evaluation.fitnessStatus.toLowerCase()}`} /><div><b>{formatDate(evaluation.sessionDate)} · {evaluation.durationMinutes} phút</b><small>{evaluation.distanceMeters} m · {evaluation.averageSpeedKmh} km/h · Gắng sức {evaluation.perceivedExertion}/10</small><p>{evaluation.trainerNotes}</p>{evaluation.videoUrl && <a href={evaluation.videoUrl} target="_blank" rel="noreferrer">Xem video</a>}</div><dl><div><dt>Khối lượng</dt><dd>{evaluation.trainingLoad}</dd></div><div><dt>Hồi phục</dt><dd>{evaluation.heartRateRecoveryBpm} BPM</dd></div></dl></div>) : <Empty title="Chưa có đánh giá" text="Bản ghi FR07 đã hoàn tất sẽ xuất hiện tại đây." />}</section></div>
     {canEdit && !horse.archivedAt && <div className="danger-zone card"><div><b>Lưu trữ hồ sơ</b><span>Hồ sơ sẽ ẩn khỏi danh mục; file Cloudinary không bị xóa.</span></div><button className="button danger-outline" onClick={archive}>Lưu trữ</button></div>}
   </>
 }
@@ -217,7 +263,7 @@ function PedigreeNode({ node, label, main }) { return <div className={`pedigree-
 function Users() {
   const [users, setUsers] = useState([]); const [query, setQuery] = useState(''); const [selected, setSelected] = useState(null); const [error, setError] = useState('')
   const load = useCallback(() => { const p = new URLSearchParams({ size: '100' }); if (query) p.set('query', query); api(`/api/users?${p}`).then((d) => setUsers(pageContent(d))).catch((e) => setError(e.message)) }, [query])
-  useEffect(load, [load])
+  useEffect(() => { void load() }, [load])
   return <><PageHeading eyebrow="QUẢN TRỊ TRUY CẬP" title="Người dùng & vai trò" description="Quản lý tài khoản và phạm vi quyền trên toàn hệ thống." /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm tên hoặc email…" /></label><span className="record-count">{users.length} tài khoản</span></div>{error && <div className="notice error"><X size={17} />{error}</div>}<section className="card table-card"><div className="data-table"><div className="table-header"><span>Người dùng</span><span>Vai trò</span><span>Trạng thái</span><span /></div>{users.map((u) => <div className="table-row" key={u.id}><div className="user-cell"><span>{initials(u.username)}</span><div><b>{u.username}</b><small>{u.email}</small></div></div><div className="role-pills">{u.roles.map((r) => <span key={r}>{ROLE_LABELS[r]}</span>)}</div><span className={`status ${u.enabled ? 'active' : 'retired'}`}><i />{u.enabled ? 'Hoạt động' : 'Đã khóa'}</span><button className="icon-button" onClick={() => setSelected(u)}><Settings2 size={18} /></button></div>)}</div></section>{selected && <RoleModal user={selected} onClose={() => setSelected(null)} onSaved={() => { setSelected(null); load() }} />}</>
 }
 
@@ -229,5 +275,15 @@ function RoleModal({ user, onClose, onSaved }) {
 }
 
 export default function App() {
-  return <AuthProvider><Routes><Route path="/login" element={<AuthShell mode="login" />} /><Route path="/register" element={<AuthShell mode="register" />} /><Route path="/*" element={<Protected><AppLayout /></Protected>} /></Routes></AuthProvider>
+  return <AppErrorBoundary><AuthProvider><Routes><Route path="/login" element={<AuthShell mode="login" />} /><Route path="/register" element={<AuthShell mode="register" />} /><Route path="/*" element={<Protected><AppLayout /></Protected>} /></Routes></AuthProvider></AppErrorBoundary>
+}
+
+class AppErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error, info) { console.error('Frontend runtime error', error, info) }
+  render() {
+    if (!this.state.error) return this.props.children
+    return <main className="fatal-error"><div className="card"><X size={28}/><h1>Không thể hiển thị trang</h1><p>Giao diện gặp lỗi tạm thời. Hãy tải lại trang để tiếp tục.</p><button className="button primary" onClick={()=>window.location.reload()}>Tải lại</button></div></main>
+  }
 }

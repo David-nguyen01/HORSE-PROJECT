@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDate;
 
@@ -22,9 +23,11 @@ public class RaceResult extends BaseEntity {
     @Column(name = "race_date", nullable = false)
     private LocalDate raceDate;
 
+    @Nationalized
     @Column(name = "race_name", nullable = false, length = 200)
     private String raceName;
 
+    @Nationalized
     @Column(name = "racecourse", nullable = false, length = 200)
     private String racecourse;
 
@@ -37,9 +40,11 @@ public class RaceResult extends BaseEntity {
     @Column(name = "finish_time", nullable = false, length = 50)
     private String finishTime;
 
+    @Nationalized
     @Column(name = "jockey", nullable = false, length = 150)
     private String jockey;
 
+    @Nationalized
     @Column(name = "track_condition", length = 100)
     private String trackCondition;
 

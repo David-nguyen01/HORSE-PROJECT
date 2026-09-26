@@ -7,6 +7,7 @@ import com.racehorse.auth.dto.UserResponse;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.auth.repository.LoginSessionRepository;
 import com.racehorse.common.exception.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,6 +35,10 @@ class UserManagementServiceTest {
 
     @Mock
     private UserAccountRepository userRepository;
+    @Mock
+    private LoginSessionRepository loginSessionRepository;
+
+    private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T06:00:00Z"), ZoneOffset.UTC);
 
     private UserManagementService service;
 
@@ -38,7 +46,9 @@ class UserManagementServiceTest {
     void setUp() {
         service = new UserManagementService(
                 userRepository,
-                new BCryptPasswordEncoder(4));
+                new BCryptPasswordEncoder(4),
+                loginSessionRepository,
+                clock);
     }
 
     @Test
@@ -118,5 +128,28 @@ class UserManagementServiceTest {
         assertThat(response.roles())
                 .containsExactlyInAnyOrder(Role.HEAD_TRAINER, Role.VETERINARIAN);
         verify(userRepository).findById(targetId);
+        verify(loginSessionRepository).revokeAllActiveByUserId(targetId, clock.instant());
+    }
+
+    @Test
+    void cannotRemoveTheOnlyActiveClubManager() {
+        UUID actorId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount target = new UserAccount(
+                "manager.one",
+                "manager@example.com",
+                "encoded-password",
+                Set.of(Role.CLUB_MANAGER));
+        when(userRepository.findById(targetId)).thenReturn(Optional.of(target));
+        when(userRepository.findActiveClubManagersForUpdate()).thenReturn(java.util.List.of(target));
+
+        assertThatThrownBy(() -> service.updateRoles(
+                actorId,
+                targetId,
+                new UpdateUserRolesRequest(Set.of(Role.HEAD_TRAINER))))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ít nhất một Club Manager");
+
+        verify(loginSessionRepository, never()).revokeAllActiveByUserId(any(UUID.class), any(Instant.class));
     }
 }

@@ -25,7 +25,11 @@ public class AuditMutationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
         chain.doFilter(request, response);
         if (!isMutation(request.getMethod()) || response.getStatus() < 200 || response.getStatus() >= 300
-                || request.getRequestURI().equals("/api/auth/login")) return;
+                || request.getRequestURI().equals("/api/auth/login")
+                || request.getRequestURI().equals("/api/users")
+                || (request.getRequestURI().startsWith("/api/users/")&&request.getRequestURI().endsWith("/roles"))
+                || request.getRequestURI().startsWith("/api/admin/accounts")
+                || request.getRequestURI().startsWith("/api/admin/horses")) return;
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         UUID actor = authentication instanceof JwtAuthenticationToken token
                 ? parseUuid(token.getToken().getSubject()) : null;
@@ -38,11 +42,11 @@ public class AuditMutationFilter extends OncePerRequestFilter {
     private boolean isMutation(String method) { return !method.equals("GET") && !method.equals("HEAD") && !method.equals("OPTIONS"); }
     private String action(String method) { return switch (method) { case "POST" -> "CREATE"; case "DELETE" -> "DELETE"; default -> "UPDATE"; }; }
     private String module(String path) {
-        if (path.contains("training") || path.contains("fitness") || path.contains("telemetry") || path.contains("racetrack")) return "TRAINING";
-        if (path.contains("health") || path.contains("medical") || path.contains("weights")) return "MEDICAL";
+        if (path.contains("training") || path.contains("fitness") || path.contains("telemetry") || path.contains("racetrack") || path.contains("trial-run")) return "TRAINING";
+        if (path.contains("health") || path.contains("medical") || path.contains("weights") || path.contains("preventive-care")) return "MEDICAL";
         if (path.contains("stable") || path.contains("inventory") || path.contains("replenishment")) return "STABLE_CARE";
         if (path.contains("race")) return "RACING";
-        if (path.contains("report")) return "REPORTING";
+        if (path.contains("report") || path.contains("financial-transactions")) return "REPORTING";
         if (path.contains("users") || path.contains("role-permissions") || path.contains("auth")) return "ACCESS";
         return "PROFILE";
     }

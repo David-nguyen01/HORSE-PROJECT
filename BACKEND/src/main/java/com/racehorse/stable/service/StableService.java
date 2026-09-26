@@ -5,6 +5,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,9 +37,16 @@ public class StableService {
         } catch (DuplicateKeyException exception) {
             throw new BusinessException("Tên chuồng đã tồn tại");
         }
-        if (stallCodes != null) {
-            stallCodes.stream().map(this::normalizeCode).distinct().forEach(code -> addStallInternal(stableId, actor, code));
+        List<String> normalized = stallCodes != null
+                ? stallCodes.stream().map(this::normalizeCode).distinct().toList()
+                : List.of();
+        if (normalized.isEmpty()) {
+            throw new BusinessException("Khu chuồng phải có ít nhất 1 ô chuồng");
         }
+        if (normalized.size() > 4) {
+            throw new BusinessException("Mỗi khu chuồng chỉ chứa tối đa 4 ô chuồng / 4 con ngựa");
+        }
+        normalized.forEach(code -> addStallInternal(stableId, actor, code));
         return get(stableId);
     }
 
@@ -61,7 +69,9 @@ public class StableService {
 
     @Transactional
     public StableView update(UUID stableId, String name, String location, Boolean active) {
-        get(stableId);
+        StableView current = get(stableId);
+        if (Boolean.FALSE.equals(active) && current.stalls().stream().anyMatch(s -> s.currentAssignment() != null))
+            throw new BusinessException("Cần chuyển ngựa ra khỏi các ô chuồng trước khi ngừng hoạt động chuồng");
         String normalizedName = required(name, "Tên chuồng không được để trống");
         try {
             jdbc.update("update stables set name=?,location=?,is_active=? where id=?",
@@ -73,6 +83,41 @@ public class StableService {
     }
 
     @Transactional
+    public void delete(UUID stableId, UUID actor) {
+        StableView current = get(stableId);
+
+        // 1. Tìm tất cả các con ngựa đang được phân bổ trong chuồng này
+        List<UUID> assignedHorseIds = jdbc.query(
+                "select distinct horse_id from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=?",
+                (rs, row) -> rs.getObject("horse_id", UUID.class), stableId.toString());
+
+        // 2. Kết thúc tất cả phân bổ chuồng đang active của chuồng này
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update(
+                "update module_records set status='ENDED', "
+                + "data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?), "
+                + "updated_at=SYSDATETIMEOFFSET() "
+                + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=?",
+                now.toString(), actor.toString(), stableId.toString());
+
+        // 3. Chuyển tất cả ngựa bị ảnh hưởng ra khỏi chuồng (vị trí chuồng thành rỗng)
+        for (UUID hId : assignedHorseIds) {
+            jdbc.update("update horses set stable_location='', updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
+        }
+
+        // 4. Xóa tất cả các ô chuồng (STALL) của chuồng này
+        jdbc.update("delete from module_records where module_code='STABLE_CARE' and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=?",
+                stableId.toString());
+
+        // 5. Gỡ bỏ khóa ngoại nếu có giao dịch tài chính trỏ tới chuồng này
+        jdbc.update("update financial_transactions set stable_id=null where stable_id=?", stableId);
+
+        // 6. Xóa chuồng khỏi bảng stables
+        jdbc.update("delete from stables where id=?", stableId);
+    }
+
+    @Transactional
     public StableView addStall(UUID stableId, UUID actor, String stallCode) {
         requireActiveStable(stableId);
         addStallInternal(stableId, actor, normalizeCode(stallCode));
@@ -80,14 +125,43 @@ public class StableService {
     }
 
     @Transactional
-    public void deactivateStall(UUID stableId, UUID stallId) {
+    public void deleteStall(UUID stableId, UUID stallId, UUID actor) {
         requireStall(stableId, stallId);
-        Integer occupied = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
+
+        // Quy tắc: Mỗi khu chuồng phải có ít nhất 1 ô chuồng
+        Integer stallCount = jdbc.queryForObject(
+                "select count(*) from module_records where module_code='STABLE_CARE' and record_type='STALL' "
+                + "and JSON_VALUE(data_json,'$.stableId')=?",
+                Integer.class, stableId.toString());
+        if (stallCount != null && stallCount <= 1) {
+            throw new BusinessException("Khu chuồng phải có ít nhất 1 ô chuồng, không thể xóa bớt");
+        }
+
+        // Nếu ô chuồng đang có ngựa phân bổ, kết thúc phân bổ và cho ngựa out ra khỏi chuồng
+        List<UUID> assignedHorseIds = jdbc.query(
+                "select distinct horse_id from module_records where module_code='STABLE_CARE' "
                 + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=?",
-                Integer.class, stallId.toString());
-        if (occupied != null && occupied > 0) throw new BusinessException("Không thể ngừng ô chuồng đang có ngựa");
-        jdbc.update("update module_records set status='INACTIVE',data_json=JSON_MODIFY(data_json,'$.isActive',cast(0 as bit)),updated_at=SYSDATETIMEOFFSET() where id=?",
-                stallId);
+                (rs, row) -> rs.getObject("horse_id", UUID.class), stallId.toString());
+
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update(
+                "update module_records set status='ENDED', "
+                + "data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?), "
+                + "updated_at=SYSDATETIMEOFFSET() "
+                + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=?",
+                now.toString(), actor.toString(), stallId.toString());
+
+        for (UUID hId : assignedHorseIds) {
+            jdbc.update("update horses set stable_location='', updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
+        }
+
+        // Xóa hẳn ô chuồng khỏi module_records
+        jdbc.update("delete from module_records where id=? and module_code='STABLE_CARE' and record_type='STALL'", stallId);
+    }
+
+    @Transactional
+    public void deactivateStall(UUID stableId, UUID stallId) {
+        deleteStall(stableId, stallId, UUID.fromString("00000000-0000-0000-0000-000000000000"));
     }
 
     @Transactional
@@ -95,13 +169,26 @@ public class StableService {
         StableView stable = requireActiveStable(stableId);
         StallView stall = requireStall(stableId, stallId);
         if (!stall.active()) throw new BusinessException("Ô chuồng đang ngừng hoạt động");
-        if(stall.currentAssignment()!=null&&stall.currentAssignment().horseId().equals(horseId))
+        if (stall.currentAssignment() != null && stall.currentAssignment().horseId().equals(horseId))
             throw new BusinessException("Ngựa đã được phân vào ô chuồng này");
-        horseAccess.requireActive(horseId);
+
+        // 1. Kiểm tra điều kiện dịch vụ (đã thanh toán hoặc được Club Manager bảo lãnh)
+        Horse horse = horseAccess.requireServiceEligible(horseId);
+
+        // 2. Quy tắc sức chứa: Mỗi chuồng chứa tối đa 4 con ngựa
+        Integer occupiedInStable = jdbc.queryForObject(
+                "select count(distinct horse_id) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?",
+                Integer.class, stableId.toString(), horseId);
+        if (occupiedInStable != null && occupiedInStable >= 4) {
+            throw new BusinessException("Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa");
+        }
+
         Integer occupied = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
                 + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?",
                 Integer.class, stallId.toString(), horseId);
         if (occupied != null && occupied > 0) throw new BusinessException("Ô chuồng đã có ngựa");
+
         OffsetDateTime now = OffsetDateTime.now();
         endCurrentHorseAssignment(horseId, now);
         UUID assignmentId = UUID.randomUUID();
@@ -117,7 +204,7 @@ public class StableService {
         jdbc.update("update horses set stable_location=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 stable.name() + " / " + stall.code(), horseId);
         return new AssignmentView(assignmentId, stableId, stable.name(), stallId, stall.code(), horseId,
-                actor, now, null, true);
+                horse.getName(), horse.getCode(), actor, now, null, true);
     }
 
     @Transactional
@@ -126,11 +213,11 @@ public class StableService {
         if (!current.active()) throw new BusinessException("Phân bổ chuồng đã kết thúc");
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update("update module_records set status='ENDED',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=?",
-                now.toString(),actor.toString(),assignmentId);
+                now.toString(), actor.toString(), assignmentId);
         jdbc.update("update horses set stable_location='',updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 current.horseId());
         return new AssignmentView(current.id(), current.stableId(), current.stableName(), current.stallId(),
-                current.stallCode(), current.horseId(), current.assignedBy(), current.assignedFrom(), now, false);
+                current.stallCode(), current.horseId(), current.horseName(), current.horseCode(), current.assignedBy(), current.assignedFrom(), now, false);
     }
 
     private StableView buildStable(UUID id, String name, String location, boolean active) {
@@ -146,20 +233,24 @@ public class StableService {
     }
 
     private AssignmentView activeAssignmentForStall(UUID stallId, UUID stableId, String stableName) {
-        List<AssignmentView> rows = jdbc.query("select top 1 id,horse_id,user_id,data_json from module_records "
-                        + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' "
-                        + "and JSON_VALUE(data_json,'$.stallId')=? order by created_at desc",
+        List<AssignmentView> rows = jdbc.query("select top 1 m.id,m.horse_id,m.user_id,m.data_json,h.name horse_name,h.code horse_code "
+                        + "from module_records m left join horses h on h.id=m.horse_id "
+                        + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
+                        + "and JSON_VALUE(m.data_json,'$.stallId')=? order by m.created_at desc",
                 (rs, row) -> assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
+                        rs.getString("horse_name"), rs.getString("horse_code"),
                         rs.getObject("user_id", UUID.class), rs.getString("data_json"), stableId, stableName, true),
                 stallId.toString());
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
     private AssignmentView requireAssignment(UUID id) {
-        List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name "
+        List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name,h.name horse_name,h.code horse_code "
                         + "from module_records m join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
+                        + "left join horses h on h.id=m.horse_id "
                         + "where m.id=? and m.record_type='STALL_ASSIGNMENT'",
                 (rs, row) -> assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
+                        rs.getString("horse_name"), rs.getString("horse_code"),
                         rs.getObject("user_id", UUID.class), rs.getString("data_json"),
                         UUID.fromString(read(rs.getString("data_json")).path("stableId").asText()),
                         rs.getString("stable_name"), "ACTIVE".equals(rs.getString("status"))), id);
@@ -167,17 +258,22 @@ public class StableService {
         return rows.getFirst();
     }
 
-    private AssignmentView assignment(UUID id, UUID horseId, UUID actor, String jsonValue,
+    private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
                                       UUID stableId, String stableName, boolean active) {
         JsonNode node = read(jsonValue);
         String until = node.path("assignedUntil").isNull() ? null : node.path("assignedUntil").asText(null);
         return new AssignmentView(id, stableId, stableName, UUID.fromString(node.path("stallId").asText()),
-                node.path("stallCode").asText(), horseId, actor,
+                node.path("stallCode").asText(), horseId, horseName, horseCode, actor,
                 OffsetDateTime.parse(node.path("assignedFrom").asText()),
                 until == null || until.isBlank() ? null : OffsetDateTime.parse(until), active);
     }
 
     private void addStallInternal(UUID stableId, UUID actor, String code) {
+        Integer stallCount = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=?", Integer.class, stableId.toString());
+        if (stallCount != null && stallCount >= 4) {
+            throw new BusinessException("Mỗi khu chuồng chỉ được chứa tối đa 4 ô chuồng");
+        }
         Integer exists = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
                 + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=? and upper(JSON_VALUE(data_json,'$.stallCode'))=upper(?)",
                 Integer.class, stableId.toString(), code);
@@ -222,6 +318,6 @@ public class StableService {
     public record StableView(UUID id, String name, String location, boolean active, List<StallView> stalls) {}
     public record StallView(UUID id, String code, boolean active, AssignmentView currentAssignment) {}
     public record AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
-                                 UUID horseId, UUID assignedBy, OffsetDateTime assignedFrom,
+                                 UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
                                  OffsetDateTime assignedUntil, boolean active) {}
 }

@@ -36,6 +36,10 @@ public class AuditLogController {
                 rs.getString("description"),rs.getString("old_values_json"),rs.getString("new_values_json"),
                 rs.getString("ip_address"),rs.getString("user_agent")),args.toArray());
     }
+    @GetMapping("/{id}")
+    AuditView get(@PathVariable long id){
+        return jdbc.query("select a.*,u.username actor_username from audit_logs a left join users u on u.id=a.actor_user_id where a.id=?",rs->{if(!rs.next())throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy audit log: "+id);return new AuditView(rs.getLong("id"),rs.getObject("actor_user_id",UUID.class),rs.getString("actor_username"),rs.getObject("occurred_at",OffsetDateTime.class),rs.getString("module_code"),rs.getString("action_code"),rs.getString("entity_type"),rs.getObject("entity_id",UUID.class),rs.getString("description"),rs.getString("old_values_json"),rs.getString("new_values_json"),rs.getString("ip_address"),rs.getString("user_agent"));},id);
+    }
     private void add(StringBuilder sql,List<Object> args,String clause,Object value){if(value!=null){sql.append(clause);args.add(value);}}
     private String upper(String value){return value==null||value.isBlank()?null:value.trim().toUpperCase(Locale.ROOT);}
     public record AuditView(long id,UUID actorId,String actorUsername,OffsetDateTime occurredAt,String module,

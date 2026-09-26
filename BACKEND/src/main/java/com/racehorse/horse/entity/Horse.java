@@ -10,6 +10,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Nationalized;
 
 import java.time.LocalDate;
 import java.time.Instant;
@@ -21,6 +22,7 @@ public class Horse extends BaseEntity {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
+    @Nationalized
     @Column(nullable = false, length = 150)
     private String name;
 
@@ -34,9 +36,11 @@ public class Horse extends BaseEntity {
     @Column(nullable = false, length = 20)
     private HorseGender gender;
 
+    @Nationalized
     @Column(name = "color_markings", nullable = false, length = 500)
     private String colorMarkings;
 
+    @Nationalized
     @Column(nullable = false, length = 100)
     private String breed;
 
@@ -52,6 +56,7 @@ public class Horse extends BaseEntity {
     @JoinColumn(name = "current_trainer_id")
     private UserAccount currentTrainer;
 
+    @Nationalized
     @Column(name = "stable_location", nullable = false, length = 150)
     private String stableLocation;
 
@@ -61,6 +66,18 @@ public class Horse extends BaseEntity {
 
     @Column(name = "archived_at")
     private Instant archivedAt;
+
+    @Column(name = "payment_status", length = 20)
+    private String paymentStatus = "UNPAID";
+
+    @Column(name = "service_override")
+    private Boolean serviceOverride = false;
+
+    @Column(name = "override_reason", length = 300)
+    private String overrideReason;
+
+    @Column(name = "paid_until")
+    private LocalDate paidUntil;
 
     protected Horse() {
     }
@@ -170,5 +187,37 @@ public class Horse extends BaseEntity {
 
     public Instant getArchivedAt() {
         return archivedAt;
+    }
+
+    public String getPaymentStatus() {
+        return paymentStatus == null ? "UNPAID" : paymentStatus;
+    }
+
+    public void setPaymentStatus(String paymentStatus) {
+        this.paymentStatus = paymentStatus;
+    }
+
+    public Boolean getServiceOverride() {
+        return Boolean.TRUE.equals(serviceOverride);
+    }
+
+    public void setServiceOverride(Boolean serviceOverride) {
+        this.serviceOverride = serviceOverride;
+    }
+
+    public String getOverrideReason() {
+        return overrideReason;
+    }
+
+    public void setOverrideReason(String overrideReason) {
+        this.overrideReason = overrideReason;
+    }
+
+    public LocalDate getPaidUntil() {
+        return paidUntil;
+    }
+
+    public void setPaidUntil(LocalDate paidUntil) {
+        this.paidUntil = paidUntil;
     }
 }

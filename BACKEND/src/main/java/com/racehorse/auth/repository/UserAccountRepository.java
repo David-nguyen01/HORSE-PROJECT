@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.Lock;
+
+import jakarta.persistence.LockModeType;
 
 import java.util.Optional;
 import java.util.List;
@@ -37,4 +40,12 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
             where ur.user_id = :userId
             """, nativeQuery = true)
     List<String> findGrantedPermissionCodes(@Param("userId") UUID userId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select distinct u from UserAccount u join u.roles role
+            where role = com.racehorse.auth.entity.Role.CLUB_MANAGER
+              and u.enabled = true
+            """)
+    List<UserAccount> findActiveClubManagersForUpdate();
 }
