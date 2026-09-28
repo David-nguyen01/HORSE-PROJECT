@@ -7,6 +7,7 @@ import com.racehorse.training.service.TrainingPlanService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +24,6 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api")
-@PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
 public class TrainingPlanController {
 
     private final TrainingPlanService service;
@@ -34,17 +34,20 @@ public class TrainingPlanController {
 
     @PostMapping("/training-plans")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrainingPlanResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TrainingPlanRequest request) {
         return service.create(userId(jwt), request);
     }
 
     @PutMapping("/training-plans/{planId}")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrainingPlanResponse update(@PathVariable UUID planId, @Valid @RequestBody TrainingPlanRequest request) {
         return service.update(planId, request);
     }
 
     @PostMapping("/training-plans/{planId}/copy")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     TrainingPlanResponse copy(
             @PathVariable UUID planId,
             @AuthenticationPrincipal Jwt jwt,
@@ -53,16 +56,32 @@ public class TrainingPlanController {
     }
 
     @GetMapping("/training-plans/{planId}")
-    TrainingPlanResponse get(@PathVariable UUID planId) {
-        return service.get(planId);
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW')")
+    TrainingPlanResponse get(
+            @PathVariable UUID planId,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+        return service.get(planId, userId(jwt), isPrivileged(authentication));
     }
 
     @GetMapping("/horses/{horseId}/training-plans")
-    List<TrainingPlanResponse> listForHorse(@PathVariable UUID horseId) {
-        return service.listForHorse(horseId);
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW')")
+    List<TrainingPlanResponse> listForHorse(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+        return service.listForHorse(horseId, userId(jwt), isPrivileged(authentication));
     }
 
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
+    }
+
+    private boolean isPrivileged(Authentication authentication) {
+        return authentication.getAuthorities().stream().anyMatch(authority ->
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
+                || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
+                || authority.getAuthority().equals("ROLE_VETERINARIAN")
+                || authority.getAuthority().equals("ROLE_STABLE_STAFF"));
     }
 }

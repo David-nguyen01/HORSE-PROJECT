@@ -63,17 +63,27 @@ public class TrainingLockService {
     }
 
     @Transactional(readOnly = true)
-    public TrainingLockResponse current(UUID horseId) {
-        horseAccessService.requireActive(horseId);
+    public TrainingLockResponse current(UUID horseId, UUID userId, boolean privileged) {
+        horseAccessService.requireReadable(horseId, userId, privileged);
         return repository.findByHorseIdAndReleasedAtIsNull(horseId)
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Ngựa không có lệnh khóa huấn luyện hoạt động"));
     }
 
     @Transactional(readOnly = true)
-    public List<TrainingLockResponse> history(UUID horseId) {
-        horseAccessService.requireActive(horseId);
+    public List<TrainingLockResponse> history(UUID horseId, UUID userId, boolean privileged) {
+        horseAccessService.requireReadable(horseId, userId, privileged);
         return repository.findByHorseIdOrderByLockedAtDesc(horseId).stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TrainingLockResponse current(UUID horseId) {
+        return current(horseId, null, true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrainingLockResponse> history(UUID horseId) {
+        return history(horseId, null, true);
     }
 
     private TrainingLock requireLock(UUID id) {

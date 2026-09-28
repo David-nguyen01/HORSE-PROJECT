@@ -63,3 +63,54 @@ export const authApi = {
 }
 
 export const pageContent = (page) => Array.isArray(page) ? page : (page?.content || [])
+
+export const stableCareApi = {
+  // FR13 Stables & Routines
+  getStables: (includeInactive = false) => api(`/api/stables?includeInactive=${includeInactive}`),
+  getStable: (id) => api(`/api/stables/${id}`),
+  getRoutines: (horseId) => api(`/api/stables/horses/${horseId}/daily-routines`),
+  addRoutine: (horseId, payload) => api(`/api/stables/horses/${horseId}/daily-routines`, { method: 'POST', body: JSON.stringify(payload) }),
+  updateRoutine: (id, payload) => api(`/api/stables/daily-routines/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteRoutine: (id) => api(`/api/stables/daily-routines/${id}`, { method: 'DELETE' }),
+
+  // FR14 Nutrition
+  getActiveNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`),
+  getNutritionHistory: (horseId) => api(`/api/horses/${horseId}/nutrition-plan/history`),
+  getDailyFeedingChecklist: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan/daily-checklist${date ? `?date=${date}` : ''}`),
+  createNutritionPlan: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'POST', body: JSON.stringify(payload) }),
+
+  // FR15 Care Tasks
+  getCareTasks: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/care-tasks?${q}`)
+  },
+  getCareTask: (id) => api(`/api/care-tasks/${id}`),
+  createCareTask: (payload) => api('/api/care-tasks', { method: 'POST', body: JSON.stringify(payload) }),
+  completeCareTask: (id, payload) => api(`/api/care-tasks/${id}/complete`, { method: 'POST', body: JSON.stringify(payload || {}) }),
+  cancelCareTask: (id) => api(`/api/care-tasks/${id}/cancel`, { method: 'POST' }),
+
+  // FR16 Incidents
+  createIncident: (payload) => api('/api/incidents', { method: 'POST', body: JSON.stringify(payload) }),
+  getIncidents: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/incidents?${q}`)
+  },
+  getIncident: (id) => api(`/api/incidents/${id}`),
+  updateIncidentStatus: (id, payload) => api(`/api/incidents/${id}/status`, { method: 'PUT', body: JSON.stringify(payload) }),
+
+  // FR17 Inventory & Replenishment
+  getInventoryItems: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/inventory/items?${q}`)
+  },
+  getInventoryItem: (id) => api(`/api/inventory/items/${id}`),
+  createInventoryItem: (payload) => api('/api/inventory/items', { method: 'POST', body: JSON.stringify(payload) }),
+  updateStock: (id, payload) => api(`/api/inventory/items/${id}/stock`, { method: 'PUT', body: JSON.stringify(payload) }),
+  getReplenishments: (status) => api(`/api/inventory/replenishments${status ? `?status=${status}` : ''}`),
+  getReplenishment: (id) => api(`/api/inventory/replenishments/${id}`),
+  createReplenishment: (payload) => api('/api/inventory/replenishments', { method: 'POST', body: JSON.stringify(payload) }),
+  reviewReplenishment: (id, payload) => api(`/api/inventory/replenishments/${id}/review`, { method: 'POST', body: JSON.stringify(payload) }),
+}

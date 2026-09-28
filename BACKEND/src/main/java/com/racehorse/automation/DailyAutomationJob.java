@@ -26,7 +26,9 @@ public class DailyAutomationJob {
                        N'Nhắc lịch chăm sóc phòng ngừa',concat(N'Lịch ',s.care_type,N' đến hạn ',convert(varchar(10),s.due_date,23)),
                        'PREVENTIVE_CARE',s.id,concat('preventive:',cast(s.id as varchar(36)),':',convert(varchar(10),s.due_date,23),':',cast(ur.user_id as varchar(36)))
                 from preventive_care_schedules s cross join user_roles ur
-                where ur.role='VETERINARIAN' and s.cancelled_at is null
+                join users u on u.id = ur.user_id
+                where ur.role in ('VETERINARIAN', 'HEAD_TRAINER') and u.enabled = 1
+                  and s.cancelled_at is null
                   and dateadd(day,-s.reminder_lead_days,s.due_date)<=?
                   and s.completed_at is null
                   and not exists(select 1 from notifications n where n.deduplication_key=concat('preventive:',cast(s.id as varchar(36)),':',convert(varchar(10),s.due_date,23),':',cast(ur.user_id as varchar(36))))

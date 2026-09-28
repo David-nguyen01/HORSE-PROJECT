@@ -74,6 +74,46 @@ public class PreventiveCareService {
         UUID horse=uuid(row.get("horse_id"));
         return list(horse,actor,true,null,null,null,null).stream().filter(x->x.id().equals(id)).findFirst().orElseThrow();
     }
+    @Transactional(readOnly = true)
+    public List<DuePreventiveCareResponse> listDue(LocalDate asOf, String careType, boolean overdueOnly) {
+        LocalDate checkDate = asOf != null ? asOf : LocalDate.now();
+        StringBuilder sql = new StringBuilder("""
+                select s.id, s.horse_id, h.code as horse_code, h.name as horse_name,
+                       s.care_type, s.details, s.due_date, s.recurrence_days, s.reminder_lead_days
+                from preventive_care_schedules s
+                join horses h on h.id = s.horse_id
+                where s.completed_at is null and s.cancelled_at is null
+                """);
+        List<Object> args = new ArrayList<>();
+        if (careType != null && !careType.isBlank()) {
+            sql.append(" and s.care_type = ?");
+            args.add(careType.trim().toUpperCase(Locale.ROOT));
+        }
+        if (overdueOnly) {
+            sql.append(" and s.due_date < ?");
+            args.add(checkDate);
+        }
+        sql.append(" order by s.due_date asc, s.id asc");
+
+        return jdbc.query(sql.toString(), (rs, rowNum) -> {
+            UUID id = rs.getObject("id", UUID.class);
+            UUID horseId = rs.getObject("horse_id", UUID.class);
+            String horseCode = rs.getString("horse_code");
+            String horseName = rs.getString("horse_name");
+            String type = rs.getString("care_type");
+            String details = rs.getString("details");
+            LocalDate dueDate = rs.getObject("due_date", LocalDate.class);
+            Integer recurrenceDays = rs.getObject("recurrence_days", Integer.class);
+            int reminderLeadDays = rs.getInt("reminder_lead_days");
+            boolean isOverdue = dueDate.isBefore(checkDate);
+            long daysUntilDue = java.time.temporal.ChronoUnit.DAYS.between(checkDate, dueDate);
+
+            return new DuePreventiveCareResponse(
+                    id, horseId, horseCode, horseName, type, details,
+                    dueDate, recurrenceDays, reminderLeadDays, isOverdue, daysUntilDue);
+        }, args.toArray());
+    }
+
     @Transactional
     public void cancel(UUID id){ requirePending(id); jdbc.update("update preventive_care_schedules set cancelled_at=SYSDATETIMEOFFSET() where id=?",id); }
     private Map<String,Object> requirePending(UUID id){

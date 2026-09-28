@@ -79,6 +79,16 @@ public class HorseProfileFileController {
         return service.approve(horseId, proposalId, userId(jwt));
     }
 
+    @PostMapping("/proposals/{proposalId}/reject")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    ResponseEntity<Void> reject(
+            @PathVariable UUID horseId,
+            @PathVariable UUID proposalId,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.reject(horseId, proposalId, userId(jwt));
+        return ResponseEntity.noContent().build();
+    }
+
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }

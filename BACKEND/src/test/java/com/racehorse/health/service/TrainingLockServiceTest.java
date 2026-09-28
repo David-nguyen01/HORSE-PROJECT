@@ -74,6 +74,44 @@ class TrainingLockServiceTest {
                 .hasMessageContaining("Chưa đến ngày tái khám");
     }
 
+    @Test
+    void currentEnforcesRequireReadableAndReturnsActiveLock() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        TrainingLock lock = new TrainingLock(horse(), "Checkup", null, veterinarian(), now);
+        when(horseAccessService.requireReadable(horseId, ownerId, false)).thenReturn(horse());
+        when(repository.findByHorseIdAndReleasedAtIsNull(horseId)).thenReturn(Optional.of(lock));
+
+        var response = service.current(horseId, ownerId, false);
+        org.assertj.core.api.Assertions.assertThat(response).isNotNull();
+        org.assertj.core.api.Assertions.assertThat(response.reason()).isEqualTo("Checkup");
+        verify(horseAccessService).requireReadable(horseId, ownerId, false);
+    }
+
+    @Test
+    void historyEnforcesRequireReadableAndReturnsList() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        TrainingLock lock = new TrainingLock(horse(), "Checkup", null, veterinarian(), now);
+        when(horseAccessService.requireReadable(horseId, ownerId, false)).thenReturn(horse());
+        when(repository.findByHorseIdOrderByLockedAtDesc(horseId)).thenReturn(java.util.List.of(lock));
+
+        var list = service.history(horseId, ownerId, false);
+        org.assertj.core.api.Assertions.assertThat(list).hasSize(1);
+        verify(horseAccessService).requireReadable(horseId, ownerId, false);
+    }
+
+    @Test
+    void currentThrowsWhenAccessDenied() {
+        UUID horseId = UUID.randomUUID();
+        UUID strangerId = UUID.randomUUID();
+        when(horseAccessService.requireReadable(horseId, strangerId, false))
+                .thenThrow(new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy"));
+
+        assertThatThrownBy(() -> service.current(horseId, strangerId, false))
+                .isInstanceOf(com.racehorse.common.exception.ResourceNotFoundException.class);
+    }
+
     private Horse horse() {
         return new Horse("H-LOCK", "Lock Test", null, LocalDate.of(2022, 1, 1),
                 HorseGender.MARE, "Bay", "Thoroughbred", "A-01", HorseStatus.INJURED);

@@ -94,8 +94,23 @@ public class TrainingPlanService {
     }
 
     @Transactional(readOnly = true)
+    public TrainingPlanResponse get(UUID planId, UUID userId, boolean privileged) {
+        TrainingPlan plan = requirePlan(planId);
+        horseAccessService.requireReadable(plan.getHorse().getId(), userId, privileged);
+        return toResponse(plan);
+    }
+
+    @Transactional(readOnly = true)
     public List<TrainingPlanResponse> listForHorse(UUID horseId) {
         horseAccessService.requireActive(horseId);
+        return repository.findByHorseIdOrderByCreatedAtDesc(horseId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TrainingPlanResponse> listForHorse(UUID horseId, UUID userId, boolean privileged) {
+        horseAccessService.requireReadable(horseId, userId, privileged);
         return repository.findByHorseIdOrderByCreatedAtDesc(horseId).stream()
                 .map(this::toResponse)
                 .toList();
