@@ -1,6 +1,6 @@
 import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, ArrowLeft, ArchiveRestore, Award, Bell, Check, ChevronRight, CircleUserRound, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Warehouse, X, Zap } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowLeft, ArchiveRestore, Award, Bell, Check, ChevronRight, CircleUserRound, Clock, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Package, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Utensils, Warehouse, X, Zap } from 'lucide-react'
 import { api, authApi, clearAuth, getAuth, pageContent, saveAuth } from './api'
 import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, PermissionsPage, StablesPage } from './AdminPages'
 
@@ -104,11 +104,29 @@ function Field({ label, children }) { return <label className="field"><span>{lab
 
 function AppLayout() {
   const { user, logout } = useAuth(); const navigate = useNavigate(); const [open, setOpen] = useState(false)
-  const navItems = [
+  const isManager = hasAny(user, 'CLUB_MANAGER')
+  const isStaff = hasAny(user, 'STABLE_STAFF') && !isManager
+  const [incidentBadge, setIncidentBadge] = useState(0)
+
+  useEffect(() => {
+    if (isStaff) {
+      api('/api/incidents?status=REPORTED')
+        .then((data) => setIncidentBadge(Array.isArray(data) ? data.length : 0))
+        .catch(() => setIncidentBadge(0))
+    }
+  }, [isStaff])
+
+  const navItems = isStaff ? [
+    { to: '/stable-care/tasks', label: 'Nhiệm vụ trong ngày', icon: Clock },
+    { to: '/stable-care/stables', label: 'Ô chuồng & Sinh hoạt', icon: Home },
+    { to: '/stable-care/nutrition', label: 'Khẩu phần & Cho ăn', icon: Utensils },
+    { to: '/stable-care/incidents', label: 'Báo cáo sự cố', icon: AlertTriangle, badge: incidentBadge > 0 ? incidentBadge : null },
+    { to: '/stable-care/inventory', label: 'Vật tư & Tồn kho', icon: Package },
+  ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/horses', label: 'Hồ sơ ngựa', icon: Activity }] : []),
     ...(hasAny(user, 'HEAD_TRAINER') ? [{ to: '/fitness', label: 'Thể lực & buổi tập', icon: Gauge }] : []),
-    ...(hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/stable-care', label: 'Chăm sóc chuồng', icon: Home }] : []),
+    ...(hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/stable-care/tasks', label: 'Chăm sóc chuồng', icon: Home }] : []),
     ...(hasAny(user, 'CLUB_MANAGER') ? [
       { to: '/admin/stables', label: 'Chuồng trại', icon: Warehouse },
       { to: '/admin/accounts', label: 'Tài khoản', icon: UsersRound },
@@ -121,10 +139,20 @@ function AppLayout() {
   return <div className="app-shell">
     <aside className={`sidebar ${open ? 'open' : ''}`}>
       <div className="sidebar-brand"><span className="brand-mark"><Activity size={22} /></span><div><b>STRIDE</b><small>RACEHORSE CLUB</small></div><button className="icon-button mobile-close" onClick={() => setOpen(false)}><X /></button></div>
-      <nav>{hasAny(user,'CLUB_MANAGER')&&<small className="nav-group">QUẢN LÝ CÂU LẠC BỘ</small>}{navItems.map(({ to, label, icon: Icon }) => <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}><Icon size={19} /><span>{label}</span></NavLink>)}</nav>
+      <nav>
+        {isManager && <small className="nav-group">QUẢN LÝ CÂU LẠC BỘ</small>}
+        {isStaff && <small className="nav-group">VẬN HÀNH HIỆN TRƯỜNG</small>}
+        {navItems.map(({ to, label, icon: Icon, badge }) => (
+          <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}>
+            <Icon size={19} />
+            <span>{label}</span>
+            {badge ? <span className="nav-badge">{badge}</span> : null}
+          </NavLink>
+        ))}
+      </nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> Hệ thống đang hoạt động</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
   </div>
 }
