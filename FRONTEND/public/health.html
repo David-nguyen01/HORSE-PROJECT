@@ -1,14 +1,14 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sức khỏe & Y tế — Turfline Stable Manager</title>
+  <title>Sá»©c khá»e & Y táº¿ â€” Turfline Stable Manager</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app-shell.css">
   
-  <!-- Thư viện Model Viewer của Google -->
+  <!-- ThÆ° viá»‡n Model Viewer cá»§a Google -->
   <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
 
   <style>
@@ -109,12 +109,12 @@
       border: 2px solid rgba(255,255,255,0.8);
       box-shadow: 0 0 12px rgba(0,0,0,0.8);
       cursor: pointer;
-      background-color: #48bb78; /* Xanh: Bình thường */
+      background-color: #48bb78; /* Xanh: BÃ¬nh thÆ°á»ng */
       transition: transform 0.2s, background-color 0.3s;
       display: flex; align-items: center; justify-content: center;
     }
     .Hotspot[data-status="MONITORING"] { background-color: #ed8936; box-shadow: 0 0 12px rgba(237,137,54,0.6); } /* Cam */
-    .Hotspot[data-status="SEVERE"] { background-color: #e53e3e; box-shadow: 0 0 12px rgba(229,62,62,0.6); animation: pulse 2s infinite; } /* Đỏ */
+    .Hotspot[data-status="SEVERE"] { background-color: #e53e3e; box-shadow: 0 0 12px rgba(229,62,62,0.6); animation: pulse 2s infinite; } /* Äá» */
     
     .Hotspot:hover { transform: scale(1.2); }
     .Hotspot-tooltip {
@@ -141,42 +141,42 @@
 <div class="app-shell" id="appShell">
   <!-- SIDEBAR -->
   <aside class="sidebar" id="sidebar">
-    <div class="sidebar-brand"><div class="brand-mark"><span class="glyph">◆</span><span class="wordmark"><b>Turfline</b>Stable Manager</span></div></div>
+    <div class="sidebar-brand"><div class="brand-mark"><span class="glyph">â—†</span><span class="wordmark"><b>Turfline</b>Stable Manager</span></div></div>
     <nav class="sidebar-nav">
-      <span class="nav-section-label">Tổng quan</span>
+      <span class="nav-section-label">Tá»•ng quan</span>
       <a href="dashboard.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
-      <span class="nav-section-label">Quản lý Ngựa</span>
-      <a href="horses.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Hồ sơ ngựa</a>
-      <span class="nav-section-label">Huấn luyện</span>
-      <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>Giáo án huấn luyện</a>
-      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lịch tập & Phân công</a>
-      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thể lực & Đánh giá</a>
-      <span class="nav-section-label">Y tế</span>
-      <a href="health.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sức khỏe & Y tế</a>
-      <span class="nav-section-label">Quản trị</span>
-      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Người dùng & Vai trò</a>
+      <span class="nav-section-label">Quáº£n lÃ½ Ngá»±a</span>
+      <a href="horses.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7c0-1.1-.9-2-2-2h-1l-1-3H8L7 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><circle cx="12" cy="13" r="3"/></svg>Há»“ sÆ¡ ngá»±a</a>
+      <span class="nav-section-label">Huáº¥n luyá»‡n</span>
+      <a href="training-plans.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>GiÃ¡o Ã¡n huáº¥n luyá»‡n</a>
+      <a href="training-schedule.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>Lá»‹ch táº­p & PhÃ¢n cÃ´ng</a>
+      <a href="fitness.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/></svg>Thá»ƒ lá»±c & ÄÃ¡nh giÃ¡</a>
+      <span class="nav-section-label">Y táº¿</span>
+      <a href="health.html" class="nav-link active"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Sá»©c khá»e & Y táº¿</a>
+      <span class="nav-section-label">Quáº£n trá»‹</span>
+      <a href="users.html" class="nav-link"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>NgÆ°á»i dÃ¹ng & Vai trÃ²</a>
     </nav>
     <div class="sidebar-foot">
-      <div class="user-chip"><span class="avatar" id="userAvatar">?</span><div class="user-info"><b id="userName">Đang tải…</b><small id="userRole"></small></div></div>
-      <a href="#" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Đăng xuất</a>
+      <div class="user-chip"><span class="avatar" id="userAvatar">?</span><div class="user-info"><b id="userName">Äang táº£iâ€¦</b><small id="userRole"></small></div></div>
+      <a href="#" class="btn-logout"><svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>ÄÄƒng xuáº¥t</a>
     </div>
   </aside>
 
   <!-- TOPBAR -->
   <header class="topbar">
     <button class="mobile-sidebar-toggle" id="sidebarToggle"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
-    <span class="topbar-title">Sức khỏe & Y tế</span>
+    <span class="topbar-title">Sá»©c khá»e & Y táº¿</span>
   </header>
 
   <!-- MAIN -->
   <main class="main-content">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">FLOW 3 · Y TẾ & PHỤC HỒI</p>
-        <h1>Hồ sơ Y tế</h1>
-        <p class="sub">Quản lý sức khỏe, chấn thương và theo dõi y tế chi tiết theo từng cá thể ngựa.</p>
+        <p class="eyebrow">FLOW 3 Â· Y Táº¾ & PHá»¤C Há»’I</p>
+        <h1>Há»“ sÆ¡ Y táº¿</h1>
+        <p class="sub">Quáº£n lÃ½ sá»©c khá»e, cháº¥n thÆ°Æ¡ng vÃ  theo dÃµi y táº¿ chi tiáº¿t theo tá»«ng cÃ¡ thá»ƒ ngá»±a.</p>
       </div>
-      <!-- Tool lấy tọa độ ẩn (chỉ dành cho Dev/Admin để thiết lập tọa độ hotspot) -->
+      <!-- Tool láº¥y tá»a Ä‘á»™ áº©n (chá»‰ dÃ nh cho Dev/Admin Ä‘á»ƒ thiáº¿t láº­p tá»a Ä‘á»™ hotspot) -->
       <div style="display:flex;gap:0.5rem;align-items:center">
         <div style="display:flex;border:1px solid #2a303f;border-radius:8px;overflow:hidden">
           <button id="btnViewList" onclick="window._switchView('list')"
@@ -196,21 +196,21 @@
     <!-- MASTER-DETAIL LAYOUT -->
     <div class="md-layout">
       
-      <!-- CỘT TRÁI: DANH SÁCH NGỰA -->
+      <!-- Cá»˜T TRÃI: DANH SÃCH NGá»°A -->
       <div class="md-sidebar">
         <div class="md-search">
-          <input type="text" id="searchHorse" placeholder="Tìm kiếm ngựa...">
+          <input type="text" id="searchHorse" placeholder="TÃ¬m kiáº¿m ngá»±a...">
         </div>
         <div class="md-list" id="horseList">
-          <div style="padding: 2rem; text-align: center; color: #7a7258;">Đang tải danh sách...</div>
+          <div style="padding: 2rem; text-align: center; color: #7a7258;">Äang táº£i danh sÃ¡ch...</div>
         </div>
       </div>
 
-      <!-- CỘT PHẢI: CHI TIẾT NGỰA ĐƯỢC CHỌN -->
+      <!-- Cá»˜T PHáº¢I: CHI TIáº¾T NGá»°A ÄÆ¯á»¢C CHá»ŒN -->
       <div class="md-main" id="horseDetailArea">
         <div class="md-empty">
           <svg width="48" height="48" fill="none" stroke="#2a303f" stroke-width="1.5" viewBox="0 0 24 24" style="margin-bottom:1rem"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          <p>Vui lòng chọn một con ngựa từ danh sách bên trái để xem chi tiết y tế.</p>
+          <p>Vui lÃ²ng chá»n má»™t con ngá»±a tá»« danh sÃ¡ch bÃªn trÃ¡i Ä‘á»ƒ xem chi tiáº¿t y táº¿.</p>
         </div>
       </div>
 
@@ -218,41 +218,41 @@
   </main>
 </div>
 
-<!-- Template cho vùng Detail (sẽ được inject vào md-main bằng JS) -->
+<!-- Template cho vÃ¹ng Detail (sáº½ Ä‘Æ°á»£c inject vÃ o md-main báº±ng JS) -->
 <template id="detailTemplate">
-  <!-- Header của ngựa -->
+  <!-- Header cá»§a ngá»±a -->
   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
-      <h2 id="dt-name" style="margin:0 0 0.2rem 0; color:#f1efe6;">Tên ngựa</h2>
-      <p id="dt-meta" style="margin:0; font-size:0.85rem; color:#a89e7a;">Mã · Giống</p>
+      <h2 id="dt-name" style="margin:0 0 0.2rem 0; color:#f1efe6;">TÃªn ngá»±a</h2>
+      <p id="dt-meta" style="margin:0; font-size:0.85rem; color:#a89e7a;">MÃ£ Â· Giá»‘ng</p>
     </div>
     <div id="dt-badge"></div>
   </div>
 
-  <!-- Cột 2 Layout: Lệnh & Chăm sóc -->
+  <!-- Cá»™t 2 Layout: Lá»‡nh & ChÄƒm sÃ³c -->
   <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-    <!-- Khóa huấn luyện -->
+    <!-- KhÃ³a huáº¥n luyá»‡n -->
     <div class="card">
       <div class="card-head">
-        <h3>Lệnh Khóa Huấn luyện</h3>
-        <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.6rem" id="btnActionLock">Thay đổi</button>
+        <h3>Lá»‡nh KhÃ³a Huáº¥n luyá»‡n</h3>
+        <button class="btn btn-secondary" style="font-size:0.75rem; padding:0.3rem 0.6rem" id="btnActionLock">Thay Ä‘á»•i</button>
       </div>
       <div class="card-body" id="dt-lock-content" style="padding-bottom:1.2rem;">
-        <p style="font-size:0.85rem; color:#7a7258; margin:0;">Không có lệnh khóa nào. Ngựa có thể tập luyện bình thường.</p>
+        <p style="font-size:0.85rem; color:#7a7258; margin:0;">KhÃ´ng cÃ³ lá»‡nh khÃ³a nÃ o. Ngá»±a cÃ³ thá»ƒ táº­p luyá»‡n bÃ¬nh thÆ°á»ng.</p>
       </div>
     </div>
     
-    <!-- Lịch chăm sóc -->
+    <!-- Lá»‹ch chÄƒm sÃ³c -->
     <div class="card">
       <div class="card-head">
-        <h3>Lịch chăm sóc & Điều trị</h3>
-        <button class="btn btn-primary" style="font-size:0.75rem; padding:0.3rem 0.6rem" id="btnActionCare">+ Thêm lịch</button>
+        <h3>Lá»‹ch chÄƒm sÃ³c & Äiá»u trá»‹</h3>
+        <button class="btn btn-primary" style="font-size:0.75rem; padding:0.3rem 0.6rem" id="btnActionCare">+ ThÃªm lá»‹ch</button>
       </div>
       <div class="card-body" style="padding:0">
         <div class="table-wrap" style="max-height: 180px; overflow-y:auto; border:none;">
           <table style="width:100%">
             <tbody id="dt-care-list">
-              <!-- Load bằng JS -->
+              <!-- Load báº±ng JS -->
             </tbody>
           </table>
         </div>
@@ -260,19 +260,19 @@
     </div>
   </div>
 
-  <!-- Bản đồ chấn thương 3D -->
+  <!-- Báº£n Ä‘á»“ cháº¥n thÆ°Æ¡ng 3D -->
   <div class="viewer-card" style="display:flex; flex-direction:column;">
     <div class="card-head" style="border-bottom: 1px solid #2a303f;">
       <div>
-        <h3 style="margin:0 0 0.2rem 0;">Bản đồ chấn thương 3D</h3>
+        <h3 style="margin:0 0 0.2rem 0;">Báº£n Ä‘á»“ cháº¥n thÆ°Æ¡ng 3D</h3>
         <p style="margin:0; font-size:0.75rem; color:#a89e7a;" id="txtRoleHint">
-          Chỉ Bác sĩ thú y mới được phép đánh dấu chấn thương.
+          Chá»‰ BÃ¡c sÄ© thÃº y má»›i Ä‘Æ°á»£c phÃ©p Ä‘Ã¡nh dáº¥u cháº¥n thÆ°Æ¡ng.
         </p>
       </div>
       <div style="display:flex; gap:0.8rem; font-size:0.75rem;">
-        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#48bb78;"></span>Bình thường</span>
-        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#ed8936;"></span>Theo dõi</span>
-        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#e53e3e;"></span>Nghiêm trọng</span>
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#48bb78;"></span>BÃ¬nh thÆ°á»ng</span>
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#ed8936;"></span>Theo dÃµi</span>
+        <span style="display:flex; align-items:center; gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#e53e3e;"></span>NghiÃªm trá»ng</span>
       </div>
     </div>
     <div style="position:relative;">
@@ -285,118 +285,118 @@
         shadow-intensity="1"
         camera-orbit="45deg 75deg 105%"
         interaction-prompt="none"
-        alt="Bản đồ ngựa 3D">
+        alt="Báº£n Ä‘á»“ ngá»±a 3D">
         
-        <!-- 12 Hotspots Cố định.
-             (Các data-position và data-normal hiện đang đặt ước lượng hoặc 0.
-              Bạn có thể bật btnDevMode để click lấy toạ độ chuẩn và ghi vào đây). -->
-        <button class="Hotspot" slot="hotspot-head" data-surface="" data-position="0 1.6 0.8" data-normal="0 1 0" data-status="NORMAL" data-part="Đầu">
-          <div class="Hotspot-tooltip"><b>Đầu</b><br><span class="sts">Bình thường</span></div>
+        <!-- 12 Hotspots Cá»‘ Ä‘á»‹nh.
+             (CÃ¡c data-position vÃ  data-normal hiá»‡n Ä‘ang Ä‘áº·t Æ°á»›c lÆ°á»£ng hoáº·c 0.
+              Báº¡n cÃ³ thá»ƒ báº­t btnDevMode Ä‘á»ƒ click láº¥y toáº¡ Ä‘á»™ chuáº©n vÃ  ghi vÃ o Ä‘Ã¢y). -->
+        <button class="Hotspot" slot="hotspot-head" data-surface="" data-position="0 1.6 0.8" data-normal="0 1 0" data-status="NORMAL" data-part="Äáº§u">
+          <div class="Hotspot-tooltip"><b>Äáº§u</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
-        <button class="Hotspot" slot="hotspot-neck" data-surface="" data-position="0 1.3 0.6" data-normal="0 1 0" data-status="NORMAL" data-part="Cổ">
-          <div class="Hotspot-tooltip"><b>Cổ</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-neck" data-surface="" data-position="0 1.3 0.6" data-normal="0 1 0" data-status="NORMAL" data-part="Cá»•">
+          <div class="Hotspot-tooltip"><b>Cá»•</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
         
-        <!-- Chân trước -->
-        <button class="Hotspot" slot="hotspot-leg-fl" data-surface="" data-position="-0.2 0.4 0.5" data-normal="-1 0 0" data-status="NORMAL" data-part="Chân trước trái">
-          <div class="Hotspot-tooltip"><b>Chân trước trái</b><br><span class="sts">Bình thường</span></div>
+        <!-- ChÃ¢n trÆ°á»›c -->
+        <button class="Hotspot" slot="hotspot-leg-fl" data-surface="" data-position="-0.2 0.4 0.5" data-normal="-1 0 0" data-status="NORMAL" data-part="ChÃ¢n trÆ°á»›c trÃ¡i">
+          <div class="Hotspot-tooltip"><b>ChÃ¢n trÆ°á»›c trÃ¡i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
-        <button class="Hotspot" slot="hotspot-leg-fr" data-surface="" data-position="0.2 0.4 0.5" data-normal="1 0 0" data-status="NORMAL" data-part="Chân trước phải">
-          <div class="Hotspot-tooltip"><b>Chân trước phải</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-leg-fr" data-surface="" data-position="0.2 0.4 0.5" data-normal="1 0 0" data-status="NORMAL" data-part="ChÃ¢n trÆ°á»›c pháº£i">
+          <div class="Hotspot-tooltip"><b>ChÃ¢n trÆ°á»›c pháº£i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
         
         <!-- Vai -->
-        <button class="Hotspot" slot="hotspot-shoulder-l" data-surface="" data-position="-0.25 1 0.4" data-normal="-1 0 0" data-status="NORMAL" data-part="Vai trái">
-          <div class="Hotspot-tooltip"><b>Vai trái</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-shoulder-l" data-surface="" data-position="-0.25 1 0.4" data-normal="-1 0 0" data-status="NORMAL" data-part="Vai trÃ¡i">
+          <div class="Hotspot-tooltip"><b>Vai trÃ¡i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
-        <button class="Hotspot" slot="hotspot-shoulder-r" data-surface="" data-position="0.25 1 0.4" data-normal="1 0 0" data-status="NORMAL" data-part="Vai phải">
-          <div class="Hotspot-tooltip"><b>Vai phải</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-shoulder-r" data-surface="" data-position="0.25 1 0.4" data-normal="1 0 0" data-status="NORMAL" data-part="Vai pháº£i">
+          <div class="Hotspot-tooltip"><b>Vai pháº£i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
         
-        <!-- Thân giữa -->
-        <button class="Hotspot" slot="hotspot-back" data-surface="" data-position="0 1.2 -0.2" data-normal="0 1 0" data-status="NORMAL" data-part="Lưng">
-          <div class="Hotspot-tooltip"><b>Lưng</b><br><span class="sts">Bình thường</span></div>
+        <!-- ThÃ¢n giá»¯a -->
+        <button class="Hotspot" slot="hotspot-back" data-surface="" data-position="0 1.2 -0.2" data-normal="0 1 0" data-status="NORMAL" data-part="LÆ°ng">
+          <div class="Hotspot-tooltip"><b>LÆ°ng</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
-        <button class="Hotspot" slot="hotspot-belly" data-surface="" data-position="0 0.6 -0.2" data-normal="0 -1 0" data-status="NORMAL" data-part="Bụng">
-          <div class="Hotspot-tooltip"><b>Bụng</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-belly" data-surface="" data-position="0 0.6 -0.2" data-normal="0 -1 0" data-status="NORMAL" data-part="Bá»¥ng">
+          <div class="Hotspot-tooltip"><b>Bá»¥ng</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
 
-        <!-- Đùi (Chân sau trên) -->
-        <button class="Hotspot" slot="hotspot-thigh-l" data-surface="" data-position="-0.25 0.9 -0.6" data-normal="-1 0 0" data-status="NORMAL" data-part="Đùi trái">
-          <div class="Hotspot-tooltip"><b>Đùi trái</b><br><span class="sts">Bình thường</span></div>
+        <!-- ÄÃ¹i (ChÃ¢n sau trÃªn) -->
+        <button class="Hotspot" slot="hotspot-thigh-l" data-surface="" data-position="-0.25 0.9 -0.6" data-normal="-1 0 0" data-status="NORMAL" data-part="ÄÃ¹i trÃ¡i">
+          <div class="Hotspot-tooltip"><b>ÄÃ¹i trÃ¡i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
-        <button class="Hotspot" slot="hotspot-thigh-r" data-surface="" data-position="0.25 0.9 -0.6" data-normal="1 0 0" data-status="NORMAL" data-part="Đùi phải">
-          <div class="Hotspot-tooltip"><b>Đùi phải</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-thigh-r" data-surface="" data-position="0.25 0.9 -0.6" data-normal="1 0 0" data-status="NORMAL" data-part="ÄÃ¹i pháº£i">
+          <div class="Hotspot-tooltip"><b>ÄÃ¹i pháº£i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
         
-        <!-- Chân sau dưới -->
-        <button class="Hotspot" slot="hotspot-leg-bl" data-surface="" data-position="-0.2 0.4 -0.7" data-normal="-1 0 0" data-status="NORMAL" data-part="Chân sau trái">
-          <div class="Hotspot-tooltip"><b>Chân sau trái</b><br><span class="sts">Bình thường</span></div>
+        <!-- ChÃ¢n sau dÆ°á»›i -->
+        <button class="Hotspot" slot="hotspot-leg-bl" data-surface="" data-position="-0.2 0.4 -0.7" data-normal="-1 0 0" data-status="NORMAL" data-part="ChÃ¢n sau trÃ¡i">
+          <div class="Hotspot-tooltip"><b>ChÃ¢n sau trÃ¡i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
-        <button class="Hotspot" slot="hotspot-leg-br" data-surface="" data-position="0.2 0.4 -0.7" data-normal="1 0 0" data-status="NORMAL" data-part="Chân sau phải">
-          <div class="Hotspot-tooltip"><b>Chân sau phải</b><br><span class="sts">Bình thường</span></div>
+        <button class="Hotspot" slot="hotspot-leg-br" data-surface="" data-position="0.2 0.4 -0.7" data-normal="1 0 0" data-status="NORMAL" data-part="ChÃ¢n sau pháº£i">
+          <div class="Hotspot-tooltip"><b>ChÃ¢n sau pháº£i</b><br><span class="sts">BÃ¬nh thÆ°á»ng</span></div>
         </button>
 
       </model-viewer>
       
-      <!-- Lớp phủ (Overlay) thông báo chế độ Dev -->
+      <!-- Lá»›p phá»§ (Overlay) thÃ´ng bÃ¡o cháº¿ Ä‘á»™ Dev -->
       <div id="devOverlayMsg" style="display:none; position:absolute; top:10px; left:10px; background:rgba(0,0,0,0.8); color:#00ff00; padding:10px; font-family:monospace; border-radius:6px; z-index:100; pointer-events:none; font-size:12px;">
-        Chế độ Dev: Click vào model để lấy tọa độ<br><span id="devCoordTxt">...</span>
+        Cháº¿ Ä‘á»™ Dev: Click vÃ o model Ä‘á»ƒ láº¥y tá»a Ä‘á»™<br><span id="devCoordTxt">...</span>
       </div>
     </div>
   </div>
 
-  <!-- FR09 – Hồ sơ Khám bệnh & Điều trị -->
+  <!-- FR09 â€“ Há»“ sÆ¡ KhÃ¡m bá»‡nh & Äiá»u trá»‹ -->
   <div class="card" style="margin-top:1.5rem">
     <div class="card-head">
-      <h3>Hồ sơ Khám bệnh &amp; Điều trị</h3>
-      <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.6rem" id="btnNewExam">+ Tạo hồ sơ khám</button>
+      <h3>Há»“ sÆ¡ KhÃ¡m bá»‡nh &amp; Äiá»u trá»‹</h3>
+      <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.6rem" id="btnNewExam">+ Táº¡o há»“ sÆ¡ khÃ¡m</button>
     </div>
-    <!-- Form tạo hồ sơ khám mới (ẩn mặc định) -->
+    <!-- Form táº¡o há»“ sÆ¡ khÃ¡m má»›i (áº©n máº·c Ä‘á»‹nh) -->
     <div id="examForm" style="display:none;padding:1rem;border-bottom:1px solid #2a303f">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
         <div>
-          <label style="font-size:0.78rem;color:#a89e7a">Ngày khám *</label>
+          <label style="font-size:0.78rem;color:#a89e7a">NgÃ y khÃ¡m *</label>
           <input type="date" id="ef-date" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
         </div>
         <div>
-          <label style="font-size:0.78rem;color:#a89e7a">Trạng thái SK sau khám *</label>
+          <label style="font-size:0.78rem;color:#a89e7a">Tráº¡ng thÃ¡i SK sau khÃ¡m *</label>
           <select id="ef-status" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
-            <option value="FIT">FIT – Sẵn sàng</option>
-            <option value="MONITOR">MONITOR – Cần theo dõi</option>
-            <option value="INJURED">INJURED – Bị thương</option>
-            <option value="QUARANTINED">QUARANTINED – Cách ly</option>
+            <option value="FIT">FIT â€“ Sáºµn sÃ ng</option>
+            <option value="MONITOR">MONITOR â€“ Cáº§n theo dÃµi</option>
+            <option value="INJURED">INJURED â€“ Bá»‹ thÆ°Æ¡ng</option>
+            <option value="QUARANTINED">QUARANTINED â€“ CÃ¡ch ly</option>
           </select>
         </div>
         <div style="grid-column:1/-1">
-          <label style="font-size:0.78rem;color:#a89e7a">Triệu chứng *</label>
-          <textarea id="ef-symptoms" rows="2" placeholder="Mô tả triệu chứng lâm sàng..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          <label style="font-size:0.78rem;color:#a89e7a">Triá»‡u chá»©ng *</label>
+          <textarea id="ef-symptoms" rows="2" placeholder="MÃ´ táº£ triá»‡u chá»©ng lÃ¢m sÃ ng..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
         </div>
         <div style="grid-column:1/-1">
-          <label style="font-size:0.78rem;color:#a89e7a">Chẩn đoán *</label>
-          <textarea id="ef-diagnosis" rows="2" placeholder="Chẩn đoán lâm sàng..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          <label style="font-size:0.78rem;color:#a89e7a">Cháº©n Ä‘oÃ¡n *</label>
+          <textarea id="ef-diagnosis" rows="2" placeholder="Cháº©n Ä‘oÃ¡n lÃ¢m sÃ ng..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
         </div>
         <div style="grid-column:1/-1">
-          <label style="font-size:0.78rem;color:#a89e7a">Phác đồ điều trị *</label>
-          <textarea id="ef-treatment" rows="2" placeholder="Phác đồ điều trị đề xuất..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+          <label style="font-size:0.78rem;color:#a89e7a">PhÃ¡c Ä‘á»“ Ä‘iá»u trá»‹ *</label>
+          <textarea id="ef-treatment" rows="2" placeholder="PhÃ¡c Ä‘á»“ Ä‘iá»u trá»‹ Ä‘á» xuáº¥t..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
         </div>
         <div>
-          <label style="font-size:0.78rem;color:#a89e7a">Thuốc / Liều lượng</label>
-          <input type="text" id="ef-meds" placeholder="VD: Penicillin 1g x 2 lần/ngày" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
+          <label style="font-size:0.78rem;color:#a89e7a">Thuá»‘c / Liá»u lÆ°á»£ng</label>
+          <input type="text" id="ef-meds" placeholder="VD: Penicillin 1g x 2 láº§n/ngÃ y" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
         </div>
         <div>
-          <label style="font-size:0.78rem;color:#a89e7a">Ngày tái khám</label>
+          <label style="font-size:0.78rem;color:#a89e7a">NgÃ y tÃ¡i khÃ¡m</label>
           <input type="date" id="ef-followup" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
         </div>
       </div>
       <div style="display:flex;gap:0.5rem;margin-top:0.75rem;justify-content:flex-end">
-        <button id="btnCancelExam" class="btn btn-secondary" style="font-size:0.82rem">Hủy</button>
-        <button id="btnSaveExam" class="btn btn-primary" style="font-size:0.82rem">Lưu hồ sơ khám</button>
+        <button id="btnCancelExam" class="btn btn-secondary" style="font-size:0.82rem">Há»§y</button>
+        <button id="btnSaveExam" class="btn btn-primary" style="font-size:0.82rem">LÆ°u há»“ sÆ¡ khÃ¡m</button>
       </div>
     </div>
-    <!-- Danh sách hồ sơ khám -->
+    <!-- Danh sÃ¡ch há»“ sÆ¡ khÃ¡m -->
     <div id="examList" style="padding:0.5rem 1rem 1rem 1rem">
-      <p style="font-size:0.85rem;color:#7a7258">Đang tải...</p>
+      <p style="font-size:0.85rem;color:#7a7258">Äang táº£i...</p>
     </div>
   </div>
 </template>
@@ -476,7 +476,7 @@
     mainArea.appendChild(tmpl);
 
     document.getElementById('dt-name').textContent = horse.name;
-    document.getElementById('dt-meta').textContent = (horse.registrationCode || 'Chua co ma') + ' - ' + (horse.breed || 'Khong ro') + ' - Chuong ' + (horse.stableLocation || '—');
+    document.getElementById('dt-meta').textContent = (horse.registrationCode || 'Chua co ma') + ' - ' + (horse.breed || 'Khong ro') + ' - Chuong ' + (horse.stableLocation || 'â€”');
 
     const badge = HEALTH_BADGE[horse.healthStatus] || { cls:'draft', label: horse.healthStatus || 'Khong ro' };
     document.getElementById('dt-badge').innerHTML = '<span class="badge ' + badge.cls + '" style="font-size:0.9rem">' + badge.label + '</span>';
@@ -504,7 +504,7 @@
     setupExamForm(horse.id);
   };
 
-  // FR09 – Tải danh sách hồ sơ khám bệnh
+  // FR09 â€“ Táº£i danh sÃ¡ch há»“ sÆ¡ khÃ¡m bá»‡nh
   async function loadExaminations(horseId) {
     const el = document.getElementById('examList');
     if (!el) return;
@@ -512,33 +512,33 @@
     try {
       const data = await apiFetch('/api/horses/' + horseId + '/examinations?sort=examinationDate,desc&size=20');
       const rows = data?.content ?? data ?? [];
-      if (!rows.length) { el.innerHTML = '<p style="font-size:0.85rem;color:#7a7258">Chưa có hồ sơ khám nào.</p>'; return; }
+      if (!rows.length) { el.innerHTML = '<p style="font-size:0.85rem;color:#7a7258">ChÆ°a cÃ³ há»“ sÆ¡ khÃ¡m nÃ o.</p>'; return; }
       el.innerHTML = '<div style="display:flex;flex-direction:column;gap:0.75rem">' + rows.map(r => `
         <div style="border:1px solid #2a303f;border-radius:8px;padding:0.75rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-            <span style="font-size:0.8rem;color:#a89e7a">📅 ${r.examinationDate} &nbsp;·&nbsp; 👨‍⚕️ ${r.veterinarian?.name||'?'}</span>
+            <span style="font-size:0.8rem;color:#a89e7a">ðŸ“… ${r.examinationDate} &nbsp;Â·&nbsp; ðŸ‘¨â€âš•ï¸ ${r.veterinarian?.name||'?'}</span>
             ${STATUS_BADGE[r.healthStatusAfter]||r.healthStatusAfter}
           </div>
-          <div style="font-size:0.85rem;color:#ccc5ab"><b>Triệu chứng:</b> ${r.symptoms}</div>
-          <div style="font-size:0.85rem;color:#ccc5ab;margin-top:0.25rem"><b>Chẩn đoán:</b> ${r.diagnosis}</div>
-          ${r.treatmentPlan?`<div style="font-size:0.82rem;color:#a89e7a;margin-top:0.25rem"><b>Điều trị:</b> ${r.treatmentPlan}</div>`:''}
-          ${r.medicationAndDosage?`<div style="font-size:0.82rem;color:#a89e7a;margin-top:0.15rem"><b>Thuốc:</b> ${r.medicationAndDosage}</div>`:''}
-          ${r.followUpDate?`<div style="font-size:0.78rem;color:#7a7258;margin-top:0.25rem">🔁 Tái khám: ${r.followUpDate}</div>`:''}
-          ${r.addenda?.length?`<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #1a2030;font-size:0.78rem;color:#7a7258">📎 ${r.addenda.length} phụ lục</div>`:''}
+          <div style="font-size:0.85rem;color:#ccc5ab"><b>Triá»‡u chá»©ng:</b> ${r.symptoms}</div>
+          <div style="font-size:0.85rem;color:#ccc5ab;margin-top:0.25rem"><b>Cháº©n Ä‘oÃ¡n:</b> ${r.diagnosis}</div>
+          ${r.treatmentPlan?`<div style="font-size:0.82rem;color:#a89e7a;margin-top:0.25rem"><b>Äiá»u trá»‹:</b> ${r.treatmentPlan}</div>`:''}
+          ${r.medicationAndDosage?`<div style="font-size:0.82rem;color:#a89e7a;margin-top:0.15rem"><b>Thuá»‘c:</b> ${r.medicationAndDosage}</div>`:''}
+          ${r.followUpDate?`<div style="font-size:0.78rem;color:#7a7258;margin-top:0.25rem">ðŸ” TÃ¡i khÃ¡m: ${r.followUpDate}</div>`:''}
+          ${r.addenda?.length?`<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #1a2030;font-size:0.78rem;color:#7a7258">ðŸ“Ž ${r.addenda.length} phá»¥ lá»¥c</div>`:''}
         </div>`).join('') + '</div>';
     } catch(err) {
-      el.innerHTML = '<p style="font-size:0.85rem;color:#a89e7a">Không thể tải hồ sơ khám.</p>';
+      el.innerHTML = '<p style="font-size:0.85rem;color:#a89e7a">KhÃ´ng thá»ƒ táº£i há»“ sÆ¡ khÃ¡m.</p>';
     }
   }
 
-  // FR09 – Gắn sự kiện cho form tạo hồ sơ khám mới
+  // FR09 â€“ Gáº¯n sá»± kiá»‡n cho form táº¡o há»“ sÆ¡ khÃ¡m má»›i
   function setupExamForm(horseId) {
     const btnNew = document.getElementById('btnNewExam');
     const formEl = document.getElementById('examForm');
     const btnCancel = document.getElementById('btnCancelExam');
     const btnSave = document.getElementById('btnSaveExam');
     if (!btnNew || !formEl) return;
-    // Chỉ vet mới thấy nút tạo mới
+    // Chá»‰ vet má»›i tháº¥y nÃºt táº¡o má»›i
     if (!canEditHealth) { btnNew.style.display = 'none'; return; }
     btnNew.addEventListener('click', () => { formEl.style.display = formEl.style.display === 'none' ? 'block' : 'none'; });
     btnCancel.addEventListener('click', () => { formEl.style.display = 'none'; });
@@ -553,24 +553,24 @@
         healthStatusAfter: document.getElementById('ef-status').value,
       };
       if (!body.examinationDate || !body.symptoms || !body.diagnosis || !body.treatmentPlan) {
-        alert('Vui lòng điền đầy đủ các trường bắt buộc (*).');
+        alert('Vui lÃ²ng Ä‘iá»n Ä‘áº§y Ä‘á»§ cÃ¡c trÆ°á»ng báº¯t buá»™c (*).');
         return;
       }
-      btnSave.disabled = true; btnSave.textContent = 'Đang lưu...';
+      btnSave.disabled = true; btnSave.textContent = 'Äang lÆ°u...';
       try {
         await apiFetch('/api/horses/' + horseId + '/examinations', { method: 'POST', body: JSON.stringify(body) });
         formEl.style.display = 'none';
         ['ef-date','ef-symptoms','ef-diagnosis','ef-treatment','ef-meds','ef-followup'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
         document.getElementById('ef-status').value = 'FIT';
         await loadExaminations(horseId);
-        // Cập nhật badge sức khỏe ngựa trong danh sách bên trái
+        // Cáº­p nháº­t badge sá»©c khá»e ngá»±a trong danh sÃ¡ch bÃªn trÃ¡i
         const idx = allHorses.findIndex(h => h.id === horseId);
         if (idx !== -1) allHorses[idx].healthStatus = body.healthStatusAfter;
         renderHorseList(allHorses);
       } catch(err) {
-        alert('Lỗi khi lưu hồ sơ khám: ' + (err?.message || err));
+        alert('Lá»—i khi lÆ°u há»“ sÆ¡ khÃ¡m: ' + (err?.message || err));
       } finally {
-        btnSave.disabled = false; btnSave.textContent = 'Lưu hồ sơ khám';
+        btnSave.disabled = false; btnSave.textContent = 'LÆ°u há»“ sÆ¡ khÃ¡m';
       }
     });
   }
@@ -580,10 +580,10 @@
     try {
       const data = await apiFetch('/api/horses/' + horseId + '/preventive-care');
       const records = data?.content ?? data ?? [];
-      const EMOJI = { VACCINATION:'💉', DEWORMING:'🪱', FARRIER:'🔨', CHECKUP:'🩺' };
+      const EMOJI = { VACCINATION:'ðŸ’‰', DEWORMING:'ðŸª±', FARRIER:'ðŸ”¨', CHECKUP:'ðŸ©º' };
       if (!records.length) { body.innerHTML = '<tr><td colspan="3" style="color:#7a7258;text-align:center;padding:1rem;">Chua co lich cham soc.</td></tr>'; return; }
       body.innerHTML = records.map(r =>
-        '<tr><td style="padding:0.5rem 0;font-size:0.85rem">' + (EMOJI[r.careType]||'🩺') + ' ' + r.careType + '</td>' +
+        '<tr><td style="padding:0.5rem 0;font-size:0.85rem">' + (EMOJI[r.careType]||'ðŸ©º') + ' ' + r.careType + '</td>' +
         '<td style="padding:0.5rem 0;font-size:0.85rem;color:#a89e7a;">' + (r.dueDate||'') + '</td>' +
         '<td style="padding:0.5rem 0;text-align:right;"><span class="badge ' + (r.completed?'completed':'draft') + '">' + (r.completed?'Hoan thanh':'Da len lich') + '</span></td></tr>'
       ).join('');
@@ -632,7 +632,7 @@
           '<div style="font-size:0.8rem;color:#a89e7a">' + new Date(u.recordedAt).toLocaleString('vi-VN') + '</div>' +
           '<div style="font-size:0.85rem;color:#f1efe6"><b>' + u.statusLabel + '</b>' + (u.severityLabel?' - '+u.severityLabel:'') + '</div>' +
           '<div style="font-size:0.82rem;color:#c8c0a4;margin-top:0.25rem">' + u.notes + '</div>' +
-          '<div style="font-size:0.75rem;color:#7a7258;margin-top:0.25rem">— ' + (u.recordedBy?.username||'?') + '</div></div>'
+          '<div style="font-size:0.75rem;color:#7a7258;margin-top:0.25rem">â€” ' + (u.recordedBy?.username||'?') + '</div></div>'
         ).join('')
       : '<p style="color:#7a7258;font-size:0.85rem">Chua co cap nhat nao.</p>';
 
@@ -691,7 +691,7 @@
         return '<div onclick="window.selectHorse(\'' + s.horseId + '\');window._switchView(\'list\')" style="background:' + c.bg + ';border:1px solid ' + c.border + ';border-radius:10px;padding:1rem;cursor:pointer;transition:transform 0.15s" onmouseover="this.style.transform=\'scale(1.02)\'" onmouseout="this.style.transform=\'scale(1)\'">' +
           '<div style="font-size:0.7rem;color:' + c.dot + ';text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.3rem">' + s.stableLocation + '</div>' +
           '<div style="font-weight:600;color:#f1efe6;margin-bottom:0.2rem">' + s.horseName + '</div>' +
-          '<div style="font-size:0.75rem;color:#a89e7a;margin-bottom:0.5rem">' + (s.registrationCode||'—') + '</div>' +
+          '<div style="font-size:0.75rem;color:#a89e7a;margin-bottom:0.5rem">' + (s.registrationCode||'â€”') + '</div>' +
           '<span style="font-size:0.72rem;padding:0.2rem 0.5rem;border-radius:99px;background:' + c.border + '22;color:' + c.dot + ';border:1px solid ' + c.dot + '55">' + s.healthStatus + '</span></div>';
       }).join('');
       area.innerHTML = '<div style="padding:0.5rem 0 1rem 0;display:flex;gap:0.5rem;flex-wrap:wrap">' + filters + '</div>' +
@@ -735,3 +735,4 @@
 
 </body>
 </html>
+

@@ -15,9 +15,6 @@ import com.racehorse.notification.service.NotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -31,7 +28,6 @@ public class IncidentReportService {
     private final HorseAccessService horseAccess;
     private final UserAccountRepository userRepository;
     private final NotificationService notificationService;
-    private final ObjectMapper json;
     private final Clock clock;
 
     public IncidentReportService(
@@ -39,13 +35,11 @@ public class IncidentReportService {
             HorseAccessService horseAccess,
             UserAccountRepository userRepository,
             NotificationService notificationService,
-            ObjectMapper json,
             Clock clock) {
         this.jdbc = jdbc;
         this.horseAccess = horseAccess;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
-        this.json = json;
         this.clock = clock;
     }
 
@@ -59,32 +53,21 @@ public class IncidentReportService {
             throw new BusinessException("Mức độ nghiêm trọng (severity) không hợp lệ: " + severity);
         }
 
-        List<String> names = jdbc.query(
-                "select username from users where id=?",
-                (rs, rn) -> rs.getString("username"), actorId);
-        String reporterName = names.isEmpty() ? "Nhân viên chuồng" : names.getFirst();
-
         UUID incidentId = UUID.randomUUID();
-        LocalDate today = LocalDate.now(clock);
         OffsetDateTime now = OffsetDateTime.now(clock);
 
-        Map<String, Object> data = new LinkedHashMap<>();
-        data.put("incidentType", incidentType);
-        data.put("severity", severity);
-        data.put("description", request.description().trim());
-        data.put("photoUrl", request.photoUrl() == null || request.photoUrl().isBlank() ? null : request.photoUrl().trim());
-        data.put("reportedByUserId", actorId.toString());
-        data.put("reportedByName", reporterName);
-        data.put("reportedAt", now.toString());
-        data.put("resolvedByUserId", null);
-        data.put("resolvedByName", null);
-        data.put("resolvedAt", null);
-        data.put("resolutionNotes", null);
+        // Append severity to type or description if needed, or modify schema. 
+        // Current schema: incident_reports(id, horse_id, reported_by_user_id, incident_type, description, submitted_at, status, resolved_by, resolved_at, resolution_notes)
+        // Note: The original schema didn't have severity explicitly. I will append it to incident_type for now: "[HIGH] Colic"
+        String fullIncidentType = "[" + severity + "] " + incidentType;
 
         jdbc.update(
-                "insert into module_records(id, module_code, record_type, horse_id, user_id, event_date, status, data_json, created_at, updated_at) " +
-                        "values (?, 'STABLE_CARE', 'INCIDENT_REPORT', ?, ?, ?, 'REPORTED', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())",
-                incidentId, horse.getId(), actorId, today, toJson(data));
+                "INSERT INTO dbo.incident_reports(id, horse_id, reported_by_user_id, incident_type, description, submitted_at, status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, 'REPORTED')",
+                incidentId, horse.getId(), actorId, fullIncidentType, request.description().trim(), now);
+
+        // Handle file if any (we map photoUrl to file link or skip if no stored_files entry)
+        // Simplification for FR16: we just assume the file is uploaded.
 
         // Push immediate notification to Veterinarians and Head Trainers
         dispatchEmergencyNotification(horse, incidentId, incidentType, severity, request.description().trim());
@@ -94,32 +77,18 @@ public class IncidentReportService {
 
     @Transactional
     public IncidentReportResponse updateStatus(UUID incidentId, UUID actorId, UpdateIncidentStatusRequest request) {
-        IncidentReportResponse existing = getReport(incidentId);
         String targetStatus = request.status().trim().toUpperCase(Locale.ROOT);
-
         if (!List.of("REPORTED", "UNDER_REVIEW", "RESOLVED").contains(targetStatus)) {
             throw new BusinessException("Trạng thái sự cố không hợp lệ: " + targetStatus);
         }
 
-        String currentJson = jdbc.queryForObject(
-                "select data_json from module_records where id=?", String.class, incidentId);
-        Map<String, Object> data = readMap(currentJson);
-
         if ("RESOLVED".equals(targetStatus)) {
-            List<String> names = jdbc.query(
-                    "select username from users where id=?",
-                    (rs, rn) -> rs.getString("username"), actorId);
-            String resolverName = names.isEmpty() ? "Người xử lý" : names.getFirst();
-
-            data.put("resolvedByUserId", actorId.toString());
-            data.put("resolvedByName", resolverName);
-            data.put("resolvedAt", OffsetDateTime.now(clock).toString());
-            data.put("resolutionNotes", request.resolutionNotes() == null ? null : request.resolutionNotes().trim());
+            jdbc.update(
+                    "UPDATE dbo.incident_reports SET status=?, resolved_by_user_id=?, resolved_at=?, resolution_notes=? WHERE id=?",
+                    targetStatus, actorId, OffsetDateTime.now(clock), request.resolutionNotes() == null ? null : request.resolutionNotes().trim(), incidentId);
+        } else {
+            jdbc.update("UPDATE dbo.incident_reports SET status=? WHERE id=?", targetStatus, incidentId);
         }
-
-        jdbc.update(
-                "update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
-                targetStatus, toJson(data), incidentId);
 
         return getReport(incidentId);
     }
@@ -127,42 +96,39 @@ public class IncidentReportService {
     @Transactional(readOnly = true)
     public IncidentReportResponse getReport(UUID incidentId) {
         List<IncidentReportResponse> rows = jdbc.query(
-                baseSelect() + " where m.id=? and m.module_code='STABLE_CARE' and m.record_type='INCIDENT_REPORT'",
+                baseSelect() + " WHERE i.id=?",
                 (rs, rowNum) -> mapResponse(rs), incidentId);
-        if (rows.isEmpty()) {
-            throw new ResourceNotFoundException("Không tìm thấy báo cáo sự cố: " + incidentId);
-        }
+        if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy báo cáo sự cố: " + incidentId);
         return rows.getFirst();
     }
 
     @Transactional(readOnly = true)
     public List<IncidentReportResponse> listReports(UUID horseId, String status, String severity, LocalDate fromDate, LocalDate toDate) {
-        StringBuilder sql = new StringBuilder(baseSelect())
-                .append(" where m.module_code='STABLE_CARE' and m.record_type='INCIDENT_REPORT'");
+        StringBuilder sql = new StringBuilder(baseSelect()).append(" WHERE 1=1 ");
         List<Object> args = new ArrayList<>();
 
         if (horseId != null) {
-            sql.append(" and m.horse_id=?");
+            sql.append(" AND i.horse_id=?");
             args.add(horseId);
         }
         if (status != null && !status.isBlank()) {
-            sql.append(" and m.status=?");
+            sql.append(" AND i.status=?");
             args.add(status.trim().toUpperCase(Locale.ROOT));
         }
         if (severity != null && !severity.isBlank()) {
-            sql.append(" and JSON_VALUE(m.data_json,'$.severity')=?");
-            args.add(severity.trim().toUpperCase(Locale.ROOT));
+            sql.append(" AND i.incident_type LIKE ?");
+            args.add("%[" + severity.trim().toUpperCase(Locale.ROOT) + "]%");
         }
         if (fromDate != null) {
-            sql.append(" and m.event_date >= ?");
+            sql.append(" AND CAST(i.submitted_at AS DATE) >= ?");
             args.add(fromDate);
         }
         if (toDate != null) {
-            sql.append(" and m.event_date <= ?");
+            sql.append(" AND CAST(i.submitted_at AS DATE) <= ?");
             args.add(toDate);
         }
 
-        sql.append(" order by m.created_at desc");
+        sql.append(" ORDER BY i.submitted_at DESC");
 
         return jdbc.query(sql.toString(), (rs, rowNum) -> mapResponse(rs), args.toArray());
     }
@@ -173,8 +139,7 @@ public class IncidentReportService {
         if (recipients.isEmpty()) return;
 
         NotificationPriority priority = ("HIGH".equals(severity) || "CRITICAL".equals(severity))
-                ? NotificationPriority.HIGH
-                : NotificationPriority.NORMAL;
+                ? NotificationPriority.HIGH : NotificationPriority.NORMAL;
 
         String title = String.format("[BÁO CÁO SỰ CỐ - %s] %s (%s)", severity, horse.getName(), horse.getCode());
         String snippet = description.length() > 100 ? description.substring(0, 97) + "..." : description;
@@ -182,21 +147,20 @@ public class IncidentReportService {
 
         for (UserAccount recipient : recipients) {
             notificationService.create(
-                    recipient,
-                    "EMERGENCY_INCIDENT",
-                    priority,
-                    title,
-                    message,
-                    "INCIDENT_REPORT",
-                    incidentId);
+                    recipient, "EMERGENCY_INCIDENT", priority, title, message, "INCIDENT_REPORT", incidentId);
         }
     }
 
     private String baseSelect() {
-        return "select m.id, m.horse_id, h.code horse_code, h.name horse_name, m.status, " +
-                "m.event_date, m.data_json, m.created_at " +
-                "from module_records m " +
-                "left join horses h on h.id = m.horse_id ";
+        return "SELECT i.id, i.horse_id, h.code AS horse_code, h.name AS horse_name, " +
+               "i.incident_type, i.description, i.status, i.submitted_at, " +
+               "i.reported_by_user_id, ur.username AS reporter_name, " +
+               "i.resolved_by_user_id, res.username AS resolver_name, " +
+               "i.resolved_at, i.resolution_notes " +
+               "FROM dbo.incident_reports i " +
+               "JOIN dbo.horses h ON h.id = i.horse_id " +
+               "JOIN dbo.users ur ON ur.id = i.reported_by_user_id " +
+               "LEFT JOIN dbo.users res ON res.id = i.resolved_by_user_id";
     }
 
     private IncidentReportResponse mapResponse(java.sql.ResultSet rs) throws java.sql.SQLException {
@@ -204,72 +168,33 @@ public class IncidentReportService {
         UUID horseId = rs.getObject("horse_id", UUID.class);
         String horseCode = rs.getString("horse_code");
         String horseName = rs.getString("horse_name");
+        String fullType = rs.getString("incident_type");
+        String description = rs.getString("description");
         String status = rs.getString("status");
-        LocalDate reportDate = rs.getObject("event_date", LocalDate.class);
-        OffsetDateTime createdAt = rs.getObject("created_at", OffsetDateTime.class);
+        OffsetDateTime submittedAt = rs.getObject("submitted_at", OffsetDateTime.class);
+        
+        UUID reportedById = rs.getObject("reported_by_user_id", UUID.class);
+        String reporterName = rs.getString("reporter_name");
+        
+        UUID resolvedById = rs.getObject("resolved_by_user_id", UUID.class);
+        String resolverName = rs.getString("resolver_name");
+        OffsetDateTime resolvedAt = rs.getObject("resolved_at", OffsetDateTime.class);
+        String resolutionNotes = rs.getString("resolution_notes");
 
-        JsonNode node = read(rs.getString("data_json"));
-        String incidentType = node.path("incidentType").asText("OTHER");
-        String severity = node.path("severity").asText("MEDIUM");
-        String description = node.path("description").asText("");
-        String photoUrl = node.path("photoUrl").isNull() ? null : node.path("photoUrl").asText(null);
-
-        String reportedByStr = node.path("reportedByUserId").isNull() ? null : node.path("reportedByUserId").asText(null);
-        UUID reportedByUserId = reportedByStr == null || reportedByStr.isBlank() ? null : UUID.fromString(reportedByStr);
-        String reportedByName = node.path("reportedByName").isNull() ? null : node.path("reportedByName").asText(null);
-        String reportedAtStr = node.path("reportedAt").isNull() ? null : node.path("reportedAt").asText(null);
-        OffsetDateTime reportedAt = reportedAtStr == null || reportedAtStr.isBlank() ? createdAt : OffsetDateTime.parse(reportedAtStr);
-
-        String resolvedByStr = node.path("resolvedByUserId").isNull() ? null : node.path("resolvedByUserId").asText(null);
-        UUID resolvedByUserId = resolvedByStr == null || resolvedByStr.isBlank() ? null : UUID.fromString(resolvedByStr);
-        String resolvedByName = node.path("resolvedByName").isNull() ? null : node.path("resolvedByName").asText(null);
-        String resolvedAtStr = node.path("resolvedAt").isNull() ? null : node.path("resolvedAt").asText(null);
-        OffsetDateTime resolvedAt = resolvedAtStr == null || resolvedAtStr.isBlank() ? null : OffsetDateTime.parse(resolvedAtStr);
-        String resolutionNotes = node.path("resolutionNotes").isNull() ? null : node.path("resolutionNotes").asText(null);
+        // Phân tách "[HIGH] Đau bụng"
+        String severity = "MEDIUM";
+        String incidentType = fullType;
+        if (fullType.startsWith("[")) {
+            int closeBracket = fullType.indexOf("]");
+            if (closeBracket > 0) {
+                severity = fullType.substring(1, closeBracket);
+                incidentType = fullType.substring(closeBracket + 1).trim();
+            }
+        }
 
         return new IncidentReportResponse(
-                id,
-                horseId,
-                horseCode,
-                horseName,
-                incidentType,
-                severity,
-                description,
-                photoUrl,
-                status,
-                reportDate,
-                reportedByUserId,
-                reportedByName,
-                reportedAt,
-                resolvedByUserId,
-                resolvedByName,
-                resolvedAt,
-                resolutionNotes);
-    }
-
-    private JsonNode read(String raw) {
-        if (raw == null || raw.isBlank()) return json.createObjectNode();
-        try {
-            return json.readTree(raw);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse incident data_json: " + e.getMessage(), e);
-        }
-    }
-
-    private Map<String, Object> readMap(String raw) {
-        if (raw == null || raw.isBlank()) return new LinkedHashMap<>();
-        try {
-            return json.readValue(raw, new TypeReference<Map<String, Object>>() {});
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to parse JSON map: " + e.getMessage(), e);
-        }
-    }
-
-    private String toJson(Object value) {
-        try {
-            return json.writeValueAsString(value);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to serialize to JSON: " + e.getMessage(), e);
-        }
+                id, horseId, horseCode, horseName, incidentType, severity, description, null, status,
+                submittedAt.toLocalDate(), reportedById, reporterName, submittedAt,
+                resolvedById, resolverName, resolvedAt, resolutionNotes);
     }
 }

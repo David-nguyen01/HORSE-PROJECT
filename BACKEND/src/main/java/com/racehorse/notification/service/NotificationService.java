@@ -19,10 +19,12 @@ public class NotificationService {
 
     private final NotificationRepository repository;
     private final Clock clock;
+    private final SseNotificationService sseService;
 
-    public NotificationService(NotificationRepository repository, Clock clock) {
+    public NotificationService(NotificationRepository repository, Clock clock, SseNotificationService sseService) {
         this.repository = repository;
         this.clock = clock;
+        this.sseService = sseService;
     }
 
     @Transactional
@@ -34,8 +36,12 @@ public class NotificationService {
             String message,
             String relatedEntityType,
             UUID relatedEntityId) {
-        return repository.save(new Notification(
+        Notification saved = repository.save(new Notification(
                 recipient, type, priority, title, message, relatedEntityType, relatedEntityId, clock.instant()));
+        
+        // Bắn Push Notification qua SSE
+        sseService.pushNotification(recipient.getId(), toResponse(saved));
+        return saved;
     }
 
     @Transactional(readOnly = true)

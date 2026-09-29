@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Đăng ký — Turfline Stable Manager</title>
+<title>ÄÄƒng kÃ½ â€” Turfline Stable Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -14,25 +14,25 @@
 
   <div class="auth-brand">
     <div class="brand-mark">
-      <span class="glyph">◆</span>
+      <span class="glyph">â—†</span>
       <span class="wordmark"><b>Turfline</b>Stable Manager</span>
     </div>
 
     <form class="auth-form" action="#" method="post">
       <p class="kicker">Get started</p>
-      <h2>Tạo tài khoản</h2>
-      <p class="lede">Điền thông tin bên dưới để đăng ký tài khoản vào hệ thống.</p>
+      <h2>Táº¡o tÃ i khoáº£n</h2>
+      <p class="lede">Äiá»n thÃ´ng tin bÃªn dÆ°á»›i Ä‘á»ƒ Ä‘Äƒng kÃ½ tÃ i khoáº£n vÃ o há»‡ thá»‘ng.</p>
 
       <div id="regError" style="display:none;background:#fff0ee;border:1px solid rgba(229,62,62,.25);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;color:#c53030;margin-bottom:1rem;"></div>
       <div id="regSuccess" style="display:none;background:#f0fff4;border:1px solid rgba(56,161,105,.25);border-radius:8px;padding:.65rem .9rem;font-size:.85rem;color:#276749;margin-bottom:1rem;"></div>
 
       <div class="field-row">
         <div class="field">
-          <label for="reg-firstname">Họ</label>
-          <input id="reg-firstname" name="firstname" type="text" required placeholder="Nguyễn">
+          <label for="reg-firstname">Há»</label>
+          <input id="reg-firstname" name="firstname" type="text" required placeholder="Nguyá»…n">
         </div>
         <div class="field">
-          <label for="reg-lastname">Tên</label>
+          <label for="reg-lastname">TÃªn</label>
           <input id="reg-lastname" name="lastname" type="text" required placeholder="An">
         </div>
       </div>
@@ -43,86 +43,86 @@
       </div>
 
       <div class="field">
-        <label id="roleLabel">Vai trò đăng ký</label>
+        <label id="roleLabel">Vai trÃ² Ä‘Äƒng kÃ½</label>
         <div class="select-custom" id="roleDropdown">
           <button type="button" class="select-trigger" id="roleTrigger" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="roleLabel roleTriggerText">
-            <span id="roleTriggerText" class="select-trigger-text is-placeholder">Chọn vai trò của bạn</span>
+            <span id="roleTriggerText" class="select-trigger-text is-placeholder">Chá»n vai trÃ² cá»§a báº¡n</span>
             <svg class="select-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           <ul class="select-options" id="roleOptions" role="listbox" tabindex="-1">
-            <li role="option" data-value="HEAD_TRAINER">Head Trainer — Huấn luyện viên Trưởng</li>
-            <li role="option" data-value="VETERINARIAN">Veterinarian — Bác sĩ Thú y</li>
-            <li role="option" data-value="STABLE_STAFF">Stable Staff — Chăm sóc &amp; Chuồng trại</li>
-            <li role="option" data-value="HORSE_OWNER">Horse Owner — Chủ sở hữu Ngựa</li>
+            <li role="option" data-value="HEAD_TRAINER">Head Trainer â€” Huáº¥n luyá»‡n viÃªn TrÆ°á»Ÿng</li>
+            <li role="option" data-value="VETERINARIAN">Veterinarian â€” BÃ¡c sÄ© ThÃº y</li>
+            <li role="option" data-value="STABLE_STAFF">Stable Staff â€” ChÄƒm sÃ³c &amp; Chuá»“ng tráº¡i</li>
+            <li role="option" data-value="HORSE_OWNER">Horse Owner â€” Chá»§ sá»Ÿ há»¯u Ngá»±a</li>
           </ul>
           <input type="hidden" id="reg-role" name="role">
         </div>
       </div>
 
       <div class="field" id="roleKeyField" hidden>
-        <label for="reg-rolekey">Mã xác thực vai trò</label>
-        <input id="reg-rolekey" name="role_key" type="text" placeholder="Nhập mã được cấp cho vai trò này">
-        <p class="field-hint">Liên hệ Quản lý câu lạc bộ để nhận mã cho vai trò này.</p>
+        <label for="reg-rolekey">MÃ£ xÃ¡c thá»±c vai trÃ²</label>
+        <input id="reg-rolekey" name="role_key" type="text" placeholder="Nháº­p mÃ£ Ä‘Æ°á»£c cáº¥p cho vai trÃ² nÃ y">
+        <p class="field-hint">LiÃªn há»‡ Quáº£n lÃ½ cÃ¢u láº¡c bá»™ Ä‘á»ƒ nháº­n mÃ£ cho vai trÃ² nÃ y.</p>
       </div>
 
       <div class="field-row">
         <div class="field">
-          <label for="reg-password">Mật khẩu</label>
-          <input id="reg-password" name="password" type="password" autocomplete="new-password" required placeholder="Tối thiểu 8 ký tự">
+          <label for="reg-password">Máº­t kháº©u</label>
+          <input id="reg-password" name="password" type="password" autocomplete="new-password" required placeholder="Tá»‘i thiá»ƒu 8 kÃ½ tá»±">
         </div>
         <div class="field">
-          <label for="reg-password2">Nhập lại mật khẩu</label>
-          <input id="reg-password2" name="password2" type="password" autocomplete="new-password" required placeholder="••••••••">
+          <label for="reg-password2">Nháº­p láº¡i máº­t kháº©u</label>
+          <input id="reg-password2" name="password2" type="password" autocomplete="new-password" required placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢">
         </div>
       </div>
 
       <div class="field-note">
         <label class="check">
           <input type="checkbox" id="terms" name="terms" required>
-          Tôi đồng ý với điều khoản sử dụng của câu lạc bộ
+          TÃ´i Ä‘á»“ng Ã½ vá»›i Ä‘iá»u khoáº£n sá»­ dá»¥ng cá»§a cÃ¢u láº¡c bá»™
         </label>
       </div>
 
-      <button type="submit" class="btn-primary">Gửi yêu cầu đăng ký</button>
+      <button type="submit" class="btn-primary">Gá»­i yÃªu cáº§u Ä‘Äƒng kÃ½</button>
 
-      <p class="auth-switch">Đã có tài khoản? <a href="login.html">Đăng nhập</a></p>
+      <p class="auth-switch">ÄÃ£ cÃ³ tÃ i khoáº£n? <a href="login.html">ÄÄƒng nháº­p</a></p>
     </form>
   </div>
 
   <div class="auth-info">
     <div>
       <p class="kicker">Join the paddock</p>
-      <h2>Ba bước để <span class="muted">bắt đầu</span></h2>
-      <p>Tạo tài khoản, chờ phê duyệt và truy cập đúng theo vai trò của bạn.</p>
+      <h2>Ba bÆ°á»›c Ä‘á»ƒ <span class="muted">báº¯t Ä‘áº§u</span></h2>
+      <p>Táº¡o tÃ i khoáº£n, chá» phÃª duyá»‡t vÃ  truy cáº­p Ä‘Ãºng theo vai trÃ² cá»§a báº¡n.</p>
     </div>
 
     <div class="steps-box">
       <div class="step">
         <span class="num">01</span>
         <div>
-          <h4>Tạo tài khoản</h4>
-          <p>Điền thông tin cá nhân và chọn vai trò bạn đảm nhận trong câu lạc bộ.</p>
+          <h4>Táº¡o tÃ i khoáº£n</h4>
+          <p>Äiá»n thÃ´ng tin cÃ¡ nhÃ¢n vÃ  chá»n vai trÃ² báº¡n Ä‘áº£m nháº­n trong cÃ¢u láº¡c bá»™.</p>
         </div>
       </div>
       <div class="step">
         <span class="num">02</span>
         <div>
-          <h4>Nhập mã xác thực vai trò</h4>
-          <p>Với vai trò ngoài Horse Owner, cần mã do Quản lý câu lạc bộ cấp trước để được kích hoạt đúng quyền.</p>
+          <h4>Nháº­p mÃ£ xÃ¡c thá»±c vai trÃ²</h4>
+          <p>Vá»›i vai trÃ² ngoÃ i Horse Owner, cáº§n mÃ£ do Quáº£n lÃ½ cÃ¢u láº¡c bá»™ cáº¥p trÆ°á»›c Ä‘á»ƒ Ä‘Æ°á»£c kÃ­ch hoáº¡t Ä‘Ãºng quyá»n.</p>
         </div>
       </div>
       <div class="step">
         <span class="num">03</span>
         <div>
-          <h4>Truy cập theo vai trò</h4>
-          <p>Bắt đầu làm việc với dữ liệu và chức năng dành riêng cho bạn.</p>
+          <h4>Truy cáº­p theo vai trÃ²</h4>
+          <p>Báº¯t Ä‘áº§u lÃ m viá»‡c vá»›i dá»¯ liá»‡u vÃ  chá»©c nÄƒng dÃ nh riÃªng cho báº¡n.</p>
         </div>
       </div>
     </div>
 
     <div class="callout">
-      <h5>Về mã xác thực vai trò</h5>
-      <p>Horse Owner không cần mã. Các vai trò còn lại (Head Trainer, Veterinarian, Groom, Club Manager) cần nhập đúng mã được cấp để tài khoản được gán đúng quyền.</p>
+      <h5>Vá» mÃ£ xÃ¡c thá»±c vai trÃ²</h5>
+      <p>Horse Owner khÃ´ng cáº§n mÃ£. CÃ¡c vai trÃ² cÃ²n láº¡i (Head Trainer, Veterinarian, Groom, Club Manager) cáº§n nháº­p Ä‘Ãºng mÃ£ Ä‘Æ°á»£c cáº¥p Ä‘á»ƒ tÃ i khoáº£n Ä‘Æ°á»£c gÃ¡n Ä‘Ãºng quyá»n.</p>
     </div>
   </div>
 
@@ -193,7 +193,7 @@
     if (!roleHiddenInput.value) {
       roleFieldWrap.classList.add('has-error');
       roleTrigger.focus();
-      showError('Vui lòng chọn vai trò của bạn.');
+      showError('Vui lÃ²ng chá»n vai trÃ² cá»§a báº¡n.');
       return;
     }
 
@@ -205,18 +205,18 @@
     const password2 = document.getElementById('reg-password2').value;
 
     if (password !== password2) {
-      showError('Mật khẩu nhập lại không khớp.');
+      showError('Máº­t kháº©u nháº­p láº¡i khÃ´ng khá»›p.');
       return;
     }
     if (password.length < 8) {
-      showError('Mật khẩu phải có tối thiểu 8 ký tự.');
+      showError('Máº­t kháº©u pháº£i cÃ³ tá»‘i thiá»ƒu 8 kÃ½ tá»±.');
       return;
     }
 
     const username = `${firstname} ${lastname}`.trim();
     const submitBtn = form.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Đang xử lý…';
+    submitBtn.textContent = 'Äang xá»­ lÃ½â€¦';
 
     try {
       const res = await fetch('/api/auth/register', {
@@ -233,7 +233,7 @@
 
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        let msg = `Đăng ký không thành công (${res.status}).`;
+        let msg = `ÄÄƒng kÃ½ khÃ´ng thÃ nh cÃ´ng (${res.status}).`;
         try {
           const json = JSON.parse(text);
           if (json.message) msg = json.message;
@@ -245,15 +245,15 @@
         return;
       }
 
-      showSuccess('Đăng ký thành công! Đang chuyển hướng đến trang đăng nhập…');
+      showSuccess('ÄÄƒng kÃ½ thÃ nh cÃ´ng! Äang chuyá»ƒn hÆ°á»›ng Ä‘áº¿n trang Ä‘Äƒng nháº­pâ€¦');
       setTimeout(() => {
         window.location.href = 'login.html';
       }, 1500);
     } catch (err) {
-      showError('Không thể kết nối đến máy chủ. Vui lòng kiểm tra backend.');
+      showError('KhÃ´ng thá»ƒ káº¿t ná»‘i Ä‘áº¿n mÃ¡y chá»§. Vui lÃ²ng kiá»ƒm tra backend.');
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Gửi yêu cầu đăng ký';
+      submitBtn.textContent = 'Gá»­i yÃªu cáº§u Ä‘Äƒng kÃ½';
     }
   });
 </script>
@@ -275,3 +275,4 @@
 
 </body>
 </html>
+

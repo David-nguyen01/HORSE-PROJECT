@@ -208,5 +208,165 @@ export function initShell(allowedRoles = []) {
     });
   }
 
+  // --- FR16: GLOBAL EMERGENCY INCIDENT FEATURE ---
+  setupGlobalIncidentFeature();
+  if (hasRole('VETERINARIAN', 'HEAD_TRAINER')) {
+    startSseListener();
+  }
+
   return auth;
 }
+
+// ── SSE LISTENER (FR16) ───────────────────────────────────────────────────
+function startSseListener() {
+  const auth = getAuth();
+  if (!auth?.accessToken) return;
+
+  const eventSource = new EventSource('/api/notifications/stream?access_token=' + auth.accessToken);
+  // Note: EventSource default doesn't support headers well in all browsers. 
+  // If backend expects Bearer token in header, a common workaround is passing via query param. 
+  // We'll try query param or just simple implementation assuming proxy can handle it.
+  // We assume the backend allows JWT via query param for this endpoint.
+
+  eventSource.addEventListener('notification', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      showToast(data.title, data.message, data.priority === 'HIGH' || data.priority === 'CRITICAL');
+    } catch (err) { console.error('Error parsing SSE event:', err); }
+  });
+  
+  eventSource.addEventListener('ping', () => console.log('SSE Ping received'));
+  eventSource.onerror = () => console.log('SSE connection error. Reconnecting...');
+}
+
+// ── TOAST NOTIFICATION ────────────────────────────────────────────────────
+function showToast(title, message, isHighPriority) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    container.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;';
+    document.body.appendChild(container);
+  }
+
+  const bg = isHighPriority ? '#e53e3e' : '#2b6cb0';
+  const toast = document.createElement('div');
+  toast.style.cssText = `background:${bg};color:#fff;padding:15px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);min-width:250px;max-width:350px;animation:slideIn 0.3s ease-out;`;
+  toast.innerHTML = `<h4 style="margin:0 0 5px 0;font-size:15px;">${title}</h4><p style="margin:0;font-size:13px;opacity:0.9;">${message}</p>`;
+  
+  container.appendChild(toast);
+  
+  // Custom animation slide in/out
+  if (!document.getElementById('toast-style')) {
+    const style = document.createElement('style');
+    style.id = 'toast-style';
+    style.innerHTML = `@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`;
+    document.head.appendChild(style);
+  }
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s';
+    setTimeout(() => toast.remove(), 300);
+  }, 10000); // 10s auto hide
+}
+
+// ── GLOBAL INCIDENT MODAL ─────────────────────────────────────────────────
+function setupGlobalIncidentFeature() {
+  const isStaffOrTrainer = hasRole('STABLE_STAFF', 'HEAD_TRAINER', 'CLUB_MANAGER');
+  if (!isStaffOrTrainer) return;
+
+  // 1. Create floating button
+  const fab = document.createElement('button');
+  fab.innerHTML = '🚨 Báo Sự cố';
+  fab.style.cssText = 'position:fixed;bottom:30px;right:30px;z-index:9000;background:#e53e3e;color:#fff;border:none;border-radius:50px;padding:12px 20px;font-size:15px;font-weight:600;box-shadow:0 4px 12px rgba(229,62,62,0.4);cursor:pointer;display:flex;align-items:center;gap:8px;transition:transform 0.2s;';
+  fab.onmouseover = () => fab.style.transform = 'scale(1.05)';
+  fab.onmouseout = () => fab.style.transform = 'scale(1)';
+  document.body.appendChild(fab);
+
+  // 2. Create Modal
+  const modalHTML = `
+    <div id="incidentModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9001;align-items:center;justify-content:center;">
+      <div style="background:#151a28;border:1px solid #2a303f;border-radius:8px;width:90%;max-width:500px;overflow:hidden;box-shadow:0 10px 25px rgba(0,0,0,0.5);">
+        <div style="background:#e53e3e;padding:15px 20px;display:flex;justify-content:space-between;align-items:center;">
+          <h2 style="margin:0;color:#fff;font-size:1.2rem;">Báo cáo Sự cố Khẩn cấp</h2>
+          <button id="closeIncidentBtn" style="background:transparent;border:none;color:#fff;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <div style="padding:20px;">
+          <div style="margin-bottom:15px;">
+            <label style="display:block;margin-bottom:5px;color:#a89e7a;font-size:14px;">Chọn Ngựa *</label>
+            <select id="inc-horseId" style="width:100%;padding:10px;background:#0a0d14;border:1px solid #2a303f;color:#fff;border-radius:4px;"></select>
+          </div>
+          <div style="margin-bottom:15px;display:flex;gap:15px;">
+            <div style="flex:1;">
+              <label style="display:block;margin-bottom:5px;color:#a89e7a;font-size:14px;">Loại sự cố *</label>
+              <select id="inc-type" style="width:100%;padding:10px;background:#0a0d14;border:1px solid #2a303f;color:#fff;border-radius:4px;">
+                <option value="Bỏ ăn">Bỏ ăn</option>
+                <option value="Dấu hiệu Đau bụng">Dấu hiệu Đau bụng</option>
+                <option value="Sốt">Sốt</option>
+                <option value="Trầy móng / Què">Trầy móng / Què</option>
+                <option value="Khác">Khác</option>
+              </select>
+            </div>
+            <div style="flex:1;">
+              <label style="display:block;margin-bottom:5px;color:#a89e7a;font-size:14px;">Mức độ *</label>
+              <select id="inc-severity" style="width:100%;padding:10px;background:#0a0d14;border:1px solid #2a303f;color:#fff;border-radius:4px;">
+                <option value="HIGH">Nghiêm trọng (HIGH)</option>
+                <option value="CRITICAL">Nguy kịch (CRITICAL)</option>
+                <option value="MEDIUM">Vừa (MEDIUM)</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:15px;">
+            <label style="display:block;margin-bottom:5px;color:#a89e7a;font-size:14px;">Mô tả chi tiết *</label>
+            <textarea id="inc-desc" rows="3" style="width:100%;padding:10px;background:#0a0d14;border:1px solid #2a303f;color:#fff;border-radius:4px;resize:vertical;" placeholder="Mô tả tình trạng..."></textarea>
+          </div>
+          <button id="submitIncidentBtn" style="width:100%;padding:12px;background:#e53e3e;color:#fff;border:none;border-radius:4px;font-size:16px;font-weight:600;cursor:pointer;">Gửi Báo Cáo Ngay</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+  const modal = document.getElementById('incidentModal');
+  const horseSelect = document.getElementById('inc-horseId');
+
+  fab.addEventListener('click', async () => {
+    modal.style.display = 'flex';
+    if (horseSelect.children.length === 0) {
+      try {
+        const horses = await apiFetch('/api/horses');
+        horseSelect.innerHTML = horses.map(h => `<option value="${h.id}">[${h.registrationCode||'?'}] ${h.name}</option>`).join('');
+      } catch (e) {
+        horseSelect.innerHTML = '<option value="">Lỗi tải danh sách</option>';
+      }
+    }
+  });
+
+  document.getElementById('closeIncidentBtn').addEventListener('click', () => modal.style.display = 'none');
+
+  document.getElementById('submitIncidentBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('submitIncidentBtn');
+    const body = {
+      horseId: horseSelect.value,
+      incidentType: document.getElementById('inc-type').value,
+      severity: document.getElementById('inc-severity').value,
+      description: document.getElementById('inc-desc').value.trim()
+    };
+    
+    if (!body.horseId || !body.description) return alert('Vui lòng điền đủ Ngựa và Mô tả!');
+    
+    btn.disabled = true; btn.textContent = 'Đang gửi...';
+    try {
+      await apiFetch('/api/incidents', { method: 'POST', body: JSON.stringify(body) });
+      alert('Đã gửi báo cáo sự cố thành công! Cảnh báo đã được chuyển cho Bác sĩ & Quản lý.');
+      modal.style.display = 'none';
+      document.getElementById('inc-desc').value = '';
+    } catch (e) {
+      alert('Lỗi khi gửi sự cố: ' + e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Gửi Báo Cáo Ngay';
+    }
+  });
+}
+

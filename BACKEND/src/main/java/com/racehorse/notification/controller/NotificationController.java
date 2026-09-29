@@ -17,15 +17,25 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.http.MediaType;
+
 @RestController
 @RequestMapping("/api/notifications")
 @PreAuthorize("isAuthenticated()")
 public class NotificationController {
 
     private final NotificationService service;
+    private final com.racehorse.notification.service.SseNotificationService sseService;
 
-    public NotificationController(NotificationService service) {
+    public NotificationController(NotificationService service, com.racehorse.notification.service.SseNotificationService sseService) {
         this.service = service;
+        this.sseService = sseService;
+    }
+
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter stream(@AuthenticationPrincipal Jwt jwt) {
+        return sseService.subscribe(userId(jwt));
     }
 
     @GetMapping

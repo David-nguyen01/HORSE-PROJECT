@@ -1,0 +1,369 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>ChÄƒm sÃ³c Chuá»“ng & Dinh dÆ°á»¡ng - HORSE-PROJECT</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="app-shell.css">
+  <style>
+    .layout-wrapper { display: flex; min-height: 100vh; }
+    .sidebar { width: 300px; background-color: #0d111a; border-right: 1px solid #2a303f; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 1rem; border-bottom: 1px solid #2a303f; }
+    .sidebar-search { width: 100%; padding: 0.5rem; background: #1a2030; border: 1px solid #2a303f; color: #f1efe6; border-radius: 4px; box-sizing: border-box; }
+    .horse-list { flex: 1; overflow-y: auto; padding: 0.5rem; }
+    
+    /* Layout tÆ°Æ¡ng tá»± health.html */
+    .md-item { display: flex; align-items: center; gap: 0.8rem; padding: 0.6rem; border-radius: 6px; cursor: pointer; transition: background 0.2s; }
+    .md-item:hover { background: #1a2030; }
+    .md-item.active { background: #2a303f; border-left: 3px solid #d4af37; }
+    .md-item-avatar { width: 32px; height: 32px; border-radius: 4px; background: #3a4154; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; }
+    .md-item-info { flex: 1; }
+    .md-item-name { font-size: 0.9rem; font-weight: 500; }
+    .md-item-meta { font-size: 0.75rem; color: #a89e7a; }
+
+    .main-content { flex: 1; display: flex; flex-direction: column; background: #0a0d14; }
+    .page-header { padding: 1.5rem; border-bottom: 1px solid #2a303f; display: flex; justify-content: space-between; align-items: center; }
+    .page-header h1 { margin: 0; font-size: 1.4rem; font-weight: 600; }
+
+    .detail-area { padding: 1.5rem; flex: 1; overflow-y: auto; }
+    
+    .card { background: #151a28; border: 1px solid #2a303f; border-radius: 8px; margin-bottom: 1.5rem; overflow: hidden; }
+    .card-head { padding: 1rem 1.2rem; border-bottom: 1px solid #2a303f; display: flex; justify-content: space-between; align-items: center; background: #1a2030; }
+    .card-head h3 { margin: 0; font-size: 1rem; color: #f1efe6; }
+    .card-body { padding: 1.2rem; }
+
+    .meal-row { display: grid; grid-template-columns: 80px 1fr 120px; gap: 1rem; padding: 0.8rem; border-bottom: 1px solid #2a303f; align-items: center; }
+    .meal-row:last-child { border-bottom: none; }
+    .meal-time { font-size: 1.2rem; font-weight: 600; color: #d4af37; }
+    .meal-info h4 { margin: 0 0 0.2rem 0; color: #f1efe6; }
+    .meal-info p { margin: 0; font-size: 0.85rem; color: #a89e7a; }
+    .meal-badge { padding: 0.3rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-align: center; }
+    .badge-pending { background: #2a303f; color: #a89e7a; }
+    
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.8rem; color: #a89e7a; margin-bottom: 0.4rem; }
+    .form-control { width: 100%; padding: 0.5rem; background: #0a0d14; border: 1px solid #2a303f; color: #f1efe6; border-radius: 4px; box-sizing: border-box; }
+    
+    .meal-editor { background: #0a0d14; padding: 1rem; border-radius: 6px; border: 1px solid #2a303f; margin-bottom: 1rem; position: relative; }
+    .meal-editor h4 { margin: 0 0 1rem 0; color: #d4af37; }
+    .remove-meal { position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: #e53e3e; cursor: pointer; }
+    
+    .btn { padding: 0.5rem 1rem; border-radius: 4px; font-weight: 500; cursor: pointer; border: none; transition: background 0.2s; }
+    .btn-primary { background: #d4af37; color: #0a0d14; }
+    .btn-primary:hover { background: #e0be4d; }
+    .btn-secondary { background: #2a303f; color: #f1efe6; }
+    .btn-secondary:hover { background: #3a4154; }
+  </style>
+</head>
+
+<body class="app-body">
+<div class="app-shell" id="appShell">
+
+
+  <!-- ═══ MAIN ═══ -->
+  <main class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-icon mobile-only" id="sidebarToggle" aria-label="Menu"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        <h1 class="page-title">Khẩu phần Dinh dưỡng (FR14)</h1>
+      </div>
+      <div class="topbar-right">
+        <div class="user-chip">
+          <div class="avatar">U</div>
+          <div class="user-info"><b>Loading...</b><small>...</small></div>
+        </div>
+        <button class="btn btn-secondary btn-logout">Đăng xuất</button>
+      </div>
+    </header>
+
+    <div class="content-body md-layout" style="display:flex; height: calc(100vh - 64px); overflow: hidden;">
+      
+      <!-- CỘT TRÁI: DANH SÁCH NGỰA -->
+      <div class="md-sidebar" style="width: 320px; border-right: 1px solid #2a303f; display:flex; flex-direction:column; background: #0d111a;">
+        <div style="padding: 1rem; border-bottom: 1px solid #2a303f;">
+          <h2 style="font-size:1rem; margin:0 0 0.8rem 0; color:#d4af37;">Danh sách Ngựa</h2>
+          <input type="text" id="searchHorse" class="form-control" style="width:100%" placeholder="Tìm tên hoặc mã ngựa...">
+        </div>
+        <div class="md-list" id="horseList" style="flex:1; overflow-y:auto; padding: 0.5rem;">
+          <div style="padding:1rem; color:#7a7258; text-align:center;">Đang tải...</div>
+        </div>
+      </div>
+
+      <!-- CỘT PHẢI: CHI TIẾT & KHẨU PHẦN -->
+      <div class="md-main" id="detailArea" style="flex:1; padding: 1.5rem; overflow-y: auto;">
+        <div style="display:flex; justify-content:center; align-items:center; height:100%; color:#7a7258;">
+          Vui lòng chọn một con ngựa từ danh sách bên trái.
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+<template id="tmplChecklist">
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom: 1.5rem;">
+    <div>
+      <h2 id="view-name" style="margin:0 0 0.3rem 0; font-size:1.8rem; color:#f1efe6;">TÃªn ngá»±a</h2>
+      <p id="view-meta" style="margin:0; font-size:0.9rem; color:#a89e7a;">MÃ£: ... | Chuá»“ng: ...</p>
+    </div>
+    <button class="btn btn-secondary" id="btnEditPlan" style="display:none;">âœï¸ Cáº­p nháº­t Káº¿ hoáº¡ch</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h3>Kháº©u pháº§n HÃ´m nay</h3>
+      <span style="font-size: 0.8rem; color: #a89e7a;" id="view-version">PhiÃªn báº£n: ?</span>
+    </div>
+    <div class="card-body" id="mealListContainer" style="padding:0">
+      <!-- Inject meal rows here -->
+      <div style="padding:1.5rem; text-align:center; color:#7a7258;">ChÆ°a cÃ³ dá»¯ liá»‡u kháº©u pháº§n.</div>
+    </div>
+  </div>
+</template>
+
+<!-- Template: Form Cáº­p nháº­t Káº¿ hoáº¡ch -->
+<template id="tmplPlanForm">
+  <div style="margin-bottom: 1.5rem; display:flex; justify-content:space-between; align-items:center;">
+    <h2 style="margin:0; color:#d4af37;">Cáº­p nháº­t Káº¿ hoáº¡ch Kháº©u pháº§n</h2>
+    <button class="btn btn-secondary" id="btnCancelEdit">Quay láº¡i</button>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="form-group">
+          <label>NgÃ y Ã¡p dá»¥ng (Báº¯t buá»™c) *</label>
+          <input type="date" id="formEffectiveDate" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>Ghi chÃº chung</label>
+          <input type="text" id="formNotes" class="form-control" placeholder="TÃ¬nh tráº¡ng háº¥p thu, lÆ°u Ã½...">
+        </div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; border-bottom: 1px solid #2a303f; padding-bottom: 0.5rem;">
+        <h3 style="margin:0; color:#f1efe6;">Danh sÃ¡ch Bá»¯a Äƒn</h3>
+        <button class="btn btn-secondary" id="btnAddMeal" type="button" style="padding:0.3rem 0.6rem; font-size:0.8rem;">+ ThÃªm bá»¯a</button>
+      </div>
+
+      <div id="mealEditorContainer">
+        <!-- Render meal editors here -->
+      </div>
+
+      <div style="margin-top: 1.5rem; text-align: right;">
+        <button class="btn btn-primary" id="btnSavePlan" type="button">LÆ°u Káº¿ hoáº¡ch Má»›i</button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script type="module">
+  import { initShell, apiFetch, hasRole } from './auth.js';
+
+  // YÃªu cáº§u quyá»n
+  const auth = initShell(['CLUB_MANAGER', 'HEAD_TRAINER', 'VETERINARIAN', 'HORSE_OWNER', 'STABLE_STAFF']);
+  if (!auth) throw new Error('Not authenticated');
+
+  // Quyá»n edit (FR14) chá»‰ dÃ nh cho Vet, Trainer, Manager
+  const canEdit = hasRole('VETERINARIAN', 'HEAD_TRAINER', 'CLUB_MANAGER');
+
+  let allHorses = [];
+  let selectedHorseId = null;
+
+  async function loadHorses() {
+    try {
+      allHorses = await apiFetch('/api/horses');
+      renderHorseList(allHorses);
+    } catch (err) {
+      document.getElementById('horseList').innerHTML = '<div style="padding:1rem;color:#e53e3e;">Lá»—i táº£i danh sÃ¡ch ngá»±a.</div>';
+    }
+  }
+
+  function renderHorseList(list) {
+    const el = document.getElementById('horseList');
+    if (!list.length) { el.innerHTML = '<div style="padding:1rem;color:#7a7258;">KhÃ´ng tÃ¬m tháº¥y.</div>'; return; }
+    
+    el.innerHTML = list.map(h => {
+      const ini = h.name ? h.name.substring(0,2).toUpperCase() : '??';
+      const active = h.id === selectedHorseId ? 'active' : '';
+      return `
+        <div class="md-item ${active}" onclick="window.selectHorse('${h.id}')">
+          <div class="md-item-avatar">${ini}</div>
+          <div class="md-item-info">
+            <div class="md-item-name">${h.name}</div>
+            <div class="md-item-meta">${h.registrationCode || h.id}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('searchHorse').addEventListener('input', e => {
+    const t = e.target.value.toLowerCase();
+    renderHorseList(allHorses.filter(h => 
+      (h.name||'').toLowerCase().includes(t) || (h.registrationCode||'').toLowerCase().includes(t)
+    ));
+  });
+
+  window.selectHorse = async function(id) {
+    selectedHorseId = id;
+    renderHorseList(allHorses); // Update active state
+    await showChecklistView();
+  };
+
+  // --- Cháº¿ Ä‘á»™ Xem (Checklist) ---
+  async function showChecklistView() {
+    const horse = allHorses.find(h => h.id === selectedHorseId);
+    if (!horse) return;
+
+    const mainArea = document.getElementById('detailArea');
+    const tmpl = document.getElementById('tmplChecklist').content.cloneNode(true);
+    mainArea.innerHTML = '';
+    mainArea.appendChild(tmpl);
+
+    document.getElementById('view-name').textContent = horse.name;
+    document.getElementById('view-meta').textContent = `MÃ£: ${horse.registrationCode} | Chuá»“ng: ${horse.stallLocation || 'ChÆ°a xáº¿p'}`;
+
+    const btnEdit = document.getElementById('btnEditPlan');
+    if (canEdit) {
+      btnEdit.style.display = 'inline-block';
+      btnEdit.addEventListener('click', () => showEditView(horse));
+    }
+
+    try {
+      // DÃ¹ng API checklist cá»§a FR14
+      const data = await apiFetch(`/api/horses/${horse.id}/nutrition-plan/daily-checklist`);
+      document.getElementById('view-version').textContent = `PhiÃªn báº£n: ${data.planVersion || 0}`;
+      
+      const container = document.getElementById('mealListContainer');
+      if (!data.meals || data.meals.length === 0) {
+        container.innerHTML = '<div style="padding:1.5rem; text-align:center; color:#7a7258;">ChÆ°a cÃ³ káº¿ hoáº¡ch kháº©u pháº§n.</div>';
+        return;
+      }
+
+      container.innerHTML = data.meals.map(m => `
+        <div class="meal-row">
+          <div class="meal-time">${m.feedingTime.substring(0,5)}</div>
+          <div class="meal-info">
+            <h4>${m.mealName}</h4>
+            <p>
+              Tinh: <b>${m.concentrateKg}kg</b> ${m.concentrateType ? '('+m.concentrateType+')' : ''} &nbsp;|&nbsp; 
+              ThÃ´: <b>${m.forageKg}kg</b> ${m.forageType ? '('+m.forageType+')' : ''}
+              ${m.supplements ? `<br><i>+ Bá»• sung: ${m.supplements}</i>` : ''}
+            </p>
+          </div>
+          <div class="meal-badge badge-pending">ChÆ°a cho Äƒn</div>
+        </div>
+      `).join('');
+    } catch (err) {
+      const container = document.getElementById('mealListContainer');
+      container.innerHTML = '<div style="padding:1.5rem; text-align:center; color:#7a7258;">ChÆ°a cÃ³ káº¿ hoáº¡ch kháº©u pháº§n hoáº·c lá»—i táº£i dá»¯ liá»‡u.</div>';
+    }
+  }
+
+  // --- Cháº¿ Ä‘á»™ Edit (Form táº¡o version má»›i) ---
+  function showEditView(horse) {
+    const mainArea = document.getElementById('detailArea');
+    const tmpl = document.getElementById('tmplPlanForm').content.cloneNode(true);
+    mainArea.innerHTML = '';
+    mainArea.appendChild(tmpl);
+
+    // Set máº·c Ä‘á»‹nh ngÃ y Ã¡p dá»¥ng lÃ  hÃ´m nay
+    document.getElementById('formEffectiveDate').valueAsDate = new Date();
+
+    document.getElementById('btnCancelEdit').addEventListener('click', () => showChecklistView());
+    document.getElementById('btnAddMeal').addEventListener('click', () => addMealEditor());
+    document.getElementById('btnSavePlan').addEventListener('click', () => savePlan(horse.id));
+
+    // Khá»Ÿi táº¡o sáºµn 1 bá»¯a máº«u náº¿u trá»‘ng
+    addMealEditor('SÃ¡ng', '07:00');
+    addMealEditor('Chiá»u', '16:00');
+  }
+
+  let mealEditorCount = 0;
+  function addMealEditor(defaultName = '', defaultTime = '') {
+    const id = `meal_ed_${mealEditorCount++}`;
+    const container = document.getElementById('mealEditorContainer');
+    
+    const div = document.createElement('div');
+    div.className = 'meal-editor';
+    div.id = id;
+    div.innerHTML = `
+      <button class="remove-meal" onclick="document.getElementById('${id}').remove()">XÃ³a</button>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom: 0.8rem;">
+        <div class="form-group"><label>TÃªn Bá»¯a *</label><input type="text" class="form-control meal-name" value="${defaultName}" required></div>
+        <div class="form-group"><label>Giá» (HH:mm) *</label><input type="time" class="form-control meal-time" value="${defaultTime}" required></div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 2fr; gap:1rem; margin-bottom: 0.8rem;">
+        <div class="form-group"><label>LÆ°á»£ng Tinh (kg) *</label><input type="number" step="0.1" class="form-control meal-conc-kg" value="0"></div>
+        <div class="form-group"><label>Loáº¡i Tinh</label><input type="text" class="form-control meal-conc-type" placeholder="VD: CÃ¡m há»—n há»£p..."></div>
+      </div>
+      <div style="display:grid; grid-template-columns: 1fr 2fr; gap:1rem; margin-bottom: 0.8rem;">
+        <div class="form-group"><label>LÆ°á»£ng ThÃ´ (kg) *</label><input type="number" step="0.1" class="form-control meal-forage-kg" value="0"></div>
+        <div class="form-group"><label>Loáº¡i ThÃ´</label><input type="text" class="form-control meal-forage-type" placeholder="VD: Cá» khÃ´ cá» voi..."></div>
+      </div>
+      <div class="form-group"><label>Thá»±c pháº©m Bá»• sung (Thuá»‘c, Vitamin...)</label><input type="text" class="form-control meal-supp" placeholder="VD: Canxi 50g..."></div>
+    `;
+    container.appendChild(div);
+  }
+
+  async function savePlan(horseId) {
+    const effDate = document.getElementById('formEffectiveDate').value;
+    if (!effDate) return alert('Vui lÃ²ng chá»n NgÃ y Ã¡p dá»¥ng!');
+
+    const mealDivs = document.querySelectorAll('.meal-editor');
+    if (mealDivs.length === 0) return alert('Káº¿ hoáº¡ch pháº£i cÃ³ Ã­t nháº¥t 1 bá»¯a Äƒn!');
+
+    const meals = [];
+    for (let el of mealDivs) {
+      const mName = el.querySelector('.meal-name').value;
+      const mTime = el.querySelector('.meal-time').value;
+      const mConcKg = el.querySelector('.meal-conc-kg').value;
+      const mForageKg = el.querySelector('.meal-forage-kg').value;
+      
+      if (!mName || !mTime) return alert('Vui lÃ²ng Ä‘iá»n Ä‘á»§ TÃªn vÃ  Giá» cho cÃ¡c bá»¯a Äƒn!');
+
+      meals.push({
+        mealName: mName,
+        feedingTime: mTime, // Backend map localTime ok string format HH:mm
+        concentrateKg: parseFloat(mConcKg) || 0,
+        concentrateType: el.querySelector('.meal-conc-type').value || null,
+        forageKg: parseFloat(mForageKg) || 0,
+        forageType: el.querySelector('.meal-forage-type').value || null,
+        supplements: el.querySelector('.meal-supp').value || null
+      });
+    }
+
+    const body = {
+      effectiveDate: effDate,
+      notes: document.getElementById('formNotes').value || null,
+      meals: meals
+    };
+
+    const btn = document.getElementById('btnSavePlan');
+    btn.disabled = true;
+    btn.textContent = 'Äang lÆ°u...';
+
+    try {
+      await apiFetch(`/api/horses/${horseId}/nutrition-plan`, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+      alert('Táº¡o Káº¿ hoáº¡ch Kháº©u pháº§n má»›i thÃ nh cÃ´ng (ÄÃ£ nÃ¢ng Version)!');
+      showChecklistView();
+    } catch (err) {
+      alert('Lá»—i: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'LÆ°u Káº¿ hoáº¡ch Má»›i';
+    }
+  }
+
+  // Khá»Ÿi Ä‘á»™ng
+  loadHorses();
+
+</script>
+</body>
+</html>
+
+

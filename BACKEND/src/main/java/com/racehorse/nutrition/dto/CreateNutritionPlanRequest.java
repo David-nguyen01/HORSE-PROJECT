@@ -10,6 +10,7 @@ import java.util.List;
 
 public record CreateNutritionPlanRequest(
         @NotNull LocalDate effectiveDate,
+        LocalDate validUntil,
         @Size(max = 2000) String notes,
         @NotEmpty List<@Valid MealItem> meals
 ) {}

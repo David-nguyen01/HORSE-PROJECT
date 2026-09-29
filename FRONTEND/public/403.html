@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Không có quyền truy cập — Turfline Stable Manager</title>
+<title>KhÃ´ng cÃ³ quyá»n truy cáº­p â€” Turfline Stable Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -105,25 +105,25 @@
 <body class="error-page">
 
 <div class="error-card">
-  <div class="error-icon">🔒</div>
+  <div class="error-icon">ðŸ”’</div>
   <div class="error-code">403</div>
-  <h1 class="error-title">Không có quyền truy cập</h1>
+  <h1 class="error-title">KhÃ´ng cÃ³ quyá»n truy cáº­p</h1>
   <p class="error-desc">
-    Vai trò hiện tại của bạn không được phép truy cập trang này.
-    Vui lòng liên hệ Quản lý câu lạc bộ nếu bạn cần quyền truy cập.
+    Vai trÃ² hiá»‡n táº¡i cá»§a báº¡n khÃ´ng Ä‘Æ°á»£c phÃ©p truy cáº­p trang nÃ y.
+    Vui lÃ²ng liÃªn há»‡ Quáº£n lÃ½ cÃ¢u láº¡c bá»™ náº¿u báº¡n cáº§n quyá»n truy cáº­p.
   </p>
   <div class="error-actions">
     <a href="dashboard.html" class="btn-back">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-      Về Dashboard
+      Vá» Dashboard
     </a>
     <a href="#" class="btn-logout-link" id="logoutBtn">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      Đăng xuất
+      ÄÄƒng xuáº¥t
     </a>
   </div>
   <div class="role-hint" id="roleHint" style="display:none">
-    Bạn đang đăng nhập với vai trò: <strong id="currentRole"></strong>
+    Báº¡n Ä‘ang Ä‘Äƒng nháº­p vá»›i vai trÃ²: <strong id="currentRole"></strong>
   </div>
 </div>
 
@@ -131,11 +131,11 @@
   import { getAuth, logout } from './auth.js';
 
   const ROLE_LABELS = {
-    CLUB_MANAGER: 'Quản lý câu lạc bộ',
-    HEAD_TRAINER: 'Huấn luyện viên Trưởng',
-    HORSE_OWNER: 'Chủ sở hữu ngựa',
-    STABLE_STAFF: 'Nhân viên chuồng',
-    VETERINARIAN: 'Bác sĩ thú y',
+    CLUB_MANAGER: 'Quáº£n lÃ½ cÃ¢u láº¡c bá»™',
+    HEAD_TRAINER: 'Huáº¥n luyá»‡n viÃªn TrÆ°á»Ÿng',
+    HORSE_OWNER: 'Chá»§ sá»Ÿ há»¯u ngá»±a',
+    STABLE_STAFF: 'NhÃ¢n viÃªn chuá»“ng',
+    VETERINARIAN: 'BÃ¡c sÄ© thÃº y',
   };
 
   const auth = getAuth();
@@ -153,3 +153,4 @@
 
 </body>
 </html>
+
