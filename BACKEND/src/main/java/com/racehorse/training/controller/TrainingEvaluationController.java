@@ -42,7 +42,7 @@ public class TrainingEvaluationController {
     }
 
     @GetMapping("/training-evaluations/{evaluationId}")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER','VETERINARIAN')")
     TrainingEvaluationResponse get(
             @PathVariable UUID evaluationId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
@@ -50,7 +50,7 @@ public class TrainingEvaluationController {
     }
 
     @GetMapping("/horses/{horseId}/training-evaluations")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER','VETERINARIAN')")
     Page<TrainingEvaluationResponse> listForHorse(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
@@ -65,6 +65,8 @@ public class TrainingEvaluationController {
 
     private boolean isPrivileged(Authentication authentication) {
         return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
+                        || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
+                        || authority.getAuthority().equals("ROLE_VETERINARIAN"));
     }
 }

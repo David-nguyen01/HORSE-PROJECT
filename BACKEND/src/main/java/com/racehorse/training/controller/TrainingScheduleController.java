@@ -49,13 +49,13 @@ public class TrainingScheduleController {
     }
 
     @GetMapping("/{scheduleId}")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','STABLE_STAFF','VETERINARIAN')")
     TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         return service.get(scheduleId, userId(jwt), isPrivileged(authentication));
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN')")
     List<TrainingScheduleResponse> calendar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -76,6 +76,8 @@ public class TrainingScheduleController {
 
     private boolean isPrivileged(Authentication authentication) {
         return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
+                        || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
+                        || authority.getAuthority().equals("ROLE_VETERINARIAN"));
     }
 }

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
@@ -345,7 +345,62 @@
       </div>
     </div>
   </div>
+
+  <!-- FR09 – Hồ sơ Khám bệnh & Điều trị -->
+  <div class="card" style="margin-top:1.5rem">
+    <div class="card-head">
+      <h3>Hồ sơ Khám bệnh &amp; Điều trị</h3>
+      <button class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.6rem" id="btnNewExam">+ Tạo hồ sơ khám</button>
+    </div>
+    <!-- Form tạo hồ sơ khám mới (ẩn mặc định) -->
+    <div id="examForm" style="display:none;padding:1rem;border-bottom:1px solid #2a303f">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div>
+          <label style="font-size:0.78rem;color:#a89e7a">Ngày khám *</label>
+          <input type="date" id="ef-date" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:#a89e7a">Trạng thái SK sau khám *</label>
+          <select id="ef-status" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
+            <option value="FIT">FIT – Sẵn sàng</option>
+            <option value="MONITOR">MONITOR – Cần theo dõi</option>
+            <option value="INJURED">INJURED – Bị thương</option>
+            <option value="QUARANTINED">QUARANTINED – Cách ly</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:0.78rem;color:#a89e7a">Triệu chứng *</label>
+          <textarea id="ef-symptoms" rows="2" placeholder="Mô tả triệu chứng lâm sàng..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:0.78rem;color:#a89e7a">Chẩn đoán *</label>
+          <textarea id="ef-diagnosis" rows="2" placeholder="Chẩn đoán lâm sàng..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+        <div style="grid-column:1/-1">
+          <label style="font-size:0.78rem;color:#a89e7a">Phác đồ điều trị *</label>
+          <textarea id="ef-treatment" rows="2" placeholder="Phác đồ điều trị đề xuất..." style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;resize:vertical;font-family:inherit;box-sizing:border-box"></textarea>
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:#a89e7a">Thuốc / Liều lượng</label>
+          <input type="text" id="ef-meds" placeholder="VD: Penicillin 1g x 2 lần/ngày" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:#a89e7a">Ngày tái khám</label>
+          <input type="date" id="ef-followup" style="width:100%;padding:0.45rem;background:#0a0d14;border:1px solid #2a303f;color:#f1efe6;border-radius:6px;font-size:0.85rem;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem;margin-top:0.75rem;justify-content:flex-end">
+        <button id="btnCancelExam" class="btn btn-secondary" style="font-size:0.82rem">Hủy</button>
+        <button id="btnSaveExam" class="btn btn-primary" style="font-size:0.82rem">Lưu hồ sơ khám</button>
+      </div>
+    </div>
+    <!-- Danh sách hồ sơ khám -->
+    <div id="examList" style="padding:0.5rem 1rem 1rem 1rem">
+      <p style="font-size:0.85rem;color:#7a7258">Đang tải...</p>
+    </div>
+  </div>
 </template>
+
 
 <script type="module">
   import { initShell, apiFetch, hasRole } from './auth.js';
@@ -445,7 +500,80 @@
 
     loadPreventiveCare(horse.id);
     await setup3DModel(horse.id);
+    loadExaminations(horse.id);
+    setupExamForm(horse.id);
   };
+
+  // FR09 – Tải danh sách hồ sơ khám bệnh
+  async function loadExaminations(horseId) {
+    const el = document.getElementById('examList');
+    if (!el) return;
+    const STATUS_BADGE = { FIT:'<span class="badge completed">FIT</span>', MONITOR:'<span class="badge" style="background:#7b6a1a;color:#f1efe6">MONITOR</span>', INJURED:'<span class="badge" style="background:#7a1a1a;color:#f1efe6">INJURED</span>', QUARANTINED:'<span class="badge" style="background:#4a1a6a;color:#f1efe6">QUARANTINED</span>' };
+    try {
+      const data = await apiFetch('/api/horses/' + horseId + '/examinations?sort=examinationDate,desc&size=20');
+      const rows = data?.content ?? data ?? [];
+      if (!rows.length) { el.innerHTML = '<p style="font-size:0.85rem;color:#7a7258">Chưa có hồ sơ khám nào.</p>'; return; }
+      el.innerHTML = '<div style="display:flex;flex-direction:column;gap:0.75rem">' + rows.map(r => `
+        <div style="border:1px solid #2a303f;border-radius:8px;padding:0.75rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+            <span style="font-size:0.8rem;color:#a89e7a">📅 ${r.examinationDate} &nbsp;·&nbsp; 👨‍⚕️ ${r.veterinarian?.name||'?'}</span>
+            ${STATUS_BADGE[r.healthStatusAfter]||r.healthStatusAfter}
+          </div>
+          <div style="font-size:0.85rem;color:#ccc5ab"><b>Triệu chứng:</b> ${r.symptoms}</div>
+          <div style="font-size:0.85rem;color:#ccc5ab;margin-top:0.25rem"><b>Chẩn đoán:</b> ${r.diagnosis}</div>
+          ${r.treatmentPlan?`<div style="font-size:0.82rem;color:#a89e7a;margin-top:0.25rem"><b>Điều trị:</b> ${r.treatmentPlan}</div>`:''}
+          ${r.medicationAndDosage?`<div style="font-size:0.82rem;color:#a89e7a;margin-top:0.15rem"><b>Thuốc:</b> ${r.medicationAndDosage}</div>`:''}
+          ${r.followUpDate?`<div style="font-size:0.78rem;color:#7a7258;margin-top:0.25rem">🔁 Tái khám: ${r.followUpDate}</div>`:''}
+          ${r.addenda?.length?`<div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid #1a2030;font-size:0.78rem;color:#7a7258">📎 ${r.addenda.length} phụ lục</div>`:''}
+        </div>`).join('') + '</div>';
+    } catch(err) {
+      el.innerHTML = '<p style="font-size:0.85rem;color:#a89e7a">Không thể tải hồ sơ khám.</p>';
+    }
+  }
+
+  // FR09 – Gắn sự kiện cho form tạo hồ sơ khám mới
+  function setupExamForm(horseId) {
+    const btnNew = document.getElementById('btnNewExam');
+    const formEl = document.getElementById('examForm');
+    const btnCancel = document.getElementById('btnCancelExam');
+    const btnSave = document.getElementById('btnSaveExam');
+    if (!btnNew || !formEl) return;
+    // Chỉ vet mới thấy nút tạo mới
+    if (!canEditHealth) { btnNew.style.display = 'none'; return; }
+    btnNew.addEventListener('click', () => { formEl.style.display = formEl.style.display === 'none' ? 'block' : 'none'; });
+    btnCancel.addEventListener('click', () => { formEl.style.display = 'none'; });
+    btnSave.addEventListener('click', async () => {
+      const body = {
+        examinationDate: document.getElementById('ef-date').value,
+        symptoms: document.getElementById('ef-symptoms').value.trim(),
+        diagnosis: document.getElementById('ef-diagnosis').value.trim(),
+        treatmentPlan: document.getElementById('ef-treatment').value.trim(),
+        medicationAndDosage: document.getElementById('ef-meds').value.trim() || null,
+        followUpDate: document.getElementById('ef-followup').value || null,
+        healthStatusAfter: document.getElementById('ef-status').value,
+      };
+      if (!body.examinationDate || !body.symptoms || !body.diagnosis || !body.treatmentPlan) {
+        alert('Vui lòng điền đầy đủ các trường bắt buộc (*).');
+        return;
+      }
+      btnSave.disabled = true; btnSave.textContent = 'Đang lưu...';
+      try {
+        await apiFetch('/api/horses/' + horseId + '/examinations', { method: 'POST', body: JSON.stringify(body) });
+        formEl.style.display = 'none';
+        ['ef-date','ef-symptoms','ef-diagnosis','ef-treatment','ef-meds','ef-followup'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+        document.getElementById('ef-status').value = 'FIT';
+        await loadExaminations(horseId);
+        // Cập nhật badge sức khỏe ngựa trong danh sách bên trái
+        const idx = allHorses.findIndex(h => h.id === horseId);
+        if (idx !== -1) allHorses[idx].healthStatus = body.healthStatusAfter;
+        renderHorseList(allHorses);
+      } catch(err) {
+        alert('Lỗi khi lưu hồ sơ khám: ' + (err?.message || err));
+      } finally {
+        btnSave.disabled = false; btnSave.textContent = 'Lưu hồ sơ khám';
+      }
+    });
+  }
 
   async function loadPreventiveCare(horseId) {
     const body = document.getElementById('dt-care-list');

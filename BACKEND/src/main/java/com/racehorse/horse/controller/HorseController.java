@@ -49,13 +49,13 @@ public class HorseController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER','VETERINARIAN')")
     HorseResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         return horseService.getByIdForUser(id, userId(jwt), isPrivileged(authentication));
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN')")
     Page<HorseResponse> search(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) HorseStatus status,
@@ -99,6 +99,8 @@ public class HorseController {
 
     private boolean isPrivileged(Authentication authentication) {
         return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
+                        || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
+                        || authority.getAuthority().equals("ROLE_VETERINARIAN"));
     }
 }

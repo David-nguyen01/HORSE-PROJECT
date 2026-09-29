@@ -24,12 +24,14 @@ public class PedigreeController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER','VETERINARIAN')")
     PedigreeResponse get(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         boolean privileged = authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
+                        || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
+                        || authority.getAuthority().equals("ROLE_VETERINARIAN"));
         return pedigreeService.get(horseId, UUID.fromString(jwt.getSubject()), privileged);
     }
 }

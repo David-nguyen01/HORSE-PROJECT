@@ -32,12 +32,14 @@ public class RaceResultController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER','VETERINARIAN')")
     RaceHistoryResponse history(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         boolean privileged = authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
+                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
+                        || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
+                        || authority.getAuthority().equals("ROLE_VETERINARIAN"));
         return service.history(horseId, UUID.fromString(jwt.getSubject()), privileged);
     }
 
