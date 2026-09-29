@@ -15,7 +15,17 @@ public record FitnessDashboardResponse(
         List<HorseFitnessSummary> horses,
         List<FitnessDataPoint> dataPoints
 ) {
-    public record FilterSummary(UUID horseId, LocalDate from, LocalDate to, FitnessStatus fitnessStatus) {}
+    public record FilterSummary(
+            UUID horseId,
+            UUID phaseId,
+            LocalDate from,
+            LocalDate to,
+            FitnessStatus fitnessStatus
+    ) {
+        public FilterSummary(UUID horseId, LocalDate from, LocalDate to, FitnessStatus fitnessStatus) {
+            this(horseId, null, from, to, fitnessStatus);
+        }
+    }
 
     public record HorseFitnessSummary(
             UUID horseId,

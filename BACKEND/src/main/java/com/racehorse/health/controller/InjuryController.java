@@ -1,0 +1,72 @@
+package com.racehorse.health.controller;
+
+import com.racehorse.health.dto.*;
+import com.racehorse.health.service.InjuryService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+public class InjuryController {
+
+    private final InjuryService service;
+
+    public InjuryController(InjuryService service) {
+        this.service = service;
+    }
+
+    @PostMapping("/api/horses/{horseId}/injuries")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    public InjuryResponse create(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateInjuryMarkerRequest request) {
+        return service.createInjury(horseId, userId(jwt), request);
+    }
+
+    @PostMapping("/api/injuries/{injuryId}/recovery-updates")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    public InjuryRecoveryUpdateResponse addRecoveryUpdate(
+            @PathVariable UUID injuryId,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody AddInjuryRecoveryUpdateRequest request) {
+        return service.addRecoveryUpdate(injuryId, userId(jwt), request);
+    }
+
+    @GetMapping("/api/injuries/{injuryId}")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','HORSE_OWNER')")
+    public InjuryDetailResponse getDetail(
+            @PathVariable UUID injuryId,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication auth) {
+        return service.getDetail(injuryId, userId(jwt), privileged(auth));
+    }
+
+    @GetMapping("/api/horses/{horseId}/injuries")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','HORSE_OWNER')")
+    public List<InjuryResponse> listByHorse(
+            @PathVariable UUID horseId,
+            @RequestParam(required = false) String status,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication auth) {
+        return service.listByHorse(horseId, userId(jwt), privileged(auth), status);
+    }
+
+    private UUID userId(Jwt jwt) {
+        return UUID.fromString(jwt.getSubject());
+    }
+
+    private boolean privileged(Authentication a) {
+        return a.getAuthorities().stream().anyMatch(
+                x -> !x.getAuthority().equals("ROLE_HORSE_OWNER") && x.getAuthority().startsWith("ROLE_"));
+    }
+}

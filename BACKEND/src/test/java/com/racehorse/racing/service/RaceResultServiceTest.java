@@ -45,6 +45,20 @@ class RaceResultServiceTest {
         assertThat(history.results()).hasSize(3);
     }
 
+    @Test
+    void deleteRemovesResultWhenFound() {
+        UUID horseId = UUID.randomUUID();
+        UUID resultId = UUID.randomUUID();
+        Horse horse = horse();
+        RaceResult result = result(horse, 1);
+        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+        when(repository.findByIdAndHorseId(resultId, horseId)).thenReturn(java.util.Optional.of(result));
+
+        new RaceResultService(repository, horseAccessService).delete(horseId, resultId);
+
+        org.mockito.Mockito.verify(repository).delete(result);
+    }
+
     private RaceResult result(Horse horse, int position) {
         return new RaceResult(
                 horse,

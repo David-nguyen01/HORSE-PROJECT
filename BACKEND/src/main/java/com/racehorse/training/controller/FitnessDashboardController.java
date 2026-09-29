@@ -27,10 +27,11 @@ public class FitnessDashboardController {
     @GetMapping("/dashboard")
     FitnessDashboardResponse dashboard(
             @RequestParam(required = false) UUID horseId,
+            @RequestParam(required = false) UUID phaseId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) FitnessStatus fitnessStatus,
             @RequestParam(required = false) String query) {
-        return service.get(horseId, from, to, fitnessStatus, query);
+        return service.get(horseId, phaseId, from, to, fitnessStatus, query);
     }
 }

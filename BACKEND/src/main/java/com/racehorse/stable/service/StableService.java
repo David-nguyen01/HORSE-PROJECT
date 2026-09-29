@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.*;
 
@@ -315,9 +316,102 @@ public class StableService {
     private String required(String value, String message) { if (value == null || value.isBlank()) throw new BusinessException(message); return value.trim(); }
     private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 
+    // Daily Routines (FR13)
+    @Transactional(readOnly = true)
+    public List<DailyRoutineView> listDailyRoutines(UUID horseId) {
+        horseAccess.requireActive(horseId);
+        return jdbc.query("select id, horse_id, status, data_json from module_records "
+                        + "where module_code='STABLE_CARE' and record_type='HORSE_DAILY_ROUTINE' and horse_id=? and status='ACTIVE' "
+                        + "order by JSON_VALUE(data_json,'$.startTime') asc",
+                (rs, row) -> {
+                    JsonNode node = read(rs.getString("data_json"));
+                    return new DailyRoutineView(
+                            rs.getObject("id", UUID.class),
+                            rs.getObject("horse_id", UUID.class),
+                            node.path("activityType").asText(),
+                            LocalTime.parse(node.path("startTime").asText()),
+                            LocalTime.parse(node.path("endTime").asText()),
+                            node.path("notes").asText(null),
+                            "ACTIVE".equals(rs.getString("status"))
+                    );
+                }, horseId);
+    }
+
+    @Transactional
+    public DailyRoutineView addDailyRoutine(UUID horseId, UUID actor, DailyRoutineRequest request) {
+        horseAccess.requireActive(horseId);
+        validateRoutine(request);
+        UUID routineId = UUID.randomUUID();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("activityType", request.activityType().trim().toUpperCase(Locale.ROOT));
+        data.put("startTime", request.startTime().toString());
+        data.put("endTime", request.endTime().toString());
+        data.put("notes", trimToNull(request.notes()));
+        data.put("isActive", true);
+
+        jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,data_json) "
+                        + "values(?,'STABLE_CARE','HORSE_DAILY_ROUTINE','api',?,?,'ACTIVE',?)",
+                routineId, horseId, actor, toJson(data));
+        return new DailyRoutineView(routineId, horseId, request.activityType().trim().toUpperCase(Locale.ROOT),
+                request.startTime(), request.endTime(), trimToNull(request.notes()), true);
+    }
+
+    @Transactional
+    public DailyRoutineView updateDailyRoutine(UUID routineId, UUID actor, DailyRoutineRequest request) {
+        validateRoutine(request);
+        DailyRoutineView existing = getDailyRoutine(routineId);
+        horseAccess.requireActive(existing.horseId());
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("activityType", request.activityType().trim().toUpperCase(Locale.ROOT));
+        data.put("startTime", request.startTime().toString());
+        data.put("endTime", request.endTime().toString());
+        data.put("notes", trimToNull(request.notes()));
+        data.put("isActive", true);
+
+        jdbc.update("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                toJson(data), routineId);
+        return new DailyRoutineView(routineId, existing.horseId(), request.activityType().trim().toUpperCase(Locale.ROOT),
+                request.startTime(), request.endTime(), trimToNull(request.notes()), true);
+    }
+
+    @Transactional
+    public void deleteDailyRoutine(UUID routineId) {
+        getDailyRoutine(routineId);
+        jdbc.update("update module_records set status='INACTIVE', updated_at=SYSDATETIMEOFFSET() where id=?", routineId);
+    }
+
+    @Transactional(readOnly = true)
+    public DailyRoutineView getDailyRoutine(UUID routineId) {
+        List<DailyRoutineView> rows = jdbc.query("select id, horse_id, status, data_json from module_records "
+                        + "where id=? and module_code='STABLE_CARE' and record_type='HORSE_DAILY_ROUTINE'",
+                (rs, row) -> {
+                    JsonNode node = read(rs.getString("data_json"));
+                    return new DailyRoutineView(
+                            rs.getObject("id", UUID.class),
+                            rs.getObject("horse_id", UUID.class),
+                            node.path("activityType").asText(),
+                            LocalTime.parse(node.path("startTime").asText()),
+                            LocalTime.parse(node.path("endTime").asText()),
+                            node.path("notes").asText(null),
+                            "ACTIVE".equals(rs.getString("status"))
+                    );
+                }, routineId);
+        if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy lịch sinh hoạt: " + routineId);
+        return rows.getFirst();
+    }
+
+    private void validateRoutine(DailyRoutineRequest r) {
+        if (r.activityType() == null || r.activityType().isBlank()) throw new BusinessException("Hoạt động sinh hoạt không được để trống");
+        if (r.startTime() == null || r.endTime() == null) throw new BusinessException("Thời gian bắt đầu và kết thúc không được để trống");
+        if (!r.startTime().isBefore(r.endTime())) throw new BusinessException("Giờ bắt đầu phải trước giờ kết thúc");
+    }
+
     public record StableView(UUID id, String name, String location, boolean active, List<StallView> stalls) {}
     public record StallView(UUID id, String code, boolean active, AssignmentView currentAssignment) {}
     public record AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
                                  UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
                                  OffsetDateTime assignedUntil, boolean active) {}
+    public record DailyRoutineView(UUID id, UUID horseId, String activityType, LocalTime startTime, LocalTime endTime, String notes, boolean active) {}
+    public record DailyRoutineRequest(String activityType, LocalTime startTime, LocalTime endTime, String notes) {}
 }

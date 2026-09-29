@@ -9,7 +9,9 @@ import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.training.dto.CreateTrainingEvaluationRequest;
 import com.racehorse.training.dto.TrainingEvaluationResponse;
 import com.racehorse.training.entity.TrainingEvaluation;
+import com.racehorse.training.entity.TrainingSchedule;
 import com.racehorse.training.repository.TrainingEvaluationRepository;
+import com.racehorse.training.repository.TrainingScheduleRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,17 +28,29 @@ public class TrainingEvaluationService {
     private final TrainingEvaluationRepository repository;
     private final UserAccountRepository userRepository;
     private final HorseAccessService horseAccessService;
+    private final TrainingScheduleRepository scheduleRepository;
     private final Clock clock;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public TrainingEvaluationService(
+            TrainingEvaluationRepository repository,
+            UserAccountRepository userRepository,
+            HorseAccessService horseAccessService,
+            TrainingScheduleRepository scheduleRepository,
+            Clock clock) {
+        this.repository = repository;
+        this.userRepository = userRepository;
+        this.horseAccessService = horseAccessService;
+        this.scheduleRepository = scheduleRepository;
+        this.clock = clock;
+    }
 
     public TrainingEvaluationService(
             TrainingEvaluationRepository repository,
             UserAccountRepository userRepository,
             HorseAccessService horseAccessService,
             Clock clock) {
-        this.repository = repository;
-        this.userRepository = userRepository;
-        this.horseAccessService = horseAccessService;
-        this.clock = clock;
+        this(repository, userRepository, horseAccessService, null, clock);
     }
 
     @Transactional
@@ -45,9 +59,28 @@ public class TrainingEvaluationService {
         UserAccount actor = userRepository.findById(actorId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người ghi nhận: " + actorId));
+        TrainingSchedule schedule = null;
+        if (request.trainingScheduleId() != null) {
+            if (scheduleRepository == null) {
+                throw new IllegalStateException("scheduleRepository is not configured");
+            }
+            schedule = scheduleRepository.findDetailById(request.trainingScheduleId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lịch huấn luyện: " + request.trainingScheduleId()));
+            if (!schedule.getHorse().getId().equals(horse.getId())) {
+                throw new BusinessException("Lịch huấn luyện không thuộc về ngựa được đánh giá");
+            }
+            if (schedule.getCancelledAt() != null) {
+                throw new BusinessException("Không thể ghi nhận đánh giá cho lịch huấn luyện đã bị hủy");
+            }
+            if (repository.existsByTrainingScheduleId(schedule.getId())) {
+                throw new BusinessException("Lịch huấn luyện này đã có đánh giá");
+            }
+            schedule.complete(clock.instant());
+        }
         String videoUrl = normalizeAndValidateVideoUrl(request.videoUrl());
         TrainingEvaluation evaluation = new TrainingEvaluation(
                 horse,
+                schedule,
                 actor,
                 request.sessionDate(),
                 request.durationMinutes(),
@@ -108,6 +141,7 @@ public class TrainingEvaluationService {
                         evaluation.getHorse().getId(),
                         evaluation.getHorse().getCode(),
                         evaluation.getHorse().getName()),
+                evaluation.getTrainingSchedule() != null ? evaluation.getTrainingSchedule().getId() : null,
                 new TrainingEvaluationResponse.UserSummary(
                         evaluation.getRecordedBy().getId(),
                         evaluation.getRecordedBy().getUsername()),

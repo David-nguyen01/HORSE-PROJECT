@@ -1,13 +1,16 @@
 package com.racehorse.training.service;
 
 import com.racehorse.common.exception.BusinessException;
+import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.repository.HorseRepository;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.training.dto.FitnessDashboardResponse;
 import com.racehorse.training.entity.FitnessStatus;
 import com.racehorse.training.entity.TrainingEvaluation;
+import com.racehorse.training.entity.TrainingPlanPhase;
 import com.racehorse.training.repository.TrainingEvaluationRepository;
+import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,39 +30,74 @@ public class FitnessDashboardService {
     private final TrainingEvaluationRepository evaluationRepository;
     private final HorseRepository horseRepository;
     private final HorseAccessService horseAccessService;
+    private final TrainingPlanPhaseRepository phaseRepository;
     private final Clock clock;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public FitnessDashboardService(
+            TrainingEvaluationRepository evaluationRepository,
+            HorseRepository horseRepository,
+            HorseAccessService horseAccessService,
+            TrainingPlanPhaseRepository phaseRepository,
+            Clock clock) {
+        this.evaluationRepository = evaluationRepository;
+        this.horseRepository = horseRepository;
+        this.horseAccessService = horseAccessService;
+        this.phaseRepository = phaseRepository;
+        this.clock = clock;
+    }
 
     public FitnessDashboardService(
             TrainingEvaluationRepository evaluationRepository,
             HorseRepository horseRepository,
             HorseAccessService horseAccessService,
             Clock clock) {
-        this.evaluationRepository = evaluationRepository;
-        this.horseRepository = horseRepository;
-        this.horseAccessService = horseAccessService;
-        this.clock = clock;
+        this(evaluationRepository, horseRepository, horseAccessService, null, clock);
     }
 
     @Transactional(readOnly = true)
     public FitnessDashboardResponse get(
             UUID horseId,
+            UUID phaseId,
             LocalDate from,
             LocalDate to,
             FitnessStatus fitnessStatus,
             String query) {
         LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
-        LocalDate effectiveTo = to == null ? today : to;
-        LocalDate effectiveFrom = from == null ? effectiveTo.minusDays(29) : from;
+        UUID targetHorseId = horseId;
+        TrainingPlanPhase phase = null;
+        if (phaseId != null) {
+            if (phaseRepository == null) {
+                throw new IllegalStateException("phaseRepository is not configured");
+            }
+            phase = phaseRepository.findDetailById(phaseId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giai đoạn huấn luyện: " + phaseId));
+            UUID phaseHorseId = phase.getTrainingPlan().getHorse().getId();
+            if (targetHorseId != null && !targetHorseId.equals(phaseHorseId)) {
+                throw new BusinessException("Giai đoạn huấn luyện không thuộc về ngựa được chọn");
+            }
+            targetHorseId = phaseHorseId;
+        }
+
+        LocalDate effectiveTo = to == null
+                ? (phase != null && !phase.getEndDate().isAfter(today) ? phase.getEndDate() : today)
+                : to;
+        LocalDate effectiveFrom = from == null
+                ? (phase != null ? phase.getStartDate() : effectiveTo.minusDays(29))
+                : from;
+        if (phase != null && from == null && phase.getStartDate().isAfter(today)) {
+            throw new BusinessException("Giai đoạn huấn luyện chưa bắt đầu");
+        }
         if (effectiveFrom.isAfter(effectiveTo)) {
             throw new BusinessException("Ngày bắt đầu không được sau ngày kết thúc");
         }
         if (effectiveTo.isAfter(today)) {
             throw new BusinessException("Khoảng thời gian dashboard không được nằm trong tương lai");
         }
-        if (horseId != null) horseAccessService.requireActive(horseId);
+        if (targetHorseId != null) horseAccessService.requireActive(targetHorseId);
 
         List<TrainingEvaluation> evaluations = evaluationRepository.findDashboardData(
-                horseId, effectiveFrom, effectiveTo, null);
+                targetHorseId, phaseId, effectiveFrom, effectiveTo, null);
         String normalizedQuery = query == null || query.isBlank()
                 ? null : query.trim().toLowerCase(Locale.ROOT);
         if (normalizedQuery != null) {
@@ -73,9 +111,9 @@ public class FitnessDashboardService {
             latestByHorse.put(evaluation.getHorse().getId(), evaluation);
         }
 
-        List<Horse> horses = horseId == null
+        List<Horse> horses = targetHorseId == null
                 ? horseRepository.findByArchivedAtIsNullOrderByNameAsc()
-                : List.of(horseAccessService.requireActive(horseId));
+                : List.of(horseAccessService.requireActive(targetHorseId));
         List<FitnessDashboardResponse.HorseFitnessSummary> horseSummaries = new ArrayList<>();
         for (Horse horse : horses) {
             if (normalizedQuery != null && !matches(horse, normalizedQuery)) continue;
@@ -100,9 +138,19 @@ public class FitnessDashboardService {
                 .toList();
         return new FitnessDashboardResponse(
                 clock.instant(),
-                new FitnessDashboardResponse.FilterSummary(horseId, effectiveFrom, effectiveTo, fitnessStatus),
+                new FitnessDashboardResponse.FilterSummary(targetHorseId, phaseId, effectiveFrom, effectiveTo, fitnessStatus),
                 horseSummaries,
                 points);
+    }
+
+    @Transactional(readOnly = true)
+    public FitnessDashboardResponse get(
+            UUID horseId,
+            LocalDate from,
+            LocalDate to,
+            FitnessStatus fitnessStatus,
+            String query) {
+        return get(horseId, null, from, to, fitnessStatus, query);
     }
 
     private boolean matches(Horse horse, String query) {

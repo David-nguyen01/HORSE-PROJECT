@@ -48,4 +48,7 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
               and u.enabled = true
             """)
     List<UserAccount> findActiveClubManagersForUpdate();
+
+    @Query("select distinct u from UserAccount u join u.roles r where r in :roles and u.enabled = true")
+    List<UserAccount> findByRoles(@Param("roles") java.util.Collection<com.racehorse.auth.entity.Role> roles);
 }

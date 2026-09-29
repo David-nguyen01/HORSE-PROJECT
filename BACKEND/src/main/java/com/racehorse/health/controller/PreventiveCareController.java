@@ -41,6 +41,15 @@ public class PreventiveCareController {
     PreventiveCareService.CareView update(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CreatePreventiveCareRequest request){
         return service.update(id,request,UUID.fromString(jwt.getSubject()));
     }
+    @GetMapping("/api/preventive-care/due")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('VETERINARIAN','CLUB_MANAGER','HEAD_TRAINER')")
+    public List<DuePreventiveCareResponse> listDue(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate asOf,
+            @RequestParam(required = false) String careType,
+            @RequestParam(required = false, defaultValue = "false") boolean overdueOnly) {
+        return service.listDue(asOf, careType, overdueOnly);
+    }
+
     @DeleteMapping("/api/preventive-care/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
     void cancel(@PathVariable UUID id){service.cancel(id);}
