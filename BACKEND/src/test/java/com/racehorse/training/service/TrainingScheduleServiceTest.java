@@ -17,6 +17,7 @@ import com.racehorse.training.entity.TrainingPlanPhase;
 import com.racehorse.training.entity.WorkloadIntensity;
 import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import com.racehorse.training.repository.TrainingScheduleRepository;
+import com.racehorse.horse.service.HorseAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -46,6 +47,7 @@ class TrainingScheduleServiceTest {
     @Mock TrainingLockRepository lockRepository;
     @Mock UserAccountRepository userRepository;
     @Mock NotificationService notificationService;
+    @Mock HorseAccessService horseAccessService;
 
     private TrainingScheduleService service;
 
@@ -53,6 +55,7 @@ class TrainingScheduleServiceTest {
     void setUp() {
         service = new TrainingScheduleService(
                 repository, phaseRepository, lockRepository, userRepository, notificationService,
+                horseAccessService,
                 Clock.fixed(Instant.parse("2026-09-15T00:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -63,12 +66,14 @@ class TrainingScheduleServiceTest {
         TrainingPlanPhase phase = phase(WorkloadIntensity.HIGH);
         UserAccount staff = user("staff", Role.STABLE_STAFF);
         when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
+        when(horseAccessService.requireReadable(org.mockito.ArgumentMatchers.any(UUID.class), org.mockito.ArgumentMatchers.any(UUID.class), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(horse());
         when(userRepository.findById(staffId)).thenReturn(Optional.of(staff));
         when(lockRepository.findByHorseIdAndReleasedAtIsNull(org.mockito.ArgumentMatchers.nullable(UUID.class)))
                 .thenReturn(Optional.of(new TrainingLock(
                         horse(), "Injury", null, user("vet", Role.VETERINARIAN), Instant.now())));
 
-        assertThatThrownBy(() -> service.create(UUID.randomUUID(), request(phaseId, staffId)))
+        assertThatThrownBy(() -> service.create(UUID.randomUUID(), request(phaseId, staffId), false))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("đang bị khóa");
         verify(repository, never()).save(org.mockito.ArgumentMatchers.any());

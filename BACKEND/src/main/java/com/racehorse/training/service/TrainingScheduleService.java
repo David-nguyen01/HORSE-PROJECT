@@ -1,11 +1,23 @@
 package com.racehorse.training.service;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.health.repository.TrainingLockRepository;
+import com.racehorse.horse.entity.Horse;
+import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.notification.entity.NotificationPriority;
 import com.racehorse.notification.service.NotificationService;
 import com.racehorse.training.dto.CreateTrainingScheduleRequest;
@@ -15,16 +27,6 @@ import com.racehorse.training.entity.TrainingSchedule;
 import com.racehorse.training.entity.WorkloadIntensity;
 import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import com.racehorse.training.repository.TrainingScheduleRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Clock;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.util.List;
-import java.util.UUID;
-
 @Service
 public class TrainingScheduleService {
 
@@ -33,6 +35,7 @@ public class TrainingScheduleService {
     private final TrainingLockRepository lockRepository;
     private final UserAccountRepository userRepository;
     private final NotificationService notificationService;
+    private final HorseAccessService horseAccessService;
     private final Clock clock;
 
     public TrainingScheduleService(
@@ -41,23 +44,32 @@ public class TrainingScheduleService {
             TrainingLockRepository lockRepository,
             UserAccountRepository userRepository,
             NotificationService notificationService,
+            HorseAccessService horseAccessService,
             Clock clock) {
         this.repository = repository;
         this.phaseRepository = phaseRepository;
         this.lockRepository = lockRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.horseAccessService = horseAccessService;
         this.clock = clock;
     }
 
     @Transactional
-    public TrainingScheduleResponse create(UUID actorId, CreateTrainingScheduleRequest request) {
+    public TrainingScheduleResponse create(UUID actorId, CreateTrainingScheduleRequest request, boolean isPrivileged) {
         if (!request.scheduledStart().isBefore(request.scheduledEnd())) {
             throw new BusinessException("Thời gian bắt đầu phải trước thời gian kết thúc");
         }
         TrainingPlanPhase phase = phaseRepository.findDetailById(request.trainingPlanPhaseId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy giai đoạn huấn luyện: " + request.trainingPlanPhaseId()));
+        
+        // Ensure actor can access the horse
+        Horse horse = horseAccessService.requireReadable(phase.getTrainingPlan().getHorse().getId(), actorId, isPrivileged);
+        if (horse.getArchivedAt() != null) {
+            throw new ResourceNotFoundException("Hồ sơ ngựa đã được lưu trữ: " + horse.getId());
+        }
+
         if (!phase.getTrainingPlan().isActive()) {
             throw new BusinessException("Chỉ có thể tạo lịch từ kế hoạch huấn luyện đang hoạt động");
         }
@@ -72,6 +84,10 @@ public class TrainingScheduleService {
         if (repository.existsByAssignedStaffIdAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
                 staff.getId(), request.scheduledEnd(), request.scheduledStart())) {
             throw new BusinessException("Nhân viên đã có lịch trong khung giờ này");
+        }
+        if (repository.existsByHorseIdAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
+                phase.getTrainingPlan().getHorse().getId(), request.scheduledEnd(), request.scheduledStart())) {
+            throw new BusinessException("Ngựa đã có lịch huấn luyện trong khung giờ này");
         }
         if (phase.getWorkloadIntensity() == WorkloadIntensity.HIGH
                 && lockRepository.findByHorseIdAndReleasedAtIsNull(phase.getTrainingPlan().getHorse().getId()).isPresent()) {

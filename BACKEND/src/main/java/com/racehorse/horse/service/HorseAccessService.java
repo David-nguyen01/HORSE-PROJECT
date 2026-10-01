@@ -25,7 +25,16 @@ public class HorseAccessService {
     public Horse requireReadable(UUID horseId, UUID userId, boolean privileged) {
         Horse horse = requireExisting(horseId);
         if (!privileged && (horse.getArchivedAt() != null
-                || !ownershipRepository.existsByHorseIdAndOwnerId(horseId, userId))) {
+                || (!ownershipRepository.existsByHorseIdAndOwnerId(horseId, userId) && 
+                    (horse.getCurrentTrainer() == null || !horse.getCurrentTrainer().getId().equals(userId))))) {
+            throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + horseId);
+        }
+        return horse;
+    }
+
+    public Horse requireAccessibleByTrainer(UUID horseId, UUID trainerId) {
+        Horse horse = requireExisting(horseId);
+        if (horse.getArchivedAt() != null || horse.getCurrentTrainer() == null || !horse.getCurrentTrainer().getId().equals(trainerId)) {
             throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + horseId);
         }
         return horse;
@@ -39,11 +48,20 @@ public class HorseAccessService {
         return horse;
     }
 
+    public boolean isServiceEligible(Horse horse) {
+        if (horse == null || horse.getPaymentStatus() == null) return false;
+        String status = horse.getPaymentStatus().toUpperCase();
+        return status.equals("PAID") || 
+               status.equals("IN_MEDICAL") || 
+               status.equals("PENDING_TRAINING") || 
+               status.equals("IN_TRAINING") || 
+               status.equals("COMPLETED_ONBOARDING");
+    }
+
     public Horse requireServiceEligible(UUID horseId) {
         Horse horse = requireActive(horseId);
-        boolean isPaid = "PAID".equalsIgnoreCase(horse.getPaymentStatus());
         boolean isOverridden = Boolean.TRUE.equals(horse.getServiceOverride());
-        if (!isPaid && !isOverridden) {
+        if (!isServiceEligible(horse) && !isOverridden) {
             throw new BusinessException("Ngựa " + horse.getName() + " chưa thanh toán phí dịch vụ chăm sóc và chưa được Club Manager duyệt bảo lãnh dịch vụ");
         }
         return horse;

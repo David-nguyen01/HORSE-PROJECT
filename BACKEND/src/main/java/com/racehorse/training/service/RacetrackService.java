@@ -95,6 +95,13 @@ public class RacetrackService {
             throw new BusinessException("Lịch huấn luyện này đã có lượt chạy thử");
         Instant start = request.date().atTime(request.startTime()).atZone(clubZone).toInstant();
         Instant end = start.plus(Duration.ofMinutes(track.getSlotMinutes()));
+        if (start.isBefore(schedule.getScheduledStart()) || end.isAfter(schedule.getScheduledEnd())) {
+            throw new BusinessException("Thời gian chạy thử phải nằm trọn trong khoảng thời gian của lịch huấn luyện");
+        }
+        if (bookingRepository.existsByTrainingScheduleHorseIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
+                schedule.getHorse().getId(), end, start)) {
+            throw new BusinessException("Ngựa đã có lượt chạy thử trên một sân/làn khác trong khung giờ này");
+        }
         if (bookingRepository.existsByLaneIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
                 lane.getId(), end, start)) throw new BusinessException("Làn chạy đã được đặt trong slot này");
         return toResponse(bookingRepository.save(new TrialRunBooking(schedule, lane, start, end)));

@@ -497,7 +497,7 @@ export function StablesPage(){
                   sStalls.map(st => {
                     const assign = st.currentAssignment;
                     const horse = assign ? horsesMap[assign.horseId] : null;
-                    const isPaid = horse?.paymentStatus === 'PAID';
+                    const isPaid = horse?.paid;
                     const isOverride = Boolean(horse?.serviceOverride);
                     return (
                       <div className={`stall-box ${assign ? 'occupied' : 'empty'}`} key={st.id}>
@@ -856,7 +856,7 @@ function AssignHorseDialog({ stallInfo, stables, horses, onClose, onSaved }) {
 
   const isEligible = useMemo(() => {
     if (!selectedHorse) return false;
-    return selectedHorse.paymentStatus === 'PAID' || selectedHorse.serviceOverride || serviceOverride;
+    return selectedHorse.paid || serviceOverride;
   }, [selectedHorse, serviceOverride]);
 
   const togglePaymentDirectly = async (newStatus) => {
@@ -1005,7 +1005,7 @@ function AssignHorseDialog({ stallInfo, stables, horses, onClose, onSaved }) {
             ) : (
               filteredHorses.map(h => {
                 const isSelected = h.id === selectedHorseId;
-                const isPaid = h.paymentStatus === 'PAID';
+                const isPaid = h.paid;
                 const isOverride = Boolean(h.serviceOverride);
                 return (
                   <div 
@@ -1038,7 +1038,7 @@ function AssignHorseDialog({ stallInfo, stables, horses, onClose, onSaved }) {
 
         {selectedHorse && (
           <div>
-            {selectedHorse.paymentStatus === 'PAID' ? (
+            {selectedHorse.paid && !selectedHorse.serviceOverride ? (
               <div className="service-eligible-notice">
                 <Check size={16}/>
                 <span>Ngựa đã đóng phí dịch vụ chăm sóc định kỳ đầy đủ. Sẵn sàng tiếp nhận vào chuồng.</span>

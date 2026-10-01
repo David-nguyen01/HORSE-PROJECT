@@ -6,6 +6,7 @@ import com.racehorse.common.exception.BusinessException;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.entity.HorseGender;
 import com.racehorse.horse.entity.HorseStatus;
+import com.racehorse.horse.repository.HorseOwnershipRepository;
 import com.racehorse.horse.repository.HorseRepository;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.training.dto.FitnessDashboardResponse;
@@ -45,12 +46,14 @@ class FitnessDashboardServiceTest {
     @Mock HorseRepository horseRepository;
     @Mock HorseAccessService horseAccessService;
     @Mock TrainingPlanPhaseRepository phaseRepository;
+    @Mock HorseOwnershipRepository ownershipRepository;
     private FitnessDashboardService service;
 
     @BeforeEach
     void setUp() {
         service = new FitnessDashboardService(
                 evaluationRepository, horseRepository, horseAccessService, phaseRepository,
+                ownershipRepository,
                 Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC));
     }
 
@@ -66,7 +69,7 @@ class FitnessDashboardServiceTest {
                 .thenReturn(List.of(evaluation));
         when(horseRepository.findByArchivedAtIsNullOrderByNameAsc()).thenReturn(List.of(horse));
 
-        FitnessDashboardResponse response = service.get(null, null, null, null, null);
+        FitnessDashboardResponse response = service.get(null, null, null, null, null, null, null);
 
         assertThat(response.dataPoints()).singleElement().satisfies(point -> {
             assertThat(point.evaluationId()).isEqualTo(evaluationId);
@@ -99,7 +102,7 @@ class FitnessDashboardServiceTest {
         when(evaluationRepository.findDashboardData(horseId, phaseId, LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 10), null))
                 .thenReturn(List.of(evaluation));
 
-        FitnessDashboardResponse response = service.get(null, phaseId, null, null, null, null);
+        FitnessDashboardResponse response = service.get(null, phaseId, null, null, null, null, null);
 
         assertThat(response.filters().horseId()).isEqualTo(horseId);
         assertThat(response.filters().phaseId()).isEqualTo(phaseId);
@@ -125,7 +128,7 @@ class FitnessDashboardServiceTest {
 
         when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
 
-        assertThatThrownBy(() -> service.get(otherHorseId, phaseId, null, null, null, null))
+        assertThatThrownBy(() -> service.get(otherHorseId, phaseId, null, null, null, null, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("không thuộc về ngựa được chọn");
     }
@@ -133,7 +136,7 @@ class FitnessDashboardServiceTest {
     @Test
     void dashboardRejectsReversedDateRange() {
         assertThatThrownBy(() -> service.get(
-                null, LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 1), null, null))
+                null, null, LocalDate.of(2026, 9, 10), LocalDate.of(2026, 9, 1), null, null, null))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Ngày bắt đầu");
     }

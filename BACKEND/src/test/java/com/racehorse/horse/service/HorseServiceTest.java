@@ -1,29 +1,10 @@
 package com.racehorse.horse.service;
 
-import com.racehorse.common.exception.BusinessException;
-import com.racehorse.auth.repository.UserAccountRepository;
-import com.racehorse.auth.entity.Role;
-import com.racehorse.auth.entity.UserAccount;
-import com.racehorse.horse.dto.CreateHorseRequest;
-import com.racehorse.horse.dto.HorseResponse;
-import com.racehorse.horse.dto.ReplaceOwnershipRequest;
-import com.racehorse.horse.entity.Horse;
-import com.racehorse.horse.entity.HorseGender;
-import com.racehorse.horse.entity.HorseStatus;
-import com.racehorse.horse.mapper.HorseMapper;
-import com.racehorse.horse.repository.HorseRepository;
-import com.racehorse.horse.repository.HorseOwnershipRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.Clock;
-import java.time.LocalDate;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -31,10 +12,29 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import static org.mockito.ArgumentMatchers.any;
+import org.mockito.Mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.racehorse.auth.entity.Role;
+import com.racehorse.auth.entity.UserAccount;
+import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.common.exception.BusinessException;
+import com.racehorse.horse.dto.CreateHorseRequest;
+import com.racehorse.horse.dto.HorseResponse;
+import com.racehorse.horse.dto.ReplaceOwnershipRequest;
+import com.racehorse.horse.entity.Horse;
+import com.racehorse.horse.entity.HorseGender;
+import com.racehorse.horse.entity.HorseStatus;
+import com.racehorse.horse.mapper.HorseMapper;
+import com.racehorse.horse.repository.HorseOwnershipRepository;
+import com.racehorse.horse.repository.HorseRepository;
 
 @ExtendWith(MockitoExtension.class)
 class HorseServiceTest {

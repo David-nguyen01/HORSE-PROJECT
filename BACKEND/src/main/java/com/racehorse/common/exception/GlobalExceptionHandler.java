@@ -15,8 +15,14 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    // VẤN ĐỀ 2: Thêm logger để ghi root cause của DataIntegrityViolationException
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({UnauthorizedException.class, AuthenticationException.class})
     ResponseEntity<ApiErrorResponse> handleUnauthorized(
@@ -43,9 +49,12 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiErrorResponse> handleDataIntegrity(
             DataIntegrityViolationException exception,
             HttpServletRequest request) {
+        Throwable root = exception;
+        while (root.getCause() != null) root = root.getCause();
+        log.error("DataIntegrityViolation at {} {}: {}", request.getMethod(), request.getRequestURI(), root.getMessage(), exception);
         return build(
                 HttpStatus.CONFLICT,
-                "Dữ liệu xung đột với ràng buộc nghiệp vụ hoặc đang được tham chiếu",
+                "Lỗi dữ liệu: " + root.getMessage(),
                 request,
                 Map.of());
     }

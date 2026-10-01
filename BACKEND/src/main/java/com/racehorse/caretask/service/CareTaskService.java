@@ -3,6 +3,7 @@ package com.racehorse.caretask.service;
 import com.racehorse.caretask.dto.*;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -30,8 +31,11 @@ public class CareTaskService {
     }
 
     @Transactional
-    public CareTaskResponse createTask(UUID actor, CreateCareTaskRequest request) {
-        horseAccess.requireActive(request.horseId());
+    public CareTaskResponse createTask(UUID actor, CreateCareTaskRequest request, boolean isPrivileged) {
+        Horse horse = horseAccess.requireReadable(request.horseId(), actor, isPrivileged);
+        if (horse.getArchivedAt() != null) {
+            throw new ResourceNotFoundException("Hồ sơ ngựa đã được lưu trữ: " + request.horseId());
+        }
         validateTask(request);
 
         UUID taskId = UUID.randomUUID();

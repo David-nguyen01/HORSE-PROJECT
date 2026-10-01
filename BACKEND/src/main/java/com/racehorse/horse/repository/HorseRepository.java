@@ -55,4 +55,14 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
     Page<Horse> findOwnedBy(
             @Param("ownerId") UUID ownerId,
             Pageable pageable);
+
+    @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
+    @Query("""
+            select h from Horse h
+            where h.currentTrainer.id = :trainerId
+              and h.archivedAt is null
+            """)
+    Page<Horse> findByCurrentTrainerId(
+            @Param("trainerId") UUID trainerId,
+            Pageable pageable);
 }

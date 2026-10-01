@@ -48,7 +48,18 @@ public class HorseMapper {
                 horse.getPaymentStatus(),
                 horse.getServiceOverride(),
                 horse.getOverrideReason(),
-                horse.getPaidUntil());
+                horse.getPaidUntil(),
+                isServiceEligible(horse) || Boolean.TRUE.equals(horse.getServiceOverride()));
+    }
+
+    private boolean isServiceEligible(Horse horse) {
+        if (horse == null || horse.getPaymentStatus() == null) return false;
+        String status = horse.getPaymentStatus().toUpperCase();
+        return status.equals("PAID") || 
+               status.equals("IN_MEDICAL") || 
+               status.equals("PENDING_TRAINING") || 
+               status.equals("IN_TRAINING") || 
+               status.equals("COMPLETED_ONBOARDING");
     }
 
     public HorseResponse toResponse(Horse horse) {

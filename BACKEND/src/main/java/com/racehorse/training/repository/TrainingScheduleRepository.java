@@ -16,6 +16,9 @@ public interface TrainingScheduleRepository extends JpaRepository<TrainingSchedu
     boolean existsByAssignedStaffIdAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
             UUID staffId, Instant requestedEnd, Instant requestedStart);
 
+    boolean existsByHorseIdAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
+            UUID horseId, Instant requestedEnd, Instant requestedStart);
+
     boolean existsByPhaseTrainingPlanId(UUID trainingPlanId);
 
     @EntityGraph(attributePaths = {"phase", "phase.trainingPlan", "horse", "assignedStaff", "createdBy"})

@@ -4,5 +4,6 @@ public enum HorseStatus {
     ACTIVE,
     RESTING,
     INJURED,
-    RETIRED
+    RETIRED,
+    UNPAID
 }

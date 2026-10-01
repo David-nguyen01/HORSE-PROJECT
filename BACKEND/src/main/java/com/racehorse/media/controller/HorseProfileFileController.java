@@ -54,7 +54,7 @@ public class HorseProfileFileController {
     }
 
     @PostMapping(value = "/proposals", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasRole('HORSE_OWNER')")
     ResponseEntity<HorseProfileFileResponse> propose(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,

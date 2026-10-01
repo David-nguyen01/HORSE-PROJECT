@@ -14,7 +14,6 @@ import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -31,7 +30,8 @@ public class FitnessDashboardService {
     private final HorseRepository horseRepository;
     private final HorseAccessService horseAccessService;
     private final TrainingPlanPhaseRepository phaseRepository;
-    private final Clock clock;
+    private final com.racehorse.horse.repository.HorseOwnershipRepository ownershipRepository;
+    private final java.time.Clock clock;
 
     @org.springframework.beans.factory.annotation.Autowired
     public FitnessDashboardService(
@@ -39,11 +39,13 @@ public class FitnessDashboardService {
             HorseRepository horseRepository,
             HorseAccessService horseAccessService,
             TrainingPlanPhaseRepository phaseRepository,
-            Clock clock) {
+            com.racehorse.horse.repository.HorseOwnershipRepository ownershipRepository,
+            java.time.Clock clock) {
         this.evaluationRepository = evaluationRepository;
         this.horseRepository = horseRepository;
         this.horseAccessService = horseAccessService;
         this.phaseRepository = phaseRepository;
+        this.ownershipRepository = ownershipRepository;
         this.clock = clock;
     }
 
@@ -51,8 +53,9 @@ public class FitnessDashboardService {
             TrainingEvaluationRepository evaluationRepository,
             HorseRepository horseRepository,
             HorseAccessService horseAccessService,
-            Clock clock) {
-        this(evaluationRepository, horseRepository, horseAccessService, null, clock);
+            com.racehorse.horse.repository.HorseOwnershipRepository ownershipRepository,
+            java.time.Clock clock) {
+        this(evaluationRepository, horseRepository, horseAccessService, null, ownershipRepository, clock);
     }
 
     @Transactional(readOnly = true)
@@ -62,7 +65,8 @@ public class FitnessDashboardService {
             LocalDate from,
             LocalDate to,
             FitnessStatus fitnessStatus,
-            String query) {
+            String query,
+            UUID ownerId) {
         LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
         UUID targetHorseId = horseId;
         TrainingPlanPhase phase = null;
@@ -114,6 +118,17 @@ public class FitnessDashboardService {
         List<Horse> horses = targetHorseId == null
                 ? horseRepository.findByArchivedAtIsNullOrderByNameAsc()
                 : List.of(horseAccessService.requireActive(targetHorseId));
+        
+        if (ownerId != null) {
+            horses = horses.stream()
+                    .filter(h -> ownershipRepository.existsByHorseIdAndOwnerId(h.getId(), ownerId) ||
+                                 (h.getCurrentTrainer() != null && h.getCurrentTrainer().getId().equals(ownerId)))
+                    .toList();
+            if (targetHorseId != null && horses.isEmpty()) {
+                throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + targetHorseId);
+            }
+        }
+
         List<FitnessDashboardResponse.HorseFitnessSummary> horseSummaries = new ArrayList<>();
         for (Horse horse : horses) {
             if (normalizedQuery != null && !matches(horse, normalizedQuery)) continue;
@@ -149,8 +164,9 @@ public class FitnessDashboardService {
             LocalDate from,
             LocalDate to,
             FitnessStatus fitnessStatus,
-            String query) {
-        return get(horseId, null, from, to, fitnessStatus, query);
+            String query,
+            UUID ownerId) {
+        return get(horseId, null, from, to, fitnessStatus, query, ownerId);
     }
 
     private boolean matches(Horse horse, String query) {

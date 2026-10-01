@@ -6,6 +6,7 @@ import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.dto.CreateHorseRequest;
+import com.racehorse.horse.dto.CreateOwnerHorseRequest;
 import com.racehorse.horse.dto.HorseResponse;
 import com.racehorse.horse.dto.ReplaceOwnershipRequest;
 import com.racehorse.horse.dto.UpdateHorseRequest;
@@ -51,6 +52,34 @@ public class HorseService {
     }
 
     @Transactional
+    public HorseResponse createOwnerRequest(CreateOwnerHorseRequest request, UUID ownerId) {
+        String reqCode = "REQ-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        
+        Horse sire = findOptionalParent(request.sireId(), "Không tìm thấy ngựa bố");
+        Horse dam = findOptionalParent(request.damId(), "Không tìm thấy ngựa mẹ");
+
+        Horse horse = new Horse(
+                reqCode,
+                request.name().trim(),
+                normalizeNullable(request.microchipPassportNumber()),
+                request.birthDate(),
+                request.gender(),
+                request.colorMarkings().trim(),
+                request.breed().trim(),
+                "Chờ xếp chuồng",
+                HorseStatus.RESTING
+        );
+        horse.assignParents(sire, dam);
+        horse = horseRepository.save(horse);
+
+        UserAccount owner = findUserWithRole(ownerId, Role.HORSE_OWNER, "Chủ sở hữu");
+        HorseOwnership ownership = new HorseOwnership(horse, owner, new BigDecimal("100.00"));
+        ownershipRepository.save(ownership);
+
+        return toResponse(horse);
+    }
+
+    @Transactional
     public HorseResponse create(CreateHorseRequest request) {
         validateUniqueIdentifiers(request);
         validateDistinctParents(request.sireId(), request.damId());
@@ -68,7 +97,8 @@ public class HorseService {
     public HorseResponse getByIdForUser(UUID id, UUID userId, boolean privileged) {
         Horse horse = findHorse(id);
         if (!privileged && (horse.getArchivedAt() != null
-                || !ownershipRepository.existsByHorseIdAndOwnerId(id, userId))) {
+                || (!ownershipRepository.existsByHorseIdAndOwnerId(id, userId) && 
+                    (horse.getCurrentTrainer() == null || !horse.getCurrentTrainer().getId().equals(userId))))) {
             throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + id);
         }
         return toResponse(horse);
@@ -84,6 +114,11 @@ public class HorseService {
     @Transactional(readOnly = true)
     public Page<HorseResponse> findOwnedBy(UUID ownerId, Pageable pageable) {
         return horseRepository.findOwnedBy(ownerId, pageable).map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<HorseResponse> findByCurrentTrainerId(UUID trainerId, Pageable pageable) {
+        return horseRepository.findByCurrentTrainerId(trainerId, pageable).map(this::toResponse);
     }
 
     @Transactional
@@ -111,6 +146,39 @@ public class HorseService {
                 request.status());
         horse.assignParents(sire, dam);
         horse.assignCurrentTrainer(findTrainer(request.currentTrainerId()));
+        return toResponse(horse);
+    }
+
+    @Transactional
+    public HorseResponse updateOwnerRequest(UUID id, CreateOwnerHorseRequest request, UUID ownerId) {
+        Horse horse = findHorse(id);
+        if (!ownershipRepository.existsByHorseIdAndOwnerId(id, ownerId)) {
+            throw new ResourceNotFoundException("Không tìm thấy ngựa của bạn: " + id);
+        }
+        
+        validateDistinctParents(request.sireId(), request.damId());
+        validateParentCycle(horse, request.sireId(), request.damId());
+
+        String chip = normalizeNullable(request.microchipPassportNumber());
+        if (chip != null
+                && horseRepository.existsByMicrochipPassportNumberIgnoreCaseAndIdNot(chip, id)) {
+            throw new BusinessException("Số chip/hộ chiếu đã tồn tại: " + chip);
+        }
+
+        Horse sire = findOptionalParent(request.sireId(), "Không tìm thấy ngựa bố");
+        Horse dam = findOptionalParent(request.damId(), "Không tìm thấy ngựa mẹ");
+        
+        horse.update(
+                request.name().trim(),
+                chip,
+                request.birthDate(),
+                request.gender(),
+                request.colorMarkings().trim(),
+                request.breed().trim(),
+                horse.getStableLocation(),
+                horse.getStatus());
+        horse.assignParents(sire, dam);
+
         return toResponse(horse);
     }
 

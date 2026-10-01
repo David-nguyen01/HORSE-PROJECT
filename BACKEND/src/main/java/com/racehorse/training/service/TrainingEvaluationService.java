@@ -54,8 +54,11 @@ public class TrainingEvaluationService {
     }
 
     @Transactional
-    public TrainingEvaluationResponse create(UUID actorId, CreateTrainingEvaluationRequest request) {
-        Horse horse = horseAccessService.requireActive(request.horseId());
+    public TrainingEvaluationResponse create(UUID actorId, CreateTrainingEvaluationRequest request, boolean isPrivileged) {
+        Horse horse = horseAccessService.requireReadable(request.horseId(), actorId, isPrivileged);
+        if (horse.getArchivedAt() != null) {
+            throw new ResourceNotFoundException("Hồ sơ ngựa đã được lưu trữ: " + request.horseId());
+        }
         UserAccount actor = userRepository.findById(actorId)
                 .filter(UserAccount::isEnabled)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người ghi nhận: " + actorId));

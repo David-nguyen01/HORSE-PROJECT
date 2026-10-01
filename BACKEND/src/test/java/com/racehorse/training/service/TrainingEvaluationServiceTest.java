@@ -40,6 +40,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -67,12 +68,12 @@ class TrainingEvaluationServiceTest {
         UUID actorId = UUID.randomUUID();
         Horse horse = horse();
         UserAccount trainer = trainer();
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+        when(horseAccessService.requireReadable(any(), any(), anyBoolean())).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer));
         when(repository.save(any(TrainingEvaluation.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        TrainingEvaluationResponse response = service.create(actorId, request(horseId, " https://video.test/run "));
+        TrainingEvaluationResponse response = service.create(actorId, request(horseId, " https://video.test/run "), false);
 
         assertThat(response.durationMinutes()).isEqualTo(42);
         assertThat(response.distanceMeters()).isEqualByComparingTo("1800.50");
@@ -97,7 +98,7 @@ class TrainingEvaluationServiceTest {
         TrainingSchedule schedule = schedule(horse);
         org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
 
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+        when(horseAccessService.requireReadable(any(), any(), anyBoolean())).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer));
         when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
         when(repository.existsByTrainingScheduleId(scheduleId)).thenReturn(false);
@@ -110,7 +111,7 @@ class TrainingEvaluationServiceTest {
                 new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
                 "Hoàn thành tốt giáo án.", null);
 
-        TrainingEvaluationResponse response = service.create(actorId, request);
+        TrainingEvaluationResponse response = service.create(actorId, request, false);
 
         assertThat(response.trainingScheduleId()).isEqualTo(scheduleId);
         assertThat(schedule.getCompletedAt()).isEqualTo(now);
@@ -130,7 +131,7 @@ class TrainingEvaluationServiceTest {
         TrainingSchedule schedule = schedule(otherHorse);
         org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
 
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+        when(horseAccessService.requireReadable(any(), any(), anyBoolean())).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
         when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
 
@@ -140,7 +141,7 @@ class TrainingEvaluationServiceTest {
                 new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
                 "Hoàn thành tốt giáo án.", null);
 
-        assertThatThrownBy(() -> service.create(actorId, request))
+        assertThatThrownBy(() -> service.create(actorId, request, false))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("không thuộc về ngựa được đánh giá");
     }
@@ -157,7 +158,7 @@ class TrainingEvaluationServiceTest {
         org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
         schedule.cancel(Instant.now());
 
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+        when(horseAccessService.requireReadable(any(), any(), anyBoolean())).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
         when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
 
@@ -167,7 +168,7 @@ class TrainingEvaluationServiceTest {
                 new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
                 "Hoàn thành tốt giáo án.", null);
 
-        assertThatThrownBy(() -> service.create(actorId, request))
+        assertThatThrownBy(() -> service.create(actorId, request, false))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("đã bị hủy");
     }
@@ -183,7 +184,7 @@ class TrainingEvaluationServiceTest {
         TrainingSchedule schedule = schedule(horse);
         org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
 
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+        when(horseAccessService.requireReadable(any(), any(), anyBoolean())).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
         when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
         when(repository.existsByTrainingScheduleId(scheduleId)).thenReturn(true);
@@ -194,7 +195,7 @@ class TrainingEvaluationServiceTest {
                 new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
                 "Hoàn thành tốt giáo án.", null);
 
-        assertThatThrownBy(() -> service.create(actorId, request))
+        assertThatThrownBy(() -> service.create(actorId, request, false))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("đã có đánh giá");
     }
@@ -203,10 +204,10 @@ class TrainingEvaluationServiceTest {
     void createRejectsUnsafeVideoProtocol() {
         UUID horseId = UUID.randomUUID();
         UUID actorId = UUID.randomUUID();
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse());
+        when(horseAccessService.requireReadable(any(), any(), anyBoolean())).thenReturn(horse());
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
 
-        assertThatThrownBy(() -> service.create(actorId, request(horseId, "javascript:alert(1)")))
+        assertThatThrownBy(() -> service.create(actorId, request(horseId, "javascript:alert(1)"), false))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("HTTP hoặc HTTPS");
     }

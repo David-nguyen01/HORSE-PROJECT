@@ -36,27 +36,28 @@ public class TrainingScheduleController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingScheduleResponse create(
+    public TrainingScheduleResponse create(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CreateTrainingScheduleRequest request) {
-        return service.create(userId(jwt), request);
+            @Valid @RequestBody CreateTrainingScheduleRequest request,
+            Authentication authentication) {
+        return service.create(userId(jwt), request, isPrivileged(authentication));
     }
 
     @PostMapping("/{scheduleId}/publish")
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingScheduleResponse publish(@PathVariable UUID scheduleId) {
+    public TrainingScheduleResponse publish(@PathVariable UUID scheduleId) {
         return service.publish(scheduleId);
     }
 
     @GetMapping("/{scheduleId}")
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','STABLE_STAFF')")
-    TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+    public TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         return service.get(scheduleId, userId(jwt), isPrivileged(authentication));
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    List<TrainingScheduleResponse> calendar(
+    public List<TrainingScheduleResponse> calendar(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) UUID horseId) {
@@ -65,7 +66,7 @@ public class TrainingScheduleController {
 
     @GetMapping("/mine")
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasRole('STABLE_STAFF')")
-    List<TrainingScheduleResponse> mine(
+    public List<TrainingScheduleResponse> mine(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {

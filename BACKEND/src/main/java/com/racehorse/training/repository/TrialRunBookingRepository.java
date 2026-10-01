@@ -13,6 +13,8 @@ public interface TrialRunBookingRepository extends JpaRepository<TrialRunBooking
     boolean existsByTrainingScheduleId(UUID scheduleId);
     boolean existsByLaneIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
             UUID laneId, Instant end, Instant start);
+    boolean existsByTrainingScheduleHorseIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
+            UUID horseId, Instant end, Instant start);
     @EntityGraph(attributePaths = {"lane", "lane.racetrack", "trainingSchedule", "trainingSchedule.horse"})
     List<TrialRunBooking> findByLaneRacetrackIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
             UUID racetrackId, Instant end, Instant start);

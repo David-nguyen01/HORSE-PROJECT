@@ -29,7 +29,8 @@ public record HorseResponse(
         String paymentStatus,
         Boolean serviceOverride,
         String overrideReason,
-        LocalDate paidUntil
+        LocalDate paidUntil,
+        boolean paid
 ) {
     public record ParentSummary(UUID id, String code, String name) {
     }

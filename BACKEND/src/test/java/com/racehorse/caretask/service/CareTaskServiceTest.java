@@ -6,6 +6,7 @@ import com.racehorse.caretask.dto.CreateCareTaskRequest;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.service.HorseAccessService;
+import com.racehorse.horse.entity.Horse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -59,7 +60,7 @@ class CareTaskServiceTest {
                 """.formatted(staffId);
 
         when(jdbc.query(contains("where m.id=? and m.module_code='STABLE_CARE' and m.record_type='DAILY_CARE_TASK'"),
-                any(RowMapper.class), any()))
+                any(RowMapper.class), any(UUID.class)))
                 .thenAnswer(inv -> {
                     RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
                     java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
@@ -73,13 +74,16 @@ class CareTaskServiceTest {
                     return List.of(mapper.mapRow(rs, 1));
                 });
 
-        CareTaskResponse response = service.createTask(actor, request);
+        Horse mockHorse = mock(Horse.class);
+        when(horseAccess.requireReadable(eq(horseId), eq(actor), eq(false))).thenReturn(mockHorse);
+
+        CareTaskResponse response = service.createTask(actor, request, false);
 
         assertThat(response.horseId()).isEqualTo(horseId);
         assertThat(response.status()).isEqualTo("PENDING");
         assertThat(response.taskType()).isEqualTo("MUCKING_OUT");
 
-        verify(horseAccess).requireActive(horseId);
+        verify(horseAccess).requireReadable(horseId, actor, false);
         verify(jdbc).update(contains("insert into module_records"), any(), eq(horseId), eq(staffId), eq(LocalDate.of(2026, 9, 25)), anyString());
     }
 
