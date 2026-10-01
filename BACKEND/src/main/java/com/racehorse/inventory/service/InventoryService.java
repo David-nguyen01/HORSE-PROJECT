@@ -44,6 +44,9 @@ public class InventoryService {
         data.put("minThreshold", request.minThreshold());
         data.put("location", request.location() == null ? "" : request.location().trim());
         data.put("description", request.description() == null ? "" : request.description().trim());
+        if (request.referencePrice() != null) {
+            data.put("referencePrice", request.referencePrice());
+        }
 
         jdbc.update(
                 "insert into module_records(id, module_code, record_type, horse_id, user_id, event_date, status, data_json, created_at, updated_at) " +
@@ -108,6 +111,10 @@ public class InventoryService {
 
     @Transactional
     public ReplenishmentResponse createReplenishment(UUID actorId, CreateReplenishmentRequest request) {
+        if (request.requestedQuantity() == null || request.requestedQuantity() <= 0 || request.requestedQuantity() != Math.floor(request.requestedQuantity())) {
+            throw new BusinessException("Số lượng yêu cầu phải là số nguyên dương lớn hơn 0");
+        }
+
         String itemName = request.itemName().trim();
         String category = request.category().trim().toUpperCase(Locale.ROOT);
         String unit = request.unit().trim();
@@ -132,7 +139,7 @@ public class InventoryService {
         data.put("itemId", request.itemId() == null ? null : request.itemId().toString());
         data.put("itemName", itemName);
         data.put("category", category);
-        data.put("requestedQuantity", request.requestedQuantity());
+        data.put("requestedQuantity", (long) Math.floor(request.requestedQuantity()));
         data.put("unit", unit);
         data.put("reason", request.reason().trim());
         data.put("proposedByUserId", actorId.toString());
@@ -252,11 +259,12 @@ public class InventoryService {
         double minThreshold = node.path("minThreshold").asDouble(0.0);
         String location = node.path("location").asText("");
         String description = node.path("description").asText("");
+        Double referencePrice = node.hasNonNull("referencePrice") ? node.path("referencePrice").asDouble() : null;
         boolean isLowStock = quantityOnHand <= minThreshold;
 
         return new InventoryItemResponse(
                 id, itemName, category, unit, quantityOnHand, minThreshold,
-                location, description, isLowStock, status, createdAt, updatedAt);
+                location, description, referencePrice, isLowStock, status, createdAt, updatedAt);
     }
 
     private ReplenishmentResponse mapReplenishmentResponse(java.sql.ResultSet rs) throws java.sql.SQLException {

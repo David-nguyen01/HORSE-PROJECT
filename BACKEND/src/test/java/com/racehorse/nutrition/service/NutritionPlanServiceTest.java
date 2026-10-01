@@ -133,6 +133,69 @@ class NutritionPlanServiceTest {
 
         assertThatThrownBy(() -> service.getActivePlan(horseId))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Không tìm thấy kế hoạch khẩu phần đang hoạt động");
+                .hasMessageContaining("Không tìm thấy kế hoạch khẩu phần");
+    }
+
+    @Test
+    void getEffectivePlanReturnsPlanEffectiveOnOrBeforeDate() {
+        UUID horseId = UUID.randomUUID();
+        LocalDate targetDate = LocalDate.of(2026, 10, 2);
+
+        String jsonV2 = """
+                {
+                  "version": 2,
+                  "effectiveDate": "2026-10-01",
+                  "notes": "Plan v2",
+                  "meals": [
+                    {"mealName": "Bữa sáng", "feedingTime": "06:30", "concentrateKg": 2.0, "forageKg": 3.0}
+                  ]
+                }
+                """;
+
+        when(jdbc.query(contains("and event_date <= ?"), any(RowMapper.class), eq(horseId), eq(targetDate)))
+                .thenAnswer(inv -> {
+                    RowMapper<NutritionPlanResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
+                    when(rs.getObject("horse_id", UUID.class)).thenReturn(horseId);
+                    when(rs.getObject("user_id", UUID.class)).thenReturn(UUID.randomUUID());
+                    when(rs.getString("status")).thenReturn("ACTIVE");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(jsonV2);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        NutritionPlanResponse plan = service.getEffectivePlan(horseId, targetDate);
+        assertThat(plan.version()).isEqualTo(2);
+        assertThat(plan.effectiveDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+    }
+
+    @Test
+    void listStandardPlansReturnsActiveStandardPlans() {
+        String stdJson = """
+                {
+                  "planCode": "STD_TRAINING",
+                  "planName": "Khẩu phần Huấn luyện Tiêu chuẩn",
+                  "description": "Tiêu chuẩn",
+                  "targetGroup": "Ngựa tập",
+                  "meals": [
+                    {"mealName": "Sáng", "feedingTime": "06:30", "concentrateKg": 1.5, "forageKg": 3.0}
+                  ]
+                }
+                """;
+
+        when(jdbc.query(contains("record_type='STANDARD_FEEDING_PLAN' and status='ACTIVE'"), any(RowMapper.class)))
+                .thenAnswer(inv -> {
+                    RowMapper<Map<String, Object>> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id")).thenReturn(UUID.randomUUID());
+                    when(rs.getString("data_json")).thenReturn(stdJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        List<Map<String, Object>> list = service.listStandardPlans();
+        assertThat(list).hasSize(1);
+        assertThat(list.get(0).get("planCode")).isEqualTo("STD_TRAINING");
+        assertThat(list.get(0).get("planName")).isEqualTo("Khẩu phần Huấn luyện Tiêu chuẩn");
     }
 }

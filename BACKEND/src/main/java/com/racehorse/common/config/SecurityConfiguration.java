@@ -44,7 +44,8 @@ public class SecurityConfiguration {
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/auth/refresh",
-                                "/api/auth/logout")
+                                "/api/auth/logout",
+                                "/api/care-tasks/*/photo")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
