@@ -71,7 +71,8 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiErrorResponse> handleUnreadableBody(
             HttpMessageNotReadableException exception,
             HttpServletRequest request) {
-        return build(HttpStatus.BAD_REQUEST, "JSON hoặc giá trị enum không hợp lệ", request, Map.of());
+        exception.printStackTrace();
+        return build(HttpStatus.BAD_REQUEST, "JSON hoặc giá trị enum không hợp lệ: " + exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
@@ -81,6 +82,18 @@ public class GlobalExceptionHandler {
         return build(
                 HttpStatus.CONTENT_TOO_LARGE,
                 "File tải lên vượt quá dung lượng cho phép",
+                request,
+                Map.of());
+    }
+
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ApiErrorResponse> handleGeneral(
+            Exception exception,
+            HttpServletRequest request) {
+        exception.printStackTrace();
+        return build(
+                HttpStatus.INTERNAL_SERVER_ERROR,
+                exception.getClass().getSimpleName() + ": " + exception.getMessage(),
                 request,
                 Map.of());
     }

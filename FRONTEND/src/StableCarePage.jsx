@@ -142,10 +142,17 @@ export default function StableCarePage() {
   const isManager = userRoles.includes('CLUB_MANAGER')
   const isTrainer = userRoles.includes('HEAD_TRAINER')
   const isStaff = userRoles.includes('STABLE_STAFF')
+  const isVet = userRoles.includes('VETERINARIAN') && !isManager && !isTrainer && !isStaff
   const canEditRoutine = isManager || isTrainer
   const canApproveInventory = isManager
 
-  const currentMeta = PAGE_META[activeTab] || PAGE_META.tasks
+  useEffect(() => {
+    if (isVet && activeTab !== 'nutrition') {
+      navigate('/stable-care/nutrition', { replace: true })
+    }
+  }, [isVet, activeTab, navigate])
+
+  const currentMeta = isVet ? PAGE_META.nutrition : (PAGE_META[activeTab] || PAGE_META.tasks)
 
   return (
     <>
@@ -157,7 +164,7 @@ export default function StableCarePage() {
         </div>
       </div>
 
-      {!isStaff && (
+      {!isStaff && !isVet && (
         <div className="flow4-tabs">
           <button
             className={`flow4-tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
@@ -192,11 +199,17 @@ export default function StableCarePage() {
         </div>
       )}
 
-      {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
-      {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
-      {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
-      {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
-      {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
+      {isVet ? (
+        <NutritionView canEditPlan={true} />
+      ) : (
+        <>
+          {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
+          {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
+          {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
+          {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
+          {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
+        </>
+      )}
     </>
   )
 }

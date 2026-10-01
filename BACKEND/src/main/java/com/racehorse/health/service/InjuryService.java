@@ -125,7 +125,7 @@ public class InjuryService {
             throw new ResourceNotFoundException("Không tìm thấy dấu chấn thương: " + injuryId);
         }
 
-        UUID horseId = (UUID) rows.getFirst().get("horse_id");
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         horseAccessService.requireActive(horseId);
 
         String newStatus = normalizeRecoveryStatus(req.recoveryStatus());
@@ -376,5 +376,10 @@ public class InjuryService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private UUID toUuid(Object value) {
+        if (value == null) return null;
+        return value instanceof UUID uuid ? uuid : UUID.fromString(value.toString());
     }
 }
