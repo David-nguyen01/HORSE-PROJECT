@@ -539,185 +539,638 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
 // 2. FR14: NUTRITION PLAN & DAILY FEEDING CHECKLIST
 // =========================================================================
 function NutritionView({ canEditPlan }) {
-  const [horses, setHorses] = useState([])
-  const [selectedHorseId, setSelectedHorseId] = useState('')
+  const [subTab, setSubTab] = useState('stables') // 'stables' or 'standard'
   const [targetDate, setTargetDate] = useState(today())
+  const [workload, setWorkload] = useState(null)
+  const [standardPlans, setStandardPlans] = useState([])
+  const [selectedStallId, setSelectedStallId] = useState('')
   const [checklist, setChecklist] = useState(null)
-  const [activePlan, setActivePlan] = useState(null)
   const [history, setHistory] = useState([])
   const [showHistory, setShowHistory] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [viewMode, setViewMode] = useState('grid') // 'grid' (thẻ ô chuồng) or 'table' (bảng)
+  const [confirmedMeals, setConfirmedMeals] = useState({})
   const [showCreatePlan, setShowCreatePlan] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [checklistLoading, setChecklistLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    api('/api/horses?size=100')
-      .then((data) => {
-        const list = pageContent(data)
-        setHorses(list)
-        if (list.length) setSelectedHorseId(list[0].id)
-      })
-      .catch(() => {})
-  }, [])
-
+  // 1. Load workload & standard plans when targetDate changes
   const loadData = useCallback(async () => {
-    if (!selectedHorseId) return
     setLoading(true)
     setError('')
     try {
-      const [chk, plan] = await Promise.all([
-        stableCareApi.getDailyFeedingChecklist(selectedHorseId, targetDate).catch(() => null),
-        stableCareApi.getActiveNutritionPlan(selectedHorseId).catch(() => null),
+      const [workloadData, stdData] = await Promise.all([
+        stableCareApi.getStablesWorkload(targetDate).catch(() => null),
+        stableCareApi.getStandardPlans().catch(() => []),
       ])
-      setChecklist(chk)
-      setActivePlan(plan)
+      setWorkload(workloadData)
+      setStandardPlans(stdData || [])
+
+      const stalls = workloadData?.stalls || []
+      if (stalls.length > 0) {
+        setSelectedStallId((prev) => {
+          if (prev && stalls.some((s) => s.stallId === prev && s.hasPlan)) return prev
+          const firstWithPlan = stalls.find((s) => s.hasPlan)
+          return firstWithPlan ? firstWithPlan.stallId : (stalls[0]?.stallId || '')
+        })
+      }
     } catch (e) {
-      setError(e.message)
+      setError(e.message || 'Không thể tải dữ liệu dinh dưỡng theo chuồng')
     } finally {
       setLoading(false)
     }
-  }, [selectedHorseId, targetDate])
+  }, [targetDate])
 
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  const toggleHistory = async () => {
-    if (!showHistory && selectedHorseId) {
-      try {
-        const list = await stableCareApi.getNutritionHistory(selectedHorseId)
-        setHistory(list || [])
-      } catch (e) {
-        setHistory([])
-      }
+  const selectedStall = useMemo(
+    () => workload?.stalls?.find((s) => s.stallId === selectedStallId) || null,
+    [workload, selectedStallId]
+  )
+
+  // 2. Load checklist and history for selected stall/horse
+  const loadHorseDetails = useCallback(async () => {
+    if (!selectedStall || !selectedStall.horseId || !selectedStall.hasPlan) {
+      setChecklist(null)
+      setHistory([])
+      return
     }
-    setShowHistory(!showHistory)
+    setChecklistLoading(true)
+    try {
+      const [chk, hist] = await Promise.all([
+        stableCareApi.getDailyFeedingChecklist(selectedStall.horseId, targetDate).catch(() => null),
+        stableCareApi.getNutritionHistory(selectedStall.horseId).catch(() => []),
+      ])
+      setChecklist(chk)
+      setHistory(hist || [])
+    } catch {
+      setChecklist(null)
+      setHistory([])
+    } finally {
+      setChecklistLoading(false)
+    }
+  }, [selectedStall, targetDate])
+
+  useEffect(() => {
+    loadHorseDetails()
+  }, [loadHorseDetails])
+
+  const toggleHistory = () => {
+    setShowHistory((prev) => !prev)
   }
+
+  const toggleMealConfirmed = (mealKey) => {
+    setConfirmedMeals((prev) => ({
+      ...prev,
+      [mealKey]: !prev[mealKey],
+    }))
+  }
+
+  const filteredStalls = useMemo(() => {
+    const stalls = workload?.stalls || []
+    if (!searchQuery.trim()) return stalls
+    const q = searchQuery.toLowerCase().trim()
+    return stalls.filter(
+      (s) =>
+        (s.stallLocationDisplay && s.stallLocationDisplay.toLowerCase().includes(q)) ||
+        (s.horseCode && s.horseCode.toLowerCase().includes(q)) ||
+        (s.horseName && s.horseName.toLowerCase().includes(q)) ||
+        (s.notes && s.notes.toLowerCase().includes(q))
+    )
+  }, [workload, searchQuery])
+
+  const summary = workload?.summary || {
+    totalStalls: 0,
+    occupiedStalls: 0,
+    emptyStalls: 0,
+    standardPlansCount: standardPlans.length,
+    specialInstructionsCount: 0,
+  }
+
+  const stallsByStable = useMemo(() => {
+    const groups = {}
+    filteredStalls.forEach((s) => {
+      const sName = s.stableName || 'Khu chuồng trại'
+      if (!groups[sName]) groups[sName] = []
+      groups[sName].push(s)
+    })
+    return groups
+  }, [filteredStalls])
 
   return (
     <div>
-      <div className="toolbar card" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <label className="field" style={{ minWidth: '240px', margin: 0 }}>
-          <select value={selectedHorseId} onChange={(e) => setSelectedHorseId(e.target.value)}>
-            {horses.map((h) => (
-              <option key={h.id} value={h.id}>{h.code} · {h.name}</option>
-            ))}
-          </select>
-        </label>
-        <label className="field" style={{ minWidth: '160px', margin: 0 }}>
-          <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
-        </label>
-        <button className="button secondary" onClick={toggleHistory}>
-          <RotateCcw size={15} /> {showHistory ? 'Ẩn lịch sử' : 'Lịch sử phiên bản'}
-        </button>
-        {canEditPlan && (
-          <button className="button primary" style={{ marginLeft: 'auto' }} onClick={() => setShowCreatePlan(true)}>
-            <Plus size={16} /> Lập khẩu phần mới
-          </button>
-        )}
+      {/* 1. OVERVIEW STATS (STABLE / STALL BASED) */}
+      <div className="stats-grid" style={{ marginBottom: '20px' }}>
+        <div className="stat card green">
+          <div>
+            <strong>{summary.occupiedStalls} / {summary.totalStalls}</strong>
+            <span>Ô chuồng có ngựa</span>
+            <small className="muted" style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+              Ngựa đang ở chuồng ngày {formatVNDate(targetDate)}
+            </small>
+          </div>
+        </div>
+        <div className="stat card rose">
+          <div>
+            <strong>{summary.emptyStalls}</strong>
+            <span>Ô chuồng trống</span>
+            <small className="muted" style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+              Chưa có ngựa ở chuồng
+            </small>
+          </div>
+        </div>
+        <div className="stat card blue">
+          <div>
+            <strong>{summary.totalStalls}</strong>
+            <span>Tổng số ô chuồng</span>
+            <small className="muted" style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+              Chuồng A & Chuồng B
+            </small>
+          </div>
+        </div>
+        <div className="stat card gold">
+          <div>
+            <strong>{summary.standardPlansCount}</strong>
+            <span>Khẩu phần tiêu chuẩn</span>
+            <small className="muted" style={{ display: 'block', fontSize: '11px', marginTop: '2px' }}>
+              Baseline dinh dưỡng cơ sở ({standardPlans.length} mẫu)
+            </small>
+          </div>
+        </div>
       </div>
 
-      {error && <div className="notice error"><X size={16} />{error}</div>}
+      {/* 2. SUB-TABS & TOOLBAR */}
+      <div className="card toolbar" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            className={`button ${subTab === 'stables' ? 'primary' : 'secondary'}`}
+            onClick={() => setSubTab('stables')}
+          >
+            <Home size={15} /> Tình trạng chuồng & Khẩu phần ăn
+          </button>
+          <button
+            className={`button ${subTab === 'standard' ? 'primary' : 'secondary'}`}
+            onClick={() => setSubTab('standard')}
+          >
+            <FileText size={15} /> Khẩu phần tiêu chuẩn cơ sở ({standardPlans.length})
+          </button>
+        </div>
 
-      {showHistory && (
-        <section className="card" style={{ padding: '20px', marginBottom: '20px' }}>
-          <div className="card-head">
-            <h3>Lịch sử các phiên bản khẩu phần</h3>
-            <span className="record-count">{history.length} phiên bản</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+            <Calendar size={15} className="muted" />
+            <span style={{ fontWeight: 500 }}>Ngày kiểm tra:</span>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              style={{ width: '150px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+            />
           </div>
-          <div className="data-table">
-            <div className="table-header" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }}>
-              <span>Phiên bản</span>
-              <span>Ngày áp dụng</span>
-              <span>Ghi chú / Khẩu phần</span>
-              <span>Trạng thái</span>
-            </div>
-            {history.map((ver) => (
-              <div className="table-row" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }} key={ver.id}>
-                <b>v{ver.version}</b>
-                <span>{formatVNDate(ver.effectiveDate)}</span>
-                <div>
-                  <b>{ver.notes || 'Khẩu phần ăn tiêu chuẩn'}</b>
-                  <small className="muted">{ver.meals?.length || 0} bữa/ngày</small>
+
+          {canEditPlan && (
+            <button className="button primary" onClick={() => setShowCreatePlan(true)}>
+              <Plus size={15} /> Lập khẩu phần mới
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && <div className="notice error" style={{ marginBottom: '16px' }}><X size={16} />{error}</div>}
+
+      {/* 3. SUB-TAB CONTENT: STABLE WORKLOAD */}
+      {subTab === 'stables' && (
+        <>
+          {/* SEARCH & STALLS GRID / TABLE */}
+          <section className="card" style={{ padding: '20px', marginBottom: '20px' }}>
+            <div className="card-head" style={{ marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+              <div>
+                <h3 style={{ margin: 0 }}>TÌNH TRẠNG CHUỒNG & KHẨU PHẦN ĂN</h3>
+                <p className="muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
+                  Theo dõi ngựa tại từng ô chuồng và khẩu phần dinh dưỡng áp dụng ngày <b>{formatVNDate(targetDate)}</b>. Bấm <b>[Xem checklist]</b> để theo dõi thực đơn bữa ăn trong ca.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', minWidth: '280px' }}>
+                <input
+                  type="text"
+                  placeholder="Tìm theo chuồng, tên ngựa…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ flex: 1, padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
+                />
+                <div style={{ display: 'flex', border: '1px solid #ccc', borderRadius: '6px', overflow: 'hidden' }}>
+                  <button
+                    type="button"
+                    style={{
+                      background: viewMode === 'grid' ? '#26754b' : '#fff',
+                      color: viewMode === 'grid' ? '#fff' : '#333',
+                      border: 'none',
+                      padding: '6px 10px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                    }}
+                    onClick={() => setViewMode('grid')}
+                    title="Dạng thẻ ô chuồng"
+                  >
+                    Lưới
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      background: viewMode === 'table' ? '#26754b' : '#fff',
+                      color: viewMode === 'table' ? '#fff' : '#333',
+                      border: 'none',
+                      padding: '6px 10px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                    }}
+                    onClick={() => setViewMode('table')}
+                    title="Dạng bảng danh sách"
+                  >
+                    Bảng
+                  </button>
                 </div>
-                <span className={`status ${ver.status === 'ACTIVE' ? 'active' : 'retired'}`}>
-                  <i /> {ver.status === 'ACTIVE' ? 'ĐANG ÁP DỤNG' : 'HẾT HIỆU LỰC'}
-                </span>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="empty" style={{ padding: '24px' }}>Đang tải danh sách chuồng trại & khẩu phần…</div>
+            ) : filteredStalls.length === 0 ? (
+              <div className="empty" style={{ padding: '20px' }}>Không tìm thấy ô chuồng nào phù hợp</div>
+            ) : viewMode === 'grid' ? (
+              <div>
+                {Object.entries(stallsByStable).map(([stableName, stalls]) => (
+                  <div key={stableName} style={{ marginBottom: '24px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', paddingBottom: '8px', borderBottom: '2px solid #26754b' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <Home size={18} style={{ color: '#26754b' }} />
+                        <h4 style={{ margin: 0, fontSize: '15px', color: '#123f32' }}>[ Khu / {stableName} ]</h4>
+                      </div>
+                      <span className="badge-tag" style={{ fontSize: '11px', background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0' }}>
+                        {stalls.filter((s) => s.hasHorse).length} / {stalls.length} ô có ngựa
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '16px' }}>
+                      {stalls.map((s) => {
+                        const isSelected = s.stallId === selectedStallId
+                        return (
+                          <div
+                            key={s.stallId}
+                            style={{
+                              border: isSelected ? '2px solid #26754b' : '1px solid var(--line, #e2e8f0)',
+                              borderRadius: '10px',
+                              padding: '16px',
+                              background: isSelected ? 'rgba(38, 117, 75, 0.05)' : s.hasHorse ? '#fff' : '#f8fafc',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              justifyContent: 'space-between',
+                              boxShadow: isSelected ? '0 0 0 1px #26754b' : '0 1px 3px rgba(0,0,0,0.05)',
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <div>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#123f32' }}>{s.stallCode}</span>
+                                {s.hasHorse ? (
+                                  <span className="badge-tag completed" style={{ fontSize: '11px', fontWeight: 600 }}>
+                                    {s.versionDisplay || 'Áp dụng'}
+                                  </span>
+                                ) : (
+                                  <span className="badge-tag" style={{ background: '#f1f5f9', color: '#64748b', fontSize: '11px' }}>
+                                    Chưa có ngựa
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ marginBottom: '10px' }}>
+                                {s.hasHorse ? (
+                                  <b style={{ fontSize: '15px', color: '#0f172a' }}>{s.horseDisplay || `${s.horseCode} — ${s.horseName}`}</b>
+                                ) : (
+                                  <span style={{ fontSize: '14px', color: '#94a3b8', fontStyle: 'italic' }}>Chưa có ngựa</span>
+                                )}
+                              </div>
+
+                              <div style={{ fontSize: '13px' }}>
+                                {s.hasHorse ? (
+                                  <>
+                                    <div style={{ fontWeight: 600, color: '#166534', marginBottom: '4px' }}>
+                                      {s.planName}
+                                    </div>
+                                    <div style={{ color: '#475569', fontSize: '12px', marginBottom: '2px' }}>
+                                      {s.feedingSummary}
+                                    </div>
+                                    <div style={{ color: '#64748b', fontSize: '12px' }}>
+                                      {s.mealsDisplay}
+                                    </div>
+                                  </>
+                                ) : (
+                                  <div style={{ color: '#94a3b8', fontSize: '13px' }}>
+                                    [Không có khẩu phần]
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
+                              {s.hasHorse && s.hasChecklist ? (
+                                <button
+                                  className={`button ${isSelected ? 'primary' : 'secondary'}`}
+                                  style={{ width: '100%', minHeight: '32px', fontSize: '12px', justifyContent: 'center' }}
+                                  onClick={() => setSelectedStallId(s.stallId)}
+                                >
+                                  {isSelected ? '✓ Đang xem checklist' : 'Xem checklist'}
+                                </button>
+                              ) : (
+                                <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px', padding: '6px 0' }}>
+                                  Không có feeding checklist
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="data-table">
+                <div className="table-header" style={{ gridTemplateColumns: '170px 180px 1fr 140px 110px 130px' }}>
+                  <span>Mã chuồng / Vị trí</span>
+                  <span>Ngựa đang ở chuồng</span>
+                  <span>Khẩu phần đang áp dụng</span>
+                  <span>Định mức / Ngày</span>
+                  <span>Số bữa</span>
+                  <span>Thao tác</span>
+                </div>
+                {filteredStalls.map((s) => {
+                  const isSelected = s.stallId === selectedStallId
+                  return (
+                    <div
+                      key={s.stallId}
+                      className="table-row"
+                      style={{
+                        gridTemplateColumns: '170px 180px 1fr 140px 110px 130px',
+                        background: isSelected ? 'rgba(38, 117, 75, 0.08)' : !s.hasHorse ? '#fafafa' : undefined,
+                        cursor: s.hasHorse ? 'pointer' : 'default',
+                        opacity: !s.hasHorse ? 0.75 : 1,
+                      }}
+                      onClick={() => {
+                        if (s.hasHorse) setSelectedStallId(s.stallId)
+                      }}
+                    >
+                      <div>
+                        <b style={{ color: '#123f32' }}>{s.stallLocationDisplay}</b>
+                        <small className="muted" style={{ display: 'block', fontSize: '11px' }}>
+                          {s.stableName}
+                        </small>
+                      </div>
+
+                      <div>
+                        {s.hasHorse ? (
+                          <b style={{ color: '#0f172a' }}>{s.horseDisplay}</b>
+                        ) : (
+                          <i style={{ color: '#8c959f', fontSize: '12px' }}>Chưa có ngựa</i>
+                        )}
+                      </div>
+
+                      <div>
+                        <b>{s.planName}</b>
+                        {s.versionDisplay && s.hasHorse && (
+                          <span className="badge-tag completed" style={{ marginLeft: '6px', fontSize: '10px' }}>{s.versionDisplay}</span>
+                        )}
+                      </div>
+
+                      <span style={{ fontSize: '12px' }}>{s.feedingSummary}</span>
+                      <span style={{ fontSize: '12px' }}>{s.mealsDisplay}</span>
+
+                      <div>
+                        {s.hasHorse && s.hasChecklist ? (
+                          <button
+                            className={`button ${isSelected ? 'primary' : 'secondary'}`}
+                            style={{ minHeight: '30px', fontSize: '11px', padding: '0 10px' }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedStallId(s.stallId)
+                            }}
+                          >
+                            {isSelected ? '✓ Đang chọn' : 'Xem checklist'}
+                          </button>
+                        ) : (
+                          <span className="muted" style={{ fontSize: '11px' }}>—</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* CHECKLIST & FEEDING DETAILS FOR SELECTED ACTIVE STALL */}
+          {selectedStall && selectedStall.hasHorse && selectedStall.hasChecklist && (
+            <section className="card" style={{ padding: '24px', marginBottom: '20px' }}>
+              <div className="card-head" style={{ padding: '0 0 16px', borderBottom: '1px solid #eee', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ margin: 0 }}>Danh sách kiểm tra cho ăn trong ca (Daily Feeding Checklist)</h3>
+                    {checklist?.planVersion && (
+                      <span className="badge-tag completed">Phiên bản: v{checklist.planVersion}</span>
+                    )}
+                  </div>
+                  <p className="muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
+                    Ngày: <b>{formatVNDate(targetDate)}</b> · Ô chuồng: <b>{selectedStall.stallLocationDisplay}</b> · Ngựa: <b>{selectedStall.horseDisplay}</b> · Định mức: <b>{selectedStall.feedingSummary}</b>
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <button className="button secondary" onClick={toggleHistory}>
+                    <RotateCcw size={14} /> {showHistory ? 'Ẩn lịch sử' : `Lịch sử phiên bản (${history.length})`}
+                  </button>
+                  <Link to="/stable-care/tasks" className="button secondary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={14} /> Xem nhiệm vụ trong ngày
+                  </Link>
+                </div>
+              </div>
+
+              {/* VERSION HISTORY ACCORDION */}
+              {showHistory && (
+                <div style={{ background: '#fcfcfc', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
+                  <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#123f32' }}>Lịch sử các phiên bản khẩu phần của ngựa này</h4>
+                  {history.length === 0 ? (
+                    <div className="empty" style={{ padding: '12px', fontSize: '12px' }}>Chưa có bản ghi lịch sử</div>
+                  ) : (
+                    <div className="data-table">
+                      <div className="table-header" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }}>
+                        <span>Phiên bản</span>
+                        <span>Ngày áp dụng</span>
+                        <span>Ghi chú / Khẩu phần</span>
+                        <span>Trạng thái</span>
+                      </div>
+                      {history.map((ver) => (
+                        <div className="table-row" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }} key={ver.id}>
+                          <b>v{ver.version}</b>
+                          <span>{formatVNDate(ver.effectiveDate)}</span>
+                          <div>
+                            <b>{ver.notes || 'Khẩu phần ăn tiêu chuẩn'}</b>
+                            <small className="muted" style={{ display: 'block' }}>{ver.meals?.length || 0} bữa/ngày</small>
+                          </div>
+                          <span className={`status ${ver.status === 'ACTIVE' ? 'active' : 'retired'}`}>
+                            <i /> {ver.status === 'ACTIVE' ? 'ĐANG ÁP DỤNG' : 'HẾT HIỆU LỰC'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SPECIAL INSTRUCTIONS (EMPTY STATE) */}
+              <div style={{ background: '#fafbfc', border: '1px dashed #d0d7de', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ background: '#fff', borderRadius: '50%', padding: '8px', border: '1px solid #e1e4e8', display: 'flex' }}>
+                  <ShieldAlert size={20} style={{ color: '#6e7781' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <b style={{ fontSize: '13px', color: '#24292f' }}>Chỉ định đặc biệt:</b>
+                    <span className="badge-tag pending" style={{ background: '#f3f4f6', color: '#57606a', border: 'none' }}>0 chỉ định</span>
+                  </div>
+                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#57606a' }}>
+                    Chưa có chỉ định đặc biệt từ Bác sĩ thú y hoặc Huấn luyện viên trưởng cho ô chuồng này. Mọi bữa ăn tuân theo khẩu phần cơ sở đã được phê duyệt.
+                  </p>
+                </div>
+              </div>
+
+              {/* MEALS CHECKLIST */}
+              {checklistLoading ? (
+                <div className="empty" style={{ minHeight: '120px', padding: '20px' }}>Đang tải thực đơn bữa ăn…</div>
+              ) : !checklist?.meals?.length ? (
+                <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
+                  <Utensils size={26} style={{ color: 'var(--muted)', opacity: 0.7 }} />
+                  <b style={{ marginTop: '6px', fontSize: '13px' }}>Chưa có kế hoạch dinh dưỡng</b>
+                  <span style={{ fontSize: '12px' }}>Ngựa này chưa được Bác sĩ thú y hoặc Huấn luyện viên trưởng thiết lập khẩu phần ăn.</span>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '14px' }}>
+                  {checklist.meals.map((meal, idx) => {
+                    const mealKey = `${targetDate}-${selectedStall.horseId}-${idx}`
+                    const isDone = !!confirmedMeals[mealKey]
+                    return (
+                      <div key={idx} className="checklist-card" style={{ borderColor: isDone ? '#bbf7d0' : undefined, background: isDone ? '#f0fdf4' : undefined }}>
+                        <span className="brand-mark" style={{ width: '40px', height: '40px', background: isDone ? '#dcfce7' : undefined, color: isDone ? '#166534' : undefined }}>
+                          {isDone ? <Check size={20} /> : <Clock size={18} />}
+                        </span>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <b style={{ fontSize: '15px', color: isDone ? '#166534' : '#123f32' }}>{meal.mealName}</b>
+                            <span className="badge-tag pending">{meal.feedingTime}</span>
+                            {isDone && <span className="badge-tag completed">Đã hoàn thành</span>}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '10px' }}>
+                            <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
+                              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN TINH</span>
+                              <b>{meal.concentrateKg} kg</b> {meal.concentrateType && `· ${meal.concentrateType}`}
+                            </div>
+                            <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
+                              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN THÔ XANH</span>
+                              <b>{meal.forageKg} kg</b> {meal.forageType && `· ${meal.forageType}`}
+                            </div>
+                            <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
+                              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>CHẤT BỔ SUNG / THUỐC</span>
+                              <b>{meal.supplements || 'Không có'}</b>
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          className={`button ${isDone ? 'secondary' : 'primary'}`}
+                          style={{
+                            minHeight: '36px',
+                            fontSize: '11px',
+                            alignSelf: 'center',
+                            background: isDone ? '#dcfce7' : undefined,
+                            color: isDone ? '#166534' : undefined,
+                            borderColor: isDone ? '#86efac' : undefined,
+                          }}
+                          onClick={() => toggleMealConfirmed(mealKey)}
+                        >
+                          {isDone ? '✓ Đã cho ăn' : 'Xác nhận cho ăn'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </section>
+          )}
+        </>
+      )}
+
+      {/* 5. SUB-TAB CONTENT: STANDARD FEEDING PLANS */}
+      {subTab === 'standard' && (
+        <section className="card" style={{ padding: '24px' }}>
+          <div className="card-head" style={{ marginBottom: '20px' }}>
+            <div>
+              <h3 style={{ margin: 0 }}>Khẩu phần tiêu chuẩn cơ sở (Standard Feeding Plans)</h3>
+              <p className="muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
+                Bộ định mức dinh dưỡng tham chiếu được Bác sĩ thú y và Huấn luyện viên trưởng phê duyệt làm căn cứ chăm sóc ngựa hàng ngày.
+              </p>
+            </div>
+            <span className="badge-tag completed">3 mẫu tiêu chuẩn</span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+            {standardPlans.map((plan) => (
+              <div key={plan.id} style={{ border: '1px solid #e5e7eb', borderRadius: '10px', padding: '18px', background: '#fff', display: 'flex', flexDirection: 'column', gap: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div>
+                    <span className="badge-tag pending" style={{ fontSize: '10px', marginBottom: '6px' }}>{plan.planCode}</span>
+                    <h4 style={{ margin: 0, fontSize: '16px', color: '#123f32' }}>{plan.planName}</h4>
+                  </div>
+                  <span className="badge-tag completed" style={{ fontSize: '11px' }}>{plan.targetGroup}</span>
+                </div>
+
+                <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', lineHeight: '1.5' }}>
+                  {plan.description}
+                </p>
+
+                <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: '12px' }}>
+                  <b style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#6b7280' }}>
+                    Chi tiết các bữa ăn ({plan.meals?.length || 0} bữa):
+                  </b>
+                  <div style={{ display: 'grid', gap: '8px', marginTop: '8px' }}>
+                    {(plan.meals || []).map((m, idx) => (
+                      <div key={idx} style={{ background: '#f9fafb', borderRadius: '6px', padding: '8px 10px', fontSize: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, color: '#1f2937' }}>
+                          <span>{m.mealName}</span>
+                          <span className="muted" style={{ fontSize: '11px' }}>{m.feedingTime}</span>
+                        </div>
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: '#4b5563' }}>
+                          <div>• Tinh: <b>{m.concentrateKg} kg</b> ({m.concentrateType || 'Chuẩn'})</div>
+                          <div>• Thô: <b>{m.forageKg} kg</b> ({m.forageType || 'Alfalfa'})</div>
+                          {m.supplements && <div>• Phụ gia: <span style={{ color: '#047857' }}>{m.supplements}</span></div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px dashed #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <small className="muted" style={{ fontSize: '11px' }}>Dữ liệu chuẩn cơ sở (Chỉ đọc)</small>
+                  <span className="status active" style={{ fontSize: '11px' }}><i></i> ĐANG HIỆU LỰC</span>
+                </div>
               </div>
             ))}
           </div>
         </section>
       )}
 
-      {/* Daily Checklist for Groom */}
-      <section className="card" style={{ padding: '24px' }}>
-        <div className="card-head" style={{ padding: '0 0 16px' }}>
-          <div>
-            <h3>Danh sách kiểm tra cho ăn trong ca</h3>
-            <p className="muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
-              Ngày: <b>{formatVNDate(targetDate)}</b> · Ngựa: <b>{checklist?.horseName || '—'}</b> ({checklist?.horseCode || '—'}) · Chuồng: <b>{checklist?.stableLocation || 'Chưa xếp'}</b>
-            </p>
-          </div>
-          {checklist?.planVersion && (
-            <span className="badge-tag completed">Phiên bản áp dụng: v{checklist.planVersion}</span>
-          )}
-        </div>
-
-        {loading ? (
-          <div className="empty" style={{ minHeight: '120px', padding: '20px' }}>Đang tải khẩu phần…</div>
-        ) : !checklist?.meals?.length ? (
-          <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
-            <Utensils size={26} style={{ color: 'var(--muted)', opacity: 0.7 }} />
-            <b style={{ marginTop: '6px', fontSize: '13px' }}>Chưa có kế hoạch dinh dưỡng</b>
-            <span style={{ fontSize: '12px' }}>Ngựa này chưa được Bác sĩ thú y hoặc Huấn luyện viên trưởng thiết lập khẩu phần ăn.</span>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '14px' }}>
-            {checklist.meals.map((meal, idx) => (
-              <div key={idx} className="checklist-card">
-                <span className="brand-mark" style={{ width: '40px', height: '40px' }}>
-                  <Clock size={18} />
-                </span>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <b style={{ fontSize: '15px', color: '#123f32' }}>{meal.mealName}</b>
-                    <span className="badge-tag pending">{meal.feedingTime}</span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '10px' }}>
-                    <div style={{ background: '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px' }}>
-                      <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN TINH</span>
-                      <b>{meal.concentrateKg} kg</b> {meal.concentrateType && `· ${meal.concentrateType}`}
-                    </div>
-                    <div style={{ background: '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px' }}>
-                      <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN THÔ XANH</span>
-                      <b>{meal.forageKg} kg</b> {meal.forageType && `· ${meal.forageType}`}
-                    </div>
-                    <div style={{ background: '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px' }}>
-                      <span className="muted" style={{ display: 'block', fontSize: '10px' }}>CHẤT BỔ SUNG / THUỐC</span>
-                      <b>{meal.supplements || 'Không có'}</b>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  className="button secondary"
-                  style={{ minHeight: '36px', fontSize: '11px' }}
-                  onClick={(e) => {
-                    e.currentTarget.innerText = '✓ Đã cho ăn'
-                    e.currentTarget.style.background = '#e4f4e9'
-                    e.currentTarget.style.color = '#237349'
-                  }}
-                >
-                  Xác nhận cho ăn
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       {showCreatePlan && (
         <CreateNutritionPlanModal
-          horseId={selectedHorseId}
+          horseId={selectedStall?.horseId}
           onClose={() => setShowCreatePlan(false)}
           onSaved={() => {
             setShowCreatePlan(false)
@@ -1175,6 +1628,11 @@ function CareTasksView({ isStaff, canEdit }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <b style={{ fontSize: '14px', color: '#123f32' }}>{task.title}</b>
+                      {task.taskCategory === 'SPECIAL' ? (
+                        <span className="badge-tag" style={{ background: '#fef3c7', color: '#92400e' }}>ĐẶC BIỆT</span>
+                      ) : (
+                        <span className="badge-tag" style={{ background: '#e0f2fe', color: '#0369a1' }}>THƯỜNG NHẬT</span>
+                      )}
                       <span className="badge-tag" style={{ background: '#eef1eb' }}>
                         {TASK_TYPE_LABELS[task.taskType] || task.taskType}
                       </span>
@@ -1185,7 +1643,11 @@ function CareTasksView({ isStaff, canEdit }) {
                     </div>
 
                     <div style={{ display: 'flex', gap: '16px', fontSize: '12px', color: 'var(--muted)', marginTop: '6px', flexWrap: 'wrap' }}>
-                      <span>Ngựa: <b style={{ color: '#1a3c31' }}>{task.horseName}</b> ({task.horseCode})</span>
+                      {task.horseName ? (
+                        <span>Ngựa: <b style={{ color: '#1a3c31' }}>{task.horseName}</b> ({task.horseCode})</span>
+                      ) : (
+                        <span>Phạm vi: <b style={{ color: '#1a3c31' }}>Khu vực chung / Chuồng trại</b></span>
+                      )}
                       <span>Giờ thực hiện: <b style={{ color: '#1a3c31' }}>{task.scheduledTime}</b></span>
                       {task.completedByName && <span>Thực hiện bởi: <b>{task.completedByName}</b></span>}
                     </div>
@@ -1242,16 +1704,42 @@ function CareTasksView({ isStaff, canEdit }) {
 
 function CompleteTaskModal({ task, onClose, onSaved }) {
   const [notes, setNotes] = useState('')
-  const [photoUrl, setPhotoUrl] = useState('')
+  const [file, setFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const handleFileChange = (e) => {
+    const selected = e.target.files?.[0]
+    if (selected) {
+      if (!selected.type.startsWith('image/')) {
+        setError('Tệp đã chọn không phải hình ảnh hợp lệ (chấp nhận JPG, PNG, WEBP,...)')
+        return
+      }
+      if (selected.size > 10 * 1024 * 1024) {
+        setError('Dung lượng ảnh không được vượt quá 10MB')
+        return
+      }
+      setError('')
+      setFile(selected)
+      setPhotoPreview(URL.createObjectURL(selected))
+    }
+  }
+
+  const removePhoto = () => {
+    setFile(null)
+    setPhotoPreview('')
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
     setError('')
     try {
-      await stableCareApi.completeCareTask(task.id, { notes, photoUrl })
+      const formData = new FormData()
+      if (notes.trim()) formData.append('notes', notes.trim())
+      if (file) formData.append('file', file)
+      await stableCareApi.completeCareTask(task.id, formData)
       onSaved()
     } catch (err) {
       setError(err.message)
@@ -1274,17 +1762,67 @@ function CompleteTaskModal({ task, onClose, onSaved }) {
           {error && <div className="notice error"><X size={16} />{error}</div>}
           <div style={{ background: '#f5f7f3', padding: '12px', borderRadius: '10px', fontSize: '12px' }}>
             <div>Nhiệm vụ: <b>{task.title}</b></div>
-            <div>Ngựa: <b>{task.horseName}</b> ({task.horseCode})</div>
+            <div>{task.horseName ? <>Ngựa: <b>{task.horseName}</b> ({task.horseCode})</> : <>Phạm vi: <b>Khu vực chung / Chuồng trại</b></>}</div>
             <div>Thời gian thực hiện: <b>{task.scheduledTime} · {formatVNDate(task.scheduledDate)}</b></div>
           </div>
           <label className="field">
             <span>Ghi chú thực hiện</span>
             <textarea rows="3" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ví dụ: Đã dọn sạch phân, thay 2 bao rơm mới..." />
           </label>
-          <label className="field">
-            <span>Đính kèm liên kết ảnh chụp bằng chứng (tùy chọn)</span>
-            <input type="url" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://example.com/photo.jpg" />
-          </label>
+          <div className="field">
+            <span>Ảnh chụp bằng chứng hoàn thành (tùy chọn)</span>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <label className="button secondary" style={{ cursor: 'pointer', margin: 0, fontSize: '12px' }}>
+                <Upload size={14} /> Tải ảnh từ thiết bị
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleFileChange}
+                />
+              </label>
+              {file && (
+                <span style={{ fontSize: '12px', color: '#276949', fontWeight: 600 }}>
+                  ✓ Đã chọn: {file.name} ({(file.size / 1024).toFixed(0)} KB)
+                </span>
+              )}
+            </div>
+            {photoPreview && (
+              <div style={{ marginTop: '10px', position: 'relative', width: 'fit-content' }}>
+                <img
+                  src={photoPreview}
+                  alt="Xem trước ảnh bằng chứng"
+                  style={{ maxHeight: '140px', maxWidth: '100%', borderRadius: '8px', border: '1px solid var(--line)', display: 'block', objectFit: 'cover' }}
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  title="Xóa ảnh đã chọn"
+                  style={{
+                    position: 'absolute',
+                    top: '6px',
+                    right: '6px',
+                    width: '22px',
+                    height: '22px',
+                    background: 'rgba(0,0,0,0.65)',
+                    color: 'white',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    border: 'none',
+                  }}
+                  onClick={removePhoto}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+            <small style={{ color: 'var(--muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+              Chấp nhận tệp ảnh JPG, PNG, WEBP dung lượng tối đa 10MB.
+            </small>
+          </div>
           <div className="modal-actions">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
             <button className="button primary" disabled={busy}>{busy ? 'Đang cập nhật…' : 'Xác nhận hoàn tất'}</button>
@@ -1757,6 +2295,8 @@ function InventoryView({ canApprove, isStaff }) {
 
   const lowStockCount = items.filter((i) => i.isLowStock).length
 
+  const itemMap = useMemo(() => Object.fromEntries(items.map((i) => [i.id, i])), [items])
+
   return (
     <div>
       <div className="sub-tabs">
@@ -1831,17 +2371,18 @@ function InventoryView({ canApprove, isStaff }) {
               <div className="empty" style={{ minHeight: '130px' }}>Không tìm thấy mặt hàng phù hợp.</div>
             ) : (
               <div className="data-table">
-                <div className="table-header" style={{ gridTemplateColumns: '1.5fr 120px 140px 100px 100px 120px 80px' }}>
+                <div className="table-header" style={{ gridTemplateColumns: '1.4fr 110px 130px 120px 90px 90px 100px 75px' }}>
                   <span>Tên mặt hàng</span>
                   <span>Danh mục</span>
                   <span>Vị trí lưu kho</span>
+                  <span>Đơn giá tham chiếu</span>
                   <span>Hiện có</span>
-                  <span>Ngưỡng cảnh báo</span>
+                  <span>Ngưỡng an toàn</span>
                   <span>Trạng thái</span>
                   <span>Thao tác</span>
                 </div>
                 {items.map((item) => (
-                  <div className="table-row" style={{ gridTemplateColumns: '1.5fr 120px 140px 100px 100px 120px 80px' }} key={item.id}>
+                  <div className="table-row" style={{ gridTemplateColumns: '1.4fr 110px 130px 120px 90px 90px 100px 75px' }} key={item.id}>
                     <div>
                       <b>{item.itemName}</b>
                       {item.description && <small className="muted">{item.description}</small>}
@@ -1852,6 +2393,18 @@ function InventoryView({ canApprove, isStaff }) {
                       </span>
                     </div>
                     <span style={{ fontSize: '11px', color: '#24483c' }}>{item.location || 'Kho chung'}</span>
+                    <div>
+                      {item.referencePrice ? (
+                        <>
+                          <b style={{ color: '#1a3c31', fontSize: '12px' }}>
+                            {Number(item.referencePrice).toLocaleString('vi-VN')} đ
+                          </b>
+                          <small className="muted" style={{ display: 'block', fontSize: '10px' }}>/ {item.unit}</small>
+                        </>
+                      ) : (
+                        <span className="muted" style={{ fontSize: '11px' }}>—</span>
+                      )}
+                    </div>
                     <div>
                       <b style={{ fontSize: '14px', color: item.isLowStock ? '#b73830' : '#123f32' }}>
                         {item.quantityOnHand}
@@ -1920,6 +2473,11 @@ function InventoryView({ canApprove, isStaff }) {
                   </div>
                   <div>
                     <b style={{ color: '#173129' }}>{req.requestedQuantity}</b> {req.unit}
+                    {itemMap[req.itemId]?.referencePrice && (
+                      <small className="muted" style={{ display: 'block', fontSize: '10px' }}>
+                        Ước tính: {Number(req.requestedQuantity * itemMap[req.itemId].referencePrice).toLocaleString('vi-VN')} đ
+                      </small>
+                    )}
                   </div>
                   <div>
                     <p style={{ margin: 0, fontSize: '11px' }}>{req.reason}</p>
@@ -1965,6 +2523,7 @@ function InventoryView({ canApprove, isStaff }) {
       {reviewingReq && (
         <ReviewReplenishmentModal
           request={reviewingReq}
+          items={items}
           onClose={() => setReviewingReq(null)}
           onSaved={() => {
             setReviewingReq(null)
@@ -1997,39 +2556,91 @@ function CreateReplenishModal({ items, onClose, onSaved }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  const selectedItem = items.find((i) => i.id === selectedItemId)
+  const isExisting = Boolean(selectedItemId && selectedItem)
+
   const handleItemChange = (e) => {
     const id = e.target.value
     setSelectedItemId(id)
+    setError('')
     if (id) {
       const itm = items.find((i) => i.id === id)
       if (itm) {
-        setItemName(itm.itemName)
-        setCategory(itm.category)
-        setUnit(itm.unit)
+        setItemName(itm.itemName || '')
+        setCategory(itm.category || 'FEED')
+        setUnit(itm.unit || '')
       }
+    } else {
+      // Switched back to "-- Mặt hàng mới chưa có trong danh mục --"
+      setItemName('')
+      setCategory('FEED')
+      setUnit('')
     }
   }
 
   const submit = async (e) => {
     e.preventDefault()
-    setBusy(true)
     setError('')
+
+    // Validate item name
+    if (!itemName.trim()) {
+      setError('Vui lòng nhập tên mặt hàng.')
+      return
+    }
+
+    // Validate unit
+    if (!unit.trim()) {
+      setError('Vui lòng nhập đơn vị tính.')
+      return
+    }
+
+    // Validate reason
+    if (!reason.trim()) {
+      setError('Vui lòng nhập lý do / mức độ cấp thiết.')
+      return
+    }
+
+    // Strictly validate positive integer quantity
+    const qtyStr = String(requestedQuantity).trim()
+    const qtyNum = Number(qtyStr)
+    const isPositiveInt = /^[1-9]\d*$/.test(qtyStr) && Number.isInteger(qtyNum) && qtyNum > 0
+
+    if (!qtyStr) {
+      setError('Vui lòng nhập số lượng cần nhập thêm.')
+      return
+    }
+
+    if (!isPositiveInt) {
+      if (qtyStr.includes('.') || qtyStr.includes(',') || (qtyNum > 0 && !Number.isInteger(qtyNum))) {
+        setError('Số lượng phải là số nguyên dương, không nhận số thập phân (ví dụ: 50 thay vì 49.81).')
+      } else if (qtyNum <= 0) {
+        setError('Số lượng cần nhập thêm phải lớn hơn 0.')
+      } else {
+        setError('Số lượng không hợp lệ. Vui lòng chỉ nhập số nguyên dương (ví dụ: 1, 10, 50, 100).')
+      }
+      return
+    }
+
+    setBusy(true)
     try {
       await stableCareApi.createReplenishment({
         itemId: selectedItemId || null,
-        itemName,
+        itemName: itemName.trim(),
         category,
-        requestedQuantity: Number(requestedQuantity),
-        unit,
-        reason,
+        requestedQuantity: parseInt(qtyStr, 10),
+        unit: unit.trim(),
+        reason: reason.trim(),
       })
       onSaved()
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Không thể tạo đề xuất bổ sung tồn kho')
     } finally {
       setBusy(false)
     }
   }
+
+  const hasValidQty = /^[1-9]\d*$/.test(String(requestedQuantity).trim())
+  const integerQty = hasValidQty ? parseInt(requestedQuantity, 10) : 0
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -2047,30 +2658,96 @@ function CreateReplenishModal({ items, onClose, onSaved }) {
             <span>Chọn mặt hàng có sẵn trong kho (hoặc nhập mới bên dưới)</span>
             <select value={selectedItemId} onChange={handleItemChange}>
               <option value="">-- Mặt hàng mới chưa có trong danh mục --</option>
-              {items.map((i) => <option key={i.id} value={i.id}>{i.itemName} (Còn {i.quantityOnHand} {i.unit})</option>)}
+              {items.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.itemName} (Còn {i.quantityOnHand} {i.unit})
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
-            <span>Tên mặt hàng *</span>
-            <input required value={itemName} onChange={(e) => setItemName(e.target.value)} placeholder="Ví dụ: Cỏ khô Alfalfa vụ mới" />
+            <span>Tên mặt hàng * {isExisting && <small style={{ color: '#718279', fontWeight: 500 }}>(Khóa theo danh mục)</small>}</span>
+            <input
+              required
+              disabled={isExisting}
+              readOnly={isExisting}
+              value={itemName}
+              onChange={(e) => setItemName(e.target.value)}
+              placeholder="Ví dụ: Cỏ khô Alfalfa vụ mới"
+            />
           </label>
           <label className="field">
-            <span>Danh mục *</span>
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              {Object.entries(INVENTORY_CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+            <span>Danh mục * {isExisting && <small style={{ color: '#718279', fontWeight: 500 }}>(Khóa theo danh mục)</small>}</span>
+            <select disabled={isExisting} value={category} onChange={(e) => setCategory(e.target.value)}>
+              {Object.entries(INVENTORY_CATEGORY_LABELS).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
             </select>
           </label>
           <label className="field">
-            <span>Số lượng cần nhập thêm *</span>
-            <input required type="number" step="0.1" min="0.01" value={requestedQuantity} onChange={(e) => setRequestedQuantity(e.target.value)} />
+            <span>Số lượng cần nhập thêm (số nguyên) *</span>
+            <input
+              required
+              type="number"
+              step="1"
+              min="1"
+              value={requestedQuantity}
+              onChange={(e) => setRequestedQuantity(e.target.value)}
+              placeholder="Ví dụ: 10, 50, 100"
+            />
           </label>
           <label className="field">
-            <span>Đơn vị tính *</span>
-            <input required value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="kg, bao, lọ, cái..." />
+            <span>Đơn vị tính * {isExisting && <small style={{ color: '#718279', fontWeight: 500 }}>(Khóa theo danh mục)</small>}</span>
+            <input
+              required
+              disabled={isExisting}
+              readOnly={isExisting}
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              placeholder="kg, bao, lọ, cái..."
+            />
           </label>
+
+          {isExisting && selectedItem?.referencePrice != null && (
+            <label className="field full">
+              <span>Đơn giá tham chiếu <small style={{ color: '#718279', fontWeight: 500 }}>(Khóa theo danh mục)</small></span>
+              <input
+                disabled
+                readOnly
+                value={`${Number(selectedItem.referencePrice).toLocaleString('vi-VN')} đ / ${unit || 'đơn vị'}`}
+              />
+            </label>
+          )}
+
+          {selectedItem?.referencePrice != null && (
+            <div className="full" style={{ background: '#f5f7f3', padding: '12px 14px', borderRadius: '8px', fontSize: '12px', border: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span className="muted">Đơn giá tham chiếu:</span>
+                <b>{Number(selectedItem.referencePrice).toLocaleString('vi-VN')} đ / {unit || 'đơn vị'}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                <span>Chi phí ước tính:</span>
+                <b style={{ color: '#1a3c31' }}>
+                  {hasValidQty
+                    ? `${Number(integerQty * selectedItem.referencePrice).toLocaleString('vi-VN')} đ`
+                    : '—'}
+                </b>
+              </div>
+              <small className="muted" style={{ display: 'block', fontSize: '10px', marginTop: '4px' }}>
+                * Chi phí ước tính mang tính tham khảo dự trù ngân sách, không phải giá mua thực tế hay hóa đơn thanh toán.
+              </small>
+            </div>
+          )}
+
           <label className="field full">
             <span>Lý do / Mức độ cấp thiết *</span>
-            <textarea required rows="3" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ví dụ: Lượng cỏ trong kho A chỉ còn đủ dùng trong 2 ngày tới, cần nhập gấp để tránh đứt đoạn dinh dưỡng..." />
+            <textarea
+              required
+              rows="3"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Ví dụ: Lượng cỏ trong kho A chỉ còn đủ dùng trong 2 ngày tới, cần nhập gấp để tránh đứt đoạn dinh dưỡng..."
+            />
           </label>
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
@@ -2082,11 +2759,13 @@ function CreateReplenishModal({ items, onClose, onSaved }) {
   )
 }
 
-function ReviewReplenishmentModal({ request, onClose, onSaved }) {
+function ReviewReplenishmentModal({ request, items = [], onClose, onSaved }) {
   const [status, setStatus] = useState('APPROVED')
   const [notes, setNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  const itemMatch = items.find((i) => i.id === request.itemId)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -2119,6 +2798,15 @@ function ReviewReplenishmentModal({ request, onClose, onSaved }) {
             <div>Số lượng đề xuất: <b>{request.requestedQuantity} {request.unit}</b></div>
             <div>Người đề xuất: <b>{request.proposedByName}</b></div>
             <div>Lý do: <i>{request.reason}</i></div>
+            {itemMatch?.referencePrice && (
+              <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #d0d7cf' }}>
+                <div>Đơn giá tham chiếu: <b>{Number(itemMatch.referencePrice).toLocaleString('vi-VN')} đ / {request.unit}</b></div>
+                <div>Dự trù chi phí ước tính: <b style={{ color: '#1a3c31' }}>{Number(request.requestedQuantity * itemMatch.referencePrice).toLocaleString('vi-VN')} đ</b></div>
+                <small className="muted" style={{ display: 'block', fontSize: '10px', marginTop: '2px' }}>
+                  * Chi phí ước tính mang tính tham khảo dự trù, không phải hóa đơn mua hàng.
+                </small>
+              </div>
+            )}
           </div>
           <label className="field">
             <span>Quyết định phê duyệt *</span>

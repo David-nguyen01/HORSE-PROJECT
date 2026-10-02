@@ -6,12 +6,17 @@ import com.racehorse.caretask.dto.CreateCareTaskRequest;
 import com.racehorse.caretask.service.CareTaskService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +48,24 @@ public class CareTaskController {
         return service.getTask(id);
     }
 
+    @GetMapping("/{id}/photo")
+    public ResponseEntity<?> getTaskPhoto(@PathVariable UUID id) {
+        CareTaskService.TaskPhotoData photo = service.getTaskPhoto(id);
+        if (photo.bytes() != null && photo.bytes().length > 0) {
+            String ct = photo.contentType() != null && !photo.contentType().isBlank()
+                    ? photo.contentType()
+                    : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CACHE_CONTROL, "public, max-age=604800")
+                    .contentType(MediaType.parseMediaType(ct))
+                    .body(photo.bytes());
+        }
+        if (photo.photoUrl() != null && photo.photoUrl().startsWith("http")) {
+            return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(photo.photoUrl())).build();
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
@@ -52,9 +75,19 @@ public class CareTaskController {
         return service.createTask(UUID.fromString(jwt.getSubject()), request);
     }
 
-    @PostMapping("/{id}/complete")
+    @PostMapping(value = "/{id}/complete", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAnyRole('STABLE_STAFF','HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
-    public CareTaskResponse completeTask(
+    public CareTaskResponse completeTaskMultipart(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required = false) String notes,
+            @RequestPart(value = "file", required = false) MultipartFile file) {
+        return service.completeTask(id, UUID.fromString(jwt.getSubject()), notes, file);
+    }
+
+    @PostMapping(value = "/{id}/complete", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE})
+    @PreAuthorize("hasAnyRole('STABLE_STAFF','HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    public CareTaskResponse completeTaskJson(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody(required = false) CompleteCareTaskRequest request) {

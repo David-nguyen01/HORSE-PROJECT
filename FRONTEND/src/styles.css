@@ -26,6 +26,8 @@ a { color: inherit; text-decoration: none; }
 .form-stack { display: grid; gap: 16px; }.field { display: grid; gap: 7px; color: #3f554c; font-size: 13px; font-weight: 600; }
 .field input, .field select, .field textarea, .toolbar select, select { width: 100%; border: 1px solid #d9ded6; background: white; border-radius: 11px; padding: 10px 14px; min-height: 42px; outline: 0; color: #173129; font-family: 'DM Sans', sans-serif; font-size: 13px; transition: .2s; }
 .field textarea { resize: vertical; min-height: 80px; }
+.field input:disabled, .field select:disabled, .field textarea:disabled,
+.field input[readonly], .field textarea[readonly] { background: #f1f4ef; color: #61736a; cursor: not-allowed; border-color: #d6dcd3; }
 .field input:focus, .field select:focus, .field textarea:focus, select:focus, .search-box:focus-within { border-color: #398069; box-shadow: 0 0 0 3px rgba(41,113,88,.1); }
 .payment-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; white-space: nowrap; }
 .payment-badge.paid { background: #e8f5ec; color: #27714d; border: 1px solid #c2e5cf; }

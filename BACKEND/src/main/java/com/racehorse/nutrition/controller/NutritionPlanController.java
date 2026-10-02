@@ -28,8 +28,10 @@ public class NutritionPlanController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
-    public NutritionPlanResponse getActivePlan(@PathVariable UUID horseId) {
-        return service.getActivePlan(horseId);
+    public NutritionPlanResponse getActivePlan(
+            @PathVariable UUID horseId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return service.getEffectivePlan(horseId, date);
     }
 
     @GetMapping("/history")

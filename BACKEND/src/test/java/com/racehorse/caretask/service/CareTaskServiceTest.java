@@ -8,12 +8,18 @@ import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.service.HorseAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.mock.web.MockMultipartFile;
 
+import java.sql.Date;
+import java.sql.ResultSet;
+import java.sql.Time;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,50 +32,44 @@ class CareTaskServiceTest {
 
     private JdbcTemplate jdbc;
     private HorseAccessService horseAccess;
-    private ObjectMapper json;
     private CareTaskService service;
 
     @BeforeEach
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         horseAccess = mock(HorseAccessService.class);
-        json = new ObjectMapper();
-        service = new CareTaskService(jdbc, horseAccess, json);
+        service = new CareTaskService(jdbc, horseAccess);
     }
 
     @Test
-    void createTaskValidatesAndPersists() {
+    void createTaskValidatesAndPersistsSpecialTask() {
         UUID horseId = UUID.randomUUID();
         UUID staffId = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
+        UUID taskId = UUID.randomUUID();
 
         CreateCareTaskRequest request = new CreateCareTaskRequest(
-                horseId, "MUCKING_OUT", "Morning mucking",
-                LocalDate.of(2026, 9, 25), LocalTime.of(8, 0), staffId);
+                horseId, "MUCKING_OUT", "Dọn phân chuồng đặc biệt",
+                LocalDate.of(2026, 10, 1), LocalTime.of(8, 0), staffId);
 
-        // Mock getTask after insert
-        String dataJson = """
-                {
-                  "taskType": "MUCKING_OUT",
-                  "title": "Morning mucking",
-                  "scheduledDate": "2026-09-25",
-                  "scheduledTime": "08:00",
-                  "assignedStaffId": "%s"
-                }
-                """.formatted(staffId);
-
-        when(jdbc.query(contains("where m.id=? and m.module_code='STABLE_CARE' and m.record_type='DAILY_CARE_TASK'"),
-                any(RowMapper.class), any()))
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), any()))
                 .thenAnswer(inv -> {
                     RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
-                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
-                    when(rs.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(taskId);
+                    when(rs.getObject("routine_definition_id", UUID.class)).thenReturn(null);
+                    when(rs.getString("task_category")).thenReturn("SPECIAL");
+                    when(rs.getString("scope")).thenReturn("HORSE");
                     when(rs.getObject("horse_id", UUID.class)).thenReturn(horseId);
                     when(rs.getString("horse_code")).thenReturn("H-001");
                     when(rs.getString("horse_name")).thenReturn("Flash");
+                    when(rs.getString("task_type")).thenReturn("MUCKING_OUT");
+                    when(rs.getString("title")).thenReturn("Dọn phân chuồng đặc biệt");
+                    when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.of(2026, 10, 1)));
+                    when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(8, 0)));
+                    when(rs.getObject("assigned_staff_id", UUID.class)).thenReturn(staffId);
                     when(rs.getString("status")).thenReturn("PENDING");
-                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
-                    when(rs.getString("data_json")).thenReturn(dataJson);
+                    when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
                     return List.of(mapper.mapRow(rs, 1));
                 });
 
@@ -77,55 +77,122 @@ class CareTaskServiceTest {
 
         assertThat(response.horseId()).isEqualTo(horseId);
         assertThat(response.status()).isEqualTo("PENDING");
-        assertThat(response.taskType()).isEqualTo("MUCKING_OUT");
+        assertThat(response.taskCategory()).isEqualTo("SPECIAL");
+        assertThat(response.scope()).isEqualTo("HORSE");
 
         verify(horseAccess).requireActive(horseId);
-        verify(jdbc).update(contains("insert into module_records"), any(), eq(horseId), eq(staffId), eq(LocalDate.of(2026, 9, 25)), anyString());
+        verify(jdbc).update(contains("INSERT INTO dbo.care_tasks"),
+                any(UUID.class), eq("HORSE"), eq(horseId), eq("Dọn phân chuồng đặc biệt"),
+                eq("MUCKING_OUT"), any(Date.class), any(Time.class), eq(staffId), eq(actor));
     }
 
     @Test
     void completeTaskUpdatesStatusAndRecordsCompletionDetails() {
         UUID taskId = UUID.randomUUID();
-        UUID horseId = UUID.randomUUID();
         UUID staffId = UUID.randomUUID();
 
-        // 1. Initial task state (PENDING)
-        String initialJson = """
-                {
-                  "taskType": "ICE_BOOTS",
-                  "title": "Ice boots therapy",
-                  "scheduledDate": "2026-09-25",
-                  "scheduledTime": "15:00",
-                  "assignedStaffId": "%s"
-                }
-                """.formatted(staffId);
-
-        when(jdbc.query(contains("where m.id=? and m.module_code='STABLE_CARE' and m.record_type='DAILY_CARE_TASK'"),
-                any(RowMapper.class), eq(taskId)))
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), eq(taskId)))
                 .thenAnswer(inv -> {
                     RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
-                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    ResultSet rs = mock(ResultSet.class);
                     when(rs.getObject("id", UUID.class)).thenReturn(taskId);
-                    when(rs.getObject("horse_id", UUID.class)).thenReturn(horseId);
-                    when(rs.getString("horse_code")).thenReturn("H-001");
-                    when(rs.getString("horse_name")).thenReturn("Flash");
                     when(rs.getString("status")).thenReturn("PENDING");
-                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
-                    when(rs.getString("data_json")).thenReturn(initialJson);
+                    when(rs.getString("task_category")).thenReturn("ROUTINE");
+                    when(rs.getString("scope")).thenReturn("FACILITY");
+                    when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.now()));
+                    when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(7, 0)));
+                    when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
                     return List.of(mapper.mapRow(rs, 1));
                 });
 
-        when(jdbc.queryForObject(eq("select data_json from module_records where id=?"), eq(String.class), eq(taskId)))
-                .thenReturn(initialJson);
+        when(jdbc.query(contains("SELECT username FROM dbo.users"), any(RowMapper.class), eq(staffId)))
+                .thenReturn(List.of("stable_groom"));
 
-        when(jdbc.query(eq("select username from users where id=?"), any(RowMapper.class), eq(staffId)))
-                .thenReturn(List.of("groom_user"));
-
-        CompleteCareTaskRequest completeReq = new CompleteCareTaskRequest("Applied 20 mins ice", "https://img.example.com/ice.jpg");
+        CompleteCareTaskRequest completeReq = new CompleteCareTaskRequest("Đã dọn sạch", "https://img.example.com/clean.jpg");
 
         service.completeTask(taskId, staffId, completeReq);
 
-        verify(jdbc).update(contains("update module_records set status='COMPLETED'"), anyString(), eq(taskId));
+        verify(jdbc).update(
+                contains("UPDATE dbo.care_tasks"),
+                eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"), eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId)
+        );
+    }
+
+    @Test
+    void completeTaskWithMultipartPhotoUploadsAndStoresBytes() {
+        UUID taskId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
+
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), eq(taskId)))
+                .thenAnswer(inv -> {
+                    RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(taskId);
+                    when(rs.getString("status")).thenReturn("PENDING");
+                    when(rs.getString("task_category")).thenReturn("ROUTINE");
+                    when(rs.getString("scope")).thenReturn("FACILITY");
+                    when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.now()));
+                    when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(7, 0)));
+                    when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        when(jdbc.query(contains("SELECT username FROM dbo.users"), any(RowMapper.class), eq(staffId)))
+                .thenReturn(List.of("stable_groom"));
+
+        byte[] fakeImage = new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01 };
+        MockMultipartFile file = new MockMultipartFile("file", "evidence.jpg", "image/jpeg", fakeImage);
+
+        service.completeTask(taskId, staffId, "Dọn chuồng xong, đã chụp ảnh", file);
+
+        verify(jdbc).update(
+                contains("UPDATE dbo.care_tasks"),
+                eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
+                eq("/api/care-tasks/" + taskId + "/photo"),
+                eq(fakeImage), eq("image/jpeg"), eq(taskId)
+        );
+    }
+
+    @Test
+    void completeTaskRejectsNonImageFiles() {
+        UUID taskId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
+
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), eq(taskId)))
+                .thenAnswer(inv -> {
+                    RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(taskId);
+                    when(rs.getString("status")).thenReturn("PENDING");
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        MockMultipartFile textFile = new MockMultipartFile("file", "test.txt", "text/plain", "hello".getBytes());
+
+        assertThatThrownBy(() -> service.completeTask(taskId, staffId, "Notes", textFile))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Tệp tải lên phải là hình ảnh");
+    }
+
+    @Test
+    void getTaskPhotoReturnsBytesWhenPresent() {
+        UUID taskId = UUID.randomUUID();
+        byte[] fakeImage = new byte[] { 1, 2, 3 };
+
+        when(jdbc.query(contains("SELECT photo_bytes"), any(RowMapper.class), eq(taskId)))
+                .thenAnswer(inv -> {
+                    RowMapper<CareTaskService.TaskPhotoData> mapper = inv.getArgument(1);
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getBytes("photo_bytes")).thenReturn(fakeImage);
+                    when(rs.getString("photo_content_type")).thenReturn("image/png");
+                    when(rs.getString("photo_url")).thenReturn("/api/care-tasks/" + taskId + "/photo");
+                    when(rs.getString("title")).thenReturn("Dọn chuồng");
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        CareTaskService.TaskPhotoData photo = service.getTaskPhoto(taskId);
+        assertThat(photo.bytes()).isEqualTo(fakeImage);
+        assertThat(photo.contentType()).isEqualTo("image/png");
     }
 
     @Test
@@ -133,18 +200,15 @@ class CareTaskServiceTest {
         UUID taskId = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
 
-        when(jdbc.query(contains("where m.id=? and m.module_code='STABLE_CARE' and m.record_type='DAILY_CARE_TASK'"),
-                any(RowMapper.class), eq(taskId)))
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), eq(taskId)))
                 .thenAnswer(inv -> {
                     RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
-                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    ResultSet rs = mock(ResultSet.class);
                     when(rs.getObject("id", UUID.class)).thenReturn(taskId);
-                    when(rs.getObject("horse_id", UUID.class)).thenReturn(UUID.randomUUID());
                     when(rs.getString("status")).thenReturn("COMPLETED");
-                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
-                    when(rs.getString("data_json")).thenReturn("""
-                            {"taskType":"BATHING","title":"Bath","scheduledDate":"2026-09-25","scheduledTime":"10:00"}
-                            """);
+                    when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.now()));
+                    when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(7, 0)));
+                    when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
                     return List.of(mapper.mapRow(rs, 1));
                 });
 
@@ -154,13 +218,107 @@ class CareTaskServiceTest {
     }
 
     @Test
+    void completeTaskRejectsCancelledTask() {
+        UUID taskId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), eq(taskId)))
+                .thenAnswer(inv -> {
+                    RowMapper<CareTaskResponse> mapper = inv.getArgument(1);
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(taskId);
+                    when(rs.getString("status")).thenReturn("CANCELLED");
+                    when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.now()));
+                    when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(7, 0)));
+                    when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        assertThatThrownBy(() -> service.completeTask(taskId, actor, new CompleteCareTaskRequest("Notes", null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không thể hoàn thành nhiệm vụ đã bị hủy");
+    }
+
+    @Test
     void getTaskThrowsWhenNotFound() {
         UUID taskId = UUID.randomUUID();
-        when(jdbc.query(contains("where m.id=?"), any(RowMapper.class), eq(taskId)))
+        when(jdbc.query(contains("WHERE t.id = ?"), any(RowMapper.class), eq(taskId)))
                 .thenReturn(List.of());
 
         assertThatThrownBy(() -> service.getTask(taskId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Không tìm thấy nhiệm vụ chăm sóc");
+    }
+
+    @Test
+    void ensureRoutineInstancesForDateIdempotencyAndNoDuplicates() {
+        LocalDate date = LocalDate.of(2026, 10, 1);
+
+        service.ensureRoutineInstancesForDate(date);
+        service.ensureRoutineInstancesForDate(date);
+
+        // Verify update was called with the date
+        verify(jdbc, times(2)).update(
+                contains("INSERT INTO dbo.care_tasks"),
+                eq(Date.valueOf(date)), eq(Date.valueOf(date))
+        );
+    }
+
+    @Test
+    void differentDatesEnsureSeparateCalls() {
+        LocalDate date1 = LocalDate.of(2026, 9, 30);
+        LocalDate date2 = LocalDate.of(2026, 10, 1);
+
+        service.ensureRoutineInstancesForDate(date1);
+        service.ensureRoutineInstancesForDate(date2);
+
+        verify(jdbc, times(1)).update(contains("INSERT INTO dbo.care_tasks"), eq(Date.valueOf(date1)), eq(Date.valueOf(date1)));
+        verify(jdbc, times(1)).update(contains("INSERT INTO dbo.care_tasks"), eq(Date.valueOf(date2)), eq(Date.valueOf(date2)));
+    }
+
+    @Test
+    void concurrentGenerationDataIntegrityViolationIsCaughtGracefully() {
+        LocalDate date = LocalDate.of(2026, 10, 1);
+
+        doThrow(new DataIntegrityViolationException("Duplicate key"))
+                .when(jdbc).update(contains("INSERT INTO dbo.care_tasks"), any(Date.class), any(Date.class));
+
+        // Should not throw exception, handles concurrency smoothly
+        service.ensureRoutineInstancesForDate(date);
+    }
+
+    @Test
+    void dynamicOverdueCalculationLogic() {
+        ZoneId zone = ZoneId.of("Asia/Ho_Chi_Minh");
+        LocalDate today = LocalDate.now(zone);
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate tomorrow = today.plusDays(1);
+
+        // Yesterday PENDING -> Overdue
+        CareTaskResponse pastTask = new CareTaskResponse(
+                UUID.randomUUID(), UUID.randomUUID(), "ROUTINE", "FACILITY",
+                null, null, null, "FEEDING", "Nước uống", null,
+                yesterday, LocalTime.of(8, 0), null, "PENDING",
+                yesterday.isBefore(today), null, null, null, null, null, OffsetDateTime.now()
+        );
+        assertThat(pastTask.isOverdue()).isTrue();
+
+        // Yesterday COMPLETED -> Not Overdue
+        CareTaskResponse pastCompletedTask = new CareTaskResponse(
+                UUID.randomUUID(), UUID.randomUUID(), "ROUTINE", "FACILITY",
+                null, null, null, "FEEDING", "Nước uống", null,
+                yesterday, LocalTime.of(8, 0), null, "COMPLETED",
+                false, OffsetDateTime.now(), UUID.randomUUID(), "groom", "Xong", null, OffsetDateTime.now()
+        );
+        assertThat(pastCompletedTask.isOverdue()).isFalse();
+
+        // Tomorrow PENDING -> Not Overdue
+        CareTaskResponse futureTask = new CareTaskResponse(
+                UUID.randomUUID(), UUID.randomUUID(), "ROUTINE", "FACILITY",
+                null, null, null, "FEEDING", "Nước uống", null,
+                tomorrow, LocalTime.of(8, 0), null, "PENDING",
+                tomorrow.isBefore(today), null, null, null, null, null, OffsetDateTime.now()
+        );
+        assertThat(futureTask.isOverdue()).isFalse();
     }
 }

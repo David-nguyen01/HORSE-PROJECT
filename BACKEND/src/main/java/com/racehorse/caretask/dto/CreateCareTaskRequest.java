@@ -9,7 +9,7 @@ import java.time.LocalTime;
 import java.util.UUID;
 
 public record CreateCareTaskRequest(
-        @NotNull UUID horseId,
+        UUID horseId,
         @NotBlank @Size(max = 50) String taskType,
         @NotBlank @Size(max = 200) String title,
         @NotNull LocalDate scheduledDate,

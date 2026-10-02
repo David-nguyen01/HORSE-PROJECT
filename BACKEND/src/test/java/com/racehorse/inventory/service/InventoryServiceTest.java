@@ -201,13 +201,166 @@ class InventoryServiceTest {
     }
 
     @Test
-    void getItemThrowsWhenNotFound() {
+    void getItemMapsReferencePriceCorrectly() {
         UUID itemId = UUID.randomUUID();
-        when(jdbc.query(contains("where id=?"), any(RowMapper.class), eq(itemId)))
-                .thenReturn(List.of());
+        String itemJson = """
+                {
+                  "itemName": "Cỏ khô Alfalfa",
+                  "category": "FEED",
+                  "unit": "kg",
+                  "quantityOnHand": 850.0,
+                  "minThreshold": 300.0,
+                  "referencePrice": 45000.0
+                }
+                """;
 
-        assertThatThrownBy(() -> service.getItem(itemId))
-                .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("Không tìm thấy mặt hàng trong kho");
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'"),
+                any(RowMapper.class), eq(itemId)))
+                .thenAnswer(inv -> {
+                    RowMapper<InventoryItemResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(itemId);
+                    when(rs.getString("status")).thenReturn("ACTIVE");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getObject("updated_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(itemJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        InventoryItemResponse item = service.getItem(itemId);
+        assertThat(item.referencePrice()).isEqualTo(45000.0);
+        assertThat(item.isLowStock()).isFalse();
+    }
+
+    @Test
+    void createReplenishmentSucceedsForPositiveIntegerQuantity() {
+        UUID actorId = UUID.randomUUID();
+        CreateReplenishmentRequest req = new CreateReplenishmentRequest(
+                null, "Cỏ linh lăng", "FEED", 50.0, "kg", "Cần bổ sung gấp");
+
+        String reqJson = """
+                {
+                  "itemId": null,
+                  "itemName": "Cỏ linh lăng",
+                  "category": "FEED",
+                  "requestedQuantity": 50,
+                  "unit": "kg",
+                  "reason": "Cần bổ sung gấp",
+                  "proposedByUserId": "%s",
+                  "proposedByName": "staff_1"
+                }
+                """.formatted(actorId);
+
+        when(jdbc.query(eq("select username from users where id=?"), any(RowMapper.class), eq(actorId)))
+                .thenReturn(List.of("staff_1"));
+
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'"),
+                any(RowMapper.class), any()))
+                .thenAnswer(inv -> {
+                    RowMapper<ReplenishmentResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
+                    when(rs.getString("status")).thenReturn("PENDING_APPROVAL");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(reqJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        ReplenishmentResponse res = service.createReplenishment(actorId, req);
+        assertThat(res.itemName()).isEqualTo("Cỏ linh lăng");
+        assertThat(res.requestedQuantity()).isEqualTo(50.0);
+        verify(jdbc).update(contains("insert into module_records"), any(), eq(actorId), any(), anyString());
+    }
+
+    @Test
+    void createReplenishmentRejectsDecimalQuantity() {
+        UUID actorId = UUID.randomUUID();
+        CreateReplenishmentRequest req = new CreateReplenishmentRequest(
+                null, "Cỏ linh lăng", "FEED", 49.81, "kg", "Cần bổ sung");
+
+        assertThatThrownBy(() -> service.createReplenishment(actorId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Số lượng yêu cầu phải là số nguyên dương lớn hơn 0");
+    }
+
+    @Test
+    void createReplenishmentRejectsZeroOrNegativeQuantity() {
+        UUID actorId = UUID.randomUUID();
+        CreateReplenishmentRequest reqZero = new CreateReplenishmentRequest(
+                null, "Cỏ linh lăng", "FEED", 0.0, "kg", "Cần bổ sung");
+        assertThatThrownBy(() -> service.createReplenishment(actorId, reqZero))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Số lượng yêu cầu phải là số nguyên dương lớn hơn 0");
+
+        CreateReplenishmentRequest reqNeg = new CreateReplenishmentRequest(
+                null, "Cỏ linh lăng", "FEED", -1.0, "kg", "Cần bổ sung");
+        assertThatThrownBy(() -> service.createReplenishment(actorId, reqNeg))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Số lượng yêu cầu phải là số nguyên dương lớn hơn 0");
+    }
+
+    @Test
+    void createReplenishmentLocksMasterFieldsWhenItemIdProvided() {
+        UUID actorId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+
+        // User attempts to tamper with name/category/unit in the request
+        CreateReplenishmentRequest req = new CreateReplenishmentRequest(
+                itemId, "Tên giả mạo", "MEDICATION", 20.0, "tấn", "Cần bổ sung");
+
+        String masterItemJson = """
+                {
+                  "itemName": "Yến mạch nguyên hạt",
+                  "category": "FEED",
+                  "unit": "kg",
+                  "quantityOnHand": 120.0,
+                  "minThreshold": 200.0
+                }
+                """;
+
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'"),
+                any(RowMapper.class), eq(itemId)))
+                .thenAnswer(inv -> {
+                    RowMapper<InventoryItemResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(itemId);
+                    when(rs.getString("status")).thenReturn("ACTIVE");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getObject("updated_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(masterItemJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        when(jdbc.query(eq("select username from users where id=?"), any(RowMapper.class), eq(actorId)))
+                .thenReturn(List.of("staff_1"));
+
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'"),
+                any(RowMapper.class), any()))
+                .thenAnswer(inv -> {
+                    RowMapper<ReplenishmentResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
+                    when(rs.getString("status")).thenReturn("PENDING_APPROVAL");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn("""
+                            {
+                              "itemId": "%s",
+                              "itemName": "Yến mạch nguyên hạt",
+                              "category": "FEED",
+                              "requestedQuantity": 20,
+                              "unit": "kg",
+                              "reason": "Cần bổ sung"
+                            }
+                            """.formatted(itemId));
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        ReplenishmentResponse res = service.createReplenishment(actorId, req);
+
+        // Verify master fields from item are preserved, overriding the request's tampered values
+        verify(jdbc).update(contains("insert into module_records"), any(), eq(actorId), any(),
+                argThat(jsonStr -> jsonStr.toString().contains("Yến mạch nguyên hạt")
+                        && jsonStr.toString().contains("FEED")
+                        && jsonStr.toString().contains("\"unit\":\"kg\"")));
     }
 }
