@@ -24,9 +24,15 @@ a { color: inherit; text-decoration: none; }
 .auth-panel { padding: 50px clamp(30px, 7vw, 110px); display: grid; place-items: center; background: #f8f8f4; }
 .auth-card { width: min(430px, 100%); }.auth-card h2, .modal-head h2 { margin: 0; font: 700 34px 'Playfair Display'; }.auth-card > .muted { margin-bottom: 30px; }.muted { color: var(--muted); line-height: 1.6; }
 .form-stack { display: grid; gap: 16px; }.field { display: grid; gap: 7px; color: #3f554c; font-size: 13px; font-weight: 600; }
-.field input, .field select, .field textarea, .toolbar select { width: 100%; border: 1px solid #d9ded6; background: white; border-radius: 11px; padding: 12px 14px; outline: 0; color: #173129; transition: .2s; }
-.field textarea { resize: vertical; }
-.field input:focus, .field select:focus, .field textarea:focus, .search-box:focus-within { border-color: #398069; box-shadow: 0 0 0 3px rgba(41,113,88,.1); }
+.field input, .field select, .field textarea, .toolbar select, select { width: 100%; border: 1px solid #d9ded6; background: white; border-radius: 11px; padding: 10px 14px; min-height: 42px; outline: 0; color: #173129; font-family: 'DM Sans', sans-serif; font-size: 13px; transition: .2s; }
+.field textarea { resize: vertical; min-height: 80px; }
+.field input:focus, .field select:focus, .field textarea:focus, select:focus, .search-box:focus-within { border-color: #398069; box-shadow: 0 0 0 3px rgba(41,113,88,.1); }
+.payment-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.payment-badge.paid { background: #e8f5ec; color: #27714d; border: 1px solid #c2e5cf; }
+.payment-badge.unpaid { background: #ffedeb; color: #ad4842; border: 1px solid #f9c9c6; }
+.payment-badge.override { background: #fff4da; color: #986b18; border: 1px solid #f3dba5; }
+.payment-badge.medical { background: #eaf2fa; color: #2b6e9b; border: 1px solid #c3dbf0; }
+.payment-badge.pending { background: #f0ebff; color: #5e35b1; border: 1px solid #d9cdfa; }
 .button { border: 0; border-radius: 11px; min-height: 43px; padding: 0 17px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 13px; cursor: pointer; transition: .2s; }
 .button:hover { transform: translateY(-1px); }.button:disabled { opacity: .6; cursor: wait; }.button.wide { width: 100%; margin-top: 4px; min-height: 48px; }
 .button.primary { background: var(--green); color: white; box-shadow: 0 8px 22px rgba(18,63,50,.16); }.button.primary:hover { background: var(--green-2); }

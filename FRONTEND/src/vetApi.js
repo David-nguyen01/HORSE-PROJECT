@@ -33,10 +33,18 @@ export const vetApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  deleteMedicalExam: (examId) =>
+    api(`/api/medical-examinations/${examId}`, {
+      method: 'DELETE',
+    }),
   addMedicalExamAddendum: (examId, payload) =>
     api(`/api/medical-examinations/${examId}/addenda`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+  deleteMedicalExamAddendum: (addendumId) =>
+    api(`/api/medical-examinations/addenda/${addendumId}`, {
+      method: 'DELETE',
     }),
 
   // FR10 Injury Tracking
@@ -48,10 +56,38 @@ export const vetApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  deleteInjury: (injuryId) =>
+    api(`/api/injuries/${injuryId}`, {
+      method: 'DELETE',
+    }),
   addInjuryRecoveryUpdate: (injuryId, payload) =>
     api(`/api/injuries/${injuryId}/recovery-updates`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+
+  // Medical Queue Workflow (PAID -> IN_MEDICAL -> PENDING_TRAINING)
+  getMedicalQueue: () => api('/api/medical/queue'),
+  getMyAssignments: () => api('/api/medical/queue/my-assignments'),
+  receiveMedicalQueue: (horseId) =>
+    api(`/api/medical/queue/${horseId}/receive`, {
+      method: 'POST',
+    }),
+  completeMedicalQueue: (horseId) =>
+    api(`/api/medical/queue/${horseId}/complete`, {
+      method: 'POST',
+    }),
+
+  // Nutrition Plan
+  getHorseNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`),
+  createNutritionPlan: (horseId, payload) =>
+    api(`/api/horses/${horseId}/nutrition-plan`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  deleteNutritionPlan: (horseId) =>
+    api(`/api/horses/${horseId}/nutrition-plan`, {
+      method: 'DELETE',
     }),
 
   // FR11 Training Locks

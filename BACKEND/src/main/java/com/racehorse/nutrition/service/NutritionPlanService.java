@@ -181,6 +181,18 @@ public class NutritionPlanService {
         );
     }
 
+    @Transactional
+    public void deleteActivePlan(UUID horseId, UUID actor) {
+        horseAccess.requireActive(horseId);
+        int updated = jdbc.update(
+                "update module_records set status='CANCELLED', updated_at=SYSDATETIMEOFFSET() " +
+                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE'",
+                horseId);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy kế hoạch dinh dưỡng đang kích hoạt của ngựa: " + horseId);
+        }
+    }
+
     private JsonNode read(String value) {
         try { return json.readTree(value); }
         catch (JacksonException exception) { throw new IllegalStateException("Dữ liệu JSON khẩu phần không hợp lệ", exception); }

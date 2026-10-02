@@ -24,7 +24,7 @@ public class PreventiveCareController {
         return service.create(horseId,UUID.fromString(jwt.getSubject()),request);
     }
     @PostMapping("/api/preventive-care/{id}/complete")
-    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    @PreAuthorize("hasAnyRole('VETERINARIAN','STABLE_STAFF','CLUB_MANAGER') and (hasAuthority('PERM_MEDICAL_EDIT') or hasAuthority('PERM_STABLE_CARE_EDIT'))")
     PreventiveCareResponse complete(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody CompletePreventiveCareRequest request){
         return service.complete(id,UUID.fromString(jwt.getSubject()),request);
     }

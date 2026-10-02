@@ -126,13 +126,11 @@ function AppLayout() {
     { to: '/stable-care/inventory', label: 'Vật tư & Tồn kho', icon: Package },
   ] : isVet ? [
     { to: '/vet', label: 'Bảng điều khiển y tế', icon: HeartPulse },
-    { to: '/horses', label: 'Hồ sơ ngựa (chỉ xem)', icon: Activity },
-    { to: '/vet/health-map', label: 'Bản đồ sức khỏe chuồng', icon: HeartPulse },
-    { to: '/vet/medical-records', label: 'Hồ sơ khám & điều trị', icon: FileText },
-    { to: '/vet/injuries', label: 'Theo dõi chấn thương', icon: MapPin },
-    { to: '/vet/training-locks', label: 'Khóa huấn luyện', icon: ShieldAlert },
-    { to: '/vet/preventive', label: 'Chăm sóc phòng ngừa', icon: Calendar },
-    { to: '/stable-care/nutrition', label: 'Khẩu phần dinh dưỡng', icon: Utensils },
+    { to: '/vet/health-map', label: 'Bản đồ chuồng & Thể trạng', icon: Home },
+    { to: '/vet/medical-records', label: 'Hồ sơ bệnh án & Chấn thương', icon: FileText },
+    { to: '/vet/preventive', label: 'Lịch tiêm phòng & Phòng ngừa', icon: Calendar },
+    { to: '/vet/nutrition', label: 'Đề xuất khẩu phần ăn', icon: Utensils },
+    { to: '/horses', label: 'Hồ sơ ngựa', icon: Activity },
   ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN') ? [{ to: '/horses', label: 'Hồ sơ ngựa', icon: Activity }] : []),

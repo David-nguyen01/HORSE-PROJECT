@@ -73,6 +73,22 @@ public class HorseMeasurementService {
         String source=request.sourceType()==null||request.sourceType().isBlank()?"MANUAL":request.sourceType().trim().toUpperCase(Locale.ROOT);
         jdbc.update("update horses set health_status=?,health_changed_by_user_id=?,health_source_type=?,health_source_id=?,health_changed_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 status,veterinarianId,source,request.sourceId(),horseId);
+
+        if ("INJURED".equals(status)) {
+            Integer activeLocks = jdbc.queryForObject(
+                    "select count(*) from training_locks where horse_id=? and released_at is null",
+                    Integer.class, horseId);
+            if (activeLocks == null || activeLocks == 0) {
+                jdbc.update(
+                        "insert into training_locks(id,horse_id,reason,review_date,locked_by_user_id,locked_at) values(?,?,?,?,?,SYSDATETIMEOFFSET())",
+                        UUID.randomUUID(), horseId, "Tự động khóa: Thể trạng chuyển sang INJURED", null, veterinarianId);
+            }
+        } else if ("FIT".equals(status)) {
+            jdbc.update(
+                    "update training_locks set released_at=SYSDATETIMEOFFSET(), released_by_user_id=?, release_reason=? where horse_id=? and released_at is null",
+                    veterinarianId, "Tự động gỡ khóa: Bác sĩ thú y xác nhận thể trạng FIT", horseId);
+        }
+
         return healthStatus(horseId,veterinarianId,true);
     }
 

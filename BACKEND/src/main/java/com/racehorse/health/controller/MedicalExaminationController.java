@@ -60,6 +60,24 @@ public class MedicalExaminationController {
         return service.listByHorse(horseId, userId(jwt), privileged(auth));
     }
 
+    @DeleteMapping("/api/medical-examinations/{examId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    public void delete(
+            @PathVariable UUID examId,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.delete(examId, userId(jwt));
+    }
+
+    @DeleteMapping("/api/medical-examinations/addenda/{addendumId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    public void deleteAddendum(
+            @PathVariable UUID addendumId,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.deleteAddendum(addendumId, userId(jwt));
+    }
+
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }

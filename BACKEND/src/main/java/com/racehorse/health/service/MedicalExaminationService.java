@@ -288,6 +288,28 @@ public class MedicalExaminationService {
         return normalized;
     }
 
+    @Transactional
+    public void delete(UUID examId, UUID actorId) {
+        Integer count = jdbc.queryForObject(
+                "select count(*) from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'",
+                Integer.class, examId);
+        if (count == null || count == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy hồ sơ khám bệnh: " + examId);
+        }
+        // Delete addenda of this examination
+        jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM' and JSON_VALUE(data_json, '$.examinationId')=?", examId.toString());
+        // Delete examination record
+        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'", examId);
+    }
+
+    @Transactional
+    public void deleteAddendum(UUID addendumId, UUID actorId) {
+        int updated = jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'", addendumId);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy phụ lục bệnh án: " + addendumId);
+        }
+    }
+
     private String findUsername(UUID userId) {
         List<String> names = jdbc.query("select username from users where id = ?",
                 (rs, rowNum) -> rs.getString(1), userId);

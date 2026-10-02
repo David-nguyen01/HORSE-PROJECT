@@ -61,6 +61,15 @@ public class InjuryController {
         return service.listByHorse(horseId, userId(jwt), privileged(auth), status);
     }
 
+    @DeleteMapping("/api/injuries/{injuryId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    public void delete(
+            @PathVariable UUID injuryId,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.delete(injuryId, userId(jwt));
+    }
+
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }

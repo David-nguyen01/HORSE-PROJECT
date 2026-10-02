@@ -48,11 +48,20 @@ public class NutritionPlanController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('VETERINARIAN','HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAnyRole('VETERINARIAN','HEAD_TRAINER','CLUB_MANAGER') and (hasAuthority('PERM_STABLE_CARE_EDIT') or hasAuthority('PERM_MEDICAL_EDIT'))")
     public NutritionPlanResponse createPlan(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateNutritionPlanRequest request) {
         return service.createPlan(horseId, UUID.fromString(jwt.getSubject()), request);
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('VETERINARIAN','HEAD_TRAINER','CLUB_MANAGER') and (hasAuthority('PERM_STABLE_CARE_EDIT') or hasAuthority('PERM_MEDICAL_EDIT'))")
+    public void deleteActivePlan(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt) {
+        service.deleteActivePlan(horseId, UUID.fromString(jwt.getSubject()));
     }
 }
