@@ -732,7 +732,12 @@ function NutritionView({ canEditPlan }) {
           </div>
 
           {canEditPlan && (
-            <button className="button primary" onClick={() => setShowCreatePlan(true)}>
+            <button
+              className="button primary"
+              disabled={!selectedStall?.horseId}
+              title={!selectedStall?.horseId ? 'Vui lòng chọn ô chuồng có ngựa để lập khẩu phần' : 'Lập khẩu phần mới cho ngựa'}
+              onClick={() => setShowCreatePlan(true)}
+            >
               <Plus size={15} /> Lập khẩu phần mới
             </button>
           )}
@@ -1171,6 +1176,7 @@ function NutritionView({ canEditPlan }) {
       {showCreatePlan && (
         <CreateNutritionPlanModal
           horseId={selectedStall?.horseId}
+          horseInfo={selectedStall ? `${selectedStall.horseDisplay || selectedStall.horseName} · ${selectedStall.stallLocationDisplay}` : ''}
           onClose={() => setShowCreatePlan(false)}
           onSaved={() => {
             setShowCreatePlan(false)
@@ -1182,7 +1188,7 @@ function NutritionView({ canEditPlan }) {
   )
 }
 
-function CreateNutritionPlanModal({ horseId, onClose, onSaved }) {
+function CreateNutritionPlanModal({ horseId, horseInfo, onClose, onSaved }) {
   const [effectiveDate, setEffectiveDate] = useState(today())
   const [notes, setNotes] = useState('')
   const [meals, setMeals] = useState([
@@ -1209,6 +1215,10 @@ function CreateNutritionPlanModal({ horseId, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!horseId) {
+      setError('Vui lòng chọn một ô chuồng đang nuôi ngựa để lập kế hoạch khẩu phần.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -1234,7 +1244,7 @@ function CreateNutritionPlanModal({ horseId, onClose, onSaved }) {
       <div className="modal" style={{ width: 'min(860px, 100%)' }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <p className="eyebrow">KẾ HOẠCH DINH DƯỠNG</p>
+            <p className="eyebrow">KẾ HOẠCH DINH DƯỠNG {horseInfo ? `· ${horseInfo}` : ''}</p>
             <h2>Lập kế hoạch dinh dưỡng mới</h2>
           </div>
           <button className="icon-button" onClick={onClose}><X /></button>
