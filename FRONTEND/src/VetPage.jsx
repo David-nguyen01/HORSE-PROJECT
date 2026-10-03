@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Activity,
@@ -8,6 +8,7 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   Clock,
   ExternalLink,
@@ -109,6 +110,94 @@ const renderPaymentBadge = (horse) => {
     return <span className="payment-badge paid">🏇 Đang huấn luyện</span>
   }
   return <span className="payment-badge unpaid">⚠️ Chưa đóng phí</span>
+}
+
+function cleanStableName(stable) {
+  if (!stable) return 'Chuồng'
+  const stalls = stable.stalls || []
+  if (stalls.length > 0 && stalls[0].code) {
+    const prefix = stalls[0].code.split('-')[0].trim().toUpperCase()
+    if (['A', 'B', 'C', 'D', 'E'].includes(prefix)) {
+      return `Chuồng ${prefix}`
+    }
+  }
+  const raw = (stable.name || '').trim()
+  if (/^chuồng\s+/i.test(raw)) return raw
+  return `Chuồng ${raw}`
+}
+
+function cleanStableLocation(loc) {
+  if (!loc) return 'Chưa thiết lập vị trí'
+  let clean = loc.trim()
+  clean = clean.replace(/^(Khu\s+)+/i, 'Khu ')
+  return clean
+}
+
+function CustomDropdown({ value, onChange, options, placeholder = 'Chọn...', style = {} }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const selectedOption = options.find((opt) => opt.value === value)
+
+  return (
+    <div className="custom-dropdown-container" ref={ref} style={{ position: 'relative', ...style }}>
+      <button
+        type="button"
+        className={`custom-dropdown-trigger ${open ? 'open' : ''}`}
+        onClick={() => setOpen(!open)}
+      >
+        <span className="dropdown-label">
+          {selectedOption ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+              {selectedOption.dot && (
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: selectedOption.dot, display: 'inline-block' }} />
+              )}
+              {selectedOption.icon}
+              <span>{selectedOption.label}</span>
+            </span>
+          ) : (
+            <span style={{ color: '#888' }}>{placeholder}</span>
+          )}
+        </span>
+        <ChevronDown size={15} style={{ transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none', color: '#556b62', flexShrink: 0 }} />
+      </button>
+
+      {open && (
+        <div className="custom-dropdown-menu">
+          {options.map((opt) => {
+            const isSelected = opt.value === value
+            return (
+              <div
+                key={opt.value}
+                className={`custom-dropdown-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => {
+                  onChange(opt.value)
+                  setOpen(false)
+                }}
+              >
+                {opt.dot && (
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: opt.dot, display: 'inline-block' }} />
+                )}
+                {opt.icon}
+                <span style={{ flex: 1 }}>{opt.label}</span>
+                {isSelected && <Check size={14} style={{ color: '#27714d', marginLeft: 'auto' }} />}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function VetPage() {
@@ -684,14 +773,14 @@ function BarnHealthMapView({ onNavigate }) {
               setSelectedHorse(null)
             }}
           >
-            <Warehouse size={14} /> Chuồng {s.name?.toUpperCase()} ({s.stalls?.length || 0} ô)
+            <Warehouse size={14} /> {cleanStableName(s)} ({s.stalls?.length || 0} ô)
           </button>
         ))}
       </div>
 
       {/* Toolbar lọc và tìm kiếm */}
-      <div className="toolbar card" style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <div className="search-box">
+      <div className="toolbar card" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="search-box" style={{ flex: 1, minWidth: '220px' }}>
           <Search size={16} />
           <input
             placeholder="Tìm theo mã ô (Ô 101), tên ngựa, mã số..."
@@ -699,26 +788,28 @@ function BarnHealthMapView({ onNavigate }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <select
+        <CustomDropdown
           value={filterHealth}
-          onChange={(e) => setFilterHealth(e.target.value)}
-          style={{ width: '220px' }}
-        >
-          <option value="">Tất cả thể trạng sức khỏe</option>
-          <option value="FIT">🟢 Khỏe mạnh (FIT)</option>
-          <option value="MONITOR">🟡 Cần theo dõi (MONITOR)</option>
-          <option value="INJURED">🔴 Chấn thương (INJURED)</option>
-          <option value="QUARANTINED">🟣 Cách ly (QUARANTINED)</option>
-        </select>
-        <select
+          onChange={setFilterHealth}
+          style={{ width: '230px' }}
+          options={[
+            { value: '', label: 'Tất cả thể trạng sức khỏe' },
+            { value: 'FIT', label: 'Khỏe mạnh (FIT)', dot: '#27714d' },
+            { value: 'MONITOR', label: 'Cần theo dõi (MONITOR)', dot: '#b08412' },
+            { value: 'INJURED', label: 'Chấn thương (INJURED)', dot: '#a74842' },
+            { value: 'QUARANTINED', label: 'Cách ly (QUARANTINED)', dot: '#6941c6' },
+          ]}
+        />
+        <CustomDropdown
           value={filterPayment}
-          onChange={(e) => setFilterPayment(e.target.value)}
-          style={{ width: '190px' }}
-        >
-          <option value="">Tất cả thanh toán</option>
-          <option value="PAID">✓ Đã trả phí / Bảo lãnh</option>
-          <option value="UNPAID">⚠️ Chưa đóng phí</option>
-        </select>
+          onChange={setFilterPayment}
+          style={{ width: '210px' }}
+          options={[
+            { value: '', label: 'Tất cả thanh toán' },
+            { value: 'PAID', label: 'Đã trả phí / Bảo lãnh', dot: '#27714d' },
+            { value: 'UNPAID', label: 'Chưa đóng phí', dot: '#a74842' },
+          ]}
+        />
         <span className="record-count">{filteredStalls.length} ô hiển thị</span>
       </div>
 
@@ -727,10 +818,10 @@ function BarnHealthMapView({ onNavigate }) {
         <section className="card" style={{ padding: '20px' }}>
           <div className="card-head" style={{ padding: '0 0 16px' }}>
             <div>
-              <h3>Sơ đồ ô chuồng — Chuồng {activeStable?.name?.toUpperCase()}</h3>
+              <h3>Sơ đồ ô chuồng — {cleanStableName(activeStable)}</h3>
               <small className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
                 <MapPin size={13} style={{ color: '#27704e' }} />
-                <span>Vị trí: <b>{activeStable?.location ? `Khu ${activeStable.location}` : 'Chưa thiết lập vị trí'}</b></span>
+                <span>Vị trí: <b>{cleanStableLocation(activeStable?.location)}</b></span>
               </small>
             </div>
             <span className="record-count">{allStalls.length} ô chuồng</span>
@@ -825,17 +916,18 @@ function BarnHealthMapView({ onNavigate }) {
             {/* Cập nhật nhanh thể trạng sức khỏe */}
             <div className="field" style={{ marginBottom: '16px' }}>
               <span>Cập nhật thể trạng sức khỏe (Tự động khóa/mở khóa)</span>
-              <select
+              <CustomDropdown
                 value={selectedHorse.healthStatus || 'FIT'}
-                disabled={updating}
-                onChange={(e) => handleUpdateStatus(e.target.value)}
-              >
-                <option value="FIT">🟢 Khỏe mạnh / Đủ điều kiện (FIT) - Tự gỡ khóa</option>
-                <option value="MONITOR">🟡 Cần theo dõi (MONITOR)</option>
-                <option value="INJURED">🔴 Bị thương / Chấn thương (INJURED) - Tự khóa tập</option>
-                <option value="QUARANTINED">🟣 Cách ly kiểm dịch (QUARANTINED)</option>
-              </select>
-              <small style={{ color: '#687971', fontSize: '11px', lineHeight: 1.4, marginTop: '2px' }}>
+                onChange={(val) => !updating && handleUpdateStatus(val)}
+                style={{ width: '100%', marginTop: '6px' }}
+                options={[
+                  { value: 'FIT', label: 'Khỏe mạnh / Đủ điều kiện (FIT) - Tự gỡ khóa', dot: '#27714d' },
+                  { value: 'MONITOR', label: 'Cần theo dõi (MONITOR)', dot: '#b08412' },
+                  { value: 'INJURED', label: 'Bị thương / Chấn thương (INJURED) - Tự khóa tập', dot: '#a74842' },
+                  { value: 'QUARANTINED', label: 'Cách ly kiểm dịch (QUARANTINED)', dot: '#6941c6' },
+                ]}
+              />
+              <small style={{ color: '#687971', fontSize: '11px', lineHeight: 1.4, marginTop: '4px', display: 'block' }}>
                 ℹ️ Khi chuyển sang <b>INJURED</b>, hệ thống tự động khóa kế hoạch huấn luyện. Khi chuyển sang <b>FIT</b>, hệ thống tự động giải phóng lệnh khóa.
               </small>
             </div>
@@ -1093,19 +1185,18 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       </div>
 
       {/* Toolbar chọn ngựa */}
-      <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+      <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, fontSize: '13px', color: '#173129' }}>Chọn con ngựa:</span>
-        <select
+        <CustomDropdown
           value={selectedHorseId}
-          onChange={(e) => setSelectedHorseId(e.target.value)}
-          style={{ width: '320px' }}
-        >
-          {horses.map((h) => (
-            <option key={h.id} value={h.id}>
-              {h.name} ({h.code}) {h.paymentStatus === 'PAID' ? '— ✓ Đã trả phí' : h.paymentStatus === 'IN_MEDICAL' ? '— 🏥 Đang khám' : h.serviceOverride ? '— ⭐ Bảo lãnh' : '— ⚠️ Chưa phí'}
-            </option>
-          ))}
-        </select>
+          onChange={setSelectedHorseId}
+          style={{ width: '340px' }}
+          options={horses.map((h) => ({
+            value: h.id,
+            label: `${h.name} (${h.code})`,
+            dot: h.paymentStatus === 'PAID' || h.paymentStatus === 'TRAINING' ? '#27714d' : h.paymentStatus === 'IN_MEDICAL' ? '#2b6e9b' : h.serviceOverride ? '#d4a017' : '#a74842',
+          }))}
+        />
         {activeHorse && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {renderPaymentBadge(activeHorse)}
@@ -1764,15 +1855,16 @@ function PreventiveCareView({ initialHorseId }) {
 
       <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, fontSize: '13px' }}>Chọn con ngựa:</span>
-        <select
+        <CustomDropdown
           value={selectedHorseId}
-          onChange={(e) => setSelectedHorseId(e.target.value)}
-          style={{ width: '280px' }}
-        >
-          {horses.map((h) => (
-            <option key={h.id} value={h.id}>{h.name} ({h.code})</option>
-          ))}
-        </select>
+          onChange={setSelectedHorseId}
+          style={{ width: '340px' }}
+          options={horses.map((h) => ({
+            value: h.id,
+            label: `${h.name} (${h.code})`,
+            dot: h.paymentStatus === 'PAID' || h.paymentStatus === 'TRAINING' ? '#27714d' : h.paymentStatus === 'IN_MEDICAL' ? '#2b6e9b' : h.serviceOverride ? '#d4a017' : '#a74842',
+          }))}
+        />
         {activeHorse && renderPaymentBadge(activeHorse)}
         <span className="record-count">{items.length} hạng mục phòng ngừa</span>
       </div>
@@ -2124,15 +2216,16 @@ function NutritionProposalView({ initialHorseId }) {
 
       <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 600, fontSize: '13px' }}>Chọn con ngựa:</span>
-        <select
+        <CustomDropdown
           value={selectedHorseId}
-          onChange={(e) => setSelectedHorseId(e.target.value)}
-          style={{ width: '280px' }}
-        >
-          {horses.map((h) => (
-            <option key={h.id} value={h.id}>{h.name} ({h.code})</option>
-          ))}
-        </select>
+          onChange={setSelectedHorseId}
+          style={{ width: '340px' }}
+          options={horses.map((h) => ({
+            value: h.id,
+            label: `${h.name} (${h.code})`,
+            dot: h.paymentStatus === 'PAID' || h.paymentStatus === 'TRAINING' ? '#27714d' : h.paymentStatus === 'IN_MEDICAL' ? '#2b6e9b' : h.serviceOverride ? '#d4a017' : '#a74842',
+          }))}
+        />
         {activeHorse && renderPaymentBadge(activeHorse)}
         {activePlan && (
           <span style={{ fontSize: '12px', color: '#27714d', fontWeight: 600, background: '#e8f5ec', padding: '4px 10px', borderRadius: '6px' }}>

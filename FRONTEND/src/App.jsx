@@ -153,7 +153,7 @@ function AppLayout() {
         {isStaff && <small className="nav-group">VẬN HÀNH HIỆN TRƯỜNG</small>}
         {isVet && <small className="nav-group">CHĂM SÓC Y TẾ</small>}
         {navItems.map(({ to, label, icon: Icon, badge }) => (
-          <NavLink key={to} end={to === '/'} to={to} onClick={() => setOpen(false)}>
+          <NavLink key={to} end={to === '/' || to === '/vet'} to={to} onClick={() => setOpen(false)}>
             <Icon size={19} />
             <span>{label}</span>
             {badge ? <span className="nav-badge">{badge}</span> : null}
