@@ -192,4 +192,59 @@ class MedicalExaminationServiceTest {
         verify(preventiveCareService).create(horseId, vetId, sched2);
         verify(jdbc).update(contains("update horses"), eq("FIT"), eq(vetId), any(), eq(horseId));
     }
+
+    @Test
+    void deleteRemovesExamAndRevertsHorseHealthStatus() {
+        UUID examId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId)))
+                .thenReturn(List.of(Map.of("horse_id", horseId)));
+        when(jdbc.queryForList(contains("select health_source_id from horses where id=?"), eq(horseId)))
+                .thenReturn(List.of(Map.of("health_source_id", examId)));
+        // No remaining exams -> resets to FIT
+        when(jdbc.queryForList(contains("order by event_date desc, created_at desc"), eq(horseId)))
+                .thenReturn(List.of());
+
+        service.delete(examId, actorId);
+
+        verify(horseAccessService).requireActive(horseId);
+        verify(jdbc).update(contains("record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(examId.toString()));
+        verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId));
+        verify(jdbc).update(contains("set health_status = 'FIT'"), eq(actorId), eq(horseId));
+    }
+
+    @Test
+    void deleteThrowsWhenExamNotFound() {
+        UUID examId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId)))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.delete(examId, actorId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy hồ sơ khám bệnh");
+    }
+
+    @Test
+    void deleteAddendumRemovesAddendumAndRevertsHorseStatus() {
+        UUID addendumId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(addendumId)))
+                .thenReturn(List.of(Map.of("horse_id", horseId)));
+        when(jdbc.queryForList(contains("select health_source_id from horses where id=?"), eq(horseId)))
+                .thenReturn(List.of(Map.of("health_source_id", addendumId)));
+        when(jdbc.queryForList(contains("order by event_date desc, created_at desc"), eq(horseId)))
+                .thenReturn(List.of());
+
+        service.deleteAddendum(addendumId, actorId);
+
+        verify(horseAccessService).requireActive(horseId);
+        verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(addendumId));
+        verify(jdbc).update(contains("set health_status = 'FIT'"), eq(actorId), eq(horseId));
+    }
 }

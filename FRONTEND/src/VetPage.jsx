@@ -1080,7 +1080,8 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     if (!selectedHorseId) return
     try {
       const data = await vetApi.getHorsePreventiveCare(selectedHorseId)
-      setPreventiveList(Array.isArray(data) ? data : pageContent(data) || [])
+      const list = Array.isArray(data) ? data : pageContent(data) || []
+      setPreventiveList(list.filter((item) => !item.cancelledAt))
     } catch {
       setPreventiveList([])
     }
@@ -1164,6 +1165,8 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     try {
       await vetApi.deleteMedicalExam(examId)
       await loadExams()
+      await loadHorses()
+      await loadPreventive()
     } catch (err) {
       alert(`Lỗi xóa phiếu khám: ${err.message}`)
     }
@@ -1174,6 +1177,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     try {
       await vetApi.deleteMedicalExamAddendum(addendumId)
       await loadExams()
+      await loadHorses()
     } catch (err) {
       alert(`Lỗi xóa phụ lục: ${err.message}`)
     }
@@ -1184,6 +1188,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     try {
       await vetApi.deleteInjury(injuryId)
       await loadInjuries()
+      await loadHorses()
     } catch (err) {
       alert(`Lỗi xóa chấn thương: ${err.message}`)
     }
@@ -2118,7 +2123,8 @@ function PreventiveCareView({ initialHorseId }) {
     setLoading(true)
     try {
       const res = await vetApi.getHorsePreventiveCare(selectedHorseId)
-      setItems(Array.isArray(res) ? res : pageContent(res) || [])
+      const raw = Array.isArray(res) ? res : pageContent(res) || []
+      setItems(raw.filter((item) => !item.cancelledAt))
     } catch (err) {
       console.error('Lỗi tải lịch phòng ngừa:', err)
       setItems([])

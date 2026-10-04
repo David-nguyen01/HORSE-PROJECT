@@ -363,16 +363,24 @@ public class InjuryService {
 
     @Transactional
     public void delete(UUID injuryId, UUID actorId) {
-        Integer count = jdbc.queryForObject(
-                "select count(*) from module_records where id=? and module_code='MEDICAL' and record_type='INJURY'",
-                Integer.class, injuryId);
-        if (count == null || count == 0) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select horse_id from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')",
+                injuryId);
+        if (rows.isEmpty()) {
             throw new ResourceNotFoundException("Không tìm thấy thông tin chấn thương: " + injuryId);
         }
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        if (horseId != null) {
+            horseAccessService.requireActive(horseId);
+        }
         // Delete recovery updates of this injury
-        jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='INJURY_RECOVERY_UPDATE' and JSON_VALUE(data_json, '$.injuryId')=?", injuryId.toString());
+        jdbc.update("""
+                delete from module_records
+                where module_code='MEDICAL' and record_type='INJURY_RECOVERY_UPDATE'
+                  and (JSON_VALUE(data_json, '$.injuryMarkerId')=? or JSON_VALUE(data_json, '$.injuryId')=? or data_json like ?)
+                """, injuryId.toString(), injuryId.toString(), "%" + injuryId + "%");
         // Delete injury record
-        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='INJURY'", injuryId);
+        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')", injuryId);
     }
 
     private String findUsername(UUID userId) {

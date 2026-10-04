@@ -375,23 +375,106 @@ public class MedicalExaminationService {
 
     @Transactional
     public void delete(UUID examId, UUID actorId) {
-        Integer count = jdbc.queryForObject(
-                "select count(*) from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'",
-                Integer.class, examId);
-        if (count == null || count == 0) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'",
+                examId);
+        if (rows.isEmpty()) {
             throw new ResourceNotFoundException("Không tìm thấy hồ sơ khám bệnh: " + examId);
+        }
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        if (horseId != null) {
+            horseAccessService.requireActive(horseId);
         }
         // Delete addenda of this examination
         jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM' and JSON_VALUE(data_json, '$.examinationId')=?", examId.toString());
         // Delete examination record
         jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'", examId);
+
+        // Revert horse health status if this exam was the source
+        if (horseId != null) {
+            revertHorseHealthStatusIfSourceMatches(horseId, examId, actorId);
+        }
     }
 
     @Transactional
     public void deleteAddendum(UUID addendumId, UUID actorId) {
-        int updated = jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'", addendumId);
-        if (updated == 0) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'",
+                addendumId);
+        if (rows.isEmpty()) {
             throw new ResourceNotFoundException("Không tìm thấy phụ lục bệnh án: " + addendumId);
+        }
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        if (horseId != null) {
+            horseAccessService.requireActive(horseId);
+        }
+        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'", addendumId);
+
+        if (horseId != null) {
+            revertHorseHealthStatusIfSourceMatches(horseId, addendumId, actorId);
+        }
+    }
+
+    private void revertHorseHealthStatusIfSourceMatches(UUID horseId, UUID deletedSourceId, UUID actorId) {
+        List<Map<String, Object>> horseRows = jdbc.queryForList(
+                "select health_source_id from horses where id=?", horseId);
+        if (horseRows.isEmpty()) return;
+        UUID currentSourceId = toUuid(horseRows.getFirst().get("health_source_id"));
+        if (currentSourceId == null || !currentSourceId.equals(deletedSourceId)) {
+            return;
+        }
+
+        List<Map<String, Object>> remainingExams = jdbc.queryForList("""
+                select top 1 id, data_json from module_records
+                where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'
+                order by event_date desc, created_at desc
+                """, horseId);
+
+        if (!remainingExams.isEmpty()) {
+            UUID prevExamId = toUuid(remainingExams.getFirst().get("id"));
+            JsonNode examData = read((String) remainingExams.getFirst().get("data_json"));
+            String prevStatus = examData.path("healthStatusAfter").asText("FIT");
+
+            List<Map<String, Object>> addenda = jdbc.queryForList("""
+                    select top 1 id, data_json from module_records
+                    where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'
+                      and JSON_VALUE(data_json, '$.examinationId')=?
+                    order by created_at desc
+                    """, prevExamId.toString());
+            if (!addenda.isEmpty()) {
+                JsonNode addendumData = read((String) addenda.getFirst().get("data_json"));
+                String addendumStatus = addendumData.path("healthStatusAfter").asText(null);
+                if (addendumStatus != null && !addendumStatus.isBlank()) {
+                    prevStatus = addendumStatus;
+                    prevExamId = toUuid(addenda.getFirst().get("id"));
+                }
+            }
+
+            jdbc.update("""
+                    update horses
+                    set health_status = ?,
+                        health_changed_by_user_id = ?,
+                        health_source_type = 'MEDICAL_EXAM',
+                        health_source_id = ?,
+                        health_changed_at = SYSDATETIMEOFFSET(),
+                        updated_at = SYSDATETIMEOFFSET(),
+                        version = version + 1
+                    where id = ?
+                    """,
+                    prevStatus, actorId, prevExamId, horseId);
+        } else {
+            jdbc.update("""
+                    update horses
+                    set health_status = 'FIT',
+                        health_changed_by_user_id = ?,
+                        health_source_type = null,
+                        health_source_id = null,
+                        health_changed_at = SYSDATETIMEOFFSET(),
+                        updated_at = SYSDATETIMEOFFSET(),
+                        version = version + 1
+                    where id = ?
+                    """,
+                    actorId, horseId);
         }
     }
 

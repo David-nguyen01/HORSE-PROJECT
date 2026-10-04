@@ -86,10 +86,10 @@ public class NutritionPlanService {
         horseAccess.requireActive(horseId);
         LocalDate targetDate = date == null ? LocalDate.now() : date;
 
-        // 1. Look for plan where event_date <= targetDate (effective on or before target date)
+        // 1. Look for active plan where event_date <= targetDate (effective on or before target date)
         List<NutritionPlanResponse> rows = jdbc.query(
                 "select id, horse_id, user_id, status, event_date, data_json, created_at from module_records " +
-                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and event_date <= ? " +
+                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE' and event_date <= ? " +
                         "order by event_date desc, cast(JSON_VALUE(data_json,'$.version') as int) desc",
                 (rs, rowNum) -> mapResponse(rs), horseId, targetDate);
 

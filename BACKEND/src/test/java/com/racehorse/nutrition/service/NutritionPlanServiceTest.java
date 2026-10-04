@@ -198,4 +198,31 @@ class NutritionPlanServiceTest {
         assertThat(list.get(0).get("planCode")).isEqualTo("STD_TRAINING");
         assertThat(list.get(0).get("planName")).isEqualTo("Khẩu phần Huấn luyện Tiêu chuẩn");
     }
+
+    @Test
+    void deleteActivePlanUpdatesStatusToCancelled() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        when(jdbc.update(contains("set status='CANCELLED'"), eq(horseId)))
+                .thenReturn(1);
+
+        service.deleteActivePlan(horseId, actor);
+
+        verify(horseAccess).requireActive(horseId);
+        verify(jdbc).update(contains("update module_records set status='CANCELLED'"), eq(horseId));
+    }
+
+    @Test
+    void deleteActivePlanThrowsWhenNoneActive() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        when(jdbc.update(contains("set status='CANCELLED'"), eq(horseId)))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> service.deleteActivePlan(horseId, actor))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy kế hoạch dinh dưỡng đang kích hoạt");
+    }
 }

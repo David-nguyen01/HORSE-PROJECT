@@ -136,4 +136,35 @@ class InjuryServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Không tìm thấy dấu chấn thương");
     }
+
+    @Test
+    void deleteRemovesMarkerAndRecoveryUpdates() {
+        UUID injuryId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("record_type in ('INJURY_MARKER', 'INJURY')"), eq(injuryId)))
+                .thenReturn(List.of(Map.of("horse_id", horseId)));
+
+        service.delete(injuryId, actorId);
+
+        verify(horseAccessService).requireActive(horseId);
+        verify(jdbc).update(contains("record_type='INJURY_RECOVERY_UPDATE'"),
+                eq(injuryId.toString()), eq(injuryId.toString()), anyString());
+        verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')"),
+                eq(injuryId));
+    }
+
+    @Test
+    void deleteThrowsWhenInjuryNotFound() {
+        UUID injuryId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("record_type in ('INJURY_MARKER', 'INJURY')"), eq(injuryId)))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.delete(injuryId, actorId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy thông tin chấn thương");
+    }
 }
