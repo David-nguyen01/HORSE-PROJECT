@@ -48,12 +48,6 @@ public class HorseController {
                 .body(response);
     }
 
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF','HORSE_OWNER')")
-    HorseResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        return horseService.getByIdForUser(id, userId(jwt), isPrivileged(authentication));
-    }
-
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
     Page<HorseResponse> search(
@@ -76,6 +70,12 @@ public class HorseController {
             @AuthenticationPrincipal Jwt jwt,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
         return horseService.findOwnedBy(userId(jwt), pageable);
+    }
+
+    @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF','HORSE_OWNER')")
+    HorseResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        return horseService.getByIdForUser(id, userId(jwt), isPrivileged(authentication));
     }
 
     @PutMapping("/{id}")

@@ -17,6 +17,7 @@ import com.racehorse.training.entity.TrainingSchedule;
 import com.racehorse.training.entity.WorkloadIntensity;
 import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import com.racehorse.training.repository.TrainingScheduleRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +42,7 @@ public class TrainingScheduleService {
     private final CareTaskService careTaskService;
     private final Clock clock;
 
+    @Autowired
     public TrainingScheduleService(
             TrainingScheduleRepository repository,
             TrainingPlanPhaseRepository phaseRepository,
