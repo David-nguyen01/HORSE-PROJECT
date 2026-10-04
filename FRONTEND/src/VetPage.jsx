@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   Activity,
   AlertOctagon,
@@ -43,12 +43,15 @@ import { api, getAuth, pageContent } from './api'
 import { vetApi } from './vetApi'
 
 const HEALTH_STATUS_MAP = {
-  FIT: { label: 'Khỏe mạnh / Đủ điều kiện', cls: 'active', color: '#27714d', bg: '#e8f5ec' },
-  ACTIVE: { label: 'Khỏe mạnh / Đủ điều kiện', cls: 'active', color: '#27714d', bg: '#e8f5ec' },
+  HEALTHY: { label: 'Khỏe mạnh', cls: 'active', color: '#27714d', bg: '#e8f5ec' },
+  FIT: { label: 'Khỏe mạnh', cls: 'active', color: '#27714d', bg: '#e8f5ec' },
+  ACTIVE: { label: 'Khỏe mạnh', cls: 'active', color: '#27714d', bg: '#e8f5ec' },
+  MONITORING: { label: 'Cần theo dõi', cls: 'resting', color: '#986b18', bg: '#fff4da' },
   MONITOR: { label: 'Cần theo dõi', cls: 'resting', color: '#986b18', bg: '#fff4da' },
   RESTING: { label: 'Nghỉ ngơi', cls: 'resting', color: '#986b18', bg: '#fff4da' },
-  INJURED: { label: 'Bị thương / Chấn thương', cls: 'injured', color: '#a74842', bg: '#ffedeb' },
-  QUARANTINED: { label: 'Cách ly kiểm dịch', cls: 'injured', color: '#882222', bg: '#fde8e8' },
+  INJURED: { label: 'Bị thương', cls: 'injured', color: '#a74842', bg: '#ffedeb' },
+  UNDER_TREATMENT: { label: 'Đang điều trị', cls: 'injured', color: '#c85a17', bg: '#fff0e6' },
+  QUARANTINED: { label: 'Cách ly', cls: 'injured', color: '#882222', bg: '#fde8e8' },
   RECOVERING: { label: 'Đang hồi phục', cls: 'recovering', color: '#2b6e9b', bg: '#e8f2fa' },
   RETIRED: { label: 'Đã giải nghệ', cls: 'retired', color: '#7a8982', bg: '#f0f3f1' },
 }
@@ -272,7 +275,7 @@ export default function VetPage() {
       {activeTab === 'health-map' && <BarnHealthMapView onNavigate={setTab} />}
       {activeTab === 'medical-records' && <MedicalRecordsView initialHorseId={initialHorseId} />}
       {activeTab === 'injuries' && <MedicalRecordsView initialHorseId={initialHorseId} defaultSubTab="injuries" />}
-      {activeTab === 'preventive' && <PreventiveCareView initialHorseId={initialHorseId} />}
+      {activeTab === 'preventive' && <Navigate to={`/vet/medical-records${initialHorseId ? `?horseId=${initialHorseId}` : ''}`} replace />}
       {activeTab === 'nutrition' && <NutritionProposalView initialHorseId={initialHorseId} />}
       {(activeTab === 'training-assessment' || activeTab === 'training') && <TrainingAssessmentView onNavigate={setTab} />}
       {activeTab === 'horses' && <HorseProfileView onNavigate={setTab} initialHorseId={initialHorseId} />}
@@ -342,7 +345,10 @@ function VetDashboard({ onNavigate }) {
     }
   }
 
-  const injuredHorses = useMemo(() => horses.filter((h) => h.status === 'INJURED' || h.healthStatus === 'INJURED'), [horses])
+  const injuredHorses = useMemo(
+    () => horses.filter((h) => ['INJURED', 'UNDER_TREATMENT'].includes(h.healthStatus) || h.status === 'INJURED'),
+    [horses]
+  )
   const activeHorses = useMemo(() => horses.filter((h) => h.status === 'ACTIVE' || h.healthStatus === 'FIT' || !h.healthStatus), [horses])
   const totalCareNeeded = medicalQueue.length + injuredHorses.length + duePreventive.length
 
@@ -506,13 +512,24 @@ function VetDashboard({ onNavigate }) {
                       <span>Mã: {h.code} · Giống: {h.breed || '—'}</span>
                     </div>
                     <span className="stable">Vị trí: <b>{h.stableLocation || 'Chưa xếp'}</b></span>
-                    <button
-                      className="button primary"
-                      style={{ padding: '6px 12px', fontSize: '11px', minHeight: '32px' }}
-                      onClick={() => onNavigate(`medical-records?horseId=${h.id}`)}
-                    >
-                      <Stethoscope size={13} /> Khám bệnh
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        style={{ padding: '6px 12px', fontSize: '11px', minHeight: '32px' }}
+                        onClick={() => onNavigate(`horses/${h.id}`)}
+                      >
+                        Xem hồ sơ
+                      </button>
+                      <button
+                        type="button"
+                        className="button primary"
+                        style={{ padding: '6px 12px', fontSize: '11px', minHeight: '32px' }}
+                        onClick={() => onNavigate(`medical-records?horseId=${h.id}`)}
+                      >
+                        <Stethoscope size={13} /> Cập nhật
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -554,13 +571,16 @@ function VetDashboard({ onNavigate }) {
                       </div>
                       <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#333' }}>{inc.description}</p>
                     </div>
-                    <button
-                      className="button primary"
-                      style={{ padding: '6px 12px', fontSize: '11px', height: '32px' }}
-                      onClick={() => onNavigate(`medical-records?horseId=${inc.horseId || ''}`)}
-                    >
-                      Xử lý ca bệnh
-                    </button>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className="button primary"
+                        style={{ padding: '6px 12px', fontSize: '11px', height: '32px' }}
+                        onClick={() => onNavigate(`medical-records?horseId=${inc.horseId || ''}`)}
+                      >
+                        <FilePlus2 size={13} /> Tạo phiếu khám
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1037,16 +1057,48 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   const [nextStatus, setNextStatus] = useState('RECOVERING')
   const [addendumText, setAddendumText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [preventiveList, setPreventiveList] = useState([])
 
-  useEffect(() => {
-    vetApi.getEligibleHorses().then((res) => {
+  const loadHorses = useCallback(async () => {
+    try {
+      const res = await vetApi.getEligibleHorses()
       const list = pageContent(res)
       setHorses(list)
       if (list.length > 0 && !selectedHorseId) {
         setSelectedHorseId(initialHorseId || list[0].id)
       }
-    })
+    } catch (err) {
+      console.error('Lỗi tải danh sách ngựa:', err)
+    }
   }, [initialHorseId, selectedHorseId])
+
+  useEffect(() => {
+    loadHorses()
+  }, [loadHorses])
+
+  const loadPreventive = useCallback(async () => {
+    if (!selectedHorseId) return
+    try {
+      const data = await vetApi.getHorsePreventiveCare(selectedHorseId)
+      setPreventiveList(Array.isArray(data) ? data : pageContent(data) || [])
+    } catch {
+      setPreventiveList([])
+    }
+  }, [selectedHorseId])
+
+  useEffect(() => {
+    loadPreventive()
+  }, [loadPreventive])
+
+  const handleDeletePreventiveCare = async (careId) => {
+    if (!window.confirm('Xác nhận hủy lịch chăm sóc phòng ngừa này?')) return
+    try {
+      await vetApi.cancelPreventiveCare(careId)
+      await loadPreventive()
+    } catch (err) {
+      alert(`Lỗi khi xóa lịch phòng ngừa: ${err.message}`)
+    }
+  }
 
   const loadExams = useCallback(async () => {
     if (!selectedHorseId) return
@@ -1145,6 +1197,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       await vetApi.addMedicalExamAddendum(selectedExam.id, { notes: addendumText })
       setAddendumText('')
       await loadExams()
+      await loadHorses()
       setSelectedExam(null)
     } catch (err) {
       alert(`Không thể thêm phụ lục: ${err.message}`)
@@ -1166,6 +1219,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       setSelectedInjury(null)
       setUpdateText('')
       await loadInjuries()
+      await loadHorses()
     } catch (err) {
       alert(`Lỗi cập nhật tiến trình: ${err.message}`)
     }
@@ -1250,6 +1304,45 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       {/* VIEW 1: HỒ SƠ KHÁM & ĐIỀU TRỊ */}
       {subTab === 'exams' && (
         <div style={{ display: 'grid', gap: '14px' }}>
+          {preventiveList.length > 0 && (
+            <div className="card" style={{ padding: '16px', background: '#fcfdfb', border: '1px solid #d8e4dc' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <b style={{ fontSize: '13px', color: '#27714d' }}>📅 Tổng hợp lịch chăm sóc phòng ngừa ({activeHorse?.name})</b>
+                <span style={{ fontSize: '11px', color: '#666' }}>{preventiveList.length} lịch ghi nhận</span>
+              </div>
+              <div style={{ display: 'grid', gap: '6px' }}>
+                {preventiveList.map((p) => {
+                  const isDone = p.status === 'COMPLETED'
+                  return (
+                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '8px 12px', background: 'white', borderRadius: '6px', border: '1px solid #edf0eb' }}>
+                      <div>
+                        <span style={{ fontWeight: 600, color: '#173129' }}>{PREVENTIVE_TYPES[p.careType] || p.careType}</span>
+                        {p.details && <span style={{ color: '#555' }}> · {p.details}</span>}
+                        <span style={{ color: '#888', marginLeft: '6px' }}>(Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)})</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
+                          {isDone ? '✅ Đã thực hiện' : '⏳ Chờ thực hiện'}
+                        </span>
+                        {!isDone && (
+                          <button
+                            type="button"
+                            className="icon-button danger"
+                            style={{ width: '22px', height: '22px' }}
+                            title="Xóa lịch phòng ngừa"
+                            onClick={() => handleDeletePreventiveCare(p.id)}
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="empty">Đang tải nhật ký khám…</div>
           ) : records.length === 0 ? (
@@ -1332,6 +1425,40 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Lịch phòng ngừa đã đặt (§7.2) */}
+                {preventiveList.filter((p) => (p.createdAt && p.createdAt.slice(0, 10) === (rec.examinationDate || rec.examDate)) || (p.scheduledDate && p.scheduledDate === (rec.examinationDate || rec.examDate))).length > 0 && (
+                  <div style={{ marginTop: '14px', background: '#f4fbf7', border: '1px solid #d2ebd9', borderRadius: '8px', padding: '10px 14px' }}>
+                    <b style={{ fontSize: '12px', color: '#1d5a3a' }}>📅 Lịch phòng ngừa đã đặt trong lần khám này:</b>
+                    <div style={{ marginTop: '8px', display: 'grid', gap: '6px' }}>
+                      {preventiveList
+                        .filter((p) => (p.createdAt && p.createdAt.slice(0, 10) === (rec.examinationDate || rec.examDate)) || (p.scheduledDate && p.scheduledDate === (rec.examinationDate || rec.examDate)))
+                        .map((p) => {
+                          const isDone = p.status === 'COMPLETED'
+                          return (
+                            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                              <div>
+                                • <b>{PREVENTIVE_TYPES[p.careType] || p.careType}:</b> {p.details || 'Theo phác đồ'} — Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)}
+                                <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
+                                  {isDone ? '✅ Đã thực hiện' : '⏳ Chờ thực hiện'}
+                                </span>
+                              </div>
+                              {!isDone && (
+                                <button
+                                  type="button"
+                                  className="button secondary"
+                                  style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#a74842' }}
+                                  onClick={() => handleDeletePreventiveCare(p.id)}
+                                >
+                                  Xóa
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1466,6 +1593,8 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           onSaved={() => {
             setShowCreateModal(false)
             loadExams()
+            loadHorses()
+            loadPreventive()
           }}
         />
       )}
@@ -1477,6 +1606,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           onSaved={() => {
             setShowAddInjuryModal(false)
             loadInjuries()
+            loadHorses()
           }}
         />
       )}
@@ -1562,19 +1692,45 @@ function CreateExamModal({ horse, onClose, onSaved }) {
     followUpDate: '',
     healthStatusAfter: 'INJURED',
   })
-  const [includePreventiveCare, setIncludePreventiveCare] = useState(false)
-  const [preventiveCareForm, setPreventiveCareForm] = useState({
-    careType: 'VACCINATION',
-    details: '',
-    dueDate: '',
-    reminderLeadDays: 3,
-  })
+  const [preventiveSchedules, setPreventiveSchedules] = useState([])
   const [busy, setBusy] = useState(false)
+
+  const addSchedule = () => {
+    setPreventiveSchedules((prev) => [
+      ...prev,
+      {
+        careType: 'VACCINATION',
+        details: '',
+        dueDate: '',
+        reminderLeadDays: 3,
+      },
+    ])
+  }
+
+  const updateSchedule = (index, field, value) => {
+    setPreventiveSchedules((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
+    )
+  }
+
+  const removeSchedule = (index) => {
+    setPreventiveSchedules((prev) => prev.filter((_, i) => i !== index))
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
     try {
+      const validSchedules = preventiveSchedules
+        .filter((s) => s.dueDate && s.dueDate.trim())
+        .map((s) => ({
+          careType: s.careType,
+          details: s.details || '',
+          dueDate: s.dueDate,
+          recurrenceDays: null,
+          reminderLeadDays: Number(s.reminderLeadDays) || 0,
+        }))
+
       await vetApi.createMedicalExam(horse.id, {
         examinationDate: form.examinationDate,
         symptoms: form.symptoms,
@@ -1583,13 +1739,8 @@ function CreateExamModal({ horse, onClose, onSaved }) {
         medicationNotes: form.medicationNotes || null,
         followUpDate: form.followUpDate || null,
         healthStatusAfter: form.healthStatusAfter || null,
-        preventiveCareSchedule: includePreventiveCare && preventiveCareForm.dueDate ? {
-          careType: preventiveCareForm.careType,
-          details: preventiveCareForm.details,
-          dueDate: preventiveCareForm.dueDate,
-          recurrenceDays: null,
-          reminderLeadDays: Number(preventiveCareForm.reminderLeadDays) || 0,
-        } : null,
+        preventiveSchedules: validSchedules.length > 0 ? validSchedules : null,
+        preventiveCareSchedule: validSchedules.length === 1 ? validSchedules[0] : null,
       })
       onSaved()
     } catch (err) {
@@ -1678,61 +1829,83 @@ function CreateExamModal({ horse, onClose, onSaved }) {
             />
           </div>
 
-          {/* Section Lên lịch chăm sóc phòng ngừa kèm theo (§5.2) */}
+          {/* Section Lên lịch chăm sóc phòng ngừa kèm theo (§7.1) */}
           <div className="full" style={{ border: '1px solid #c8d8d0', borderRadius: '10px', padding: '14px', background: '#f8faf9', marginTop: '6px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 600, color: '#163f33' }}>
-              <input
-                type="checkbox"
-                checked={includePreventiveCare}
-                onChange={(e) => setIncludePreventiveCare(e.target.checked)}
-              />
-              <span>🗓️ Lên lịch chăm sóc phòng ngừa kèm theo (Tiêm phòng / Tẩy giun)</span>
-            </label>
-            {includePreventiveCare && (
-              <div className="form-grid" style={{ marginTop: '12px' }}>
-                <div className="field">
-                  <span>Loại chăm sóc phòng ngừa *</span>
-                  <select
-                    value={preventiveCareForm.careType}
-                    onChange={(e) => setPreventiveCareForm({ ...preventiveCareForm, careType: e.target.value })}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: preventiveSchedules.length > 0 ? '12px' : '0' }}>
+              <span style={{ fontWeight: 700, color: '#163f33', fontSize: '13px' }}>
+                🗓️ Lịch chăm sóc phòng ngừa kèm theo (tùy chọn)
+              </span>
+              <button
+                type="button"
+                className="button secondary"
+                style={{ padding: '4px 10px', fontSize: '11px' }}
+                onClick={addSchedule}
+              >
+                <Plus size={13} /> Thêm lịch tiêm / tẩy giun
+              </button>
+            </div>
+
+            {preventiveSchedules.map((sched, idx) => (
+              <div key={idx} style={{ background: 'white', border: '1px solid #e0e6e2', borderRadius: '8px', padding: '12px', marginBottom: '10px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <b style={{ fontSize: '12px', color: '#27714d' }}>Lịch {idx + 1}</b>
+                  <button
+                    type="button"
+                    className="icon-button danger"
+                    style={{ width: '22px', height: '22px' }}
+                    onClick={() => removeSchedule(idx)}
+                    title="Xóa lịch này"
                   >
-                    <option value="VACCINATION">Tiêm phòng (Vaccination)</option>
-                    <option value="DEWORMING">Tẩy giun (Deworming)</option>
-                    <option value="FARRIER">Chăm sóc móng (Farrier)</option>
-                    <option value="OTHER">Khác (Other)</option>
-                  </select>
+                    <X size={13} />
+                  </button>
                 </div>
-                <div className="field">
-                  <span>Ngày dự kiến thực hiện *</span>
-                  <input
-                    type="date"
-                    required={includePreventiveCare}
-                    value={preventiveCareForm.dueDate}
-                    onChange={(e) => setPreventiveCareForm({ ...preventiveCareForm, dueDate: e.target.value })}
-                  />
+                <div className="form-grid">
+                  <div className="field">
+                    <span>Loại chăm sóc *</span>
+                    <select
+                      value={sched.careType}
+                      onChange={(e) => updateSchedule(idx, 'careType', e.target.value)}
+                    >
+                      <option value="VACCINATION">Tiêm phòng (Vaccination)</option>
+                      <option value="DEWORMING">Tẩy giun (Deworming)</option>
+                      <option value="FARRIER">Chăm sóc móng (Farrier)</option>
+                      <option value="OTHER">Khác (Other)</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <span>Ngày dự kiến thực hiện *</span>
+                    <input
+                      type="date"
+                      required
+                      value={sched.dueDate}
+                      onChange={(e) => updateSchedule(idx, 'dueDate', e.target.value)}
+                    />
+                  </div>
+                  <div className="field full">
+                    <span>Tên / Chi tiết / Thuốc / Vắc-xin *</span>
+                    <input
+                      required
+                      placeholder="VD: Vắc-xin cúm ngựa Equine Influenza, Thuốc tẩy giun Ivermectin..."
+                      value={sched.details}
+                      onChange={(e) => updateSchedule(idx, 'details', e.target.value)}
+                    />
+                  </div>
+                  <div className="field">
+                    <span>Nhắc trước (ngày)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      value={sched.reminderLeadDays}
+                      onChange={(e) => updateSchedule(idx, 'reminderLeadDays', e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="field full">
-                  <span>Chi tiết / Tên vắc-xin / Liều thuốc *</span>
-                  <input
-                    required={includePreventiveCare}
-                    placeholder="VD: Vắc-xin cúm ngựa Equine Influenza, Thuốc tẩy giun Ivermectin..."
-                    value={preventiveCareForm.details}
-                    onChange={(e) => setPreventiveCareForm({ ...preventiveCareForm, details: e.target.value })}
-                  />
-                </div>
-                <div className="field">
-                  <span>Nhắc trước (ngày)</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="30"
-                    value={preventiveCareForm.reminderLeadDays}
-                    onChange={(e) => setPreventiveCareForm({ ...preventiveCareForm, reminderLeadDays: e.target.value })}
-                  />
-                </div>
-                <div className="full" style={{ fontSize: '11px', color: '#27714d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Check size={14} /> Hệ thống sẽ tự động gửi thông báo lịch tới Nhân viên chăm sóc chuồng.
-                </div>
+              </div>
+            ))}
+            {preventiveSchedules.length > 0 && (
+              <div style={{ fontSize: '11px', color: '#27714d', display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                <Check size={14} /> Hệ thống sẽ tự động gửi thông báo lịch tới Nhân viên chăm sóc chuồng.
               </div>
             )}
           </div>

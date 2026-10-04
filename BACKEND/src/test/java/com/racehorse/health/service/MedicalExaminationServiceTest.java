@@ -5,9 +5,14 @@ import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.health.dto.AddMedicalExaminationAddendumRequest;
 import com.racehorse.health.dto.CreateMedicalExaminationRequest;
+import com.racehorse.health.dto.CreatePreventiveCareRequest;
 import com.racehorse.health.dto.MedicalExaminationAddendumResponse;
 import com.racehorse.health.dto.MedicalExaminationResponse;
+import com.racehorse.health.repository.TrainingLockRepository;
+import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
+import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,12 +36,19 @@ class MedicalExaminationServiceTest {
 
     @Mock private JdbcTemplate jdbc;
     @Mock private HorseAccessService horseAccessService;
+    @Mock private TrainingLockRepository trainingLockRepository;
+    @Mock private TrainingLockService trainingLockService;
+    @Mock private PreventiveCareService preventiveCareService;
+    @Mock private UserAccountRepository userRepository;
+    @Mock private NotificationService notificationService;
     private final ObjectMapper json = new ObjectMapper();
     private MedicalExaminationService service;
 
     @BeforeEach
     void setUp() {
-        service = new MedicalExaminationService(jdbc, horseAccessService, json);
+        service = new MedicalExaminationService(
+                jdbc, horseAccessService, trainingLockRepository, trainingLockService,
+                preventiveCareService, userRepository, notificationService, json);
     }
 
     @Test
@@ -153,5 +165,31 @@ class MedicalExaminationServiceTest {
         assertThatThrownBy(() -> service.addAddendum(examId, vetId, req))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Không tìm thấy hồ sơ khám bệnh");
+    }
+
+    @Test
+    void createWithPreventiveSchedulesAndAlias() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        CreatePreventiveCareRequest sched1 = new CreatePreventiveCareRequest("VACCINATION", "Flu shot", LocalDate.now().plusDays(10), null, 3);
+        CreatePreventiveCareRequest sched2 = new CreatePreventiveCareRequest("DEWORMING", "Ivermectin", LocalDate.now().plusDays(20), null, 2);
+
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "General checkup", "Normal routine",
+                "Maintain regimen", null, null, "HEALTHY",
+                null, List.of(sched1, sched2));
+
+        when(jdbc.query(contains("select username from users"), any(RowMapper.class), eq(vetId)))
+                .thenReturn(List.of("dr_vet"));
+        Horse mockHorse = org.mockito.Mockito.mock(Horse.class);
+        when(horseAccessService.requireActive(horseId)).thenReturn(mockHorse);
+
+        MedicalExaminationResponse response = service.create(horseId, vetId, req);
+
+        assertThat(response).isNotNull();
+        assertThat(response.healthStatusAfter()).isEqualTo("FIT");
+        verify(preventiveCareService).create(horseId, vetId, sched1);
+        verify(preventiveCareService).create(horseId, vetId, sched2);
+        verify(jdbc).update(contains("update horses"), eq("FIT"), eq(vetId), any(), eq(horseId));
     }
 }

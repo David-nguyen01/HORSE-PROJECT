@@ -66,7 +66,7 @@ public class MedicalExaminationService {
             UUID horseId,
             UUID veterinarianId,
             CreateMedicalExaminationRequest req) {
-        horseAccessService.requireActive(horseId);
+        Horse horse = horseAccessService.requireActive(horseId);
 
         LocalDate today = LocalDate.now();
         if (req.examinationDate().isAfter(today)) {
@@ -123,7 +123,6 @@ public class MedicalExaminationService {
             }
             if (userRepository != null && notificationService != null) {
                 List<UserAccount> headTrainers = userRepository.findByRoles(List.of(Role.HEAD_TRAINER));
-                Horse horse = horseAccessService.requireActive(horseId);
                 for (UserAccount ht : headTrainers) {
                     notificationService.create(
                             ht,
@@ -138,20 +137,30 @@ public class MedicalExaminationService {
         }
 
         // Tích hợp tạo lịch chăm sóc phòng ngừa nếu có
-        if (req.preventiveCareSchedule() != null && preventiveCareService != null) {
-            preventiveCareService.create(horseId, veterinarianId, req.preventiveCareSchedule());
-            if (userRepository != null && notificationService != null) {
-                List<UserAccount> staffList = userRepository.findByRoles(List.of(Role.STABLE_STAFF));
-                Horse horse = horseAccessService.requireActive(horseId);
-                for (UserAccount staff : staffList) {
-                    notificationService.create(
-                            staff,
-                            "PREVENTIVE_CARE_SCHEDULED",
-                            NotificationPriority.NORMAL,
-                            "Lịch chăm sóc phòng ngừa: " + horse.getCode() + " - " + horse.getName(),
-                            "Bác sĩ đã lên lịch " + req.preventiveCareSchedule().careType() + " cho ngựa " + horse.getName() + " vào ngày " + req.preventiveCareSchedule().dueDate(),
-                            "HORSE",
-                            horseId);
+        List<CreatePreventiveCareRequest> schedules = new ArrayList<>();
+        if (req.preventiveSchedules() != null && !req.preventiveSchedules().isEmpty()) {
+            schedules.addAll(req.preventiveSchedules());
+        }
+        if (req.preventiveCareSchedule() != null) {
+            schedules.add(req.preventiveCareSchedule());
+        }
+
+        if (!schedules.isEmpty() && preventiveCareService != null) {
+            List<UserAccount> staffList = userRepository != null ? userRepository.findByRoles(List.of(Role.STABLE_STAFF)) : List.of();
+            for (CreatePreventiveCareRequest schedule : schedules) {
+                if (schedule == null || schedule.dueDate() == null) continue;
+                preventiveCareService.create(horseId, veterinarianId, schedule);
+                if (notificationService != null && !staffList.isEmpty()) {
+                    for (UserAccount staff : staffList) {
+                        notificationService.create(
+                                staff,
+                                "PREVENTIVE_CARE_SCHEDULED",
+                                NotificationPriority.NORMAL,
+                                "Lịch chăm sóc phòng ngừa: " + horse.getCode() + " - " + horse.getName(),
+                                "Bác sĩ đã lên lịch " + schedule.careType() + " cho ngựa " + horse.getName() + " vào ngày " + schedule.dueDate(),
+                                "HORSE",
+                                horseId);
+                    }
                 }
             }
         }
@@ -355,6 +364,9 @@ public class MedicalExaminationService {
     private String normalizeHealthStatus(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if ("HEALTHY".equals(normalized) || "ACTIVE".equals(normalized)) normalized = "FIT";
+        else if ("MONITORING".equals(normalized)) normalized = "MONITOR";
+        else if ("UNDER_TREATMENT".equals(normalized)) normalized = "INJURED";
         if (!Set.of("FIT", "MONITOR", "INJURED", "QUARANTINED").contains(normalized)) {
             throw new BusinessException("Trạng thái sức khỏe chỉ nhận FIT, MONITOR, INJURED hoặc QUARANTINED");
         }
