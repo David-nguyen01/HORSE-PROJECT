@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 import { api, getAuth, pageContent } from './api'
 import { vetApi } from './vetApi'
+import HorseBodyModel3D from './components/horse3d/HorseBodyModel3D'
 
 const HEALTH_STATUS_MAP = {
   HEALTHY: { label: 'Khỏe mạnh', cls: 'active', color: '#27714d', bg: '#e8f5ec' },
@@ -138,13 +139,13 @@ const ANATOMICAL_REGIONS = [
     ],
   },
   {
-    category: 'Khác',
+    category: 'Mô mềm / Khác',
     items: [
-      { code: 'TENDON_LEFT', label: 'Gân trái (chung)' },
-      { code: 'TENDON_RIGHT', label: 'Gân phải (chung)' },
-      { code: 'LIGAMENT', label: 'Dây chằng (chung)' },
+      { code: 'TENDON_LEFT', label: 'Gân trái' },
+      { code: 'TENDON_RIGHT', label: 'Gân phải' },
+      { code: 'LIGAMENT', label: 'Dây chằng' },
       { code: 'SKIN_LACERATION', label: 'Da / Vết rách' },
-      { code: 'OTHER', label: 'Khác (ghi chú thêm)' },
+      { code: 'OTHER', label: 'Khác (kèm ghi chú)' },
     ],
   },
 ]
@@ -345,8 +346,46 @@ function VetDashboard({ onNavigate }) {
     }
   }
 
+  const handleCreateExamFromIncident = async (inc) => {
+    setActionBusyId(inc.id)
+    try {
+      await vetApi.acknowledgeIncident(inc.id, 'Đã tiếp nhận tạo phiếu khám')
+      await loadData()
+    } catch (err) {
+      console.warn('Ghi nhận sự cố:', err)
+    } finally {
+      setActionBusyId(null)
+    }
+    onNavigate(`medical-records?horseId=${inc.horseId || ''}`)
+  }
+
+  const handleAcknowledgeIncident = async (inc) => {
+    setActionBusyId(inc.id)
+    try {
+      await vetApi.acknowledgeIncident(inc.id, 'Bác sĩ thú y đã ghi nhận theo dõi')
+      await loadData()
+    } catch (err) {
+      alert(`Lỗi ghi nhận sự cố: ${err.message}`)
+    } finally {
+      setActionBusyId(null)
+    }
+  }
+
+  const handleDismissIncident = async (inc) => {
+    if (!window.confirm('Xác nhận bỏ qua/đóng báo cáo sự cố này?')) return
+    setActionBusyId(inc.id)
+    try {
+      await vetApi.dismissIncident(inc.id, 'Bác sĩ thú y đánh giá không cần can thiệp y tế')
+      await loadData()
+    } catch (err) {
+      alert(`Lỗi bỏ qua sự cố: ${err.message}`)
+    } finally {
+      setActionBusyId(null)
+    }
+  }
+
   const injuredHorses = useMemo(
-    () => horses.filter((h) => ['INJURED', 'UNDER_TREATMENT'].includes(h.healthStatus) || h.status === 'INJURED'),
+    () => horses.filter((h) => ['INJURED', 'UNDER_TREATMENT'].includes(h.healthStatus)),
     [horses]
   )
   const activeHorses = useMemo(() => horses.filter((h) => h.status === 'ACTIVE' || h.healthStatus === 'FIT' || !h.healthStatus), [horses])
@@ -576,9 +615,30 @@ function VetDashboard({ onNavigate }) {
                         type="button"
                         className="button primary"
                         style={{ padding: '6px 12px', fontSize: '11px', height: '32px' }}
-                        onClick={() => onNavigate(`medical-records?horseId=${inc.horseId || ''}`)}
+                        disabled={actionBusyId === inc.id}
+                        onClick={() => handleCreateExamFromIncident(inc)}
                       >
                         <FilePlus2 size={13} /> Tạo phiếu khám
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        style={{ padding: '6px 10px', fontSize: '11px', height: '32px' }}
+                        disabled={actionBusyId === inc.id}
+                        title="Ghi nhận theo dõi"
+                        onClick={() => handleAcknowledgeIncident(inc)}
+                      >
+                        <Check size={13} /> Ghi nhận
+                      </button>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        style={{ padding: '6px 8px', fontSize: '11px', height: '32px', color: '#888' }}
+                        disabled={actionBusyId === inc.id}
+                        title="Bỏ qua"
+                        onClick={() => handleDismissIncident(inc)}
+                      >
+                        <X size={13} />
                       </button>
                     </div>
                   </div>
@@ -660,7 +720,7 @@ function BarnHealthMapView({ onNavigate }) {
   const [stables, setStables] = useState([])
   const [selectedStableId, setSelectedStableId] = useState('')
   const [selectedHorse, setSelectedHorse] = useState(null)
-  const [selectedHorseExtra, setSelectedHorseExtra] = useState({ lastExamDate: null, lastPreventiveDate: null })
+  const [selectedHorseExtra, setSelectedHorseExtra] = useState({ lastExamDate: null, lastPreventiveDate: null, currentLock: null })
   const [horsesMap, setHorsesMap] = useState({})
   const [locksMap, setLocksMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -765,23 +825,25 @@ function BarnHealthMapView({ onNavigate }) {
       }
       setSelectedHorse(combined)
 
-      // Fetch last exam and preventive care dates for read-only panel
+      // Fetch last exam, preventive care dates and current lock for read-only panel
       try {
-        const [examsRes, prevRes] = await Promise.allSettled([
+        const [examsRes, prevRes, lockRes] = await Promise.allSettled([
           vetApi.getHorseMedicalExams(horseId),
           vetApi.getHorsePreventiveCare(horseId),
+          vetApi.getCurrentTrainingLock(horseId),
         ])
         const examList = examsRes.status === 'fulfilled' ? (Array.isArray(examsRes.value) ? examsRes.value : pageContent(examsRes.value) || []) : []
         const prevList = prevRes.status === 'fulfilled' ? (Array.isArray(prevRes.value) ? prevRes.value : pageContent(prevRes.value) || []) : []
         const lastExam = examList.length > 0 ? examList[0].examinationDate || examList[0].createdAt : null
         const lastPrev = prevList.length > 0 ? prevList[0].dueDate || prevList[0].performedAt : null
-        setSelectedHorseExtra({ lastExamDate: lastExam, lastPreventiveDate: lastPrev })
+        const lock = lockRes.status === 'fulfilled' ? lockRes.value : null
+        setSelectedHorseExtra({ lastExamDate: lastExam, lastPreventiveDate: lastPrev, currentLock: lock })
       } catch {
-        setSelectedHorseExtra({ lastExamDate: null, lastPreventiveDate: null })
+        setSelectedHorseExtra({ lastExamDate: null, lastPreventiveDate: null, currentLock: null })
       }
     } else {
       setSelectedHorse(null)
-      setSelectedHorseExtra({ lastExamDate: null, lastPreventiveDate: null })
+      setSelectedHorseExtra({ lastExamDate: null, lastPreventiveDate: null, currentLock: null })
     }
   }
 
@@ -990,6 +1052,20 @@ function BarnHealthMapView({ onNavigate }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
                 <span className="muted">Lần tiêm phòng gần nhất:</span>
                 <b>{selectedHorseExtra.lastPreventiveDate ? formatVNDate(selectedHorseExtra.lastPreventiveDate) : 'Chưa có'}</b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
+                <span className="muted">Lịch tập:</span>
+                <b>
+                  {selectedHorseExtra.currentLock || locksMap[selectedHorse.id] ? (
+                    <span style={{ color: '#c62828', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Lock size={13} /> Khóa huấn luyện {(selectedHorseExtra.currentLock?.lockReason || locksMap[selectedHorse.id]?.lockReason) ? `(${selectedHorseExtra.currentLock?.lockReason || locksMap[selectedHorse.id]?.lockReason})` : ''}
+                    </span>
+                  ) : (
+                    <span style={{ color: '#27714d', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle2 size={13} /> Sẵn sàng tập luyện
+                    </span>
+                  )}
+                </b>
               </div>
             </div>
 
@@ -1434,20 +1510,27 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                 )}
 
                 {/* Lịch phòng ngừa đã đặt (§7.2) */}
-                {preventiveList.filter((p) => (p.createdAt && p.createdAt.slice(0, 10) === (rec.examinationDate || rec.examDate)) || (p.scheduledDate && p.scheduledDate === (rec.examinationDate || rec.examDate))).length > 0 && (
-                  <div style={{ marginTop: '14px', background: '#f4fbf7', border: '1px solid #d2ebd9', borderRadius: '8px', padding: '10px 14px' }}>
-                    <b style={{ fontSize: '12px', color: '#1d5a3a' }}>📅 Lịch phòng ngừa đã đặt trong lần khám này:</b>
-                    <div style={{ marginTop: '8px', display: 'grid', gap: '6px' }}>
-                      {preventiveList
-                        .filter((p) => (p.createdAt && p.createdAt.slice(0, 10) === (rec.examinationDate || rec.examDate)) || (p.scheduledDate && p.scheduledDate === (rec.examinationDate || rec.examDate)))
-                        .map((p) => {
-                          const isDone = p.status === 'COMPLETED'
+                {(() => {
+                  const examSchedules = preventiveList.filter((p) => {
+                    if (rec.preventiveScheduleIds && rec.preventiveScheduleIds.length > 0) {
+                      return rec.preventiveScheduleIds.includes(p.id)
+                    }
+                    const examDateStr = rec.examinationDate || rec.examDate
+                    return (p.dueDate && p.dueDate === examDateStr) || (p.createdAt && p.createdAt.slice(0, 10) === examDateStr)
+                  })
+                  if (examSchedules.length === 0) return null
+                  return (
+                    <div style={{ marginTop: '14px', background: '#f4fbf7', border: '1px solid #d2ebd9', borderRadius: '8px', padding: '10px 14px' }}>
+                      <b style={{ fontSize: '12px', color: '#1d5a3a' }}>📅 Lịch phòng ngừa đã đặt trong lần khám này:</b>
+                      <div style={{ marginTop: '8px', display: 'grid', gap: '6px' }}>
+                        {examSchedules.map((p) => {
+                          const isDone = Boolean(p.completedAt || p.status === 'COMPLETED')
                           return (
                             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
                               <div>
                                 • <b>{PREVENTIVE_TYPES[p.careType] || p.careType}:</b> {p.details || 'Theo phác đồ'} — Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)}
                                 <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
-                                  {isDone ? '✅ Đã thực hiện' : '⏳ Chờ thực hiện'}
+                                  {isDone ? `✅ Đã thực hiện (${formatVNDate(p.completedAt)})` : '⏳ Chờ thực hiện'}
                                 </span>
                               </div>
                               {!isDone && (
@@ -1463,9 +1546,10 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                             </div>
                           )
                         })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             ))
           )}
@@ -1474,7 +1558,26 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
 
       {/* VIEW 2: THEO DÕI CHẤN THƯƠNG */}
       {subTab === 'injuries' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '18px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(400px, 1fr) minmax(400px, 1fr)', gap: '20px', alignItems: 'start' }}>
+          {/* CỘT TRÁI: MÔ HÌNH NGỰA 3D ĐỊNH VỊ CHẤN THƯƠNG (§6.1) */}
+          <div className="card" style={{ padding: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <h3 style={{ margin: 0, font: '700 17px "Playfair Display"' }}>Mô hình giải phẫu 3D</h3>
+              <span className="record-count">{injuries.length} chấn thương</span>
+            </div>
+            <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#5e7269' }}>
+              Định vị không gian 3 chiều các điểm tổn thương. Bấm trực tiếp vào điểm để xem chẩn đoán:
+            </p>
+            <HorseBodyModel3D
+              injuries={injuries}
+              height={440}
+            />
+            <p style={{ fontSize: '11px', color: '#888', marginTop: '8px', textAlign: 'center' }}>
+              Kéo chuột để xoay 360° · Cuộn chuột để phóng to/thu nhỏ · Bấm vào điểm để xem chi tiết
+            </p>
+          </div>
+
+          {/* CỘT PHẢI: DANH SÁCH & TIẾN TRÌNH HỒI PHỤC */}
           <div style={{ display: 'grid', gap: '14px' }}>
             {loading ? (
               <div className="empty">Đang tải chấn thương…</div>
@@ -1560,33 +1663,6 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                 )
               })
             )}
-          </div>
-
-          {/* Sơ đồ giải phẫu 2D trực quan */}
-          <div className="card" style={{ padding: '20px', height: 'fit-content' }}>
-            <h3 style={{ margin: '0 0 10px', font: '700 17px "Playfair Display"' }}>Sơ đồ giải phẫu ngựa</h3>
-            <p style={{ margin: '0 0 14px', fontSize: '11px', color: '#666' }}>
-              Phân vùng vị trí tổn thương cơ / xương khớp:
-            </p>
-            <div
-              style={{
-                background: '#f4f6f2',
-                borderRadius: '12px',
-                padding: '16px',
-                textAlign: 'center',
-                border: '1px dashed #c0cebe',
-              }}
-            >
-              <div style={{ fontSize: '48px', marginBottom: '8px' }}>🐎</div>
-              <div style={{ display: 'grid', gap: '6px', fontSize: '11px', textAlign: 'left' }}>
-                <div style={{ padding: '6px', background: 'white', borderRadius: '6px' }}>📍 <b>Đầu / Cổ</b>: Căng cơ vùng gáy</div>
-                <div style={{ padding: '6px', background: 'white', borderRadius: '6px' }}>📍 <b>Lưng / Hông</b>: Cột sống thắt lưng</div>
-                <div style={{ padding: '6px', background: '#ffebee', borderRadius: '6px', color: '#c62828' }}>
-                  📍 <b>Chân trước (Trái/Phải)</b>: Gân gấp & móng
-                </div>
-                <div style={{ padding: '6px', background: 'white', borderRadius: '6px' }}>📍 <b>Chân sau (Trái/Phải)</b>: Khớp khoeo</div>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -1992,9 +2068,29 @@ function CreateInjuryModal({ horse, onClose, onSaved }) {
           <button className="icon-button" onClick={onClose}><X size={16} /></button>
         </div>
         <form onSubmit={submit} className="form-stack">
-          {/* Vị trí giải phẫu theo danh mục chuẩn (§5.3) */}
+          {/* Vị trí giải phẫu theo danh mục chuẩn (§6.2) */}
           <div className="field">
             <span>Vị trí giải phẫu chấn thương (Chọn một hoặc nhiều vùng) *</span>
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  toggleRegion(e.target.value)
+                }
+              }}
+              style={{ marginBottom: '8px' }}
+            >
+              <option value="">-- Chọn vị trí giải phẫu từ danh mục có nhóm --</option>
+              {ANATOMICAL_REGIONS.map((cat) => (
+                <optgroup key={cat.category} label={`Nhóm: ${cat.category}`}>
+                  {cat.items.map((item) => (
+                    <option key={item.code} value={item.code}>
+                      {item.label} {selectedRegions.includes(item.code) ? '(✓ Đã chọn)' : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <div style={{ maxHeight: '180px', overflowY: 'auto', border: '1px solid #d0dcd5', borderRadius: '8px', padding: '10px', background: '#fafbfa' }}>
               {ANATOMICAL_REGIONS.map((cat) => (
                 <div key={cat.category} style={{ marginBottom: '10px' }}>
@@ -3855,6 +3951,22 @@ function HorseProfileView({ onNavigate, initialHorseId }) {
                   <strong>{latestDeworming ? `${formatVNDate(latestDeworming.completedAt || latestDeworming.dueDate)} (${latestDeworming.details || 'Tẩy giun'})` : 'Chưa ghi nhận'}</strong>
                 </div>
               </div>
+            </div>
+
+            {/* SƠ ĐỒ CƠ THỂ & CHẤN THƯƠNG 3D */}
+            <div className="card" style={{ padding: '22px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #edf2ed', paddingBottom: '12px' }}>
+                <h3 style={{ margin: 0, fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <HeartPulse size={18} color="#27714d" /> Sơ đồ cơ thể & Chấn thương 3D
+                </h3>
+                <span className="record-count" style={{ fontSize: '12px', color: activeInjuries.length > 0 ? '#ad4842' : '#27714d', fontWeight: 600 }}>
+                  {activeInjuries.length > 0 ? `${activeInjuries.length} chấn thương đang theo dõi` : 'Không có chấn thương'}
+                </span>
+              </div>
+              <HorseBodyModel3D injuries={activeInjuries} height={340} readonly={true} />
+              <p style={{ fontSize: '11px', color: '#888', marginTop: '8px', textAlign: 'center' }}>
+                🖱️ Kéo để xoay 3D · Cuộn để phóng to/thu nhỏ · Nhấp điểm đánh dấu để xem chi tiết
+              </p>
             </div>
 
             {/* KẾ HOẠCH HUẤN LUYỆN HIỆN TẠI */}

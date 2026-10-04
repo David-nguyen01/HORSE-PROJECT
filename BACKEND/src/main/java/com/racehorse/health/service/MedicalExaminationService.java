@@ -145,11 +145,15 @@ public class MedicalExaminationService {
             schedules.add(req.preventiveCareSchedule());
         }
 
+        List<UUID> createdScheduleIds = new ArrayList<>();
         if (!schedules.isEmpty() && preventiveCareService != null) {
             List<UserAccount> staffList = userRepository != null ? userRepository.findByRoles(List.of(Role.STABLE_STAFF)) : List.of();
             for (CreatePreventiveCareRequest schedule : schedules) {
                 if (schedule == null || schedule.dueDate() == null) continue;
-                preventiveCareService.create(horseId, veterinarianId, schedule);
+                PreventiveCareResponse care = preventiveCareService.create(horseId, veterinarianId, schedule);
+                if (care != null && care.id() != null) {
+                    createdScheduleIds.add(care.id());
+                }
                 if (notificationService != null && !staffList.isEmpty()) {
                     for (UserAccount staff : staffList) {
                         notificationService.create(
@@ -163,6 +167,11 @@ public class MedicalExaminationService {
                     }
                 }
             }
+        }
+
+        if (!createdScheduleIds.isEmpty()) {
+            data.put("preventiveScheduleIds", createdScheduleIds.stream().map(UUID::toString).toList());
+            jdbc.update("update module_records set data_json = ? where id = ?", toJson(data), examId);
         }
 
         String vetName = findUsername(veterinarianId);
@@ -277,11 +286,19 @@ public class MedicalExaminationService {
             String followUpStr = node.path("followUpDate").isNull() ? null : node.path("followUpDate").asText(null);
             LocalDate followUpDate = followUpStr != null && !followUpStr.isBlank() ? LocalDate.parse(followUpStr) : null;
             String healthStatusAfter = node.path("healthStatusAfter").isNull() ? null : node.path("healthStatusAfter").asText(null);
+            List<UUID> scheduleIds = new ArrayList<>();
+            if (node.has("preventiveScheduleIds") && node.path("preventiveScheduleIds").isArray()) {
+                for (JsonNode sid : node.path("preventiveScheduleIds")) {
+                    try {
+                        scheduleIds.add(UUID.fromString(sid.asText()));
+                    } catch (Exception ignored) {}
+                }
+            }
 
             return new MedicalExaminationDetailResponse(
                     id, horseId, horseCode, horseName, vetId, vetName,
                     examDate, symptoms, diagnosis, treatment, medication,
-                    followUpDate, healthStatusAfter, createdAt, List.of());
+                    followUpDate, healthStatusAfter, createdAt, List.of(), scheduleIds);
         }, examId);
 
         if (rows.isEmpty()) {
@@ -317,7 +334,7 @@ public class MedicalExaminationService {
                 exam.examinationDate(), exam.symptoms(), exam.diagnosis(),
                 exam.treatmentProtocol(), exam.medicationNotes(),
                 exam.followUpDate(), exam.healthStatusAfter(),
-                exam.createdAt(), addenda);
+                exam.createdAt(), addenda, exam.preventiveScheduleIds());
     }
 
     @Transactional(readOnly = true)

@@ -151,6 +151,16 @@ export const vetApi = {
     const qs = q.toString()
     return api(`/api/incidents${qs ? `?${qs}` : ''}`)
   },
+  acknowledgeIncident: (incidentId, notes = '') =>
+    api(`/api/incidents/${incidentId}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
+  dismissIncident: (incidentId, notes = '') =>
+    api(`/api/incidents/${incidentId}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({ notes }),
+    }),
 
   // Vet Training Assessment
   getTrainingSessionsByDate: (date) =>

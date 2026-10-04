@@ -181,6 +181,52 @@ class IncidentReportServiceTest {
     }
 
     @Test
+    void updateStatusToAcknowledgedAndDismissedUpdatesDatabase() {
+        UUID incidentId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        String currentJson = """
+                {
+                  "incidentType": "FEVER",
+                  "severity": "HIGH",
+                  "description": "Sốt 39.5 độ"
+                }
+                """;
+
+        when(jdbc.query(contains("where m.id=? and m.module_code='STABLE_CARE' and m.record_type='INCIDENT_REPORT'"),
+                any(RowMapper.class), eq(incidentId)))
+                .thenAnswer(inv -> {
+                    RowMapper<IncidentReportResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(incidentId);
+                    when(rs.getObject("horse_id", UUID.class)).thenReturn(UUID.randomUUID());
+                    when(rs.getString("horse_code")).thenReturn("H-001");
+                    when(rs.getString("horse_name")).thenReturn("Flash");
+                    when(rs.getString("status")).thenReturn("REPORTED");
+                    when(rs.getObject("event_date", java.time.LocalDate.class)).thenReturn(java.time.LocalDate.of(2026, 9, 25));
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(currentJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        when(jdbc.queryForObject(eq("select data_json from module_records where id=?"), eq(String.class), eq(incidentId)))
+                .thenReturn(currentJson);
+
+        when(jdbc.query(eq("select username from users where id=?"), any(RowMapper.class), eq(actorId)))
+                .thenReturn(List.of("dr_vet"));
+
+        // Test ACKNOWLEDGED
+        service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã tiếp nhận tạo phiếu khám"));
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+                eq("ACKNOWLEDGED"), contains("acknowledgedByName"), eq(incidentId));
+
+        // Test DISMISSED
+        service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("DISMISSED", "Không cần can thiệp y tế"));
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+                eq("DISMISSED"), contains("resolvedByName"), eq(incidentId));
+    }
+
+    @Test
     void getReportThrowsWhenNotFound() {
         UUID incidentId = UUID.randomUUID();
         when(jdbc.query(contains("where m.id=?"), any(RowMapper.class), eq(incidentId)))
@@ -191,3 +237,4 @@ class IncidentReportServiceTest {
                 .hasMessageContaining("Không tìm thấy báo cáo sự cố");
     }
 }
+

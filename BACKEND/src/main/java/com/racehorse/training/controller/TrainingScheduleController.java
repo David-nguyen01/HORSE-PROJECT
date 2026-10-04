@@ -48,12 +48,6 @@ public class TrainingScheduleController {
         return service.publish(scheduleId);
     }
 
-    @GetMapping("/{scheduleId}")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
-    TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        return service.get(scheduleId, userId(jwt), isPrivileged(authentication));
-    }
-
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN')")
     List<TrainingScheduleResponse> calendar(
@@ -76,7 +70,7 @@ public class TrainingScheduleController {
         return service.findOpenSessions(userId(jwt), isVet(authentication), from, to);
     }
 
-    @PostMapping("/{scheduleId}/claim")
+    @PostMapping("/{scheduleId:[0-9a-fA-F\\-]{36}}/claim")
     @PreAuthorize("hasAuthority('PERM_TRAINING_CLAIM') and hasAnyRole('STABLE_STAFF','VETERINARIAN')")
     TrainingScheduleResponse claim(
             @PathVariable UUID scheduleId,
@@ -93,6 +87,12 @@ public class TrainingScheduleController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return service.mine(userId(jwt), isVet(authentication), from, to);
+    }
+
+    @GetMapping("/{scheduleId:[0-9a-fA-F\\-]{36}}")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
+    TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        return service.get(scheduleId, userId(jwt), isPrivileged(authentication));
     }
 
     private UUID userId(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }

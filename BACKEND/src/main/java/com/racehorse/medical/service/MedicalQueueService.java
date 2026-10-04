@@ -12,7 +12,11 @@ import com.racehorse.notification.service.NotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.racehorse.health.dto.CreateTrainingLockRequest;
+import com.racehorse.health.repository.TrainingLockRepository;
+import com.racehorse.health.service.TrainingLockService;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.OffsetDateTime;
@@ -38,6 +42,8 @@ public class MedicalQueueService {
     private final HorseRepository horseRepository;
     private final UserAccountRepository userRepository;
     private final NotificationService notificationService;
+    private final TrainingLockService trainingLockService;
+    private final TrainingLockRepository trainingLockRepository;
     private final ObjectMapper json;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -46,16 +52,20 @@ public class MedicalQueueService {
             HorseRepository horseRepository,
             UserAccountRepository userRepository,
             NotificationService notificationService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) TrainingLockService trainingLockService,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) TrainingLockRepository trainingLockRepository,
             ObjectMapper json) {
         this.jdbc = jdbc;
         this.horseRepository = horseRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.trainingLockService = trainingLockService;
+        this.trainingLockRepository = trainingLockRepository;
         this.json = json;
     }
 
     public MedicalQueueService(JdbcTemplate jdbc, HorseRepository horseRepository, ObjectMapper json) {
-        this(jdbc, horseRepository, null, null, json);
+        this(jdbc, horseRepository, null, null, null, null, json);
     }
 
     // ─── DANH SÁCH HÀNG CHỜ ─────────────────────────────────────
@@ -182,6 +192,45 @@ public class MedicalQueueService {
         horse.setPaymentStatus("PENDING_TRAINING");
         horseRepository.save(horse);
 
+        // Tự động kiểm tra và khóa huấn luyện nếu ngựa có chấn thương
+        boolean isInjured = List.of("INJURED", "UNDER_TREATMENT").contains(horse.getHealthStatus());
+        if (!isInjured) {
+            List<Map<String, Object>> latestExams = jdbc.queryForList("""
+                    select top 1 data_json from module_records
+                    where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'
+                    order by event_date desc, created_at desc
+                    """, horseId);
+            if (!latestExams.isEmpty()) {
+                JsonNode n = read((String) latestExams.getFirst().get("data_json"));
+                String statusAfter = n.path("healthStatusAfter").asText(null);
+                String diag = n.path("diagnosis").asText("");
+                if ("INJURED".equalsIgnoreCase(statusAfter) || "UNDER_TREATMENT".equalsIgnoreCase(statusAfter)
+                        || diag.toLowerCase().contains("chấn thương") || diag.toLowerCase().contains("injury")) {
+                    isInjured = true;
+                }
+            }
+        }
+
+        if (isInjured && trainingLockService != null && trainingLockRepository != null) {
+            if (trainingLockRepository.findByHorseIdAndReleasedAtIsNull(horseId).isEmpty()) {
+                String reason = "Khóa tự động: Ngựa chấn thương sau khi hoàn tất khám y tế ban đầu";
+                trainingLockService.lock(horseId, veterinarianId, new CreateTrainingLockRequest(reason, null));
+                if (userRepository != null && notificationService != null) {
+                    List<UserAccount> headTrainers = userRepository.findByRoles(List.of(Role.HEAD_TRAINER));
+                    for (UserAccount ht : headTrainers) {
+                        notificationService.create(
+                                ht,
+                                "TRAINING_LOCK_AUTOMATIC",
+                                NotificationPriority.HIGH,
+                                "Khóa lịch tập y tế: " + horse.getCode() + " - " + horse.getName(),
+                                "Ngựa " + horse.getCode() + " bị khóa lịch tập tự động do có chấn thương y tế.",
+                                "HORSE",
+                                horseId);
+                    }
+                }
+            }
+        }
+
         if (userRepository != null && notificationService != null) {
             List<UserAccount> staffMembers = userRepository.findByRoles(List.of(Role.STABLE_STAFF));
             for (UserAccount staff : staffMembers) {
@@ -200,6 +249,14 @@ public class MedicalQueueService {
 
         return new AssignmentView(assignmentId, horseId, horse.getCode(), horse.getName(),
                 veterinarianId, vetName, "COMPLETED", null, OffsetDateTime.now());
+    }
+
+    private JsonNode read(String value) {
+        try {
+            return json.readTree(value);
+        } catch (Exception e) {
+            return json.createObjectNode();
+        }
     }
 
     // ─── DANH SÁCH NGỰA ĐANG KHÁM CỦA BÁC SĨ ───────────────────

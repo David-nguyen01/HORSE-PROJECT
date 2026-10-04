@@ -36,7 +36,7 @@ public class IncidentReportController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') or hasAuthority('PERM_MEDICAL_VIEW')")
     public List<IncidentReportResponse> listReports(
             @RequestParam(required = false) UUID horseId,
             @RequestParam(required = false) String status,
@@ -47,17 +47,39 @@ public class IncidentReportController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') or hasAuthority('PERM_MEDICAL_VIEW')")
     public IncidentReportResponse getReport(@PathVariable UUID id) {
         return service.getReport(id);
     }
 
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasAuthority('PERM_MEDICAL_EDIT')")
     public IncidentReportResponse updateStatus(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody UpdateIncidentStatusRequest request) {
         return service.updateStatus(id, UUID.fromString(jwt.getSubject()), request);
+    }
+
+    @PostMapping("/{id}/acknowledge")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_EDIT') or hasAuthority('PERM_STABLE_CARE_EDIT')")
+    public IncidentReportResponse acknowledge(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String notes = body != null ? body.getOrDefault("notes", "") : "";
+        return service.updateStatus(id, UUID.fromString(jwt.getSubject()),
+                new UpdateIncidentStatusRequest("ACKNOWLEDGED", notes));
+    }
+
+    @PostMapping("/{id}/dismiss")
+    @PreAuthorize("hasAuthority('PERM_MEDICAL_EDIT') or hasAuthority('PERM_STABLE_CARE_EDIT')")
+    public IncidentReportResponse dismiss(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) java.util.Map<String, String> body) {
+        String notes = body != null ? body.getOrDefault("notes", "") : "";
+        return service.updateStatus(id, UUID.fromString(jwt.getSubject()),
+                new UpdateIncidentStatusRequest("DISMISSED", notes));
     }
 }
