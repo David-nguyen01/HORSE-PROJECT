@@ -59,8 +59,15 @@ public class HorseController {
     Page<HorseResponse> search(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) HorseStatus status,
+            @RequestParam(required = false, defaultValue = "false") boolean paidOnly,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return horseService.search(query, status, pageable);
+        return horseService.search(query, status, paidOnly, pageable);
+    }
+
+    @GetMapping("/eligible-for-medical")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
+    java.util.List<HorseResponse> getEligibleForMedical() {
+        return horseService.getEligibleForMedical();
     }
 
     @GetMapping("/mine")

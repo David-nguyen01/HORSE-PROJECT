@@ -60,6 +60,53 @@ public class CareTaskService {
     }
 
     @Transactional
+    public void createRecoveryTask(com.racehorse.training.entity.TrainingSchedule schedule, UUID staffId) {
+        if (schedule == null || staffId == null || schedule.getHorse() == null) return;
+        LocalDate date = schedule.getScheduledStart().atZone(clubZone).toLocalDate();
+        LocalTime time = schedule.getScheduledEnd() != null 
+                ? schedule.getScheduledEnd().atZone(clubZone).toLocalTime() 
+                : LocalTime.of(11, 0);
+
+        String title = "Hồi phục sau buổi tập - " + schedule.getHorse().getName();
+        String description = "Chăm sóc, làm mát gân chân và kiểm tra thể trạng sau phiên tập: " + schedule.getTaskName();
+
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.care_tasks WHERE horse_id = ? AND scheduled_date = ? AND title = ?",
+                Integer.class,
+                schedule.getHorse().getId(),
+                java.sql.Date.valueOf(date),
+                title
+        );
+        if (count != null && count > 0) return;
+
+        String sql = """
+            INSERT INTO dbo.care_tasks (
+                id, routine_definition_id, task_category, scope, horse_id,
+                title, description, task_type, scheduled_date, scheduled_time,
+                assigned_staff_id, status, created_by_user_id, created_at, updated_at
+            ) VALUES (
+                NEWID(), NULL, 'SPECIAL', 'HORSE', ?,
+                ?, ?, 'HEALTH_CHECK', ?, ?,
+                ?, 'PENDING', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET()
+            )
+            """;
+        try {
+            jdbc.update(
+                    sql,
+                    schedule.getHorse().getId(),
+                    title,
+                    description,
+                    java.sql.Date.valueOf(date),
+                    java.sql.Time.valueOf(time),
+                    staffId,
+                    staffId
+            );
+        } catch (Exception ex) {
+            // Idempotent catch
+        }
+    }
+
+    @Transactional
     public CareTaskResponse createTask(UUID actor, CreateCareTaskRequest request) {
         if (request.horseId() != null) {
             horseAccess.requireActive(request.horseId());

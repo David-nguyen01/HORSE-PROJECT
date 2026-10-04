@@ -46,12 +46,21 @@ public class InjuryService {
                 ? req.attachmentFileIds().stream().map(UUID::toString).toList()
                 : List.of();
 
+        String effectiveBodyLocation = req.bodyLocation() != null && !req.bodyLocation().isBlank()
+                ? req.bodyLocation().trim()
+                : (req.bodyRegions() != null && !req.bodyRegions().isEmpty() ? String.join(", ", req.bodyRegions()) : "OTHER");
+        double x = req.x() != null ? req.x() : 0.0;
+        double y = req.y() != null ? req.y() : 0.0;
+        double z = req.z() != null ? req.z() : 0.0;
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("examinationId", req.examinationId() != null ? req.examinationId().toString() : null);
-        data.put("bodyLocation", req.bodyLocation().trim());
-        data.put("x", req.x());
-        data.put("y", req.y());
-        data.put("z", req.z());
+        data.put("bodyLocation", effectiveBodyLocation);
+        data.put("bodyRegions", req.bodyRegions() != null ? req.bodyRegions() : List.of());
+        data.put("additionalNotes", trimToNull(req.additionalNotes()));
+        data.put("x", x);
+        data.put("y", y);
+        data.put("z", z);
         data.put("severity", severity);
         data.put("currentStatus", initialStatus);
         data.put("notes", trimToNull(req.notes()));
@@ -95,10 +104,10 @@ public class InjuryService {
                 injuryId,
                 horseId,
                 req.examinationId(),
-                req.bodyLocation().trim(),
-                req.x(),
-                req.y(),
-                req.z(),
+                effectiveBodyLocation,
+                x,
+                y,
+                z,
                 severity,
                 initialStatus,
                 trimToNull(req.notes()),

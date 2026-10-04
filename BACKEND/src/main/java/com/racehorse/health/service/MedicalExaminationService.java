@@ -3,10 +3,17 @@ package com.racehorse.health.service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.racehorse.auth.entity.Role;
+import com.racehorse.auth.entity.UserAccount;
+import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.health.dto.*;
+import com.racehorse.health.repository.TrainingLockRepository;
+import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
+import com.racehorse.notification.entity.NotificationPriority;
+import com.racehorse.notification.service.NotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +27,38 @@ public class MedicalExaminationService {
 
     private final JdbcTemplate jdbc;
     private final HorseAccessService horseAccessService;
+    private final TrainingLockRepository trainingLockRepository;
+    private final TrainingLockService trainingLockService;
+    private final PreventiveCareService preventiveCareService;
+    private final UserAccountRepository userRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper json;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public MedicalExaminationService(
+            JdbcTemplate jdbc,
+            HorseAccessService horseAccessService,
+            TrainingLockRepository trainingLockRepository,
+            TrainingLockService trainingLockService,
+            PreventiveCareService preventiveCareService,
+            UserAccountRepository userRepository,
+            NotificationService notificationService,
+            ObjectMapper json) {
+        this.jdbc = jdbc;
+        this.horseAccessService = horseAccessService;
+        this.trainingLockRepository = trainingLockRepository;
+        this.trainingLockService = trainingLockService;
+        this.preventiveCareService = preventiveCareService;
+        this.userRepository = userRepository;
+        this.notificationService = notificationService;
+        this.json = json;
+    }
 
     public MedicalExaminationService(
             JdbcTemplate jdbc,
             HorseAccessService horseAccessService,
             ObjectMapper json) {
-        this.jdbc = jdbc;
-        this.horseAccessService = horseAccessService;
-        this.json = json;
+        this(jdbc, horseAccessService, null, null, null, null, null, json);
     }
 
     @Transactional
@@ -81,6 +111,49 @@ public class MedicalExaminationService {
                     where id = ?
                     """,
                     healthStatusAfter, veterinarianId, examId, horseId);
+        }
+
+        // Tự động tạo Training Lock nếu chẩn đoán liên quan đến chấn thương
+        boolean isInjury = isInjuryDiagnosis(req.diagnosis(), healthStatusAfter);
+        if (isInjury && trainingLockService != null && trainingLockRepository != null) {
+            if (trainingLockRepository.findByHorseIdAndReleasedAtIsNull(horseId).isEmpty()) {
+                String lockReason = "Khóa tự động từ kết quả khám: " + req.diagnosis().trim();
+                trainingLockService.lock(horseId, veterinarianId,
+                        new CreateTrainingLockRequest(lockReason, req.followUpDate()));
+            }
+            if (userRepository != null && notificationService != null) {
+                List<UserAccount> headTrainers = userRepository.findByRoles(List.of(Role.HEAD_TRAINER));
+                Horse horse = horseAccessService.requireActive(horseId);
+                for (UserAccount ht : headTrainers) {
+                    notificationService.create(
+                            ht,
+                            "TRAINING_LOCK_AUTOMATIC",
+                            NotificationPriority.HIGH,
+                            "Khóa lịch tập y tế: " + horse.getCode() + " - " + horse.getName(),
+                            "Ngựa " + horse.getCode() + " bị khóa lịch tập do kết quả chẩn đoán: " + req.diagnosis().trim(),
+                            "HORSE",
+                            horseId);
+                }
+            }
+        }
+
+        // Tích hợp tạo lịch chăm sóc phòng ngừa nếu có
+        if (req.preventiveCareSchedule() != null && preventiveCareService != null) {
+            preventiveCareService.create(horseId, veterinarianId, req.preventiveCareSchedule());
+            if (userRepository != null && notificationService != null) {
+                List<UserAccount> staffList = userRepository.findByRoles(List.of(Role.STABLE_STAFF));
+                Horse horse = horseAccessService.requireActive(horseId);
+                for (UserAccount staff : staffList) {
+                    notificationService.create(
+                            staff,
+                            "PREVENTIVE_CARE_SCHEDULED",
+                            NotificationPriority.NORMAL,
+                            "Lịch chăm sóc phòng ngừa: " + horse.getCode() + " - " + horse.getName(),
+                            "Bác sĩ đã lên lịch " + req.preventiveCareSchedule().careType() + " cho ngựa " + horse.getName() + " vào ngày " + req.preventiveCareSchedule().dueDate(),
+                            "HORSE",
+                            horseId);
+                }
+            }
         }
 
         String vetName = findUsername(veterinarianId);
@@ -334,6 +407,14 @@ public class MedicalExaminationService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean isInjuryDiagnosis(String diagnosis, String healthStatusAfter) {
+        if ("INJURED".equalsIgnoreCase(healthStatusAfter)) return true;
+        if (diagnosis == null) return false;
+        String lower = diagnosis.toLowerCase(Locale.ROOT);
+        return lower.contains("chấn thương") || lower.contains("injury") || lower.contains("gãy")
+                || lower.contains("bong gân") || lower.contains("rách") || lower.contains("trật khớp");
     }
 
     private UUID toUuid(Object value) {

@@ -1,7 +1,7 @@
 import { api } from './api'
 
 export const vetApi = {
-  // FR08 Barn Health Map
+  // Barn Health Map
   getBarnHealthMap: (params = {}) => {
     const q = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
@@ -12,6 +12,7 @@ export const vetApi = {
   },
 
   // General Horses & Stables
+  getEligibleHorses: () => api('/api/horses/eligible-for-medical'),
   getHorses: (params = {}) => {
     const q = new URLSearchParams({ size: '100', ...params })
     return api(`/api/horses?${q.toString()}`)
@@ -25,7 +26,7 @@ export const vetApi = {
     }),
   getStables: (includeInactive = false) => api(`/api/stables?includeInactive=${includeInactive}`),
 
-  // FR09 Medical Examination & Treatment Records
+  // Medical Examination & Treatment Records
   getHorseMedicalExams: (horseId) => api(`/api/horses/${horseId}/medical-examinations`),
   getMedicalExamDetail: (examId) => api(`/api/medical-examinations/${examId}`),
   createMedicalExam: (horseId, payload) =>
@@ -47,7 +48,7 @@ export const vetApi = {
       method: 'DELETE',
     }),
 
-  // FR10 Injury Tracking
+  // Injury Tracking
   getHorseInjuries: (horseId, status) =>
     api(`/api/horses/${horseId}/injuries${status ? `?status=${encodeURIComponent(status)}` : ''}`),
   getInjuryDetail: (injuryId) => api(`/api/injuries/${injuryId}`),
@@ -90,7 +91,7 @@ export const vetApi = {
       method: 'DELETE',
     }),
 
-  // FR11 Training Locks
+  // Training Locks
   getCurrentTrainingLock: (horseId) => api(`/api/horses/${horseId}/training-locks/current`),
   getTrainingLockHistory: (horseId) => api(`/api/horses/${horseId}/training-locks`),
   createTrainingLock: (horseId, payload) =>
@@ -104,7 +105,7 @@ export const vetApi = {
       body: JSON.stringify(payload),
     }),
 
-  // FR12 Preventive Care
+  // Preventive Care
   getDuePreventiveCare: (params = {}) => {
     const q = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => {
@@ -150,4 +151,44 @@ export const vetApi = {
     const qs = q.toString()
     return api(`/api/incidents${qs ? `?${qs}` : ''}`)
   },
+
+  // Vet Training Assessment
+  getTrainingSessionsByDate: (date) =>
+    api(`/api/training-schedules?date=${date}`),
+  submitVetAssessment: (scheduleId, payload) =>
+    api(`/api/training-evaluations/${scheduleId}/vet-assessment`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getVetAssessment: (scheduleId) =>
+    api(`/api/training-evaluations/${scheduleId}/vet-assessment`),
+  getVetAssessmentsByDate: (date) =>
+    api(`/api/training-evaluations/vet-assessments?date=${date}`),
+
+  // Horse Detailed Profile
+  getHorseTrainingPlans: (horseId) =>
+    api(`/api/horses/${horseId}/training-plans`),
+  getHorseWeights: (horseId) =>
+    api(`/api/horses/${horseId}/weights`),
+  getHorseRaceReadiness: (horseId) =>
+    api(`/api/horses/${horseId}/race-readiness`),
+
+  // Training Supervision & Distributed Claiming
+  getOpenTrainingSessions: (from, to) => {
+    const q = new URLSearchParams()
+    if (from) q.set('from', from)
+    if (to)   q.set('to', to)
+    const qs = q.toString()
+    return api(`/api/training-schedules/open${qs ? `?${qs}` : ''}`)
+  },
+  claimTrainingSession: (scheduleId) =>
+    api(`/api/training-schedules/${scheduleId}/claim`, { method: 'POST' }),
+  getMyTrainingSessions: (from, to) => {
+    const q = new URLSearchParams()
+    if (from) q.set('from', from)
+    if (to)   q.set('to', to)
+    const qs = q.toString()
+    return api(`/api/training-schedules/mine${qs ? `?${qs}` : ''}`)
+  },
 }
+

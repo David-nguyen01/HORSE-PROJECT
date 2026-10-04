@@ -76,9 +76,23 @@ public class HorseService {
 
     @Transactional(readOnly = true)
     public Page<HorseResponse> search(String query, HorseStatus status, Pageable pageable) {
+        return search(query, status, false, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<HorseResponse> search(String query, HorseStatus status, boolean paidOnly, Pageable pageable) {
         String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
-        return horseRepository.search(normalizedQuery, status, pageable)
+        return (paidOnly
+                ? horseRepository.searchPaidOnly(normalizedQuery, status, pageable)
+                : horseRepository.search(normalizedQuery, status, pageable))
                 .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<HorseResponse> getEligibleForMedical() {
+        return horseRepository.findEligibleForMedical().stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

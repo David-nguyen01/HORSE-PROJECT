@@ -14,6 +14,18 @@ public record CreateMedicalExaminationRequest(
         @NotBlank @Size(max = 4000) String treatmentProtocol,
         @Size(max = 2000) String medicationNotes,
         LocalDate followUpDate,
-        @Size(max = 30) String healthStatusAfter
+        @Size(max = 30) String healthStatusAfter,
+        CreatePreventiveCareRequest preventiveCareSchedule
 ) {
+    public CreateMedicalExaminationRequest(
+            LocalDate examinationDate,
+            String symptoms,
+            String diagnosis,
+            String treatmentProtocol,
+            String medicationNotes,
+            LocalDate followUpDate,
+            String healthStatusAfter
+    ) {
+        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, null);
+    }
 }

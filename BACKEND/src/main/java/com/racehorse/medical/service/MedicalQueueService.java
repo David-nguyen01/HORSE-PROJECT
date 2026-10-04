@@ -4,6 +4,11 @@ import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.repository.HorseRepository;
+import com.racehorse.auth.entity.Role;
+import com.racehorse.auth.entity.UserAccount;
+import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.notification.entity.NotificationPriority;
+import com.racehorse.notification.service.NotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +36,26 @@ public class MedicalQueueService {
 
     private final JdbcTemplate jdbc;
     private final HorseRepository horseRepository;
+    private final UserAccountRepository userRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper json;
 
-    public MedicalQueueService(JdbcTemplate jdbc, HorseRepository horseRepository, ObjectMapper json) {
+    @org.springframework.beans.factory.annotation.Autowired
+    public MedicalQueueService(
+            JdbcTemplate jdbc,
+            HorseRepository horseRepository,
+            UserAccountRepository userRepository,
+            NotificationService notificationService,
+            ObjectMapper json) {
         this.jdbc = jdbc;
         this.horseRepository = horseRepository;
+        this.userRepository = userRepository;
+        this.notificationService = notificationService;
         this.json = json;
+    }
+
+    public MedicalQueueService(JdbcTemplate jdbc, HorseRepository horseRepository, ObjectMapper json) {
+        this(jdbc, horseRepository, null, null, json);
     }
 
     // ─── DANH SÁCH HÀNG CHỜ ─────────────────────────────────────
@@ -162,6 +181,20 @@ public class MedicalQueueService {
         // Cập nhật paymentStatus → PENDING_TRAINING
         horse.setPaymentStatus("PENDING_TRAINING");
         horseRepository.save(horse);
+
+        if (userRepository != null && notificationService != null) {
+            List<UserAccount> staffMembers = userRepository.findByRoles(List.of(Role.STABLE_STAFF));
+            for (UserAccount staff : staffMembers) {
+                notificationService.create(
+                        staff,
+                        "STABLE_ASSIGNMENT_REQUEST",
+                        NotificationPriority.HIGH,
+                        "Hoàn tất khám y tế: " + horse.getName() + " (" + horse.getCode() + ")",
+                        "Ngựa " + horse.getCode() + " đã hoàn thành khám y tế ban đầu. Vui lòng kiểm tra và sắp xếp ô chuồng.",
+                        "HORSE",
+                        horse.getId());
+            }
+        }
 
         String vetName = jdbc.queryForObject("select username from users where id=?", String.class, veterinarianId);
 

@@ -51,4 +51,44 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     @Query("select distinct u from UserAccount u join u.roles r where r in :roles and u.enabled = true")
     List<UserAccount> findByRoles(@Param("roles") java.util.Collection<com.racehorse.auth.entity.Role> roles);
+
+    @Query(value = """
+            SELECT TOP 1 u.* FROM users u
+            JOIN user_roles ur ON ur.user_id = u.id AND ur.role = 'VETERINARIAN'
+            WHERE u.enabled = 1
+              AND u.id NOT IN (
+                  SELECT veterinarian_user_id FROM training_schedules
+                  WHERE cancelled_at IS NULL
+                    AND CAST(scheduled_start AT TIME ZONE 'SE Asia Standard Time' AS DATE) = :targetDate
+                    AND veterinarian_user_id IS NOT NULL
+              )
+            ORDER BY (
+                SELECT COUNT(*) FROM training_schedules
+                WHERE veterinarian_user_id = u.id
+                  AND vet_assigned_by = 'SYSTEM'
+                  AND scheduled_start >= DATEADD(day, -30, SYSDATETIMEOFFSET())
+            ) ASC,
+            u.id ASC
+            """, nativeQuery = true)
+    Optional<UserAccount> findLeastAutoPickedVet(@Param("targetDate") java.time.LocalDate targetDate);
+
+    @Query(value = """
+            SELECT TOP 1 u.* FROM users u
+            JOIN user_roles ur ON ur.user_id = u.id AND ur.role = 'STABLE_STAFF'
+            WHERE u.enabled = 1
+              AND u.id NOT IN (
+                  SELECT assigned_staff_id FROM training_schedules
+                  WHERE cancelled_at IS NULL
+                    AND CAST(scheduled_start AT TIME ZONE 'SE Asia Standard Time' AS DATE) = :targetDate
+                    AND assigned_staff_id IS NOT NULL
+              )
+            ORDER BY (
+                SELECT COUNT(*) FROM training_schedules
+                WHERE assigned_staff_id = u.id
+                  AND staff_assigned_by = 'SYSTEM'
+                  AND scheduled_start >= DATEADD(day, -30, SYSDATETIMEOFFSET())
+            ) ASC,
+            u.id ASC
+            """, nativeQuery = true)
+    Optional<UserAccount> findLeastAutoPickedStaff(@Param("targetDate") java.time.LocalDate targetDate);
 }
