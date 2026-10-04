@@ -130,7 +130,7 @@ function AppLayout() {
     { to: '/vet/medical-records', label: 'Hồ sơ bệnh án & Chấn thương', icon: FileText },
     { to: '/vet/preventive', label: 'Lịch tiêm phòng & Phòng ngừa', icon: Calendar },
     { to: '/vet/nutrition', label: 'Đề xuất khẩu phần ăn', icon: Utensils },
-    { to: '/vet/training-assessment', label: 'Đánh giá buổi tập', icon: Activity },
+    { to: '/vet/training', label: 'Theo dõi & Đánh giá buổi tập', icon: Activity },
     { to: '/vet/horses', label: 'Hồ sơ ngựa', icon: Award },
   ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },

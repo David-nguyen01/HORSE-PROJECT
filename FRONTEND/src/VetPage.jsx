@@ -274,7 +274,7 @@ export default function VetPage() {
       {activeTab === 'injuries' && <MedicalRecordsView initialHorseId={initialHorseId} defaultSubTab="injuries" />}
       {activeTab === 'preventive' && <PreventiveCareView initialHorseId={initialHorseId} />}
       {activeTab === 'nutrition' && <NutritionProposalView initialHorseId={initialHorseId} />}
-      {activeTab === 'training-assessment' && <TrainingAssessmentView onNavigate={setTab} />}
+      {(activeTab === 'training-assessment' || activeTab === 'training') && <TrainingAssessmentView onNavigate={setTab} />}
       {activeTab === 'horses' && <HorseProfileView onNavigate={setTab} initialHorseId={initialHorseId} />}
       {activeTab === 'training-locks' && <AutomatedLocksNotice onNavigate={setTab} />}
     </>
