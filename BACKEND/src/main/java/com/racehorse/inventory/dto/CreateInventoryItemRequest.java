@@ -23,6 +23,18 @@ public record CreateInventoryItemRequest(
         Double minThreshold,
 
         String location,
-        String description
+        String description,
+        Double referencePrice
 ) {
+    public CreateInventoryItemRequest(
+            String itemName,
+            String category,
+            String unit,
+            Double initialQuantity,
+            Double minThreshold,
+            String location,
+            String description
+    ) {
+        this(itemName, category, unit, initialQuantity, minThreshold, location, description, null);
+    }
 }

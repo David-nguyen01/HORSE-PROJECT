@@ -74,9 +74,12 @@ export const stableCareApi = {
   deleteRoutine: (id) => api(`/api/stables/daily-routines/${id}`, { method: 'DELETE' }),
 
   // FR14 Nutrition
-  getActiveNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`),
+  getActiveNutritionPlan: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan${date ? `?date=${date}` : ''}`),
   getNutritionHistory: (horseId) => api(`/api/horses/${horseId}/nutrition-plan/history`),
   getDailyFeedingChecklist: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan/daily-checklist${date ? `?date=${date}` : ''}`),
+  getStandardPlans: () => api('/api/nutrition/standard-plans'),
+  getHorsesActivePlans: (date) => api(`/api/nutrition/horses-active${date ? `?date=${date}` : ''}`),
+  getStablesWorkload: (date) => api(`/api/nutrition/stables-workload${date ? `?date=${date}` : ''}`),
   createNutritionPlan: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'POST', body: JSON.stringify(payload) }),
 
   // FR15 Care Tasks
@@ -87,7 +90,7 @@ export const stableCareApi = {
   },
   getCareTask: (id) => api(`/api/care-tasks/${id}`),
   createCareTask: (payload) => api('/api/care-tasks', { method: 'POST', body: JSON.stringify(payload) }),
-  completeCareTask: (id, payload) => api(`/api/care-tasks/${id}/complete`, { method: 'POST', body: JSON.stringify(payload || {}) }),
+  completeCareTask: (id, payload) => api(`/api/care-tasks/${id}/complete`, { method: 'POST', body: payload instanceof FormData ? payload : JSON.stringify(payload || {}) }),
   cancelCareTask: (id) => api(`/api/care-tasks/${id}/cancel`, { method: 'POST' }),
 
   // FR16 Incidents
