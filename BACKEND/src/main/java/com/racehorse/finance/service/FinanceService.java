@@ -1,5 +1,6 @@
 package com.racehorse.finance.service;
 
+import com.racehorse.audit.service.AuditService;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -7,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -16,8 +18,12 @@ public class FinanceService {
     private static final Set<String> TYPES = Set.of("EXPENSE", "REVENUE");
     private static final Set<String> CATEGORIES = Set.of("FEED_COST", "MEDICAL_COST", "OPERATING_COST", "PRIZE_REVENUE");
     private final JdbcTemplate jdbc;
+    private final AuditService audit;
 
-    public FinanceService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public FinanceService(JdbcTemplate jdbc, AuditService audit) {
+        this.jdbc = jdbc;
+        this.audit = audit;
+    }
 
     @Transactional
     public TransactionView create(UUID actor, UUID horseId, UUID stableId, LocalDate date, String type,
@@ -38,6 +44,10 @@ public class FinanceService {
                         + "values(?,?,?,?,?,?,?,'VND',?,?,?,?)",
                 id, horseId, stableId, date, normalizedType, normalizedCategory, amount,
                 required(description), trimToNull(sourceType), sourceId, actor);
+        audit.record(actor, "REPORTING", "TRANSACTION_CREATE", "FINANCIAL_TRANSACTION", id,
+                "Ghi nhận giao dịch " + ("EXPENSE".equals(normalizedType) ? "Chi phí" : "Doanh thu")
+                        + " (" + categoryLabel(normalizedCategory) + ") số tiền " + amount + " VND: " + description,
+                null, null);
         return get(id, actor, true);
     }
 
@@ -70,11 +80,51 @@ public class FinanceService {
         add(sql, args, " and ft.stable_id=?", stableId);
         add(sql, args, " and ft.transaction_date>=?", from);
         add(sql, args, " and ft.transaction_date<=?", to);
-        add(sql, args, " and ft.transaction_type=?", type == null ? null : upper(type));
-        add(sql, args, " and ft.category=?", category == null ? null : upper(category));
+        add(sql, args, " and ft.transaction_type=?", cleanUpper(type));
+        add(sql, args, " and ft.category=?", cleanUpper(category));
         sql.append(" order by ft.transaction_date desc,ft.created_at desc offset ? rows fetch next ? rows only");
         args.add(page * size); args.add(size);
         return jdbc.query(sql.toString(), this::map, args.toArray());
+    }
+
+    @Transactional(readOnly = true)
+    public long count(UUID requester, boolean manager, UUID horseId, UUID stableId,
+                      LocalDate from, LocalDate to, String type, String category) {
+        StringBuilder sql = new StringBuilder("select count(*) from financial_transactions ft where 1=1");
+        List<Object> args = new ArrayList<>();
+        if (!manager) {
+            sql.append(" and exists(select 1 from horse_ownerships ho where ho.horse_id=ft.horse_id and ho.owner_id=?)");
+            args.add(requester);
+        }
+        add(sql, args, " and ft.horse_id=?", horseId);
+        add(sql, args, " and ft.stable_id=?", stableId);
+        add(sql, args, " and ft.transaction_date>=?", from);
+        add(sql, args, " and ft.transaction_date<=?", to);
+        add(sql, args, " and ft.transaction_type=?", cleanUpper(type));
+        add(sql, args, " and ft.category=?", cleanUpper(category));
+        Long total = jdbc.queryForObject(sql.toString(), Long.class, args.toArray());
+        return total == null ? 0 : total;
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportCsv(UUID requester, boolean manager, UUID horseId, UUID stableId,
+                            LocalDate from, LocalDate to, String type, String category) {
+        List<TransactionView> rows = list(requester, manager, horseId, stableId, from, to, type, category, 0, 10000);
+        StringBuilder sb = new StringBuilder();
+        sb.append('\uFEFF'); // UTF-8 BOM
+        sb.append("Mã giao dịch,Ngày giao dịch,Loại giao dịch,Nhóm danh mục,Số tiền (VND),Ngựa liên quan,Chuồng liên quan,Mô tả,Thời điểm ghi nhận\n");
+        for (TransactionView t : rows) {
+            sb.append(escapeCsv(t.id() == null ? "" : t.id().toString())).append(',');
+            sb.append(escapeCsv(t.transactionDate() == null ? "" : t.transactionDate().toString())).append(',');
+            sb.append(escapeCsv("EXPENSE".equals(t.transactionType()) ? "Khoản chi" : "Khoản thu")).append(',');
+            sb.append(escapeCsv(categoryLabel(t.category()))).append(',');
+            sb.append(t.amount() == null ? "0" : t.amount().toString()).append(',');
+            sb.append(escapeCsv(t.horseName() == null ? "" : t.horseName())).append(',');
+            sb.append(escapeCsv(t.stableName() == null ? "" : t.stableName())).append(',');
+            sb.append(escapeCsv(t.description() == null ? "" : t.description())).append(',');
+            sb.append(escapeCsv(t.createdAt() == null ? "" : t.createdAt().toString())).append('\n');
+        }
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Transactional(readOnly = true)
@@ -129,8 +179,25 @@ public class FinanceService {
     }
     private void add(StringBuilder sql, List<Object> args, String clause, Object value) { if (value != null) { sql.append(clause); args.add(value); } }
     private String upper(String value) { return required(value).toUpperCase(Locale.ROOT); }
+    private String cleanUpper(String value) { return value == null || value.isBlank() ? null : value.trim().toUpperCase(Locale.ROOT); }
     private String required(String value) { if (value == null || value.isBlank()) throw new BusinessException("Mô tả không được để trống"); return value.trim(); }
     private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+
+    private String categoryLabel(String cat) {
+        if (cat == null) return "";
+        return switch (cat) {
+            case "FEED_COST" -> "Chi phí thức ăn";
+            case "MEDICAL_COST" -> "Chi phí y tế & thú y";
+            case "OPERATING_COST" -> "Chi phí vận hành";
+            case "PRIZE_REVENUE" -> "Tiền thưởng giải đua";
+            default -> cat;
+        };
+    }
+
+    private String escapeCsv(String val) {
+        if (val == null) return "\"\"";
+        return "\"" + val.replace("\"", "\"\"") + "\"";
+    }
 
     public record TransactionView(UUID id, UUID horseId, String horseName, UUID stableId, String stableName,
                                   LocalDate transactionDate, String transactionType, String category,
