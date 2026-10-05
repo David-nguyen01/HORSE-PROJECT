@@ -41,6 +41,29 @@ public class FinanceController {
         return service.list(user(jwt), manager(auth), horseId, stableId, from, to, type, category, page, size);
     }
 
+    @GetMapping("/count")
+    public java.util.Map<String, Long> count(@AuthenticationPrincipal Jwt jwt, Authentication auth,
+            @RequestParam(required=false) UUID horseId, @RequestParam(required=false) UUID stableId,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required=false) String type, @RequestParam(required=false) String category) {
+        long total = service.count(user(jwt), manager(auth), horseId, stableId, from, to, type, category);
+        return java.util.Map.of("count", total);
+    }
+
+    @GetMapping(value = "/export", produces = "text/csv; charset=UTF-8")
+    public org.springframework.http.ResponseEntity<byte[]> export(@AuthenticationPrincipal Jwt jwt, Authentication auth,
+            @RequestParam(required=false) UUID horseId, @RequestParam(required=false) UUID stableId,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required=false) String type, @RequestParam(required=false) String category) {
+        byte[] csv = service.exportCsv(user(jwt), manager(auth), horseId, stableId, from, to, type, category);
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=financial-transactions-" + LocalDate.now() + ".csv")
+                .contentType(org.springframework.http.MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .body(csv);
+    }
+
     @GetMapping("/summary")
     FinanceService.SummaryView summary(@AuthenticationPrincipal Jwt jwt, Authentication auth, @RequestParam(required=false) UUID horseId,
             @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,

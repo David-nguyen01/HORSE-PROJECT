@@ -3,6 +3,7 @@ package com.racehorse.reporting.service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.racehorse.audit.service.AuditService;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.finance.service.FinanceService;
@@ -21,9 +22,10 @@ public class OwnerReportService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final FinanceService finance;
+    private final AuditService audit;
 
-    public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance) {
-        this.jdbc = jdbc; this.json = json; this.finance = finance;
+    public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance, AuditService audit) {
+        this.jdbc = jdbc; this.json = json; this.finance = finance; this.audit = audit;
     }
 
     @Transactional
@@ -42,7 +44,28 @@ public class OwnerReportService {
         } catch (org.springframework.dao.DuplicateKeyException exception) {
             throw new BusinessException("Báo cáo cho kỳ này đã tồn tại");
         }
+        String ownerName = jdbc.queryForObject("select username from users where id=?", String.class, ownerId);
+        audit.record(actor, "REPORTING", "REPORT_GENERATE", "OWNER_REPORT", id,
+                "Lập báo cáo tài chính cho chủ ngựa " + ownerName + " kỳ " + start + " đến " + end,
+                null, null);
         return get(id, actor, true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<OwnerOption> getOwners() {
+        String sql = """
+                select u.id, u.username, u.email,
+                       (select count(*) from horse_ownerships ho where ho.owner_id=u.id) as horse_count
+                from users u
+                join user_roles ur on ur.user_id=u.id
+                where ur.role='HORSE_OWNER' and u.enabled=1
+                order by u.username
+                """;
+        return jdbc.query(sql, (rs, row) -> new OwnerOption(
+                rs.getObject("id", UUID.class),
+                rs.getString("username"),
+                rs.getString("email"),
+                rs.getInt("horse_count")));
     }
 
     @Transactional(readOnly = true)
@@ -84,6 +107,43 @@ public class OwnerReportService {
         catch (JacksonException exception) { throw new IllegalStateException("Không thể xuất báo cáo JSON",exception); }
     }
 
+    public byte[] csvDownload(UUID id, UUID requester, boolean manager) {
+        ReportView r = get(id, requester, manager);
+        StringBuilder sb = new StringBuilder();
+        sb.append('\uFEFF');
+        sb.append("BÁO CÁO TÀI CHÍNH CHỦ SỞ HỮU NGỰA\n");
+        sb.append("Mã báo cáo:,").append(r.id()).append("\n");
+        sb.append("Chủ sở hữu:,").append(escapeCsv(r.ownerUsername())).append("\n");
+        sb.append("Kỳ báo cáo:,").append(r.periodStart()).append(" đến ").append(r.periodEnd()).append("\n");
+        sb.append("Thời điểm lập:,").append(r.generatedAt()).append("\n");
+        sb.append("Tổng chi phí (VND):,").append(r.expense()).append("\n");
+        sb.append("Tổng doanh thu (VND):,").append(r.revenue()).append("\n");
+        sb.append("Số dư ròng (VND):,").append(r.net()).append("\n\n");
+
+        sb.append("DANH SÁCH NGỰA TRONG KỲ\n");
+        sb.append("Mã ngựa,Tên ngựa\n");
+        for (HorseItem h : r.horses()) {
+            sb.append(escapeCsv(h.code())).append(',').append(escapeCsv(h.name())).append('\n');
+        }
+        sb.append("\nCHI TIẾT GIAO DỊCH PHÁT SINH\n");
+        sb.append("Ngày,Loại,Danh mục,Số tiền (VND),Ngựa,Chuồng,Mô tả\n");
+        for (FinanceService.TransactionView t : r.transactions()) {
+            sb.append(escapeCsv(t.transactionDate() == null ? "" : t.transactionDate().toString())).append(',');
+            sb.append(escapeCsv("EXPENSE".equals(t.transactionType()) ? "Chi phí" : "Doanh thu")).append(',');
+            sb.append(escapeCsv(t.category())).append(',');
+            sb.append(t.amount() == null ? "0" : t.amount().toString()).append(',');
+            sb.append(escapeCsv(t.horseName() == null ? "" : t.horseName())).append(',');
+            sb.append(escapeCsv(t.stableName() == null ? "" : t.stableName())).append(',');
+            sb.append(escapeCsv(t.description() == null ? "" : t.description())).append('\n');
+        }
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
+    }
+
+    private String escapeCsv(String val) {
+        if (val == null) return "\"\"";
+        return "\"" + val.replace("\"", "\"\"") + "\"";
+    }
+
     private List<UUID> transactionIds(List<UUID> horses,LocalDate start,LocalDate end){
         if(horses.isEmpty()) return List.of();
         String placeholders=String.join(",",Collections.nCopies(horses.size(),"?"));
@@ -104,6 +164,7 @@ public class OwnerReportService {
     private UUID uuid(Object value){return value instanceof UUID id?id:UUID.fromString(String.valueOf(value));}
     private record ReportRow(UUID ownerId,String username,LocalDate start,LocalDate end,OffsetDateTime generatedAt,UUID generatedBy,String horseIdsJson,String transactionIdsJson){}
 
+    public record OwnerOption(UUID id, String username, String email, int horseCount) {}
     public record ReportSummary(UUID id,UUID ownerId,String ownerUsername,LocalDate periodStart,LocalDate periodEnd,
                                 OffsetDateTime generatedAt,UUID generatedBy){}
     public record HorseItem(UUID id,String code,String name){}

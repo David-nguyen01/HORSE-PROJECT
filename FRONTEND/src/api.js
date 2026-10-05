@@ -118,3 +118,84 @@ export const stableCareApi = {
   createReplenishment: (payload) => api('/api/inventory/replenishments', { method: 'POST', body: JSON.stringify(payload) }),
   reviewReplenishment: (id, payload) => api(`/api/inventory/replenishments/${id}/review`, { method: 'POST', body: JSON.stringify(payload) }),
 }
+
+export const financeApi = {
+  getTransactions: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/financial-transactions?${q}`)
+  },
+  getCount: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/financial-transactions/count?${q}`)
+  },
+  getSummary: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/financial-transactions/summary?${q}`)
+  },
+  createTransaction: (payload) => api('/api/financial-transactions', { method: 'POST', body: JSON.stringify(payload) }),
+  exportCsv: async (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    const auth = getAuth()
+    const response = await fetch(`${API_URL}/api/financial-transactions/export?${q}`, {
+      headers: auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}
+    })
+    if (!response.ok) throw new Error('Không thể tải file CSV')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `financial-transactions-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  }
+}
+
+export const reportingApi = {
+  getOwners: () => api('/api/owner-reports/owners'),
+  getReports: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/owner-reports?${q}`)
+  },
+  getReport: (id) => api(`/api/owner-reports/${id}`),
+  generateReport: (payload) => api('/api/owner-reports', { method: 'POST', body: JSON.stringify(payload) }),
+  downloadJson: async (id) => {
+    const auth = getAuth()
+    const response = await fetch(`${API_URL}/api/owner-reports/${id}/download`, {
+      headers: auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}
+    })
+    if (!response.ok) throw new Error('Không thể tải file JSON')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `owner-report-${id}.json`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  },
+  downloadCsv: async (id) => {
+    const auth = getAuth()
+    const response = await fetch(`${API_URL}/api/owner-reports/${id}/export-csv`, {
+      headers: auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}
+    })
+    if (!response.ok) throw new Error('Không thể tải file CSV')
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `owner-report-${id}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  }
+}
+

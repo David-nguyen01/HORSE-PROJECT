@@ -62,6 +62,34 @@ public class AdminManagementService {
 
     @Transactional
     public void resetPassword(UUID actor,UUID id,String password){requireUser(id);jdbc.update("update users set password_hash=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",encoder.encode(password),id);revokeSessions(id);writeAudit(actor,"PASSWORD_RESET",id,"Đặt lại mật khẩu và thu hồi phiên",null,Map.of("sessionsRevoked",true));}
+
+    @Transactional(readOnly=true)
+    public List<Map<String,Object>> userSessions(UUID id){
+        requireUser(id);
+        return jdbc.query("""
+            select id, ip_address, user_agent, last_activity_at, expires_at, created_at
+            from login_sessions
+            where user_id=? and revoked_at is null and expires_at > SYSDATETIMEOFFSET()
+            order by last_activity_at desc
+            """, (rs, row) -> {
+                Map<String,Object> m = new LinkedHashMap<>();
+                m.put("id", rs.getObject("id", UUID.class));
+                m.put("ipAddress", rs.getString("ip_address"));
+                m.put("userAgent", rs.getString("user_agent"));
+                m.put("lastActivityAt", rs.getObject("last_activity_at", java.time.OffsetDateTime.class));
+                m.put("expiresAt", rs.getObject("expires_at", java.time.OffsetDateTime.class));
+                m.put("createdAt", rs.getObject("created_at", java.time.OffsetDateTime.class));
+                return m;
+            }, id);
+    }
+
+    @Transactional
+    public void revokeUserSessions(UUID actor, UUID id){
+        requireUser(id);
+        int count = jdbc.update("update login_sessions set revoked_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where user_id=? and revoked_at is null", id);
+        writeAudit(actor, "SESSION_REVOKE", id, "Thu hồi " + count + " phiên đăng nhập của tài khoản", null, Map.of("revokedCount", count));
+    }
+
     private void revokeSessions(UUID id){jdbc.update("update login_sessions set revoked_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where user_id=? and revoked_at is null",id);}
     private void requireUser(UUID id){Integer n=jdbc.queryForObject("select count(*) from users where id=?",Integer.class,id);if(n==null||n==0)throw new ResourceNotFoundException("Không tìm thấy tài khoản");}
 
@@ -88,10 +116,15 @@ public class AdminManagementService {
                 "select name, payment_status, service_override, override_reason, paid_until from horses where id=?", horseId);
 
         String currentStatus = (String) before.get("payment_status");
-        String newStatus = (paymentStatus != null && !paymentStatus.isBlank())
+        boolean paymentStatusProvided = paymentStatus != null && !paymentStatus.isBlank();
+        String newStatus = paymentStatusProvided
                 ? paymentStatus.trim().toUpperCase(Locale.ROOT)
                 : (currentStatus != null ? currentStatus : "UNPAID");
-        if (!"PAID".equals(newStatus) && !"UNPAID".equals(newStatus)) {
+        // Some existing Azure records still contain admission workflow values such as
+        // PENDING_PAYMENT or IN_TRAINING in payment_status. A manager must still be
+        // able to grant/revoke a service override without rewriting that legacy value.
+        // Validate only when this request explicitly changes the payment status.
+        if (paymentStatusProvided && !"PAID".equals(newStatus) && !"UNPAID".equals(newStatus)) {
             throw new BusinessException("Trạng thái thanh toán không hợp lệ (chỉ chấp nhận PAID hoặc UNPAID)");
         }
 

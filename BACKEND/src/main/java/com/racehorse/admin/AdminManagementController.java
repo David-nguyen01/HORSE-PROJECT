@@ -22,6 +22,10 @@ public class AdminManagementController {
     public void status(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody AccountStatus r){service.setEnabled(UUID.fromString(jwt.getSubject()),id,r.enabled());}
     @PostMapping("/accounts/{id}/reset-password") @ResponseStatus(HttpStatus.NO_CONTENT)
     public void reset(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt,@Valid @RequestBody PasswordReset r){service.resetPassword(UUID.fromString(jwt.getSubject()),id,r.password());}
+    @GetMapping("/accounts/{id}/sessions")
+    public List<Map<String,Object>> sessions(@PathVariable UUID id){return service.userSessions(id);}
+    @PostMapping("/accounts/{id}/revoke-sessions") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void revokeSessions(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt){service.revokeUserSessions(UUID.fromString(jwt.getSubject()),id);}
     @GetMapping("/horses/archived") @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_PROFILE_VIEW')")
     public List<Map<String,Object>> archived(@RequestParam(required=false) String query,@RequestParam(defaultValue="0") int page,@RequestParam(defaultValue="20") int size){return service.archivedHorses(query,page,size);}
     @PatchMapping("/horses/{id}/restore") @ResponseStatus(HttpStatus.NO_CONTENT) @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_PROFILE_EDIT')")

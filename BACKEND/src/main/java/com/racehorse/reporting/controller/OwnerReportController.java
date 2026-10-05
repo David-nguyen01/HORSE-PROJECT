@@ -22,6 +22,12 @@ public class OwnerReportController {
     private final OwnerReportService service;
     public OwnerReportController(OwnerReportService service){this.service=service;}
 
+    @GetMapping("/owners")
+    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_REPORTING_VIEW')")
+    public List<OwnerReportService.OwnerOption> owners() {
+        return service.getOwners();
+    }
+
     @GetMapping
     List<OwnerReportService.ReportSummary> list(@AuthenticationPrincipal Jwt jwt,Authentication auth,
             @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
@@ -35,6 +41,12 @@ public class OwnerReportController {
     ResponseEntity<byte[]> download(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt,Authentication auth){
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=owner-report-"+id+".json")
                 .contentType(MediaType.APPLICATION_JSON).body(service.jsonDownload(id,user(jwt),manager(auth)));
+    }
+
+    @GetMapping(value="/{id}/export-csv",produces="text/csv; charset=UTF-8")
+    ResponseEntity<byte[]> exportCsv(@PathVariable UUID id,@AuthenticationPrincipal Jwt jwt,Authentication auth){
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=owner-report-"+id+".csv")
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8")).body(service.csvDownload(id,user(jwt),manager(auth)));
     }
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)

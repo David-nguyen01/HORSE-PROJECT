@@ -9,6 +9,7 @@ import com.racehorse.horse.dto.HorseResponse;
 import com.racehorse.horse.dto.ReplaceOwnershipRequest;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.entity.HorseGender;
+import com.racehorse.horse.entity.HorseOwnership;
 import com.racehorse.horse.entity.HorseStatus;
 import com.racehorse.horse.mapper.HorseMapper;
 import com.racehorse.horse.repository.HorseRepository;
@@ -72,6 +73,39 @@ class HorseServiceTest {
         assertThat(response.microchipPassportNumber()).isEqualTo("CHIP-001");
         assertThat(response.status()).isEqualTo(HorseStatus.ACTIVE);
         verify(horseRepository).save(any(Horse.class));
+    }
+
+    @Test
+    void createWithInitialOwnerAssignsOwnershipSuccessfully() {
+        UUID ownerId = UUID.randomUUID();
+        UserAccount owner = new UserAccount("owner1", "encoded", "owner@gmail.com", Set.of(Role.HORSE_OWNER));
+        CreateHorseRequest request = new CreateHorseRequest(
+                "H-100",
+                "Thunder",
+                "CHIP-100",
+                LocalDate.of(2022, 1, 1),
+                HorseGender.STALLION,
+                "Bay",
+                "Thoroughbred",
+                null,
+                null,
+                null,
+                "Stable B-01",
+                HorseStatus.ACTIVE,
+                ownerId
+        );
+
+        when(horseRepository.save(any(Horse.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+
+        HorseResponse response = horseService.create(request);
+
+        assertThat(response.code()).isEqualTo("H-100");
+        assertThat(response.owners()).hasSize(1);
+        assertThat(response.owners().get(0).username()).isEqualTo("owner1");
+        assertThat(response.owners().get(0).percentage()).isEqualByComparingTo("100.00");
+        verify(ownershipRepository).save(any(HorseOwnership.class));
     }
 
     @Test

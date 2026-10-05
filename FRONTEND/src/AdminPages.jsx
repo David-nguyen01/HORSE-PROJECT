@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArchiveRestore, ArrowRight, Check, ChevronUp, KeyRound, Lock, Pencil, Plus, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Trash2, Unlock, UserPlus, Warehouse, X } from 'lucide-react'
+import { AlertTriangle, ArchiveRestore, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronUp, DollarSign, Download, KeyRound, Lock, LogOut, Monitor, Pencil, Plus, RotateCcw, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Smartphone, Trash2, Unlock, UserPlus, Warehouse, X } from 'lucide-react'
 import { api } from './api'
 
 const initials = (name = '') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'RC'
@@ -141,9 +141,14 @@ export function AdminDashboard(){
             )}
           </section>
           <section className="card">
-            <div className="admin-section-head">
-              <ChevronUp size={18}/>
-              <h3>Cơ cấu tài chính</h3>
+            <div className="admin-card-header-action" style={{borderBottom:'1px solid #edf0eb'}}>
+              <div className="admin-section-head" style={{padding:0}}>
+                <DollarSign size={18}/>
+                <h3>Cơ cấu tài chính</h3>
+              </div>
+              <button type="button" onClick={()=>navigate('/admin/finance-reports')}>
+                Sổ quỹ & Báo cáo <ArrowRight size={14}/>
+              </button>
             </div>
             <div className="finance-lines">
               <Line label="Thức ăn" value={current.feedCost}/>
@@ -252,13 +257,397 @@ export function PermissionsPage(){
   }
   return <><Heading eyebrow="PHÂN QUYỀN RBAC" title="Ma trận quyền theo vai trò" text="Bật hoặc tắt các quyền mà từng phân hệ thực sự hỗ trợ."/>{error&&<Notice text={error}/>} {loading?<section className="card simple-empty">Đang tải ma trận quyền…</section>:modules.length?<div className="permission-grid">{roles.map(role=><section className="card permission-card" key={role}><SectionHead icon={SlidersHorizontal} title={ROLES[role]}/><div className="permission-head"><span>Phân hệ</span><span>Xem</span><span>Sửa</span><span>Duyệt</span></div>{modules.map(module=><div className="permission-row" key={module}><b>{MODULES[module]||module}</b>{['VIEW','EDIT','APPROVE'].map(action=>{const item=safeItems.find(x=>x.role===role&&x.module===module&&x.action===action);const key=`${role}-${module}-${action}`;return item?<button aria-label={`${ROLES[role]} ${MODULES[module]||module} ${action}`} disabled={busy===key} className={item.granted?'granted':''} key={action} onClick={()=>toggle(item)}>{item.granted?<Check size={15}/>:<X size={15}/>}</button>:<span className="unsupported-permission" key={action}>—</span>})}</div>)}</section>)}</div>:<section className="card simple-empty">Chưa có dữ liệu phân quyền.</section>}</>
 }
-function CreateAccount({onClose,onSaved}){const [form,setForm]=useState({username:'',email:'',password:'',roles:['HEAD_TRAINER']});const [error,setError]=useState('');const submit=async e=>{e.preventDefault();try{await api('/api/users',{method:'POST',body:JSON.stringify(form)});onSaved()}catch(x){setError(x.message)}};return <Dialog title="Tạo tài khoản" onClose={onClose}><form onSubmit={submit} className="form-stack">{error&&<Notice text={error}/>}<Input label="Tên tài khoản" value={form.username} onChange={v=>setForm({...form,username:v})}/><Input label="Email" type="email" value={form.email} onChange={v=>setForm({...form,email:v})}/><Input label="Mật khẩu ban đầu" type="password" value={form.password} onChange={v=>setForm({...form,password:v})}/><RoleChecks chosen={form.roles} setChosen={roles=>setForm({...form,roles})}/><Actions onClose={onClose}/></form></Dialog>}
-function ManageAccount({user,onClose,onSaved}){const [username,setUsername]=useState(user.username);const [email,setEmail]=useState(user.email);const [roles,setRoles]=useState(user.roles);const [password,setPassword]=useState('');const [error,setError]=useState('');const run=async fn=>{setError('');try{await fn();onSaved()}catch(e){setError(e.message)}};return <Dialog title={`Quản lý · ${user.username}`} onClose={onClose}>{error&&<Notice text={error}/>}<div className="form-stack"><Input label="Tên tài khoản" value={username} onChange={setUsername}/><Input label="Email" type="email" value={email} onChange={setEmail}/><button className="button secondary" onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}`,{method:'PUT',body:JSON.stringify({username,email})}))}><Pencil size={16}/>Lưu thông tin</button><RoleChecks chosen={roles} setChosen={setRoles}/><button className="button secondary" onClick={()=>run(()=>api(`/api/users/${user.id}/roles`,{method:'PUT',body:JSON.stringify({roles})}))}><ShieldCheck size={16}/>Lưu vai trò</button><div className="inline-action"><input type="password" minLength="8" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mật khẩu mới, tối thiểu 8 ký tự"/><button className="button secondary" disabled={password.length<8} onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}/reset-password`,{method:'POST',body:JSON.stringify({password})}))}><KeyRound size={16}/>Đặt lại</button></div><button className={`button ${user.enabled?'danger-outline':'secondary'}`} onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}/status`,{method:'PATCH',body:JSON.stringify({enabled:!user.enabled})}))}>{user.enabled?<Lock size={16}/>:<Unlock size={16}/>} {user.enabled?'Khóa tài khoản':'Mở khóa tài khoản'}</button></div></Dialog>}
+function checkPasswordStrength(pw){
+  if(!pw)return{score:0,label:'',color:'',width:'0%'};
+  let score=0;
+  if(pw.length>=8)score++;
+  if(/[A-Z]/.test(pw)&&/[a-z]/.test(pw))score++;
+  if(/[0-9]/.test(pw))score++;
+  if(/[^A-Za-z0-9]/.test(pw))score++;
+  if(pw.length<8)return{score:1,label:'Quá ngắn (ít nhất 8 ký tự)',color:'#d15f57',width:'25%'};
+  if(score<=2)return{score:2,label:'Trung bình (nên thêm số & chữ hoa)',color:'#d8a33d',width:'50%'};
+  if(score===3)return{score:3,label:'Khá an toàn',color:'#42a467',width:'75%'};
+  return{score:4,label:'Rất an toàn & mạnh mẽ',color:'#27704e',width:'100%'};
+}
+
+function PasswordStrength({password}){
+  if(!password)return null;
+  const {label,color,width}=checkPasswordStrength(password);
+  return <div className="pw-strength-box">
+    <div className="pw-strength-track"><div className="pw-strength-bar" style={{width,backgroundColor:color}}/></div>
+    <div className="pw-strength-text" style={{color}}>{label}</div>
+  </div>;
+}
+
+function cleanUserAgent(ua){
+  if(!ua)return 'Trình duyệt Web';
+  if(ua.includes('Edg/'))return 'Microsoft Edge';
+  if(ua.includes('Chrome/'))return 'Google Chrome';
+  if(ua.includes('Firefox/'))return 'Mozilla Firefox';
+  if(ua.includes('Safari/')&&!ua.includes('Chrome'))return 'Apple Safari';
+  return ua.length>45?ua.slice(0,45)+'…':ua;
+}
+
+function UserSessionsList({userId}){
+  const [sessions,setSessions]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [revoking,setRevoking]=useState(false);
+  const [msg,setMsg]=useState('');
+
+  const loadSessions=useCallback(()=>{
+    setLoading(true);
+    api(`/api/admin/accounts/${userId}/sessions`)
+      .then(res=>setSessions(Array.isArray(res)?res:[]))
+      .catch(()=>setSessions([]))
+      .finally(()=>setLoading(false));
+  },[userId]);
+
+  useEffect(()=>{loadSessions()},[loadSessions]);
+
+  const revokeAll=async()=>{
+    if(!confirm('Bạn có chắc chắn muốn đăng xuất người dùng này khỏi tất cả các thiết bị?'))return;
+    setRevoking(true);setMsg('');
+    try{
+      await api(`/api/admin/accounts/${userId}/revoke-sessions`,{method:'POST'});
+      setMsg('Đã thu hồi tất cả phiên đăng nhập thành công.');
+      await loadSessions();
+    }catch(e){
+      setMsg(e.message);
+    }finally{
+      setRevoking(false);
+    }
+  };
+
+  return <div className="active-sessions-section">
+    <div className="sessions-header">
+      <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+        <Monitor size={16}/>
+        <b>Phiên đăng nhập đang hoạt động ({sessions.length})</b>
+      </div>
+      {sessions.length>0&&(
+        <button
+          type="button"
+          className="button secondary"
+          style={{fontSize:'11px',padding:'5px 10px',color:'#b3261e',borderColor:'#f3c2be'}}
+          disabled={revoking}
+          onClick={revokeAll}
+        >
+          <LogOut size={13}/> {revoking?'Đang thu hồi…':'Đăng xuất mọi thiết bị'}
+        </button>
+      )}
+    </div>
+    {msg&&<div className="notice success" style={{margin:'8px 0',fontSize:'11px'}}>{msg}</div>}
+    {loading?(
+      <div style={{color:'var(--muted)',fontSize:'11px',padding:'8px 0'}}>Đang tải danh sách phiên…</div>
+    ):!sessions.length?(
+      <div style={{color:'var(--muted)',fontSize:'11px',padding:'8px 0'}}>Không có phiên đăng nhập nào đang kết nối.</div>
+    ):(
+      <div className="sessions-scroll-list">
+        {sessions.map(s=>{
+          const isMobile=(s.userAgent||'').toLowerCase().includes('mobile');
+          return <div key={s.id} className="session-item-row">
+            <span className="session-icon">{isMobile?<Smartphone size={16}/>:<Monitor size={16}/>}</span>
+            <div className="session-item-info">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <b>IP: {s.ipAddress||'127.0.0.1'}</b>
+                <span className="session-active-pill">Đang hoạt động</span>
+              </div>
+              <small title={s.userAgent}>{cleanUserAgent(s.userAgent)}</small>
+              <small style={{color:'#889891'}}>Hoạt động: {s.lastActivityAt?new Date(s.lastActivityAt).toLocaleString('vi-VN'):'—'}</small>
+            </div>
+          </div>;
+        })}
+      </div>
+    )}
+  </div>;
+}
+
+function CreateAccount({onClose,onSaved}){
+  const [form,setForm]=useState({username:'',email:'',password:'',roles:['HEAD_TRAINER']});
+  const [error,setError]=useState('');
+  const submit=async e=>{
+    e.preventDefault();
+    if(form.password.length<8){
+      setError('Mật khẩu cần ít nhất 8 ký tự');
+      return;
+    }
+    try{
+      await api('/api/users',{method:'POST',body:JSON.stringify(form)});
+      onSaved();
+    }catch(x){
+      setError(x.message);
+    }
+  };
+  return <Dialog title="Tạo tài khoản" onClose={onClose}>
+    <form onSubmit={submit} className="form-stack">
+      {error&&<Notice text={error}/>}
+      <Input label="Tên tài khoản" value={form.username} onChange={v=>setForm({...form,username:v})}/>
+      <Input label="Email" type="email" value={form.email} onChange={v=>setForm({...form,email:v})}/>
+      <div>
+        <Input label="Mật khẩu ban đầu" type="password" value={form.password} onChange={v=>setForm({...form,password:v})}/>
+        <PasswordStrength password={form.password}/>
+      </div>
+      <RoleChecks chosen={form.roles} setChosen={roles=>setForm({...form,roles})}/>
+      <Actions onClose={onClose}/>
+    </form>
+  </Dialog>;
+}
+
+function ManageAccount({user,onClose,onSaved}){
+  const [username,setUsername]=useState(user.username);
+  const [email,setEmail]=useState(user.email);
+  const [roles,setRoles]=useState(user.roles);
+  const [password,setPassword]=useState('');
+  const [error,setError]=useState('');
+  const run=async fn=>{setError('');try{await fn();onSaved()}catch(e){setError(e.message)}};
+  return <Dialog title={`Quản lý · ${user.username}`} onClose={onClose}>
+    {error&&<Notice text={error}/>}
+    <div className="form-stack">
+      <Input label="Tên tài khoản" value={username} onChange={setUsername}/>
+      <Input label="Email" type="email" value={email} onChange={setEmail}/>
+      <button className="button secondary" onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}`,{method:'PUT',body:JSON.stringify({username,email})}))}><Pencil size={16}/>Lưu thông tin</button>
+      <RoleChecks chosen={roles} setChosen={setRoles}/>
+      <button className="button secondary" onClick={()=>run(()=>api(`/api/users/${user.id}/roles`,{method:'PUT',body:JSON.stringify({roles})}))}><ShieldCheck size={16}/>Lưu vai trò</button>
+      <div style={{display:'grid',gap:'4px'}}>
+        <div className="inline-action">
+          <input type="password" minLength="8" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mật khẩu mới, tối thiểu 8 ký tự"/>
+          <button className="button secondary" disabled={password.length<8} onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}/reset-password`,{method:'POST',body:JSON.stringify({password})}))}><KeyRound size={16}/>Đặt lại</button>
+        </div>
+        <PasswordStrength password={password}/>
+      </div>
+      <button className={`button ${user.enabled?'danger-outline':'secondary'}`} onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}/status`,{method:'PATCH',body:JSON.stringify({enabled:!user.enabled})}))}>{user.enabled?<Lock size={16}/>:<Unlock size={16}/>} {user.enabled?'Khóa tài khoản':'Mở khóa tài khoản'}</button>
+      <UserSessionsList userId={user.id}/>
+    </div>
+  </Dialog>;
+}
+
 function RoleChecks({chosen,setChosen}){const toggle=r=>setChosen(chosen.includes(r)?chosen.filter(x=>x!==r):[...chosen,r]);return <div className="compact-roles">{Object.entries(ROLES).map(([r,l])=><label className={chosen.includes(r)?'chosen':''} key={r}><input type="checkbox" checked={chosen.includes(r)} onChange={()=>toggle(r)}/><span>{l}</span>{chosen.includes(r)&&<Check size={15}/>}</label>)}</div>}
 
 export function ArchivedHorses(){const [items,setItems]=useState([]);const [query,setQuery]=useState('');const [error,setError]=useState('');const [loading,setLoading]=useState(true);const load=useCallback(()=>{setLoading(true);api(`/api/admin/horses/archived?size=100&query=${encodeURIComponent(query)}`).then(res=>setItems(Array.isArray(res)?res:[])).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[query]);useEffect(()=>{void load()},[load]);const safeItems=Array.isArray(items)?items:[];const restore=async h=>{if(!confirm(`Khôi phục hồ sơ ${h.name}?`))return;try{await api(`/api/admin/horses/${h.id}/restore`,{method:'PATCH'});await load()}catch(e){setError(e.message)}};return <><Heading eyebrow="QUẢN LÝ NGỰA" title="Hồ sơ đã lưu trữ" text="Kiểm tra và khôi phục hồ sơ ngựa khi cần."/><div className="toolbar card"><label className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tên hoặc mã ngựa…"/></label></div>{error&&<Notice text={error}/>}<section className="card archived-list">{loading ? <div className="simple-empty">Đang tải hồ sơ lưu trữ…</div> : !safeItems.length ? <div className="simple-empty">Không có hồ sơ đã lưu trữ.</div> : safeItems.map(h=><div key={h.id}><div><b>{h.name}</b><small>{h.code} · {h.breed} · Lưu {h.archivedAt ? new Date(h.archivedAt).toLocaleString('vi-VN') : '—'}</small></div><button className="button secondary" onClick={()=>restore(h)}><ArchiveRestore size={16}/>Khôi phục</button></div>)}</section></>}
 
-export function AuditLogs(){const [items,setItems]=useState([]);const [module,setModule]=useState('');const [action,setAction]=useState('');const [selected,setSelected]=useState(null);const [error,setError]=useState('');const [loading,setLoading]=useState(true);useEffect(()=>{setLoading(true);const p=new URLSearchParams({size:'200'});if(module)p.set('module',module);if(action)p.set('action',action);api(`/api/admin/audit-logs?${p}`).then(res=>setItems(Array.isArray(res)?res:[])).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[module,action]);const safeItems=Array.isArray(items)?items:[];return <><Heading eyebrow="AN TOÀN HỆ THỐNG" title="Nhật ký kiểm toán" text="Theo dõi ai đã thao tác, thời điểm và dữ liệu thay đổi."/><div className="toolbar card"><select value={module} onChange={e=>setModule(e.target.value)}><option value="">Tất cả phân hệ</option>{['ACCESS','PROFILE','TRAINING','MEDICAL','STABLE_CARE','RACING','REPORTING'].map(x=><option key={x}>{x}</option>)}</select><input value={action} onChange={e=>setAction(e.target.value)} placeholder="Lọc hành động…"/></div>{error&&<Notice text={error}/>}<section className="card audit-list">{loading ? <div className="simple-empty">Đang tải nhật ký kiểm toán…</div> : !safeItems.length ? <div className="simple-empty">Không có dữ liệu nhật ký.</div> : safeItems.map(x=><button key={x.id} onClick={()=>setSelected(x)}><span className="audit-icon"><ScrollText size={17}/></span><div><b>{x.actorUsername||'Hệ thống'} · {x.action}</b><small>{x.module} / {x.entityType||'SYSTEM'} · {x.occurredAt ? new Date(x.occurredAt).toLocaleString('vi-VN') : '—'}</small><p>{x.description}</p></div></button>)}</section>{selected&&<Dialog title={`Audit #${selected.id}`} onClose={()=>setSelected(null)}><dl className="audit-detail"><div><dt>Người thao tác</dt><dd>{selected.actorUsername||'Hệ thống'}</dd></div><div><dt>Đối tượng</dt><dd>{selected.entityType} {selected.entityId||''}</dd></div><div><dt>Trước thay đổi</dt><dd><pre>{pretty(selected.oldValuesJson)}</pre></dd></div><div><dt>Sau thay đổi</dt><dd><pre>{pretty(selected.newValuesJson)}</pre></dd></div><div><dt>IP / thiết bị</dt><dd>{selected.ipAddress||'—'} · {selected.userAgent||'—'}</dd></div></dl></Dialog>}</>}
+export function AuditLogs(){
+  const [items,setItems]=useState([]);
+  const [totalCount,setTotalCount]=useState(0);
+  const [module,setModule]=useState('');
+  const [query,setQuery]=useState('');
+  const [from,setFrom]=useState('');
+  const [to,setTo]=useState('');
+  const [page,setPage]=useState(0);
+  const [size,setSize]=useState(25);
+  const [selected,setSelected]=useState(null);
+  const [error,setError]=useState('');
+  const [loading,setLoading]=useState(true);
+  const [exporting,setExporting]=useState(false);
+
+  const load=useCallback(()=>{
+    setLoading(true);setError('');
+    const p=new URLSearchParams({page:String(page),size:String(size)});
+    if(module)p.set('module',module);
+    if(query.trim())p.set('query',query.trim());
+    if(from)p.set('from',from);
+    if(to)p.set('to',to);
+
+    const countP=new URLSearchParams();
+    if(module)countP.set('module',module);
+    if(query.trim())countP.set('query',query.trim());
+    if(from)countP.set('from',from);
+    if(to)countP.set('to',to);
+
+    Promise.all([
+      api(`/api/admin/audit-logs?${p}`),
+      api(`/api/admin/audit-logs/count?${countP}`).catch(()=>({total:0}))
+    ])
+      .then(([logsData,countData])=>{
+        setItems(Array.isArray(logsData)?logsData:[]);
+        setTotalCount(countData?.total||0);
+      })
+      .catch(e=>setError(e.message))
+      .finally(()=>setLoading(false));
+  },[module,query,from,to,page,size]);
+
+  useEffect(()=>{load()},[load]);
+
+  const totalPages=Math.max(1,Math.ceil(totalCount/size));
+
+  const resetFilters=()=>{
+    setModule('');setQuery('');setFrom('');setTo('');setPage(0);
+  };
+
+  const exportCsv=async()=>{
+    setExporting(true);
+    try{
+      const p=new URLSearchParams();
+      if(module)p.set('module',module);
+      if(query.trim())p.set('query',query.trim());
+      if(from)p.set('from',from);
+      if(to)p.set('to',to);
+
+      const auth=JSON.parse(sessionStorage.getItem('racehorse.auth')||'{}');
+      const token=auth?.accessToken;
+      const url=`${(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')}/api/admin/audit-logs/export?${p}`;
+
+      const res=await fetch(url,{headers:token?{Authorization:`Bearer ${token}`}:{}});
+      if(!res.ok)throw new Error('Không thể tải xuống tệp kiểm toán');
+      const blob=await res.blob();
+      const downloadUrl=window.URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=downloadUrl;
+      a.download=`nhat-ky-kiem-toan-${new Date().toISOString().slice(0,10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    }catch(err){
+      alert(err.message);
+    }finally{
+      setExporting(false);
+    }
+  };
+
+  const safeItems=Array.isArray(items)?items:[];
+
+  return <>
+    <Heading
+      eyebrow="AN TOÀN HỆ THỐNG"
+      title="Nhật ký kiểm toán"
+      text="Theo dõi toàn bộ hoạt động của các vai trò, lịch sử can thiệp dữ liệu và an ninh truy cập."
+      action={
+        <button
+          type="button"
+          className="button secondary"
+          disabled={exporting}
+          onClick={exportCsv}
+          title="Xuất file CSV nhật ký kiểm toán mở bằng Excel"
+        >
+          <Download size={16}/> {exporting?'Đang xuất…':'Xuất CSV'}
+        </button>
+      }
+    />
+
+    <div className="card audit-filter-panel">
+      <div className="audit-filter-row">
+        <label className="field-compact">
+          <span>Phân hệ</span>
+          <select value={module} onChange={e=>{setModule(e.target.value);setPage(0)}}>
+            <option value="">Tất cả phân hệ</option>
+            {['ACCESS','PROFILE','TRAINING','MEDICAL','STABLE_CARE','RACING','REPORTING'].map(x=>(
+              <option key={x} value={x}>{MODULES[x]||x}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field-compact">
+          <span>Từ ngày</span>
+          <input type="date" value={from} onChange={e=>{setFrom(e.target.value);setPage(0)}}/>
+        </label>
+
+        <label className="field-compact">
+          <span>Đến ngày</span>
+          <input type="date" value={to} onChange={e=>{setTo(e.target.value);setPage(0)}}/>
+        </label>
+
+        <label className="field-compact flex-grow">
+          <span>Tìm kiếm từ khóa</span>
+          <div className="search-box">
+            <Search size={15}/>
+            <input
+              value={query}
+              onChange={e=>{setQuery(e.target.value);setPage(0)}}
+              placeholder="Người thao tác, hành động, IP, mô tả..."
+            />
+          </div>
+        </label>
+
+        <div style={{display:'flex',alignItems:'flex-end'}}>
+          <button
+            type="button"
+            className="button secondary"
+            style={{minHeight:'36px',padding:'0 12px'}}
+            onClick={resetFilters}
+            title="Đặt lại bộ lọc"
+          >
+            <RotateCcw size={14}/> Đặt lại
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {error&&<Notice text={error}/>}
+
+    <section className="card audit-list" style={{marginTop:'16px'}}>
+      {loading ? (
+        <div className="simple-empty">Đang tải nhật ký kiểm toán…</div>
+      ) : !safeItems.length ? (
+        <div className="simple-empty">Không tìm thấy bản ghi nhật ký phù hợp với bộ lọc.</div>
+      ) : (
+        safeItems.map(x=>(
+          <button key={x.id} onClick={()=>setSelected(x)}>
+            <span className="audit-icon"><ScrollText size={17}/></span>
+            <div>
+              <b>{x.actorUsername||'Hệ thống'} · <span className="action-tag">{x.action}</span></b>
+              <small>
+                Phân hệ: <b>{MODULES[x.module]||x.module}</b> · Đối tượng: {x.entityType||'SYSTEM'} · {x.occurredAt?new Date(x.occurredAt).toLocaleString('vi-VN'):'—'}
+              </small>
+              <p>{x.description}</p>
+            </div>
+          </button>
+        ))
+      )}
+    </section>
+
+    <div className="card audit-pagination-bar">
+      <div className="pagination-info">
+        Hiển thị <b>{safeItems.length}</b> / <b>{totalCount}</b> bản ghi · Trang <b>{page+1}</b> / <b>{totalPages}</b>
+      </div>
+      <div className="pagination-controls">
+        <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'11px',color:'var(--muted)'}}>
+          Dòng/trang:
+          <select
+            value={size}
+            onChange={e=>{setSize(Number(e.target.value));setPage(0)}}
+            style={{padding:'4px 8px',borderRadius:'6px',border:'1px solid #d9ded6',fontSize:'11px'}}
+          >
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          className="button secondary"
+          style={{minHeight:'32px',padding:'0 10px',fontSize:'11px'}}
+          disabled={page===0||loading}
+          onClick={()=>setPage(p=>Math.max(0,p-1))}
+        >
+          <ChevronLeft size={14}/> Trước
+        </button>
+        <button
+          type="button"
+          className="button secondary"
+          style={{minHeight:'32px',padding:'0 10px',fontSize:'11px'}}
+          disabled={page+1>=totalPages||loading}
+          onClick={()=>setPage(p=>p+1)}
+        >
+          Sau <ChevronRight size={14}/>
+        </button>
+      </div>
+    </div>
+
+    {selected&&<Dialog title={`Chi tiết nhật ký kiểm toán #${selected.id}`} onClose={()=>setSelected(null)}>
+      <dl className="audit-detail">
+        <div><dt>Thời điểm thao tác</dt><dd>{selected.occurredAt?new Date(selected.occurredAt).toLocaleString('vi-VN'):'—'}</dd></div>
+        <div><dt>Người thao tác</dt><dd><b>{selected.actorUsername||'Hệ thống'}</b> (ID: {selected.actorId||'N/A'})</dd></div>
+        <div><dt>Phân hệ & Hành động</dt><dd><span className="role-tags"><span>{MODULES[selected.module]||selected.module}</span></span> <b>{selected.action}</b></dd></div>
+        <div><dt>Đối tượng tác động</dt><dd>{selected.entityType} {selected.entityId||''}</dd></div>
+        <div><dt>Mô tả chi tiết</dt><dd>{selected.description}</dd></div>
+        <div><dt>Dữ liệu trước thay đổi</dt><dd><pre>{pretty(selected.oldValuesJson)}</pre></dd></div>
+        <div><dt>Dữ liệu sau thay đổi</dt><dd><pre>{pretty(selected.newValuesJson)}</pre></dd></div>
+        <div><dt>Địa chỉ IP client</dt><dd><code>{selected.ipAddress||'—'}</code></dd></div>
+        <div><dt>Trình duyệt & Thiết bị (User-Agent)</dt><dd><small style={{wordBreak:'break-all'}}>{selected.userAgent||'—'}</small></dd></div>
+      </dl>
+    </Dialog>}
+  </>;
+}
 function pretty(value){if(!value)return 'Không có dữ liệu';try{return JSON.stringify(JSON.parse(value),null,2)}catch{return value}}
 
 function Heading({eyebrow,title,text,action}){return <div className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{text}</p></div>{action}</div>}

@@ -10,3 +10,4 @@ import org.springframework.data.web.config.EnableSpringDataWebSupport;
         pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class JpaConfiguration {
 }
+

@@ -61,7 +61,16 @@ public class HorseService {
         Horse horse = horseMapper.toEntity(request);
         horse.assignParents(sire, dam);
         horse.assignCurrentTrainer(findTrainer(request.currentTrainerId()));
-        return toResponse(horseRepository.save(horse));
+        Horse saved = horseRepository.save(horse);
+
+        if (request.initialOwnerId() != null) {
+            UserAccount owner = findUserWithRole(request.initialOwnerId(), Role.HORSE_OWNER, "Chủ sở hữu");
+            HorseOwnership ownership = new HorseOwnership(saved, owner, new BigDecimal("100.00"));
+            ownershipRepository.save(ownership);
+            return horseMapper.toResponse(saved, List.of(ownership));
+        }
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
