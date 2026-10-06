@@ -40,4 +40,10 @@ public class TrialRunBooking {
     public void cancel(Instant at) {
         if (cancelledAt == null) cancelledAt = at;
     }
+    public void reschedule(RacetrackLane value, Instant start, Instant end) {
+        lane = value;
+        bookedStart = start;
+        bookedEnd = end;
+        cancelledAt = null;
+    }
 }

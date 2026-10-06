@@ -43,17 +43,17 @@ class TrainingPlanControllerTest {
 
     @Test
     void methodLevelPreAuthorizeMatchesSrsRbac() throws Exception {
-        Method createMethod = TrainingPlanController.class.getDeclaredMethod("create", Jwt.class, TrainingPlanRequest.class);
+        Method createMethod = TrainingPlanController.class.getDeclaredMethod("create", Jwt.class, TrainingPlanRequest.class, Authentication.class);
         PreAuthorize createAuth = createMethod.getAnnotation(PreAuthorize.class);
         assertThat(createAuth).isNotNull();
         assertThat(createAuth.value()).isEqualTo("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')");
 
-        Method updateMethod = TrainingPlanController.class.getDeclaredMethod("update", UUID.class, TrainingPlanRequest.class);
+        Method updateMethod = TrainingPlanController.class.getDeclaredMethod("update", UUID.class, Jwt.class, TrainingPlanRequest.class, Authentication.class);
         PreAuthorize updateAuth = updateMethod.getAnnotation(PreAuthorize.class);
         assertThat(updateAuth).isNotNull();
         assertThat(updateAuth.value()).isEqualTo("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')");
 
-        Method copyMethod = TrainingPlanController.class.getDeclaredMethod("copy", UUID.class, Jwt.class, CopyTrainingPlanRequest.class);
+        Method copyMethod = TrainingPlanController.class.getDeclaredMethod("copy", UUID.class, Jwt.class, CopyTrainingPlanRequest.class, Authentication.class);
         PreAuthorize copyAuth = copyMethod.getAnnotation(PreAuthorize.class);
         assertThat(copyAuth).isNotNull();
         assertThat(copyAuth.value()).isEqualTo("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')");
@@ -81,12 +81,12 @@ class TrainingPlanControllerTest {
         when(ownerAuth.getAuthorities()).thenReturn((Collection) List.of(new SimpleGrantedAuthority("ROLE_HORSE_OWNER")));
 
         controller.get(planId, jwt, ownerAuth);
-        verify(service).get(planId, userId, false);
+        verify(service).get(planId, userId, false, false, true);
 
         Authentication vetAuth = mock(Authentication.class);
         when(vetAuth.getAuthorities()).thenReturn((Collection) List.of(new SimpleGrantedAuthority("ROLE_VETERINARIAN")));
 
         controller.get(planId, jwt, vetAuth);
-        verify(service).get(planId, userId, true);
+        verify(service).get(planId, userId, false, false, false);
     }
 }

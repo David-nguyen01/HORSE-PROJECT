@@ -1,6 +1,7 @@
 package com.racehorse.incident.controller;
 
 import com.racehorse.incident.dto.CreateIncidentReportRequest;
+import com.racehorse.incident.dto.CreateTrainingEmergencyRequest;
 import com.racehorse.incident.dto.IncidentReportResponse;
 import com.racehorse.incident.dto.UpdateIncidentStatusRequest;
 import com.racehorse.incident.service.IncidentReportService;
@@ -33,6 +34,15 @@ public class IncidentReportController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateIncidentReportRequest request) {
         return service.createReport(UUID.fromString(jwt.getSubject()), request);
+    }
+
+    @PostMapping("/training-emergency")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('HEAD_TRAINER') and hasAuthority('PERM_TRAINING_VIEW')")
+    public IncidentReportResponse createTrainingEmergency(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateTrainingEmergencyRequest request) {
+        return service.createTrainingEmergency(UUID.fromString(jwt.getSubject()), request);
     }
 
     @GetMapping

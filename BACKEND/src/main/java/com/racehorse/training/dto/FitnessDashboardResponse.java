@@ -46,6 +46,12 @@ public record FitnessDashboardResponse(
             LocalDate sessionDate,
             BigDecimal trainingLoad,
             BigDecimal averageSpeedKmh,
+            BigDecimal maxSpeedKmh,
+            BigDecimal intensityPercent,
+            Integer stopBpm,
+            Integer oneMinuteBpm,
+            BigDecimal recoveryRate,
+            int hours,
             int heartRateRecoveryBpm,
             FitnessStatus fitnessStatus
     ) {}

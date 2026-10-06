@@ -39,6 +39,22 @@ public class HorseAccessService {
         return horse;
     }
 
+    public Horse requireTrainingAccess(UUID horseId, UUID userId,
+            boolean manager, boolean trainer, boolean owner) {
+        Horse horse = requireActive(horseId);
+        if (manager) {
+            return horse;
+        }
+        if (trainer && horse.getCurrentTrainer() != null
+                && horse.getCurrentTrainer().getId().equals(userId)) {
+            return horse;
+        }
+        if (owner && ownershipRepository.existsByHorseIdAndOwnerId(horseId, userId)) {
+            return horse;
+        }
+        throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + horseId);
+    }
+
     public Horse requireServiceEligible(UUID horseId) {
         Horse horse = requireActive(horseId);
         boolean isPaid = "PAID".equalsIgnoreCase(horse.getPaymentStatus());

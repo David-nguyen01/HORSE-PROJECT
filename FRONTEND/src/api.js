@@ -13,9 +13,22 @@ async function parseResponse(response) {
   const type = response.headers.get('content-type') || ''
   const body = type.includes('application/json') ? await response.json() : await response.text()
   if (!response.ok) {
-    const error = new Error(body?.message || body || `Yêu cầu thất bại (${response.status})`)
+    const validationErrors = body && typeof body === 'object' ? body.validationErrors : null
+    const validationMessage = validationErrors && typeof validationErrors === 'object'
+      ? Object.values(validationErrors).filter((value) => typeof value === 'string').join('; ')
+      : ''
+    const message = typeof body === 'string'
+      ? body
+      : typeof body?.message === 'string'
+        ? body.message
+        : typeof body?.detail === 'string'
+          ? body.detail
+          : typeof body?.title === 'string'
+            ? body.title
+            : validationMessage
+    const error = new Error(message || `Yêu cầu thất bại (${response.status})`)
     error.status = response.status
-    error.validationErrors = body?.validationErrors
+    error.validationErrors = validationErrors
     throw error
   }
   return body

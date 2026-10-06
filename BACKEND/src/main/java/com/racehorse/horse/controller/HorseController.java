@@ -40,7 +40,7 @@ public class HorseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     ResponseEntity<HorseResponse> create(@Valid @RequestBody CreateHorseRequest request) {
         HorseResponse response = horseService.create(request);
         return ResponseEntity
@@ -57,9 +57,15 @@ public class HorseController {
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
     Page<HorseResponse> search(
-            @RequestParam(required = false) String query,
-            @RequestParam(required = false) HorseStatus status,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "status", required = false) HorseStatus status,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable,
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        boolean trainer = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HEAD_TRAINER"));
+        boolean manager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_CLUB_MANAGER"));
+        if (trainer && !manager) return horseService.searchForTrainer(query, status, userId(jwt), pageable);
         return horseService.search(query, status, pageable);
     }
 

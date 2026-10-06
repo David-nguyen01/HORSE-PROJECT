@@ -7,6 +7,10 @@ import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.health.dto.RaceReadinessResponse;
 import com.racehorse.health.service.HorseMeasurementService;
+import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.horse.repository.HorseOwnershipRepository;
+import com.racehorse.notification.entity.NotificationPriority;
+import com.racehorse.notification.service.NotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,9 +24,14 @@ public class RaceEventService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final HorseMeasurementService measurement;
+    private final UserAccountRepository users;
+    private final HorseOwnershipRepository ownerships;
+    private final NotificationService notifications;
 
-    public RaceEventService(JdbcTemplate jdbc, ObjectMapper json, HorseMeasurementService measurement) {
+    public RaceEventService(JdbcTemplate jdbc, ObjectMapper json, HorseMeasurementService measurement,
+            UserAccountRepository users, HorseOwnershipRepository ownerships, NotificationService notifications) {
         this.jdbc = jdbc; this.json = json; this.measurement = measurement;
+        this.users = users; this.ownerships = ownerships; this.notifications = notifications;
     }
 
     @Transactional
@@ -71,7 +80,8 @@ public class RaceEventService {
     }
 
     @Transactional
-    public RegistrationView register(UUID eventId, UUID horseId, UUID actor, BigDecimal registeredWeight) {
+    public RegistrationView register(UUID eventId, UUID horseId, UUID actor, BigDecimal registeredWeight,
+            boolean manager, boolean trainer) {
         EventView event = event(eventId);
         if (!event.active()) throw new BusinessException("Giải đua đã ngừng nhận đăng ký");
         OffsetDateTime now = OffsetDateTime.now();
@@ -81,7 +91,9 @@ public class RaceEventService {
                 Integer.class, horseId, eventId.toString());
         if (duplicate != null && duplicate > 0) throw new BusinessException("Ngựa đã được đăng ký cho giải này");
         validateAge(event, horseId);
-        RaceReadinessResponse readiness = measurement.readiness(horseId, eventId, actor, true);
+        if (trainer && !manager && !isCurrentTrainer(horseId, actor))
+            throw new ResourceNotFoundException("Không tìm thấy ngựa do bạn huấn luyện");
+        RaceReadinessResponse readiness = measurement.readiness(horseId, eventId, actor, manager, trainer);
         if (!readiness.ready()) throw new BusinessException("Ngựa chưa sẵn sàng dự đua: " + String.join("; ", readiness.failedRules()));
         BigDecimal weight = registeredWeight == null ? readiness.latestWeightKg() : registeredWeight;
         UUID id = UUID.randomUUID();
@@ -89,29 +101,48 @@ public class RaceEventService {
         data.put("raceEventId", eventId.toString()); data.put("registeredWeightKg", weight);
         data.put("submittedAt", now.toString()); data.put("confirmedAt", null);
         data.put("withdrawnAt", null); data.put("withdrawnByUserId", null);
+        data.put("withdrawalReason", null); data.put("decisionReason", null);
         jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,event_date,data_json) "
                         + "values(?,'RACING','RACE_REGISTRATION','api',?,?,'SUBMITTED',?,?)",
                 id, horseId, actor, event.raceDate(), toJson(data));
+        notifyOwner(horseId, id, "Đăng ký đua mới: " + event.raceName(), "SUBMITTED");
         return registration(id);
     }
 
     @Transactional
-    public RegistrationView confirm(UUID registrationId) {
+    public RegistrationView decide(UUID registrationId, UUID actor, boolean approve, String reason, boolean manager) {
         RegistrationView value = registration(registrationId);
-        if (!"SUBMITTED".equals(value.status())) throw new BusinessException("Chỉ đăng ký SUBMITTED mới có thể xác nhận");
-        String at = OffsetDateTime.now().toString();
-        jdbc.update("update module_records set status='CONFIRMED',data_json=JSON_MODIFY(data_json,'$.confirmedAt',?),updated_at=SYSDATETIMEOFFSET() where id=?",
-                at, registrationId);
-        return registration(registrationId);
+        List<UUID> owners = ownerships.findByHorseIdOrderByOwnerUsernameAsc(value.horseId()).stream()
+                .map(row -> row.getOwner().getId()).toList();
+        if (owners.size() != 1) throw new BusinessException("Quyết định bị chặn: ngựa phải có đúng một chủ sở hữu (hiện có " + owners.size() + ")");
+        if (!manager && !owners.getFirst().equals(actor))
+            throw new ResourceNotFoundException("Không tìm thấy đăng ký thuộc ngựa của bạn");
+        if (!"SUBMITTED".equals(value.status())) throw new BusinessException("Chỉ đăng ký đang chờ mới có thể được quyết định");
+        String cleanReason = reason == null || reason.isBlank() ? null : reason.trim();
+        if (!approve && cleanReason == null) throw new BusinessException("Khi từ chối cần nêu lý do");
+        String status = approve ? "APPROVE" : "REJECT";
+        String at = OffsetDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh")).toString();
+        jdbc.update("update module_records set status=?,data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.decisionAt',?),"+
+                "'$.decisionReason',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='SUBMITTED'",
+                status, at, cleanReason, registrationId);
+        notifyUser(value.registeredBy(), "RACE_REGISTRATION_DECISION", "Chủ ngựa đã " + (approve ? "duyệt" : "từ chối") + " đăng ký đua",
+                value.id(), "RACE_REGISTRATION_DECISION_" + value.id());
+        RegistrationView updated = registration(registrationId);
+        return manager ? updated : withoutStaffIdentities(updated);
     }
 
     @Transactional
-    public RegistrationView withdraw(UUID registrationId, UUID actor) {
+    public RegistrationView withdraw(UUID registrationId, UUID actor, String reason, boolean manager) {
         RegistrationView value = registration(registrationId);
-        if ("WITHDRAWN".equals(value.status())) throw new BusinessException("Đăng ký đã được rút");
-        OffsetDateTime now = OffsetDateTime.now();
-        jdbc.update("update module_records set status='WITHDRAWN',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.withdrawnAt',?),'$.withdrawnByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=?",
-                now.toString(), actor.toString(), registrationId);
+        if (!manager && !isCurrentTrainer(value.horseId(), actor)) throw new ResourceNotFoundException("Không tìm thấy đăng ký của ngựa do bạn huấn luyện");
+        EventView event = event(value.raceEventId());
+        OffsetDateTime now = OffsetDateTime.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        if (now.isAfter(event.registrationDeadline())) throw new BusinessException("Không thể rút đăng ký sau hạn đăng ký");
+        if (!List.of("SUBMITTED", "APPROVE").contains(value.status())) throw new BusinessException("Trạng thái đăng ký hiện tại không thể rút");
+        if (reason == null || reason.isBlank()) throw new BusinessException("Khi rút đăng ký cần nêu lý do");
+        jdbc.update("update module_records set status='WITHDRAWN',data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.withdrawnAt',?),'$.withdrawnByUserId',?), '$.withdrawalReason',?),updated_at=SYSDATETIMEOFFSET() where id=? and status in ('SUBMITTED','APPROVE')",
+                now.toString(), actor.toString(), reason.trim(), registrationId);
+        notifyOwner(value.horseId(), value.id(), "Đăng ký đã được rút: " + reason.trim(), "WITHDRAWN");
         return registration(registrationId);
     }
 
@@ -124,6 +155,66 @@ public class RaceEventService {
         if (status != null && !status.isBlank()) { sql.append(" and m.status=?"); args.add(status.trim().toUpperCase(Locale.ROOT)); }
         sql.append(" order by m.created_at desc");
         return jdbc.query(sql.toString(), (rs,row)->registration(rs,row), args.toArray());
+    }
+
+    @Transactional(readOnly = true)
+    public List<RegistrationView> scopedRegistrations(UUID eventId, UUID horseId, String status,
+            UUID actor, boolean manager, boolean trainer, boolean owner) {
+        if (owner && !manager && horseId != null) requireSingleOwner(horseId, actor);
+        List<RegistrationView> visible = registrations(eventId, horseId, status).stream().filter(value -> {
+            if (manager) return true;
+            if (trainer) return isCurrentTrainer(value.horseId(), actor);
+            return owner && isSoleOwner(value.horseId(), actor);
+        }).toList();
+        return owner && !manager && !trainer ? visible.stream().map(this::withoutStaffIdentities).toList() : visible;
+    }
+
+    private RegistrationView withoutStaffIdentities(RegistrationView value) {
+        return new RegistrationView(value.id(), value.raceEventId(), value.raceName(), value.raceDate(),
+                value.horseId(), value.horseName(), null, value.status(), value.registeredWeightKg(),
+                value.submittedAt(), value.confirmedAt(), value.withdrawnAt(), null,
+                value.decisionReason(), value.withdrawalReason());
+    }
+
+    @Transactional(readOnly = true)
+    public RaceReadinessResponse eligibility(UUID horseId, UUID eventId, UUID actor,
+            boolean manager, boolean trainer, boolean owner) {
+        if (trainer && !manager && !isCurrentTrainer(horseId, actor)) throw new ResourceNotFoundException("Không tìm thấy ngựa do bạn huấn luyện");
+        if (owner && !manager) requireSingleOwner(horseId, actor);
+        return measurement.readiness(horseId, eventId, actor, manager, trainer && !manager);
+    }
+
+    private boolean isCurrentTrainer(UUID horseId, UUID actor) {
+        Integer count=jdbc.queryForObject("select count(*) from horses where id=? and current_trainer_id=? and archived_at is null",Integer.class,horseId,actor);
+        return count != null && count > 0;
+    }
+
+    private boolean isSoleOwner(UUID horseId, UUID actor) {
+        List<UUID> ids=ownerships.findByHorseIdOrderByOwnerUsernameAsc(horseId).stream().map(row->row.getOwner().getId()).toList();
+        return ids.size()==1 && ids.getFirst().equals(actor);
+    }
+
+    private void requireSingleOwner(UUID horseId, UUID actor) {
+        List<UUID> ids=ownerships.findByHorseIdOrderByOwnerUsernameAsc(horseId).stream().map(row->row.getOwner().getId()).toList();
+        if (ids.size()!=1) throw new BusinessException("Quyết định bị chặn: ngựa phải có đúng một chủ sở hữu (hiện có "+ids.size()+")");
+        if (!ids.getFirst().equals(actor)) throw new ResourceNotFoundException("Không tìm thấy ngựa thuộc sở hữu của bạn");
+    }
+
+    private void notifyOwner(UUID horseId, UUID registrationId, String title, String eventKey) {
+        List<com.racehorse.horse.entity.HorseOwnership> owners=ownerships.findByHorseIdOrderByOwnerUsernameAsc(horseId);
+        if (owners.size()!=1) {
+            System.getLogger(getClass().getName()).log(System.Logger.Level.WARNING,
+                    "Skipped race registration owner notification: horse {0} has {1} ownership rows", horseId, owners.size());
+            return;
+        }
+        notifications.createDeduplicated(owners.getFirst().getOwner(), "RACE_REGISTRATION", NotificationPriority.NORMAL,
+                title, "Có cập nhật đăng ký đua cần xem", "RACE_REGISTRATION", registrationId,
+                "RACE_REGISTRATION_OWNER_"+registrationId+"_"+eventKey);
+    }
+
+    private void notifyUser(UUID userId, String type, String title, UUID registrationId, String key) {
+        users.findById(userId).ifPresent(user -> notifications.createDeduplicated(user, type, NotificationPriority.NORMAL,
+                title, "Đăng ký đua đã được cập nhật", "RACE_REGISTRATION", registrationId, key));
     }
 
     @Transactional(readOnly = true)
@@ -146,7 +237,8 @@ public class RaceEventService {
                 rs.getString("horse_name"), rs.getObject("user_id", UUID.class), rs.getString("status"),
                 node.path("registeredWeightKg").decimalValue(), parseTime(node, "submittedAt"),
                 parseTime(node, "confirmedAt"), parseTime(node, "withdrawnAt"),
-                uuidOrNull(node.path("withdrawnByUserId").asText(null)));
+                uuidOrNull(node.path("withdrawnByUserId").asText(null)),
+                node.path("decisionReason").asText(null), node.path("withdrawalReason").asText(null));
     }
 
     private EventView event(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
@@ -192,5 +284,6 @@ public class RaceEventService {
     public record RegistrationView(UUID id, UUID raceEventId, String raceName, LocalDate raceDate,
                                    UUID horseId, String horseName, UUID registeredBy, String status,
                                    BigDecimal registeredWeightKg, OffsetDateTime submittedAt,
-                                   OffsetDateTime confirmedAt, OffsetDateTime withdrawnAt, UUID withdrawnBy) {}
+                                   OffsetDateTime confirmedAt, OffsetDateTime withdrawnAt, UUID withdrawnBy,
+                                   String decisionReason, String withdrawalReason) {}
 }

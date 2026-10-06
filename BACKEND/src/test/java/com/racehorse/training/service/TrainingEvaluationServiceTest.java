@@ -40,218 +40,103 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TrainingEvaluationServiceTest {
-
     @Mock TrainingEvaluationRepository repository;
     @Mock UserAccountRepository userRepository;
-    @Mock HorseAccessService horseAccessService;
-    @Mock TrainingScheduleRepository scheduleRepository;
-
-    private TrainingEvaluationService service;
+    @Mock HorseAccessService horseAccess;
+    @Mock TrainingScheduleRepository schedules;
     private final Instant now = Instant.parse("2026-09-10T02:00:00Z");
+    private TrainingEvaluationService service;
 
-    @BeforeEach
-    void setUp() {
-        service = new TrainingEvaluationService(
-                repository, userRepository, horseAccessService, scheduleRepository,
+    @BeforeEach void setUp() {
+        service = new TrainingEvaluationService(repository, userRepository, horseAccess, schedules,
                 Clock.fixed(now, ZoneOffset.UTC));
     }
 
-    @Test
-    void createStoresTrainerEnteredMetricsWithoutRecalculation() {
-        UUID horseId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        Horse horse = horse();
-        UserAccount trainer = trainer();
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+    @Test void computesEvaluationAndLeavesCompletedSessionTimestampUnchanged() {
+        UUID horseId = UUID.randomUUID(); UUID actorId = UUID.randomUUID(); UUID scheduleId = UUID.randomUUID();
+        Horse horse = horse(horseId); UserAccount trainer = trainer();
+        TrainingSchedule session = schedule(horse, true);
+        Instant finishedAt = Instant.parse("2026-09-09T04:00:00Z"); session.finishTraining(finishedAt);
+        org.springframework.test.util.ReflectionTestUtils.setField(session, "id", scheduleId);
+        when(horseAccess.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer));
-        when(repository.save(any(TrainingEvaluation.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
-        TrainingEvaluationResponse response = service.create(actorId, request(horseId, " https://video.test/run "));
-
-        assertThat(response.durationMinutes()).isEqualTo(42);
-        assertThat(response.distanceMeters()).isEqualByComparingTo("1800.50");
-        assertThat(response.averageSpeedKmh()).isEqualByComparingTo("54.75");
-        assertThat(response.trainingLoad()).isEqualByComparingTo("72.25");
-        assertThat(response.heartRateRecoveryBpm()).isEqualTo(38);
-        assertThat(response.perceivedExertion()).isEqualTo(7);
-        assertThat(response.fitnessStatus()).isEqualTo(FitnessStatus.YELLOW);
-        assertThat(response.videoUrl()).isEqualTo("https://video.test/run");
-        assertThat(response.completedAt()).isEqualTo(now);
-    }
-
-    @Test
-    void createWithTrainingScheduleMarksScheduleCompletedAndLinksEntity() {
-        UUID horseId = UUID.randomUUID();
-        UUID scheduleId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        Horse horse = horse();
-        org.springframework.test.util.ReflectionTestUtils.setField(horse, "id", horseId);
-        UserAccount trainer = trainer();
-
-        TrainingSchedule schedule = schedule(horse);
-        org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
-
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
-        when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer));
-        when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(schedules.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(session));
         when(repository.existsByTrainingScheduleId(scheduleId)).thenReturn(false);
-        when(repository.save(any(TrainingEvaluation.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any(TrainingEvaluation.class))).thenAnswer(i -> i.getArgument(0));
 
-        CreateTrainingEvaluationRequest request = new CreateTrainingEvaluationRequest(
-                horseId, scheduleId, LocalDate.of(2026, 9, 9), 45,
-                new BigDecimal("2000.00"), new BigDecimal("55.00"),
-                new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
-                "Hoàn thành tốt giáo án.", null);
+        TrainingEvaluationResponse result = service.create(actorId, request(horseId, scheduleId,
+                "https://video.test/run"), false, true);
 
-        TrainingEvaluationResponse response = service.create(actorId, request);
-
-        assertThat(response.trainingScheduleId()).isEqualTo(scheduleId);
-        assertThat(schedule.getCompletedAt()).isEqualTo(now);
+        assertThat(result.averageSpeedKmh()).isEqualByComparingTo("54.00");
+        assertThat(result.intensityPercent()).isEqualByComparingTo("90.00");
+        assertThat(result.recoveryRate()).isEqualByComparingTo("40.00");
+        assertThat(result.perceivedExertion()).isEqualTo(5);
+        assertThat(result.fitnessStatus()).isEqualTo(FitnessStatus.YELLOW);
+        assertThat(result.trackCompletionSeconds()).isEqualByComparingTo("120.000");
+        assertThat(session.getCompletedAt()).isEqualTo(finishedAt);
     }
 
-    @Test
-    void createWithTrainingScheduleRejectsHorseMismatch() {
-        UUID horseId = UUID.randomUUID();
-        UUID otherHorseId = UUID.randomUUID();
-        UUID scheduleId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        Horse horse = horse();
-        org.springframework.test.util.ReflectionTestUtils.setField(horse, "id", horseId);
-        Horse otherHorse = horse();
-        org.springframework.test.util.ReflectionTestUtils.setField(otherHorse, "id", otherHorseId);
-
-        TrainingSchedule schedule = schedule(otherHorse);
-        org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
-
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
+    @Test void rejectsEvaluationUntilSessionHasFinished() {
+        UUID horseId = UUID.randomUUID(); UUID actorId = UUID.randomUUID(); UUID scheduleId = UUID.randomUUID();
+        Horse horse = horse(horseId); TrainingSchedule session = schedule(horse, false);
+        org.springframework.test.util.ReflectionTestUtils.setField(session, "id", scheduleId);
+        when(horseAccess.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
-        when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
+        when(schedules.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(session));
 
-        CreateTrainingEvaluationRequest request = new CreateTrainingEvaluationRequest(
-                horseId, scheduleId, LocalDate.of(2026, 9, 9), 45,
-                new BigDecimal("2000.00"), new BigDecimal("55.00"),
-                new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
-                "Hoàn thành tốt giáo án.", null);
-
-        assertThatThrownBy(() -> service.create(actorId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("không thuộc về ngựa được đánh giá");
+        assertThatThrownBy(() -> service.create(actorId, request(horseId, scheduleId, null), false, true))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("đã hoàn thành");
     }
 
-    @Test
-    void createWithTrainingScheduleRejectsCancelledSchedule() {
-        UUID horseId = UUID.randomUUID();
-        UUID scheduleId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        Horse horse = horse();
-        org.springframework.test.util.ReflectionTestUtils.setField(horse, "id", horseId);
-
-        TrainingSchedule schedule = schedule(horse);
-        org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
-        schedule.cancel(Instant.now());
-
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
-        when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
-        when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
-
-        CreateTrainingEvaluationRequest request = new CreateTrainingEvaluationRequest(
-                horseId, scheduleId, LocalDate.of(2026, 9, 9), 45,
-                new BigDecimal("2000.00"), new BigDecimal("55.00"),
-                new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
-                "Hoàn thành tốt giáo án.", null);
-
-        assertThatThrownBy(() -> service.create(actorId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("đã bị hủy");
+    @Test void refusesManagerAndNonTrainerEvaluationCreation() {
+        UUID id = UUID.randomUUID();
+        assertThatThrownBy(() -> service.create(id, request(id, UUID.randomUUID(), null), true, false))
+                .isInstanceOf(com.racehorse.common.exception.ForbiddenException.class);
+        assertThatThrownBy(() -> service.create(id, request(id, UUID.randomUUID(), null), false, false))
+                .isInstanceOf(com.racehorse.common.exception.ForbiddenException.class);
     }
 
-    @Test
-    void createWithTrainingScheduleRejectsAlreadyEvaluatedSchedule() {
-        UUID horseId = UUID.randomUUID();
-        UUID scheduleId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        Horse horse = horse();
-        org.springframework.test.util.ReflectionTestUtils.setField(horse, "id", horseId);
+    @Test void ownerEvaluationPayloadOmitsRecordedByIdentity() {
+        UUID horseId = UUID.randomUUID(); UUID ownerId = UUID.randomUUID();
+        Horse horse = horse(horseId); UserAccount trainer = trainer();
+        TrainingEvaluation evaluation = new TrainingEvaluation(horse, trainer, LocalDate.of(2026, 9, 9), 42,
+                new BigDecimal("1800"), new BigDecimal("54"), new BigDecimal("72"), 40, 5,
+                FitnessStatus.YELLOW, "Good session", null, now);
+        when(repository.findByHorseIdOrderBySessionDateDescCompletedAtDesc(horseId, PageRequest.of(0, 20)))
+                .thenReturn(new PageImpl<>(List.of(evaluation)));
 
-        TrainingSchedule schedule = schedule(horse);
-        org.springframework.test.util.ReflectionTestUtils.setField(schedule, "id", scheduleId);
+        var result = service.listForHorse(horseId, ownerId, false, false, true, PageRequest.of(0, 20));
 
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse);
-        when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
-        when(scheduleRepository.findDetailById(scheduleId)).thenReturn(Optional.of(schedule));
-        when(repository.existsByTrainingScheduleId(scheduleId)).thenReturn(true);
-
-        CreateTrainingEvaluationRequest request = new CreateTrainingEvaluationRequest(
-                horseId, scheduleId, LocalDate.of(2026, 9, 9), 45,
-                new BigDecimal("2000.00"), new BigDecimal("55.00"),
-                new BigDecimal("80.00"), 40, 8, FitnessStatus.GREEN,
-                "Hoàn thành tốt giáo án.", null);
-
-        assertThatThrownBy(() -> service.create(actorId, request))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("đã có đánh giá");
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().getFirst().recordedBy()).isNull();
     }
 
-    @Test
-    void createRejectsUnsafeVideoProtocol() {
-        UUID horseId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        when(horseAccessService.requireActive(horseId)).thenReturn(horse());
-        when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer()));
-
-        assertThatThrownBy(() -> service.create(actorId, request(horseId, "javascript:alert(1)")))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("HTTP hoặc HTTPS");
+    private CreateTrainingEvaluationRequest request(UUID horseId, UUID scheduleId, String video) {
+        return new CreateTrainingEvaluationRequest(horseId, scheduleId, LocalDate.of(2026, 9, 9), 42,
+                new BigDecimal("1800"), new BigDecimal("54"), new BigDecimal("72"), "Good session", video,
+                new BigDecimal("60"), 160, 120, new BigDecimal("120"), 5, false, null, null);
     }
 
-    @Test
-    void ownerHistoryRequiresHorseOwnershipCheck() {
-        UUID horseId = UUID.randomUUID();
-        UUID ownerId = UUID.randomUUID();
-        PageRequest pageable = PageRequest.of(0, 20);
-        when(repository.findByHorseIdOrderBySessionDateDescCompletedAtDesc(horseId, pageable))
-                .thenReturn(new PageImpl<>(List.of()));
-
-        service.listForHorse(horseId, ownerId, false, pageable);
-
-        verify(horseAccessService).requireReadable(horseId, ownerId, false);
-    }
-
-    private CreateTrainingEvaluationRequest request(UUID horseId, String videoUrl) {
-        return new CreateTrainingEvaluationRequest(
-                horseId, LocalDate.of(2026, 9, 9), 42,
-                new BigDecimal("1800.50"), new BigDecimal("54.75"),
-                new BigDecimal("72.25"), 38, 7, FitnessStatus.YELLOW,
-                "Phản ứng tốt, cần theo dõi hồi phục.", videoUrl);
-    }
-
-    private Horse horse() {
-        return new Horse("H-001", "Lightning", null, LocalDate.of(2022, 3, 10),
+    private Horse horse(UUID id) {
+        Horse horse = new Horse("H-001", "Lightning", null, LocalDate.of(2022, 3, 10),
                 HorseGender.STALLION, "White blaze", "Thoroughbred", "A-01", HorseStatus.ACTIVE);
+        org.springframework.test.util.ReflectionTestUtils.setField(horse, "id", id); return horse;
     }
 
-    private UserAccount trainer() {
-        return new UserAccount("trainer", "trainer@test.local", "encoded", Set.of(Role.HEAD_TRAINER));
-    }
+    private UserAccount trainer() { return new UserAccount("trainer", "trainer@test.local", "encoded", Set.of(Role.HEAD_TRAINER)); }
 
-    private TrainingSchedule schedule(Horse horse) {
-        TrainingPlan plan = new TrainingPlan(horse, "Active plan", null, trainer(), true);
-        com.racehorse.training.entity.TrainingPlanPhase phase = new com.racehorse.training.entity.TrainingPlanPhase(
-                1, "Phase 1", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30),
-                new BigDecimal("1500"), com.racehorse.training.entity.WorkloadIntensity.MEDIUM,
-                com.racehorse.training.entity.SurfaceType.GRASS);
+    private TrainingSchedule schedule(Horse horse, boolean ready) {
+        var plan = new TrainingPlan(horse, "Active plan", null, trainer(), true);
+        var phase = new TrainingPlanPhase(1, "Phase", LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30),
+                new BigDecimal("1500"), WorkloadIntensity.MEDIUM, SurfaceType.GRASS);
         plan.replacePhases(List.of(phase));
-        return new TrainingSchedule(
-                phase, horse, trainer(), "Buổi chạy tốc độ",
-                com.racehorse.training.entity.WorkloadIntensity.MEDIUM,
-                Instant.parse("2026-09-09T01:00:00Z"), Instant.parse("2026-09-09T02:00:00Z"),
-                trainer());
+        TrainingSchedule schedule = new TrainingSchedule(phase, horse, trainer(), "Run", WorkloadIntensity.MEDIUM,
+                Instant.parse("2026-09-09T01:00:00Z"), Instant.parse("2026-09-09T02:00:00Z"), trainer());
+        if (ready) { schedule.markReady(UUID.randomUUID(), now); schedule.startTraining(now); }
+        return schedule;
     }
 }

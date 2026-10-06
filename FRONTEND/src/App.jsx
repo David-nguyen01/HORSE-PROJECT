@@ -5,6 +5,10 @@ import { api, authApi, clearAuth, getAuth, pageContent, reportingApi, saveAuth }
 import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, PermissionsPage, StablesPage } from './AdminPages'
 
 const FitnessPage = lazy(() => import('./FitnessPage'))
+const TrainingMetricsPage = lazy(() => import('./TrainingMetricsPage'))
+const TrainingSchedulePage = lazy(() => import('./TrainingSchedulePage'))
+const TrainingEmergencyPage = lazy(() => import('./TrainingEmergencyPage'))
+const TrainingRacePage = lazy(() => import('./TrainingRacePage'))
 const StableCarePage = lazy(() => import('./StableCarePage'))
 const FinanceReportsPage = lazy(() => import('./FinanceReportsPage').then(m => ({ default: m.FinanceReportsPage })))
 
@@ -126,8 +130,11 @@ function AppLayout() {
   ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/horses', label: 'Hồ sơ ngựa', icon: Activity }] : []),
-    ...(hasAny(user, 'HEAD_TRAINER') ? [{ to: '/fitness', label: 'Thể lực & buổi tập', icon: Gauge }] : []),
-    ...(hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/stable-care/tasks', label: 'Chăm sóc chuồng', icon: Home }] : []),
+    ...(hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/fitness', label: 'Chỉ số huấn luyện', icon: Gauge }] : []),
+    ...(hasAny(user, 'HEAD_TRAINER') ? [{ to: '/training-schedule', label: 'Lên lịch huấn luyện', icon: Clock }] : []),
+    ...(hasAny(user, 'HEAD_TRAINER') ? [{ to: '/training-emergency', label: 'Khẩn cấp', icon: AlertTriangle }] : []),
+    ...(hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/races', label: 'Đăng ký đua', icon: Award }] : []),
+    ...(hasAny(user, 'STABLE_STAFF', 'VETERINARIAN') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/stable-care/tasks', label: 'Chăm sóc chuồng', icon: Home }] : []),
     ...(hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/my-reports', label: 'Báo cáo của tôi', icon: FileSpreadsheet }] : []),
     ...(hasAny(user, 'CLUB_MANAGER') ? [
       { to: '/admin/finance-reports', label: 'Tài chính & Báo cáo', icon: DollarSign },
@@ -155,12 +162,15 @@ function AppLayout() {
       </nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? <FitnessPage /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/finance-reports" element={hasAny(user,'CLUB_MANAGER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="finance" element={<Navigate to="/admin/finance-reports" replace/>}/><Route path="my-reports" element={hasAny(user,'HORSE_OWNER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:<Dashboard />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER') ? <FitnessPage /> : hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingMetricsPage user={user} isOwner={!hasAny(user, 'HEAD_TRAINER')} /> : <Navigate to="/" replace />} /><Route path="training-schedule" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingSchedulePage isOwner={!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')} isHeadTrainer={hasAny(user, 'HEAD_TRAINER')} canEdit={hasAny(user, 'CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="training-emergency" element={hasAny(user,'HEAD_TRAINER') && !hasAny(user,'CLUB_MANAGER') ? <TrainingEmergencyPage /> : <Navigate to="/" replace />} /><Route path="races" element={hasAny(user,'HEAD_TRAINER','HORSE_OWNER') && !hasAny(user,'CLUB_MANAGER') ? <TrainingRacePage isOwner={!hasAny(user,'HEAD_TRAINER')} /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/finance-reports" element={hasAny(user,'CLUB_MANAGER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="finance" element={<Navigate to="/admin/finance-reports" replace/>}/><Route path="my-reports" element={hasAny(user,'HORSE_OWNER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
   </div>
 }
 
 function NotificationBell() {
+  const navigate = useNavigate()
+  const { user } = useAuth()
+  const [linkError, setLinkError] = useState('')
   const [items, setItems] = useState([])
   const [open, setOpen] = useState(false)
   const load = useCallback(() => api('/api/notifications?unreadOnly=true&size=20')
@@ -175,11 +185,32 @@ function NotificationBell() {
     await api(`/api/notifications/${id}/read`, { method: 'PATCH' })
     setItems((current) => current.filter((item) => item.id !== id))
   }
+  const openNotification = async (item) => {
+    setLinkError('')
+    try {
+      let target = null
+      const canOpenTraining = hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER')
+      const id = encodeURIComponent(item.relatedEntityId || '')
+      if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_EVALUATION') target = '/fitness?evaluationId=' + id
+      if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_SCHEDULE') {
+        const owner = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER', 'CLUB_MANAGER')
+        const schedule = await api('/api/training-schedules/' + id + (owner ? '/owner-view' : ''))
+        target = schedule.evaluation?.id ? '/fitness?evaluationId=' + encodeURIComponent(schedule.evaluation.id)
+          : schedule.horse?.id ? '/fitness?horseId=' + encodeURIComponent(schedule.horse.id) : '/training-schedule'
+      }
+      if (item.relatedEntityId && item.relatedEntityType === 'RACE_REGISTRATION'
+          && hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER'))
+        target = '/races?registrationId=' + id
+      await markRead(item.id)
+      if (target) { navigate(target); setOpen(false) }
+    } catch (error) { setLinkError(error.message || 'Không mở được thông báo.') }
+  }
   return <div className="notification-center">
     <button className="notification-button" aria-label="Thông báo" onClick={() => setOpen((value) => !value)}><Bell size={19} />{items.length > 0 && <span>{items.length > 99 ? '99+' : items.length}</span>}</button>
     {open && <div className="notification-panel">
       <div className="notification-head"><b>Thông báo</b><small>{items.length} chưa đọc</small></div>
-      {items.length ? items.map((item) => <button key={item.id} className="notification-item" onClick={() => markRead(item.id)}><span className={`notification-priority ${String(item.priority).toLowerCase()}`} /><div><b>{item.title}</b><p>{item.message}</p><small>{new Date(item.createdAt).toLocaleString('vi-VN')}</small></div></button>) : <div className="notification-empty">Không có thông báo mới.</div>}
+      {linkError && <p className="notice error" role="alert">{linkError}</p>}
+      {items.length ? items.map((item) => <button key={item.id} className="notification-item" onClick={() => openNotification(item)}><span className={`notification-priority ${String(item.priority).toLowerCase()}`} /><div><b>{item.title}</b><p>{item.message}</p><small>{new Date(item.createdAt).toLocaleString('vi-VN')}</small></div></button>) : <div className="notification-empty">Không có thông báo mới.</div>}
     </div>}
   </div>
 }
@@ -229,7 +260,7 @@ function HorseRow({ horse }) {
 }
 
 function Horses() {
-  const { user } = useAuth(); const canEdit = hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')
+  const { user } = useAuth(); const canEdit = hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER'); const canAdd = hasAny(user, 'CLUB_MANAGER')
   const [horses, setHorses] = useState([]); const [query, setQuery] = useState(''); const [status, setStatus] = useState(''); const [loading, setLoading] = useState(true); const [showCreate, setShowCreate] = useState(false)
   const load = useCallback(() => {
     setLoading(true); const params = new URLSearchParams({ size: '100' }); if (query) params.set('query', query); if (status) params.set('status', status)
@@ -237,7 +268,7 @@ function Horses() {
     api(path).then((data) => setHorses(pageContent(data))).catch(() => setHorses([])).finally(() => setLoading(false))
   }, [query, status, user, canEdit])
   useEffect(() => { if (hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER')) load(); else setLoading(false) }, [load, user])
-  return <><PageHeading eyebrow="FR01 · HỒ SƠ GỐC" title="Danh mục ngựa" description="Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành." action={canEdit && <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Thêm ngựa</button>} /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên, mã hoặc số chip…" /></label><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div><section className="card table-card">{loading ? <Empty title="Đang tải dữ liệu…" text="Vui lòng chờ trong giây lát." /> : horses.length ? <div className="horse-list">{horses.map((h) => <HorseRow key={h.id} horse={h} />)}</div> : <Empty title="Không tìm thấy hồ sơ" text="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." />}</section>{showCreate && <HorseModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); load() }} />}</>
+  return <><PageHeading eyebrow="FR01 · HỒ SƠ GỐC" title="Danh mục ngựa" description="Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành." action={canAdd && <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Thêm ngựa</button>} /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên, mã hoặc số chip…" /></label><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div><section className="card table-card">{loading ? <Empty title="Đang tải dữ liệu…" text="Vui lòng chờ trong giây lát." /> : horses.length ? <div className="horse-list">{horses.map((h) => <HorseRow key={h.id} horse={h} />)}</div> : <Empty title="Không tìm thấy hồ sơ" text="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." />}</section>{showCreate && <HorseModal onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); load() }} />}</>
 }
 
 const emptyHorse = { code: '', name: '', microchipPassportNumber: '', birthDate: '', gender: 'STALLION', colorMarkings: '', breed: '', stableLocation: '', status: 'ACTIVE', initialOwnerId: '' }

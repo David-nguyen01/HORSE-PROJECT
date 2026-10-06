@@ -64,6 +64,9 @@ public class Horse extends BaseEntity {
     @Column(nullable = false, length = 20)
     private HorseStatus status;
 
+    @Column(name = "health_status", length = 20)
+    private String healthStatus;
+
     @Column(name = "archived_at")
     private Instant archivedAt;
 
@@ -183,6 +186,14 @@ public class Horse extends BaseEntity {
 
     public HorseStatus getStatus() {
         return status;
+    }
+
+    public String getHealthStatus() {
+        return healthStatus;
+    }
+
+    public void clearOperationalInjury() {
+        if (this.status == HorseStatus.INJURED) this.status = HorseStatus.ACTIVE;
     }
 
     public Instant getArchivedAt() {

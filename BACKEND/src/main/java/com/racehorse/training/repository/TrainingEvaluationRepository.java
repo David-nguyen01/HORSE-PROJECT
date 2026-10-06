@@ -24,6 +24,9 @@ public interface TrainingEvaluationRepository extends JpaRepository<TrainingEval
     Optional<TrainingEvaluation> findByTrainingScheduleId(UUID trainingScheduleId);
 
     @EntityGraph(attributePaths = {"horse", "recordedBy", "trainingSchedule"})
+    List<TrainingEvaluation> findByTrainingScheduleIdIn(List<UUID> trainingScheduleIds);
+
+    @EntityGraph(attributePaths = {"horse", "recordedBy", "trainingSchedule"})
     Page<TrainingEvaluation> findByHorseIdOrderBySessionDateDescCompletedAtDesc(
             UUID horseId,
             Pageable pageable);

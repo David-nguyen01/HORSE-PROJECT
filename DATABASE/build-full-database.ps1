@@ -20,7 +20,13 @@ $migrationNames = @(
     "09_racing_reporting_rbac_audit.sql",
     "10_confirmed_business_rules.sql",
     "11_confirmed_automation_and_governance.sql",
-    "12_compact_schema.sql"
+    "12_compact_schema.sql",
+    "15_training_operational_window.sql",
+    "16_seed_training_racetracks.sql",
+    "17_align_training_operational_schema.sql",
+    "18_training_plan_rest_days_and_evaluation_metrics.sql",
+    "19_training_lanes_expiry_and_metrics.sql",
+    "20_evaluation_exertion_nullable_and_session_notes.sql"
 )
 
 $header = @"

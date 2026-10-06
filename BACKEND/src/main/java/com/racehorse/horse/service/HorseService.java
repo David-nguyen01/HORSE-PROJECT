@@ -91,6 +91,12 @@ public class HorseService {
     }
 
     @Transactional(readOnly = true)
+    public Page<HorseResponse> searchForTrainer(String query, HorseStatus status, UUID trainerId, Pageable pageable) {
+        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, pageable).map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public Page<HorseResponse> findOwnedBy(UUID ownerId, Pageable pageable) {
         return horseRepository.findOwnedBy(ownerId, pageable).map(this::toResponse);
     }

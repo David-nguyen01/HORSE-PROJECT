@@ -10,6 +10,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
+@org.junit.jupiter.api.Disabled("Shared Azure write smoke test requires separate database approval; even rollback writes are outside the authorized read-only inventory.")
 public class AzureConnectionSmokeTest {
 
     @Test

@@ -72,6 +72,9 @@ public class MedicalExaminationService {
             jdbc.update("""
                     update horses
                     set health_status = ?,
+                        status = case when ? = 'INJURED' then 'INJURED'
+                                      when health_status = 'INJURED' and status = 'INJURED' then 'ACTIVE'
+                                      else status end,
                         health_changed_by_user_id = ?,
                         health_source_type = 'MEDICAL_EXAM',
                         health_source_id = ?,
@@ -80,7 +83,7 @@ public class MedicalExaminationService {
                         version = version + 1
                     where id = ?
                     """,
-                    healthStatusAfter, veterinarianId, examId, horseId);
+                    healthStatusAfter, healthStatusAfter, veterinarianId, examId, horseId);
         }
 
         String vetName = findUsername(veterinarianId);
@@ -143,6 +146,9 @@ public class MedicalExaminationService {
             jdbc.update("""
                     update horses
                     set health_status = ?,
+                        status = case when ? = 'INJURED' then 'INJURED'
+                                      when health_status = 'INJURED' and status = 'INJURED' then 'ACTIVE'
+                                      else status end,
                         health_changed_by_user_id = ?,
                         health_source_type = 'MEDICAL_EXAM_ADDENDUM',
                         health_source_id = ?,
@@ -151,7 +157,7 @@ public class MedicalExaminationService {
                         version = version + 1
                     where id = ?
                     """,
-                    healthStatusAfter, authorId, addendumId, horseId);
+                    healthStatusAfter, healthStatusAfter, authorId, addendumId, horseId);
         }
 
         String authorName = findUsername(authorId);

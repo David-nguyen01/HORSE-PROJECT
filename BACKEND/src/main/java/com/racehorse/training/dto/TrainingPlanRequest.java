@@ -26,6 +26,12 @@ public record TrainingPlanRequest(
             @NotNull LocalDate endDate,
             @NotNull @DecimalMin("0.01") BigDecimal targetDistanceMeters,
             @NotNull WorkloadIntensity workloadIntensity,
-            @NotNull SurfaceType surfaceType
-    ) {}
+            @NotNull SurfaceType surfaceType,
+            List<@NotNull LocalDate> restDays
+    ) {
+        public Phase(String name, LocalDate startDate, LocalDate endDate, BigDecimal targetDistanceMeters,
+                WorkloadIntensity workloadIntensity, SurfaceType surfaceType) {
+            this(name, startDate, endDate, targetDistanceMeters, workloadIntensity, surfaceType, List.of());
+        }
+    }
 }

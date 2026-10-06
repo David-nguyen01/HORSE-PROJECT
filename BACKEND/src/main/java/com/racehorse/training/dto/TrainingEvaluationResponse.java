@@ -13,38 +13,26 @@ public record TrainingEvaluationResponse(
         UUID trainingScheduleId,
         UserSummary recordedBy,
         LocalDate sessionDate,
-        int durationMinutes,
+        int hours,
+        Integer durationMinutes,
         BigDecimal distanceMeters,
         BigDecimal averageSpeedKmh,
+        BigDecimal maxSpeedKmh,
+        BigDecimal intensityPercent,
+        Integer stopBpm,
+        Integer oneMinuteBpm,
+        BigDecimal recoveryRate,
         BigDecimal trainingLoad,
-        int heartRateRecoveryBpm,
-        int perceivedExertion,
+        Integer perceivedExertion,
         FitnessStatus fitnessStatus,
         String trainerNotes,
         String videoUrl,
-        Instant completedAt
+        Instant completedAt,
+        BigDecimal trackCompletionSeconds,
+        Boolean injured,
+        String injuryLocation,
+        String injuryNotes
 ) {
-    public TrainingEvaluationResponse(
-            UUID id,
-            HorseSummary horse,
-            UserSummary recordedBy,
-            LocalDate sessionDate,
-            int durationMinutes,
-            BigDecimal distanceMeters,
-            BigDecimal averageSpeedKmh,
-            BigDecimal trainingLoad,
-            int heartRateRecoveryBpm,
-            int perceivedExertion,
-            FitnessStatus fitnessStatus,
-            String trainerNotes,
-            String videoUrl,
-            Instant completedAt
-    ) {
-        this(id, horse, null, recordedBy, sessionDate, durationMinutes, distanceMeters,
-                averageSpeedKmh, trainingLoad, heartRateRecoveryBpm, perceivedExertion,
-                fitnessStatus, trainerNotes, videoUrl, completedAt);
-    }
-
     public record HorseSummary(UUID id, String code, String name) {}
     public record UserSummary(UUID id, String username) {}
 }

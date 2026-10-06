@@ -48,6 +48,9 @@ public class Notification {
     @Column(name = "related_entity_id")
     private UUID relatedEntityId;
 
+    @Column(name = "deduplication_key", length = 200)
+    private String deduplicationKey;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -66,6 +69,12 @@ public class Notification {
             String relatedEntityType,
             UUID relatedEntityId,
             Instant createdAt) {
+        this(recipient, notificationType, priority, title, message, relatedEntityType, relatedEntityId, null, createdAt);
+    }
+
+    public Notification(UserAccount recipient, String notificationType, NotificationPriority priority,
+            String title, String message, String relatedEntityType, UUID relatedEntityId,
+            String deduplicationKey, Instant createdAt) {
         this.recipient = recipient;
         this.notificationType = notificationType;
         this.priority = priority;
@@ -73,6 +82,7 @@ public class Notification {
         this.message = message;
         this.relatedEntityType = relatedEntityType;
         this.relatedEntityId = relatedEntityId;
+        this.deduplicationKey = deduplicationKey;
         this.createdAt = createdAt;
     }
 
@@ -86,6 +96,7 @@ public class Notification {
     public String getMessage() { return message; }
     public String getRelatedEntityType() { return relatedEntityType; }
     public UUID getRelatedEntityId() { return relatedEntityId; }
+    public String getDeduplicationKey() { return deduplicationKey; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getReadAt() { return readAt; }
 }

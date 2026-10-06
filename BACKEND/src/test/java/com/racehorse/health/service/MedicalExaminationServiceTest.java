@@ -107,7 +107,7 @@ class MedicalExaminationServiceTest {
                 any(), eq(horseId), eq(vetId), eq(req.examinationDate()), anyString());
         // Verify update health_status on horses
         verify(jdbc).update(contains("update horses"),
-                eq("INJURED"), eq(vetId), any(), eq(horseId));
+                eq("INJURED"), eq("INJURED"), eq(vetId), any(), eq(horseId));
     }
 
     @Test
@@ -137,7 +137,7 @@ class MedicalExaminationServiceTest {
                 any(), eq(horseId), eq(vetId), any(), anyString());
         // Verify horse health_status update
         verify(jdbc).update(contains("update horses"),
-                eq("MONITOR"), eq(vetId), any(), eq(horseId));
+                eq("MONITOR"), eq("MONITOR"), eq(vetId), any(), eq(horseId));
     }
 
     @Test

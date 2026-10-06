@@ -12,4 +12,5 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     Page<Notification> findByRecipientIdAndReadAtIsNullOrderByCreatedAtDesc(UUID recipientId, Pageable pageable);
     Page<Notification> findByRecipientIdOrderByCreatedAtDesc(UUID recipientId, Pageable pageable);
     Optional<Notification> findByIdAndRecipientId(UUID id, UUID recipientId);
+    Optional<Notification> findByDeduplicationKey(String deduplicationKey);
 }

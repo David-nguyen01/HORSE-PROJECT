@@ -6,6 +6,7 @@ import jakarta.validation.constraints.*;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -48,29 +49,45 @@ public class RaceEventController {
     void deactivate(@PathVariable UUID id) { service.deactivate(id); }
 
     @PostMapping("/{eventId}/registrations") @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    @PreAuthorize("hasRole('HEAD_TRAINER') and hasAuthority('PERM_RACING_EDIT')")
     RaceEventService.RegistrationView register(@PathVariable UUID eventId, @AuthenticationPrincipal Jwt jwt,
-                                                @Valid @RequestBody RegistrationRequest request) {
-        return service.register(eventId, request.horseId(), user(jwt), request.registeredWeightKg());
+                                                @Valid @RequestBody RegistrationRequest request, Authentication auth) {
+        return service.register(eventId, request.horseId(), user(jwt), request.registeredWeightKg(),
+                hasRole(auth,"CLUB_MANAGER"),hasRole(auth,"HEAD_TRAINER"));
     }
 
-    @GetMapping("/registrations") @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @GetMapping("/registrations") @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     List<RaceEventService.RegistrationView> registrations(@RequestParam(required=false) UUID eventId,
-             @RequestParam(required=false) UUID horseId, @RequestParam(required=false) String status) {
-        return service.registrations(eventId, horseId, status);
+             @RequestParam(required=false) UUID horseId, @RequestParam(required=false) String status,
+             @AuthenticationPrincipal Jwt jwt, Authentication auth) {
+        return service.scopedRegistrations(eventId, horseId, status, user(jwt), hasRole(auth,"CLUB_MANAGER"),
+                hasRole(auth,"HEAD_TRAINER"),hasRole(auth,"HORSE_OWNER"));
     }
 
-    @PostMapping("/registrations/{id}/confirm")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_APPROVE')")
-    RaceEventService.RegistrationView confirm(@PathVariable UUID id) { return service.confirm(id); }
+    @GetMapping("/eligibility")
+    @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
+    com.racehorse.health.dto.RaceReadinessResponse eligibility(@RequestParam UUID horseId,
+            @RequestParam(required=false) UUID eventId, @AuthenticationPrincipal Jwt jwt, Authentication auth) {
+        return service.eligibility(horseId,eventId,user(jwt),hasRole(auth,"CLUB_MANAGER"),
+                hasRole(auth,"HEAD_TRAINER"),hasRole(auth,"HORSE_OWNER"));
+    }
+
+    @PostMapping("/registrations/{id}/decision")
+    @PreAuthorize("hasAuthority('PERM_RACING_APPROVE') and hasAnyRole('CLUB_MANAGER','HORSE_OWNER')")
+    RaceEventService.RegistrationView decide(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody DecisionRequest request, Authentication auth) {
+        return service.decide(id,user(jwt),request.approve(),request.reason(),hasRole(auth,"CLUB_MANAGER"));
+    }
 
     @PostMapping("/registrations/{id}/withdraw")
     @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
-    RaceEventService.RegistrationView withdraw(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
-        return service.withdraw(id, user(jwt));
+    RaceEventService.RegistrationView withdraw(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody WithdrawalRequest request, Authentication auth) {
+        return service.withdraw(id, user(jwt),request.reason(),hasRole(auth,"CLUB_MANAGER"));
     }
 
     private UUID user(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
+    private boolean hasRole(Authentication authentication,String role){return authentication.getAuthorities().stream().anyMatch(a->a.getAuthority().equals("ROLE_"+role));}
 
     public record EventRequest(@NotBlank @Size(max=200) String raceName, @NotBlank @Size(max=200) String racecourse,
             @NotNull LocalDate raceDate, @NotNull OffsetDateTime registrationDeadline,
@@ -83,4 +100,6 @@ public class RaceEventController {
                 minimumWeightKg,maximumWeightKg,activeValue); }
     }
     public record RegistrationRequest(@NotNull UUID horseId, @DecimalMin("0.01") BigDecimal registeredWeightKg) {}
+    public record DecisionRequest(@NotNull Boolean approve, String reason) {}
+    public record WithdrawalRequest(@NotBlank @Size(max=1000) String reason) {}
 }

@@ -16,6 +16,7 @@ public record TrainingPlanResponse(
         UUID sourcePlanId,
         UserSummary createdBy,
         boolean active,
+        String status,
         List<Phase> phases,
         Instant createdAt,
         Instant updatedAt
@@ -30,6 +31,23 @@ public record TrainingPlanResponse(
             LocalDate endDate,
             BigDecimal targetDistanceMeters,
             WorkloadIntensity workloadIntensity,
-            SurfaceType surfaceType
+            SurfaceType surfaceType,
+            List<LocalDate> restDays,
+            List<SessionSummary> sessions
     ) {}
+    public record SessionSummary(
+            UUID id,
+            LocalDate date,
+            String status,
+            WorkloadIntensity workloadIntensity,
+            String taskName,
+            TrainingScheduleResponse.UserSummary assignedStaff,
+            TrainingScheduleResponse.UserSummary veterinarian,
+            String staffAssignedBy,
+            String vetAssignedBy,
+            TrainingScheduleResponse.RacetrackSummary racetrack,
+            EvaluationSummary evaluation
+    ) {}
+    public record EvaluationSummary(UUID id, LocalDate sessionDate, BigDecimal intensityPercent,
+                                    BigDecimal recoveryRate, String fitnessStatus) {}
 }

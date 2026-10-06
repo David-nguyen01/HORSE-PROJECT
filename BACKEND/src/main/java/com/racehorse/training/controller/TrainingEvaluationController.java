@@ -34,11 +34,12 @@ public class TrainingEvaluationController {
 
     @PostMapping("/training-evaluations")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasRole('HEAD_TRAINER')")
     TrainingEvaluationResponse create(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CreateTrainingEvaluationRequest request) {
-        return service.create(userId(jwt), request);
+            @Valid @RequestBody CreateTrainingEvaluationRequest request, Authentication authentication) {
+        return service.create(userId(jwt), request,
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
     }
 
     @GetMapping("/training-evaluations/{evaluationId}")
@@ -46,7 +47,8 @@ public class TrainingEvaluationController {
     TrainingEvaluationResponse get(
             @PathVariable UUID evaluationId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        return service.getById(evaluationId, userId(jwt), isPrivileged(authentication));
+        return service.getById(evaluationId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"),
+                hasRole(authentication, "HEAD_TRAINER"), hasRole(authentication, "HORSE_OWNER"));
     }
 
     @GetMapping("/horses/{horseId}/training-evaluations")
@@ -56,15 +58,16 @@ public class TrainingEvaluationController {
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication,
             @PageableDefault(size = 20) Pageable pageable) {
-        return service.listForHorse(horseId, userId(jwt), isPrivileged(authentication), pageable);
+        return service.listForHorse(horseId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"),
+                hasRole(authentication, "HEAD_TRAINER"), hasRole(authentication, "HORSE_OWNER"), pageable);
     }
 
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }
 
-    private boolean isPrivileged(Authentication authentication) {
+    private boolean hasRole(Authentication authentication, String role) {
         return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER") || authority.getAuthority().equals("ROLE_HEAD_TRAINER"));
+                authority.getAuthority().equals("ROLE_" + role));
     }
 }

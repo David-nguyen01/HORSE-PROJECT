@@ -71,15 +71,15 @@ BEGIN
     CREATE TABLE dbo.horses (
         id UNIQUEIDENTIFIER NOT NULL CONSTRAINT pk_horses PRIMARY KEY,
         code VARCHAR(50) NOT NULL,
-        name VARCHAR(150) NOT NULL,
+        name NVARCHAR(150) NOT NULL,
         microchip_passport_number VARCHAR(100) NULL,
         birth_date DATE NOT NULL,
         gender VARCHAR(20) NOT NULL,
-        color_markings VARCHAR(500) NOT NULL,
-        breed VARCHAR(100) NOT NULL,
+        color_markings NVARCHAR(500) NOT NULL,
+        breed NVARCHAR(100) NOT NULL,
         sire_id UNIQUEIDENTIFIER NULL,
         dam_id UNIQUEIDENTIFIER NULL,
-        stable_location VARCHAR(150) NOT NULL,
+        stable_location NVARCHAR(150) NOT NULL,
         status VARCHAR(20) NOT NULL,
         created_at DATETIMEOFFSET NOT NULL CONSTRAINT df_horses_created_at DEFAULT SYSDATETIMEOFFSET(),
         updated_at DATETIMEOFFSET NOT NULL CONSTRAINT df_horses_updated_at DEFAULT SYSDATETIMEOFFSET(),
@@ -369,7 +369,7 @@ BEGIN
         average_speed_kmh DECIMAL(8, 2) NOT NULL,
         training_load DECIMAL(10, 2) NOT NULL,
         heart_rate_recovery_bpm INT NOT NULL,
-        perceived_exertion TINYINT NOT NULL,
+        perceived_exertion TINYINT NULL,
         fitness_status VARCHAR(10) NOT NULL,
         trainer_notes NVARCHAR(4000) NOT NULL,
         video_url VARCHAR(2000) NULL,
@@ -384,7 +384,7 @@ BEGIN
         CONSTRAINT ck_training_evaluations_speed CHECK (average_speed_kmh > 0),
         CONSTRAINT ck_training_evaluations_load CHECK (training_load >= 0),
         CONSTRAINT ck_training_evaluations_recovery CHECK (heart_rate_recovery_bpm BETWEEN 0 AND 300),
-        CONSTRAINT ck_training_evaluations_exertion CHECK (perceived_exertion BETWEEN 1 AND 10),
+        CONSTRAINT ck_training_evaluations_exertion CHECK (perceived_exertion IS NULL OR perceived_exertion BETWEEN 1 AND 10),
         CONSTRAINT ck_training_evaluations_fitness_status CHECK (fitness_status IN ('GREEN', 'YELLOW', 'RED'))
     );
 END;
@@ -2201,4 +2201,472 @@ GO
 DECLARE @table_count INT=(SELECT COUNT(*) FROM sys.tables WHERE is_ms_shipped=0 AND name<>N'sysdiagrams');
 IF @table_count > 30
     THROW 51030, N'Compact schema vượt quá giới hạn 30 bảng.', 1;
+GO
+
+/* ========================================================================== */
+/* Source: 15_training_operational_window.sql */
+/* ========================================================================== */
+/* Training operational window, ground reservations, staffing claims and evaluation metrics. */
+USE [racehorse];
+GO
+
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS ck_racetracks_operating_hours;
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS ck_racetracks_slot_minutes;
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS df_racetracks_opens_at;
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS df_racetracks_closes_at;
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS df_racetracks_closes_next_day;
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS df_racetracks_slot_minutes;
+GO
+ALTER TABLE dbo.racetracks ADD CONSTRAINT df_racetracks_opens_at DEFAULT '05:00:00' FOR opens_at;
+ALTER TABLE dbo.racetracks ADD CONSTRAINT df_racetracks_closes_at DEFAULT '11:00:00' FOR closes_at;
+ALTER TABLE dbo.racetracks ADD CONSTRAINT df_racetracks_closes_next_day DEFAULT 0 FOR closes_next_day;
+ALTER TABLE dbo.racetracks ADD CONSTRAINT ck_racetracks_operating_hours
+    CHECK (opens_at = '05:00:00' AND closes_at = '11:00:00' AND closes_next_day = 0);
+UPDATE dbo.racetracks SET opens_at='05:00:00', closes_at='11:00:00', closes_next_day=0;
+GO
+
+ALTER TABLE dbo.training_schedules ALTER COLUMN assigned_staff_id UNIQUEIDENTIFIER NULL;
+IF COL_LENGTH(N'dbo.training_schedules', N'racetrack_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.training_schedules ADD racetrack_id UNIQUEIDENTIFIER NULL;
+    ALTER TABLE dbo.training_schedules ADD CONSTRAINT fk_training_schedules_racetrack FOREIGN KEY(racetrack_id) REFERENCES dbo.racetracks(id);
+END;
+IF COL_LENGTH(N'dbo.training_schedules', N'veterinarian_user_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.training_schedules ADD veterinarian_user_id UNIQUEIDENTIFIER NULL;
+    ALTER TABLE dbo.training_schedules ADD CONSTRAINT fk_training_schedules_vet FOREIGN KEY(veterinarian_user_id) REFERENCES dbo.users(id);
+END;
+IF COL_LENGTH(N'dbo.training_schedules', N'staff_assigned_by') IS NULL
+    ALTER TABLE dbo.training_schedules ADD staff_assigned_by VARCHAR(20) NULL, staff_assigned_at DATETIMEOFFSET NULL,
+        vet_assigned_by VARCHAR(20) NULL, vet_assigned_at DATETIMEOFFSET NULL;
+GO
+
+UPDATE s SET racetrack_id=l.racetrack_id FROM dbo.training_schedules s
+JOIN dbo.trial_run_bookings b ON b.training_schedule_id=s.id
+JOIN dbo.racetrack_lanes l ON l.id=b.racetrack_lane_id
+WHERE s.racetrack_id IS NULL;
+GO
+CREATE OR ALTER TRIGGER dbo.tr_training_schedules_no_staff_overlap ON dbo.training_schedules AFTER INSERT, UPDATE AS
+BEGIN
+ SET NOCOUNT ON;
+ IF EXISTS(SELECT 1 FROM dbo.training_schedules s JOIN inserted i ON s.assigned_staff_id=i.assigned_staff_id AND s.id<>i.id
+   AND s.cancelled_at IS NULL AND i.cancelled_at IS NULL AND i.assigned_staff_id IS NOT NULL
+   WHERE s.scheduled_start<i.scheduled_end AND s.scheduled_end>i.scheduled_start)
+ THROW 50061,N'Nhân viên chuồng đã được phân công lịch huấn luyện khác trong ngày này.',1;
+END;
+GO
+CREATE OR ALTER TRIGGER dbo.tr_training_schedules_no_vet_overlap ON dbo.training_schedules AFTER INSERT, UPDATE AS
+BEGIN
+ SET NOCOUNT ON;
+ IF EXISTS(SELECT 1 FROM dbo.training_schedules s JOIN inserted i ON s.veterinarian_user_id=i.veterinarian_user_id AND s.id<>i.id
+   AND s.cancelled_at IS NULL AND i.cancelled_at IS NULL AND i.veterinarian_user_id IS NOT NULL
+   WHERE s.scheduled_start<i.scheduled_end AND s.scheduled_end>i.scheduled_start)
+ THROW 50062,N'Bác sĩ thú y đã nhận lịch theo dõi buổi tập khác trong ngày này.',1;
+END;
+GO
+IF COL_LENGTH(N'dbo.training_evaluations',N'actual_run_minutes') IS NULL
+ ALTER TABLE dbo.training_evaluations ADD actual_run_minutes DECIMAL(8,2) NULL, average_heart_rate_bpm INT NULL,
+ max_heart_rate_bpm INT NULL, peak_heart_rate_bpm INT NULL, heart_rate_after_rest_bpm INT NULL,
+ rest_minutes DECIMAL(6,2) NULL, intensity_percent DECIMAL(7,2) NULL, heart_rate_recovery_rate DECIMAL(9,2) NULL,
+ hrr1_bpm INT NULL;
+GO
+IF COL_LENGTH(N'dbo.training_plans',N'goal_target_race') IS NULL
+ ALTER TABLE dbo.training_plans ADD goal_target_race NVARCHAR(300) NULL, planned_sessions_per_week TINYINT NULL,
+ rest_days NVARCHAR(100) NULL, trainer_notes NVARCHAR(4000) NULL;
+GO
+
+ALTER TABLE dbo.horses ALTER COLUMN name NVARCHAR(150) NOT NULL;
+IF COL_LENGTH(N'dbo.horses',N'normalized_name') IS NULL
+ ALTER TABLE dbo.horses ADD normalized_name AS (CONVERT(NVARCHAR(150),LTRIM(RTRIM(name))) COLLATE Vietnamese_100_CI_AS_SC) PERSISTED;
+IF NOT EXISTS(SELECT 1 FROM dbo.horses GROUP BY normalized_name HAVING COUNT(*)>1)
+ AND NOT EXISTS(SELECT 1 FROM sys.indexes WHERE name=N'uq_horses_normalized_name' AND object_id=OBJECT_ID(N'dbo.horses'))
+ CREATE UNIQUE INDEX uq_horses_normalized_name ON dbo.horses(normalized_name);
+GO
+
+/* ========================================================================== */
+/* Source: 16_seed_training_racetracks.sql */
+/* ========================================================================== */
+/* Seed active training grounds only when a name is not already present. */
+USE [racehorse];
+GO
+
+DECLARE @LaneCount INT = 4;
+
+IF @LaneCount < 1
+    THROW 51020, N'@LaneCount ph\u1ea3i l\u1edbn h\u01a1n ho\u1eb7c b\u1eb1ng 1.', 1;
+
+DECLARE @TrackNames TABLE (name NVARCHAR(200) NOT NULL PRIMARY KEY);
+INSERT INTO @TrackNames (name)
+VALUES
+    (N'Sân tập 01'), (N'Sân tập 02'), (N'Sân tập 03'), (N'Sân tập 04'), (N'Sân tập 05'),
+    (N'Sân tập 06'), (N'Sân tập 07'), (N'Sân tập 08'), (N'Sân tập 09'), (N'Sân tập 10');
+
+INSERT INTO dbo.racetracks (id, name, is_active)
+SELECT NEWID(), names.name, 1
+FROM @TrackNames names
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dbo.racetracks track
+    WHERE track.name = names.name
+);
+
+DECLARE @LaneNumber INT = 1;
+WHILE @LaneNumber <= @LaneCount
+BEGIN
+    INSERT INTO dbo.racetrack_lanes (id, racetrack_id, lane_number, is_active)
+    SELECT NEWID(), track.id, @LaneNumber, 1
+    FROM dbo.racetracks track
+    JOIN @TrackNames names ON names.name = track.name
+    WHERE NOT EXISTS (
+        SELECT 1
+        FROM dbo.racetrack_lanes lane
+        WHERE lane.racetrack_id = track.id
+          AND lane.lane_number = @LaneNumber
+    );
+
+    SET @LaneNumber += 1;
+END;
+GO
+
+/* ========================================================================== */
+/* Source: 17_align_training_operational_schema.sql */
+/* ========================================================================== */
+/* Align the deployed schema with the training entities. Safe to rerun. */
+USE [racehorse];
+GO
+
+IF COL_LENGTH(N'dbo.training_evaluations', N'actual_run_minutes') IS NULL
+BEGIN
+    ALTER TABLE dbo.training_evaluations ADD
+        actual_run_minutes DECIMAL(8,2) NULL,
+        average_heart_rate_bpm INT NULL,
+        max_heart_rate_bpm INT NULL,
+        peak_heart_rate_bpm INT NULL,
+        heart_rate_after_rest_bpm INT NULL,
+        rest_minutes DECIMAL(6,2) NULL,
+        intensity_percent DECIMAL(7,2) NULL,
+        heart_rate_recovery_rate DECIMAL(9,2) NULL,
+        hrr1_bpm INT NULL;
+END;
+GO
+
+ALTER TABLE dbo.training_schedules ALTER COLUMN assigned_staff_id UNIQUEIDENTIFIER NULL;
+
+IF COL_LENGTH(N'dbo.training_schedules', N'racetrack_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.training_schedules ADD racetrack_id UNIQUEIDENTIFIER NULL;
+    ALTER TABLE dbo.training_schedules ADD CONSTRAINT fk_training_schedules_racetrack
+        FOREIGN KEY (racetrack_id) REFERENCES dbo.racetracks(id);
+END;
+
+IF COL_LENGTH(N'dbo.training_schedules', N'veterinarian_user_id') IS NULL
+BEGIN
+    ALTER TABLE dbo.training_schedules ADD veterinarian_user_id UNIQUEIDENTIFIER NULL;
+    ALTER TABLE dbo.training_schedules ADD CONSTRAINT fk_training_schedules_vet
+        FOREIGN KEY (veterinarian_user_id) REFERENCES dbo.users(id);
+END;
+
+IF COL_LENGTH(N'dbo.training_schedules', N'staff_assigned_by') IS NULL
+    ALTER TABLE dbo.training_schedules ADD
+        staff_assigned_by VARCHAR(20) NULL,
+        staff_assigned_at DATETIMEOFFSET NULL,
+        vet_assigned_by VARCHAR(20) NULL,
+        vet_assigned_at DATETIMEOFFSET NULL;
+GO
+
+/* ========================================================================== */
+/* Source: 18_training_plan_rest_days_and_evaluation_metrics.sql */
+/* ========================================================================== */
+/* Training-plan rest days, date-derived schedule eligibility and evaluation metrics. Safe to rerun. */
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET NUMERIC_ROUNDABORT OFF;
+GO
+USE [racehorse];
+GO
+
+IF COL_LENGTH(N'dbo.training_plan_phases', N'rest_days_json') IS NULL
+BEGIN
+    ALTER TABLE dbo.training_plan_phases ADD rest_days_json NVARCHAR(MAX) NOT NULL
+        CONSTRAINT df_training_plan_phases_rest_days_json DEFAULT N'[]';
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1 FROM sys.check_constraints
+    WHERE name = N'ck_training_plan_phases_rest_days_json'
+      AND parent_object_id = OBJECT_ID(N'dbo.training_plan_phases')
+)
+BEGIN
+    ALTER TABLE dbo.training_plan_phases ADD CONSTRAINT ck_training_plan_phases_rest_days_json
+        CHECK (ISJSON(rest_days_json) = 1);
+END;
+GO
+
+IF COL_LENGTH(N'dbo.training_evaluations', N'max_speed_kmh') IS NULL
+    ALTER TABLE dbo.training_evaluations ADD max_speed_kmh DECIMAL(8,2) NULL;
+IF COL_LENGTH(N'dbo.training_evaluations', N'heart_rate_at_stop_bpm') IS NULL
+    ALTER TABLE dbo.training_evaluations ADD heart_rate_at_stop_bpm INT NULL;
+IF COL_LENGTH(N'dbo.training_evaluations', N'heart_rate_after_1min_bpm') IS NULL
+    ALTER TABLE dbo.training_evaluations ADD heart_rate_after_1min_bpm INT NULL;
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.training_evaluations')
+      AND name = N'intensity_percent' AND (precision <> 5 OR scale <> 1)
+)
+    ALTER TABLE dbo.training_evaluations ALTER COLUMN intensity_percent DECIMAL(5,1) NULL;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name=N'ck_training_evaluations_max_speed')
+    ALTER TABLE dbo.training_evaluations ADD CONSTRAINT ck_training_evaluations_max_speed
+        CHECK (max_speed_kmh IS NULL OR (max_speed_kmh > 0 AND max_speed_kmh >= average_speed_kmh));
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name=N'ck_training_evaluations_heart_rate_at_stop')
+    ALTER TABLE dbo.training_evaluations ADD CONSTRAINT ck_training_evaluations_heart_rate_at_stop
+        CHECK (heart_rate_at_stop_bpm IS NULL OR heart_rate_at_stop_bpm BETWEEN 0 AND 300);
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name=N'ck_training_evaluations_heart_rate_after_1min')
+    ALTER TABLE dbo.training_evaluations ADD CONSTRAINT ck_training_evaluations_heart_rate_after_1min
+        CHECK (heart_rate_after_1min_bpm IS NULL OR heart_rate_after_1min_bpm BETWEEN 0 AND 300);
+IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name=N'ck_training_evaluations_recovery_consistency')
+    ALTER TABLE dbo.training_evaluations ADD CONSTRAINT ck_training_evaluations_recovery_consistency
+        CHECK (heart_rate_at_stop_bpm IS NULL OR heart_rate_after_1min_bpm IS NULL
+            OR heart_rate_recovery_bpm = heart_rate_at_stop_bpm - heart_rate_after_1min_bpm);
+GO
+
+CREATE OR ALTER TRIGGER dbo.tr_training_schedules_plan_and_lock
+ON dbo.training_schedules
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_plan_phases p ON p.id = i.training_plan_phase_id
+        JOIN dbo.training_plans plan_record ON plan_record.id = p.training_plan_id
+        WHERE plan_record.horse_id <> i.horse_id
+    )
+        THROW 51012, N'Ngựa trên lịch phải trùng với ngựa của kế hoạch huấn luyện.', 1;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_plan_phases p ON p.id = i.training_plan_phase_id
+        JOIN dbo.training_plans plan_record ON plan_record.id = p.training_plan_id
+        WHERE plan_record.is_active = 0
+           OR p.end_date < CONVERT(date, SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time')
+    )
+        THROW 51014, N'Không thể tạo buổi tập cho kế hoạch đã hết hạn.', 1;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_locks training_lock
+          ON training_lock.horse_id = i.horse_id
+         AND training_lock.released_at IS NULL
+        WHERE i.workload_intensity = 'HIGH'
+          AND i.cancelled_at IS NULL
+    )
+        THROW 51013, N'Không thể xếp lịch cường độ cao khi ngựa đang bị khóa huấn luyện.', 1;
+END;
+GO
+
+/* ========================================================================== */
+/* Source: 19_training_lanes_expiry_and_metrics.sql */
+/* ========================================================================== */
+/* Enforce the approved fixed-window, lane-based training rules. Safe to rerun. */
+USE [racehorse];
+GO
+
+IF OBJECT_ID(N'dbo.tr_training_schedules_ground_exclusivity', N'TR') IS NOT NULL
+    DROP TRIGGER dbo.tr_training_schedules_ground_exclusivity;
+GO
+
+UPDATE dbo.racetracks
+SET opens_at = '05:00:00',
+    closes_at = '11:00:00',
+    closes_next_day = 0,
+    slot_minutes = 360
+WHERE opens_at <> '05:00:00'
+   OR closes_at <> '11:00:00'
+   OR closes_next_day <> 0
+   OR slot_minutes <> 360;
+GO
+
+ALTER TABLE dbo.racetracks DROP CONSTRAINT IF EXISTS df_racetracks_slot_minutes;
+ALTER TABLE dbo.racetracks ADD CONSTRAINT df_racetracks_slot_minutes DEFAULT 360 FOR slot_minutes;
+GO
+
+DECLARE @LaneNumber INT = 1;
+WHILE @LaneNumber <= 4
+BEGIN
+    INSERT INTO dbo.racetrack_lanes (id, racetrack_id, lane_number, is_active)
+    SELECT NEWID(), track.id, @LaneNumber, track.is_active
+    FROM dbo.racetracks track
+    WHERE NOT EXISTS (
+        SELECT 1 FROM dbo.racetrack_lanes lane
+        WHERE lane.racetrack_id = track.id AND lane.lane_number = @LaneNumber
+    );
+    SET @LaneNumber += 1;
+END;
+GO
+
+UPDATE dbo.racetrack_lanes
+SET is_active = 0
+WHERE lane_number NOT BETWEEN 1 AND 4
+  AND is_active = 1;
+GO
+
+CREATE OR ALTER TRIGGER dbo.tr_trial_run_bookings_no_lane_overlap
+ON dbo.trial_run_bookings
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.trial_run_bookings b
+          ON b.racetrack_lane_id = i.racetrack_lane_id
+         AND b.id <> i.id
+         AND b.cancelled_at IS NULL
+         AND i.cancelled_at IS NULL
+         AND CONVERT(date, b.booked_start AT TIME ZONE 'SE Asia Standard Time')
+             = CONVERT(date, i.booked_start AT TIME ZONE 'SE Asia Standard Time')
+    )
+        THROW 51003, N'Làn chạy đã được đặt trong ngày này.', 1;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_schedules current_session ON current_session.id = i.training_schedule_id
+        JOIN dbo.trial_run_bookings b
+          ON b.id <> i.id
+         AND b.cancelled_at IS NULL
+         AND i.cancelled_at IS NULL
+        JOIN dbo.training_schedules other_session ON other_session.id = b.training_schedule_id
+        WHERE current_session.horse_id = other_session.horse_id
+          AND CONVERT(date, current_session.scheduled_start AT TIME ZONE 'SE Asia Standard Time')
+              = CONVERT(date, other_session.scheduled_start AT TIME ZONE 'SE Asia Standard Time')
+    )
+        THROW 51003, N'Ngựa đã có buổi tập trong ngày này.', 1;
+END;
+GO
+
+IF EXISTS (
+    SELECT 1 FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.training_evaluations')
+      AND name = N'intensity_percent'
+      AND (precision <> 5 OR scale <> 2)
+)
+    ALTER TABLE dbo.training_evaluations ALTER COLUMN intensity_percent DECIMAL(5,2) NULL;
+GO
+
+CREATE OR ALTER TRIGGER dbo.tr_training_schedules_plan_and_lock
+ON dbo.training_schedules
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_plan_phases p ON p.id = i.training_plan_phase_id
+        JOIN dbo.training_plans plan_record ON plan_record.id = p.training_plan_id
+        WHERE plan_record.horse_id <> i.horse_id
+    )
+        THROW 51012, N'Ngựa trên lịch phải trùng với ngựa của kế hoạch huấn luyện.', 1;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_plan_phases p ON p.id = i.training_plan_phase_id
+        JOIN dbo.training_plans plan_record ON plan_record.id = p.training_plan_id
+        CROSS APPLY (SELECT MAX(end_date) AS last_phase_end FROM dbo.training_plan_phases WHERE training_plan_id = plan_record.id) expiry
+        WHERE i.cancelled_at IS NULL
+          AND (plan_record.is_active = 0 OR expiry.last_phase_end <
+              CONVERT(date, SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time'))
+    )
+        THROW 51014, N'Kế hoạch đã hết hạn, không thể tạo buổi tập mới.', 1;
+
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_locks training_lock
+          ON training_lock.horse_id = i.horse_id
+         AND training_lock.released_at IS NULL
+        WHERE i.workload_intensity = 'HIGH'
+          AND i.cancelled_at IS NULL
+    )
+        THROW 51013, N'Không thể xếp lịch cường độ cao khi ngựa đang bị khóa huấn luyện.', 1;
+END;
+GO
+
+CREATE OR ALTER TRIGGER dbo.tr_training_evaluations_plan_expiry
+ON dbo.training_evaluations
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (
+        SELECT 1
+        FROM inserted i
+        JOIN dbo.training_schedules s ON s.id = i.training_schedule_id
+        JOIN dbo.training_plan_phases p ON p.id = s.training_plan_phase_id
+        JOIN dbo.training_plans plan_record ON plan_record.id = p.training_plan_id
+        CROSS APPLY (SELECT MAX(end_date) AS last_phase_end FROM dbo.training_plan_phases WHERE training_plan_id = plan_record.id) expiry
+        WHERE plan_record.is_active = 0
+           OR expiry.last_phase_end <
+              CONVERT(date, SYSUTCDATETIME() AT TIME ZONE 'UTC' AT TIME ZONE 'SE Asia Standard Time')
+    )
+        THROW 51014, N'Kế hoạch đã hết hạn, không thể tạo đánh giá mới.', 1;
+END;
+GO
+
+/* ========================================================================== */
+/* Source: 20_evaluation_exertion_nullable_and_session_notes.sql */
+/* ========================================================================== */
+/* Make perceived exertion optional and add optional session notes. Safe to rerun. */
+USE [racehorse];
+GO
+
+IF COL_LENGTH(N'dbo.training_schedules', N'notes') IS NULL
+    ALTER TABLE dbo.training_schedules ADD notes NVARCHAR(2000) NULL;
+GO
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE name = N'ck_training_evaluations_exertion'
+      AND parent_object_id = OBJECT_ID(N'dbo.training_evaluations')
+)
+    ALTER TABLE dbo.training_evaluations DROP CONSTRAINT ck_training_evaluations_exertion;
+GO
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID(N'dbo.training_evaluations')
+      AND name = N'perceived_exertion'
+      AND is_nullable = 0
+)
+    ALTER TABLE dbo.training_evaluations ALTER COLUMN perceived_exertion TINYINT NULL;
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.check_constraints
+    WHERE name = N'ck_training_evaluations_exertion'
+      AND parent_object_id = OBJECT_ID(N'dbo.training_evaluations')
+)
+    ALTER TABLE dbo.training_evaluations ADD CONSTRAINT ck_training_evaluations_exertion
+        CHECK (perceived_exertion IS NULL OR perceived_exertion BETWEEN 1 AND 10);
 GO

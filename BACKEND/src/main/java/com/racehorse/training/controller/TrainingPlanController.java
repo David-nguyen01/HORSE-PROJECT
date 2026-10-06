@@ -1,6 +1,7 @@
 package com.racehorse.training.controller;
 
 import com.racehorse.training.dto.CopyTrainingPlanRequest;
+import com.racehorse.training.dto.CopyTrainingPlanResponse;
 import com.racehorse.training.dto.TrainingPlanRequest;
 import com.racehorse.training.dto.TrainingPlanResponse;
 import com.racehorse.training.service.TrainingPlanService;
@@ -35,24 +36,25 @@ public class TrainingPlanController {
     @PostMapping("/training-plans")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingPlanResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TrainingPlanRequest request) {
-        return service.create(userId(jwt), request);
+    TrainingPlanResponse create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TrainingPlanRequest request, Authentication authentication) {
+        return service.create(userId(jwt), request, hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
     }
 
     @PutMapping("/training-plans/{planId}")
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingPlanResponse update(@PathVariable UUID planId, @Valid @RequestBody TrainingPlanRequest request) {
-        return service.update(planId, request);
+    TrainingPlanResponse update(@PathVariable UUID planId, @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TrainingPlanRequest request, Authentication authentication) {
+        return service.update(planId, userId(jwt), request, hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
     }
 
     @PostMapping("/training-plans/{planId}/copy")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingPlanResponse copy(
+    CopyTrainingPlanResponse copy(
             @PathVariable UUID planId,
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CopyTrainingPlanRequest request) {
-        return service.copy(planId, userId(jwt), request);
+            @Valid @RequestBody CopyTrainingPlanRequest request,
+            Authentication authentication) {
+        return service.copy(planId, userId(jwt), request, hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
     }
 
     @GetMapping("/training-plans/{planId}")
@@ -61,7 +63,7 @@ public class TrainingPlanController {
             @PathVariable UUID planId,
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
-        return service.get(planId, userId(jwt), isPrivileged(authentication));
+        return service.get(planId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"), hasRole(authentication, "HORSE_OWNER"));
     }
 
     @GetMapping("/horses/{horseId}/training-plans")
@@ -70,18 +72,14 @@ public class TrainingPlanController {
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
-        return service.listForHorse(horseId, userId(jwt), isPrivileged(authentication));
+        return service.listForHorse(horseId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"), hasRole(authentication, "HORSE_OWNER"));
     }
 
     private UUID userId(Jwt jwt) {
         return UUID.fromString(jwt.getSubject());
     }
 
-    private boolean isPrivileged(Authentication authentication) {
-        return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
-                || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
-                || authority.getAuthority().equals("ROLE_VETERINARIAN")
-                || authority.getAuthority().equals("ROLE_STABLE_STAFF"));
+    private boolean hasRole(Authentication authentication, String role) {
+        return authentication.getAuthorities().stream().anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role));
     }
 }

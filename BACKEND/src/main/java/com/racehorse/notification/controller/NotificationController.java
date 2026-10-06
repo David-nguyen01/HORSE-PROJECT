@@ -31,7 +31,7 @@ public class NotificationController {
     @GetMapping
     Page<NotificationResponse> list(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(name = "unreadOnly", defaultValue = "false") boolean unreadOnly,
             @PageableDefault(size = 20) Pageable pageable) {
         return service.list(userId(jwt), unreadOnly, pageable);
     }

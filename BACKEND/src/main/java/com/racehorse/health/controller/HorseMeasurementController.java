@@ -28,13 +28,13 @@ public class HorseMeasurementController {
     @GetMapping("/weights")
     @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','HORSE_OWNER')")
     List<HorseWeightResponse> list(@PathVariable UUID horseId,@AuthenticationPrincipal Jwt jwt,Authentication auth) {
-        return service.weights(horseId,userId(jwt),privileged(auth));
+        return service.weights(horseId,userId(jwt),privileged(auth),trainer(auth));
     }
     @GetMapping("/race-readiness")
     @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','HORSE_OWNER')")
     RaceReadinessResponse readiness(@PathVariable UUID horseId,@RequestParam(required=false) UUID raceEventId,
                                     @AuthenticationPrincipal Jwt jwt,Authentication auth) {
-        return service.readiness(horseId,raceEventId,userId(jwt),privileged(auth));
+        return service.readiness(horseId,raceEventId,userId(jwt),privileged(auth),trainer(auth));
     }
     @PutMapping("/health-status")
     @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
@@ -45,8 +45,15 @@ public class HorseMeasurementController {
     @GetMapping("/health-status")
     @PreAuthorize("hasAuthority('PERM_MEDICAL_VIEW')")
     HorseMeasurementService.HealthStatusView health(@PathVariable UUID horseId,@AuthenticationPrincipal Jwt jwt,Authentication auth){
-        return service.healthStatus(horseId,userId(jwt),privileged(auth));
+        return service.healthStatus(horseId,userId(jwt),privileged(auth),trainer(auth));
     }
     private UUID userId(Jwt jwt){return UUID.fromString(jwt.getSubject());}
-    private boolean privileged(Authentication a){return a.getAuthorities().stream().anyMatch(x->!x.getAuthority().equals("ROLE_HORSE_OWNER")&&x.getAuthority().startsWith("ROLE_"));}
+    private boolean trainer(Authentication a) {
+        return a.getAuthorities().stream().anyMatch(x -> x.getAuthority().equals("ROLE_HEAD_TRAINER"))
+                && a.getAuthorities().stream().noneMatch(x -> x.getAuthority().equals("ROLE_CLUB_MANAGER"));
+    }
+    private boolean privileged(Authentication a) {
+        return !trainer(a) && a.getAuthorities().stream().anyMatch(x ->
+                java.util.Set.of("ROLE_CLUB_MANAGER", "ROLE_VETERINARIAN", "ROLE_STABLE_STAFF").contains(x.getAuthority()));
+    }
 }

@@ -1,6 +1,6 @@
 package com.racehorse.training.service;
 
-import com.racehorse.common.exception.BusinessException;
+import com.racehorse.common.exception.InvalidInputException;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.training.dto.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -21,12 +21,12 @@ public class TelemetryService {
     public TelemetryService(JdbcTemplate jdbc,HorseAccessService access){this.jdbc=jdbc;this.access=access;}
 
     @Transactional
-    public UUID configureThreshold(UUID horseId,UUID actor,CreateMetricThresholdRequest r){
-        access.requireActive(horseId);
+    public UUID configureThreshold(UUID horseId,UUID actor,boolean manager,boolean trainer,CreateMetricThresholdRequest r){
+        requireAccess(horseId,actor,manager,trainer,false,false);
         String metric=upper(r.metricType());
-        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new BusinessException("metricType chỉ nhận HEART_RATE hoặc SPEED");
-        if(r.minimumValue()==null&&r.maximumValue()==null) throw new BusinessException("Phải nhập ít nhất một ngưỡng");
-        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new BusinessException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
+        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new InvalidInputException("metricType chỉ nhận HEART_RATE hoặc SPEED");
+        if(r.minimumValue()==null&&r.maximumValue()==null) throw new InvalidInputException("Phải nhập ít nhất một ngưỡng");
+        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new InvalidInputException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
         UUID id=UUID.randomUUID();
         jdbc.update("insert into horse_metric_thresholds(id,horse_id,metric_type,minimum_value,maximum_value,unit,configured_by_user_id,effective_from,effective_to) values(?,?,?,?,?,?,?,?,?)",
                 id,horseId,metric,r.minimumValue(),r.maximumValue(),r.unit(),actor,r.effectiveFrom(),r.effectiveTo());
@@ -34,8 +34,9 @@ public class TelemetryService {
     }
 
     @Transactional(readOnly = true)
-    public List<ThresholdView> thresholds(UUID horseId, UUID requester, boolean privileged, boolean includeExpired) {
-        access.requireReadable(horseId, requester, privileged);
+    public List<ThresholdView> thresholds(UUID horseId, UUID requester, boolean manager, boolean trainer,
+                                          boolean owner, boolean vet, boolean includeExpired) {
+        requireAccess(horseId,requester,manager,trainer,owner,vet);
         String sql="select id,horse_id,metric_type,minimum_value,maximum_value,unit,configured_by_user_id,effective_from,effective_to,created_at "
                 +"from horse_metric_thresholds where horse_id=? "+(includeExpired?"":"and (effective_to is null or effective_to>SYSDATETIMEOFFSET()) ")
                 +"order by metric_type,effective_from desc";
@@ -47,42 +48,45 @@ public class TelemetryService {
     }
 
     @Transactional
-    public ThresholdView updateThreshold(UUID horseId, UUID thresholdId, UUID actor, CreateMetricThresholdRequest r) {
-        access.requireActive(horseId);
+    public ThresholdView updateThreshold(UUID horseId, UUID thresholdId, UUID actor, boolean manager, boolean trainer,
+                                         CreateMetricThresholdRequest r) {
+        requireAccess(horseId,actor,manager,trainer,false,false);
         Integer count=jdbc.queryForObject("select count(*) from horse_metric_thresholds where id=? and horse_id=?",Integer.class,thresholdId,horseId);
         if(count==null||count==0) throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy ngưỡng: "+thresholdId);
         String metric=upper(r.metricType());
-        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new BusinessException("metricType chỉ nhận HEART_RATE hoặc SPEED");
-        if(r.minimumValue()==null&&r.maximumValue()==null) throw new BusinessException("Phải nhập ít nhất một ngưỡng");
-        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new BusinessException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
+        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new InvalidInputException("metricType chỉ nhận HEART_RATE hoặc SPEED");
+        if(r.minimumValue()==null&&r.maximumValue()==null) throw new InvalidInputException("Phải nhập ít nhất một ngưỡng");
+        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new InvalidInputException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
         jdbc.update("update horse_metric_thresholds set metric_type=?,minimum_value=?,maximum_value=?,unit=?,configured_by_user_id=?,effective_from=?,effective_to=? where id=?",
                 metric,r.minimumValue(),r.maximumValue(),r.unit(),actor,r.effectiveFrom(),r.effectiveTo(),thresholdId);
-        return thresholds(horseId,actor,true,true).stream().filter(v->v.id().equals(thresholdId)).findFirst().orElseThrow();
+        return thresholds(horseId,actor,manager,trainer,false,false,true).stream()
+                .filter(v->v.id().equals(thresholdId)).findFirst().orElseThrow();
     }
 
     @Transactional
-    public void endThreshold(UUID horseId, UUID thresholdId) {
+    public void endThreshold(UUID horseId, UUID thresholdId, UUID actor, boolean manager, boolean trainer) {
+        requireAccess(horseId,actor,manager,trainer,false,false);
         int changed=jdbc.update("update horse_metric_thresholds set effective_to=case when effective_to is null or effective_to>SYSDATETIMEOFFSET() then SYSDATETIMEOFFSET() else effective_to end where id=? and horse_id=?",
                 thresholdId,horseId);
         if(changed==0) throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy ngưỡng: "+thresholdId);
     }
 
     @Transactional
-    public TelemetryResponse enter(UUID horseId,UUID actor,CreateTelemetryRequest r){
-        access.requireActive(horseId);
+    public TelemetryResponse enter(UUID horseId,UUID actor,boolean manager,boolean trainer,CreateTelemetryRequest r){
+        requireAccess(horseId,actor,manager,trainer,false,false);
         String context=upper(r.measurementContext());
-        if(!List.of("RESTING","TRAINING","RECOVERY").contains(context)) throw new BusinessException("measurementContext không hợp lệ");
-        if(r.endedAt()!=null&&!r.startedAt().isBefore(r.endedAt())) throw new BusinessException("endedAt phải sau startedAt");
+        if(!List.of("RESTING","TRAINING","RECOVERY").contains(context)) throw new InvalidInputException("measurementContext không hợp lệ");
+        if(r.endedAt()!=null&&!r.startedAt().isBefore(r.endedAt())) throw new InvalidInputException("endedAt phải sau startedAt");
         if(r.trainingScheduleId()!=null){
             Integer count=jdbc.queryForObject("select count(*) from training_schedules where id=? and horse_id=?",Integer.class,r.trainingScheduleId(),horseId);
-            if(count==null||count==0) throw new BusinessException("Lịch tập không thuộc ngựa này");
+            if(count==null||count==0) throw new InvalidInputException("Lịch tập không thuộc ngựa này");
         }
         UUID session=UUID.randomUUID();
         jdbc.update("insert into telemetry_sessions(id,horse_id,training_schedule_id,started_at,ended_at,recorded_by_user_id,entry_method,measurement_context) values(?,?,?,?,?,?,'MANUAL',?)",
                 session,horseId,r.trainingScheduleId(),r.startedAt(),r.endedAt(),actor,context);
         List<TelemetryResponse.Alert> alerts=new ArrayList<>();
         for(CreateTelemetryRequest.Reading reading:r.readings()){
-            if(reading.heartRateBpm()==null&&reading.speedKmh()==null) throw new BusinessException("Mỗi dòng phải có nhịp tim hoặc tốc độ");
+            if(reading.heartRateBpm()==null&&reading.speedKmh()==null) throw new InvalidInputException("Mỗi dòng phải có nhịp tim hoặc tốc độ");
             long readingId=insertReading(session,reading);
             if(reading.heartRateBpm()!=null) evaluate(horseId,session,readingId,"HEART_RATE",BigDecimal.valueOf(reading.heartRateBpm()),reading.recordedAt(),alerts);
             if(reading.speedKmh()!=null) evaluate(horseId,session,readingId,"SPEED",reading.speedKmh(),reading.recordedAt(),alerts);
@@ -91,10 +95,9 @@ public class TelemetryService {
     }
 
     @Transactional(readOnly = true)
-    public List<SessionView> history(UUID horseId, UUID requester, boolean privileged, String context,
+    private List<SessionView> historyAfterAccess(UUID horseId, String context,
                                      OffsetDateTime from, OffsetDateTime to, int page, int size) {
-        access.requireReadable(horseId,requester,privileged);
-        if(page<0||size<1||size>200) throw new BusinessException("Phân trang không hợp lệ");
+        if(page<0||size<1||size>200) throw new InvalidInputException("Phân trang không hợp lệ");
         StringBuilder sql=new StringBuilder("select id,training_schedule_id,started_at,ended_at,recorded_by_user_id,entry_method,measurement_context from telemetry_sessions where horse_id=?");
         List<Object> args=new ArrayList<>();args.add(horseId);
         if(context!=null&&!context.isBlank()){sql.append(" and measurement_context=?");args.add(upper(context));}
@@ -114,10 +117,9 @@ public class TelemetryService {
     }
 
     @Transactional(readOnly = true)
-    public List<AlertView> alerts(UUID horseId, UUID requester, boolean privileged, String metric, Boolean acknowledged,
+    private List<AlertView> alertsAfterAccess(UUID horseId, String metric, Boolean acknowledged,
                                   OffsetDateTime from, OffsetDateTime to, int page, int size) {
-        access.requireReadable(horseId,requester,privileged);
-        if(page<0||size<1||size>200) throw new BusinessException("Phân trang không hợp lệ");
+        if(page<0||size<1||size>200) throw new InvalidInputException("Phân trang không hợp lệ");
         StringBuilder sql=new StringBuilder("select id,telemetry_session_id,telemetry_reading_id,threshold_id,metric_type,observed_value,threshold_value,threshold_direction,occurred_at,acknowledged_by_user_id,acknowledged_at from alert_events where horse_id=?");
         List<Object> args=new ArrayList<>();args.add(horseId);
         if(metric!=null&&!metric.isBlank()){sql.append(" and metric_type=?");args.add(upper(metric));}
@@ -134,14 +136,31 @@ public class TelemetryService {
     }
 
     @Transactional
-    public AlertView acknowledge(UUID horseId, UUID alertId, UUID actor) {
+    public AlertView acknowledge(UUID horseId, UUID alertId, UUID actor, boolean manager, boolean trainer) {
+        requireAccess(horseId,actor,manager,trainer,false,false);
         int changed=jdbc.update("update alert_events set acknowledged_by_user_id=?,acknowledged_at=SYSDATETIMEOFFSET() where id=? and horse_id=? and acknowledged_at is null",
                 actor,alertId,horseId);
         if(changed==0){
             Integer exists=jdbc.queryForObject("select count(*) from alert_events where id=? and horse_id=?",Integer.class,alertId,horseId);
             if(exists==null||exists==0)throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy cảnh báo: "+alertId);
         }
-        return alerts(horseId,actor,true,null,null,null,null,0,200).stream().filter(v->v.id().equals(alertId)).findFirst().orElseThrow();
+        return alerts(horseId,actor,manager,trainer,false,false,null,null,null,null,0,200).stream()
+                .filter(v->v.id().equals(alertId)).findFirst().orElseThrow();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SessionView> history(UUID horseId, UUID requester, boolean manager, boolean trainer, boolean owner,
+                                     boolean vet, String context, OffsetDateTime from, OffsetDateTime to, int page, int size) {
+        requireAccess(horseId,requester,manager,trainer,owner,vet);
+        return historyAfterAccess(horseId, context, from, to, page, size);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AlertView> alerts(UUID horseId, UUID requester, boolean manager, boolean trainer, boolean owner,
+                                  boolean vet, String metric, Boolean acknowledged, OffsetDateTime from,
+                                  OffsetDateTime to, int page, int size) {
+        requireAccess(horseId,requester,manager,trainer,owner,vet);
+        return alertsAfterAccess(horseId, metric, acknowledged, from, to, page, size);
     }
 
     private long insertReading(UUID session,CreateTelemetryRequest.Reading r){
@@ -174,6 +193,14 @@ public class TelemetryService {
     }
     private String upper(String value){return value.trim().toUpperCase(Locale.ROOT);}
     private UUID uuid(Object value){return value instanceof UUID id?id:UUID.fromString(String.valueOf(value));}
+
+    private void requireAccess(UUID horseId, UUID requester, boolean manager, boolean trainer, boolean owner, boolean vet) {
+        if (manager || vet) {
+            access.requireActive(horseId);
+        } else {
+            access.requireTrainingAccess(horseId,requester,false,trainer,owner);
+        }
+    }
 
     public record ThresholdView(UUID id,UUID horseId,String metricType,BigDecimal minimumValue,BigDecimal maximumValue,
                                 String unit,UUID configuredBy,OffsetDateTime effectiveFrom,OffsetDateTime effectiveTo,
