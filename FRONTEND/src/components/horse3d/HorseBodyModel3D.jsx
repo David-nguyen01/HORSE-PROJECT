@@ -3,7 +3,7 @@ import React, { Component, Suspense, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { BODY_REGION_MAP, SEVERITY_COLOR } from './bodyRegionMap'
+import { BODY_REGION_MAP, SEVERITY_COLOR, resolveRegionsFromInjury } from './bodyRegionMap'
 import InjuryMarker from './InjuryMarker'
 import HorseModelFallback from './HorseModelFallback'
 
@@ -114,22 +114,7 @@ export default function HorseBodyModel3D({
   const regionInjuryMap = useMemo(() => {
     const map = {}
     injuries.forEach((inj) => {
-      let regions = []
-      if (Array.isArray(inj.bodyRegions) && inj.bodyRegions.length > 0) {
-        regions = inj.bodyRegions
-      } else if (typeof inj.bodyRegions === 'string' && inj.bodyRegions.trim()) {
-        regions = inj.bodyRegions.split(',').map((s) => s.trim()).filter(Boolean)
-      } else if (inj.bodyLocation) {
-        // Fallback matching by bodyLocation
-        const parts = inj.bodyLocation.split(',').map((s) => s.trim()).filter(Boolean)
-        parts.forEach((p) => {
-          if (BODY_REGION_MAP[p]) regions.push(p)
-        })
-      }
-
-      // Nếu không khớp vùng nào, đưa vào OTHER
-      if (regions.length === 0) regions = ['OTHER']
-
+      const regions = resolveRegionsFromInjury(inj)
       regions.forEach((r) => {
         if (!map[r]) map[r] = []
         map[r].push(inj)

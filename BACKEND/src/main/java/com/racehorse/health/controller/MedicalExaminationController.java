@@ -62,7 +62,7 @@ public class MedicalExaminationController {
 
     @DeleteMapping("/api/medical-examinations/{examId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    @PreAuthorize("hasAnyRole('VETERINARIAN','CLUB_MANAGER') and (hasAuthority('PERM_MEDICAL_EDIT') or hasRole('CLUB_MANAGER'))")
     public void delete(
             @PathVariable UUID examId,
             @AuthenticationPrincipal Jwt jwt) {
@@ -71,7 +71,7 @@ public class MedicalExaminationController {
 
     @DeleteMapping("/api/medical-examinations/addenda/{addendumId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    @PreAuthorize("hasAnyRole('VETERINARIAN','CLUB_MANAGER') and (hasAuthority('PERM_MEDICAL_EDIT') or hasRole('CLUB_MANAGER'))")
     public void deleteAddendum(
             @PathVariable UUID addendumId,
             @AuthenticationPrincipal Jwt jwt) {

@@ -51,7 +51,7 @@ public class PreventiveCareController {
     }
 
     @DeleteMapping("/api/preventive-care/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    @PreAuthorize("hasAnyRole('VETERINARIAN','CLUB_MANAGER') and (hasAuthority('PERM_MEDICAL_EDIT') or hasRole('CLUB_MANAGER'))")
     void cancel(@PathVariable UUID id){service.cancel(id);}
     private boolean privileged(Authentication a){return a.getAuthorities().stream().anyMatch(x->!x.getAuthority().equals("ROLE_HORSE_OWNER")&&x.getAuthority().startsWith("ROLE_"));}
 }

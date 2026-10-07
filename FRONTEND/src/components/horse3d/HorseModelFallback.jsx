@@ -1,7 +1,7 @@
 // FRONTEND/src/components/horse3d/HorseModelFallback.jsx
 // Hiển thị sơ đồ 2D giải phẫu khi trình duyệt không hỗ trợ WebGL hoặc khi xảy ra lỗi render 3D
 
-import { BODY_REGION_MAP, SEVERITY_COLOR } from './bodyRegionMap'
+import { BODY_REGION_MAP, SEVERITY_COLOR, resolveRegionsFromInjury } from './bodyRegionMap'
 
 const HORSE_SVG_PATH = `
 M 20,80 C 20,80 30,30 80,25 C 100,22 110,20 130,15
@@ -29,11 +29,8 @@ Z
 export default function HorseModelFallback({ injuries = [] }) {
   const regionInjuryMap = {}
   injuries.forEach((inj) => {
-    const regions = Array.isArray(inj.bodyRegions)
-      ? inj.bodyRegions
-      : (inj.bodyRegions || '').split(',').filter(Boolean)
-    regions.forEach((r) => {
-      const code = r.trim()
+    const regions = resolveRegionsFromInjury(inj)
+    regions.forEach((code) => {
       if (!regionInjuryMap[code]) regionInjuryMap[code] = []
       regionInjuryMap[code].push(inj)
     })

@@ -160,3 +160,21 @@ Mô hình được tự động scale về chiều dài ~2.5 units, móng ngựa
 3. **Kiểm tra Tab Hồ sơ ngựa:**
    - Chọn mục **Hồ sơ ngựa** (`horses`) -> Chọn một con ngựa đang có chấn thương.
    - Quan sát thẻ **Sơ đồ cơ thể & Chấn thương 3D** hiển thị ở cột phải.
+
+---
+
+## 7. BỔ SUNG CẬP NHẬT THEO PHẢN HỒI NGƯỜI DÙNG
+
+1. **Khắc phục lỗi tô màu đồng thời Sidebar (`App.jsx`):**
+   - Đã cấu hình thuộc tính `end` cho các NavLink `/vet` và `/horses`. Khi người dùng truy cập các tab con như `/vet/medical-records` hoặc `/vet/health-map`, mục "Bảng điều khiển y tế" (`/vet`) sẽ không còn bị kích hoạt và tô xanh nhầm nữa.
+2. **Xóa hoàn toàn mục "Lịch tiêm phòng & Phòng ngừa" khỏi Sidebar:**
+   - Đã gỡ bỏ mục `{ to: '/vet/preventive' }` khỏi Sidebar của Bác sĩ Thú y trong [App.jsx](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/FRONTEND/src/App.jsx). Toàn bộ thao tác lập lịch tiêm phòng, tẩy giun hiện được tích hợp trọn vẹn trong modal tạo phiếu khám bệnh và danh sách bệnh án.
+   - Cập nhật các nút liên kết tắt điều hướng trực tiếp sang tab Hồ sơ bệnh án (`medical-records`).
+3. **Sửa lỗi nút Delete không hoạt động / không bấm được:**
+   - Thay thế toàn bộ hộp thoại mặc định `window.confirm` (dễ bị trình duyệt chặn ngầm) bằng **Modal xác nhận tùy chỉnh chuyên dụng** (`deleteConfirm`) với giao diện trực quan, cảnh báo rủi ro màu đỏ, trạng thái chờ và thông báo lỗi rõ ràng.
+   - Bổ sung `type="button"` và sự kiện bấm chuẩn xác cho tất cả nút xóa phiếu khám, xóa phụ lục, xóa chấn thương và hủy lịch phòng ngừa.
+   - Nới lỏng `@PreAuthorize` ở Backend ([MedicalExaminationController.java](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/BACKEND/src/main/java/com/racehorse/health/controller/MedicalExaminationController.java), [InjuryController.java](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/BACKEND/src/main/java/com/racehorse/health/controller/InjuryController.java), [PreventiveCareController.java](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/BACKEND/src/main/java/com/racehorse/health/controller/PreventiveCareController.java)) để hỗ trợ cả quyền `VETERINARIAN` lẫn `CLUB_MANAGER`, loại bỏ hoàn toàn lỗi 403 Forbidden.
+4. **Khắc phục lỗi mô hình 3D chỉ hiện 1 điểm chấn thương:**
+   - Cập nhật DTO Backend ([InjuryResponse.java](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/BACKEND/src/main/java/com/racehorse/health/dto/InjuryResponse.java), [InjuryDetailResponse.java](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/BACKEND/src/main/java/com/racehorse/health/dto/InjuryDetailResponse.java)) và [InjuryService.java](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/BACKEND/src/main/java/com/racehorse/health/service/InjuryService.java) để trả về mảng danh sách `bodyRegions` chuẩn.
+   - Xây dựng thuật toán phân giải thông minh `resolveRegionsFromInjury` trong [bodyRegionMap.js](file:///c:/Users/admin/OneDrive/Documents/GitHub/HORSE-PROJECT/FRONTEND/src/components/horse3d/bodyRegionMap.js) hỗ trợ tự động bóc tách cả chuỗi tiếng Việt phức tạp trong `bodyLocation` thành các tọa độ 3D riêng biệt, giúp mô hình hiển thị đầy đủ và chính xác tất cả các điểm tổn thương cùng lúc.
+

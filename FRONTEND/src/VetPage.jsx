@@ -677,7 +677,7 @@ function VetDashboard({ onNavigate }) {
           <section className="card">
             <div className="card-head">
               <h3>Chăm sóc phòng ngừa (7 ngày tới)</h3>
-              <button className="button secondary" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => onNavigate('preventive')}>
+              <button className="button secondary" style={{ padding: '4px 8px', fontSize: '10px' }} onClick={() => onNavigate('medical-records')}>
                 Chi tiết
               </button>
             </div>
@@ -1134,6 +1134,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   const [addendumText, setAddendumText] = useState('')
   const [busy, setBusy] = useState(false)
   const [preventiveList, setPreventiveList] = useState([])
+  const [deleteConfirm, setDeleteConfirm] = useState(null)
 
   const loadHorses = useCallback(async () => {
     try {
@@ -1167,14 +1168,67 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     loadPreventive()
   }, [loadPreventive])
 
-  const handleDeletePreventiveCare = async (careId) => {
-    if (!window.confirm('Xác nhận hủy lịch chăm sóc phòng ngừa này?')) return
+  const executeDelete = async () => {
+    if (!deleteConfirm) return
+    setDeleteConfirm((prev) => ({ ...prev, busy: true, error: '' }))
     try {
-      await vetApi.cancelPreventiveCare(careId)
-      await loadPreventive()
+      if (deleteConfirm.type === 'exam') {
+        await vetApi.deleteMedicalExam(deleteConfirm.id)
+        await loadExams()
+        await loadHorses()
+        await loadPreventive()
+      } else if (deleteConfirm.type === 'injury') {
+        await vetApi.deleteInjury(deleteConfirm.id)
+        await loadInjuries()
+        await loadHorses()
+      } else if (deleteConfirm.type === 'addendum') {
+        await vetApi.deleteMedicalExamAddendum(deleteConfirm.id)
+        await loadExams()
+        await loadHorses()
+      } else if (deleteConfirm.type === 'preventive') {
+        await vetApi.cancelPreventiveCare(deleteConfirm.id)
+        await loadPreventive()
+      }
+      setDeleteConfirm(null)
     } catch (err) {
-      alert(`Lỗi khi xóa lịch phòng ngừa: ${err.message}`)
+      setDeleteConfirm((prev) => ({ ...prev, busy: false, error: err.message || 'Thao tác xóa thất bại' }))
     }
+  }
+
+  const promptDeleteExam = (examId, examDate) => {
+    setDeleteConfirm({
+      type: 'exam',
+      id: examId,
+      title: 'Xóa phiếu khám lâm sàng',
+      description: `Bạn có chắc muốn xóa phiếu khám ngày ${formatVNDate(examDate)}? Mọi chẩn đoán và phụ lục đính kèm sẽ bị xóa vĩnh viễn khỏi hồ sơ bệnh án.`,
+    })
+  }
+
+  const promptDeleteInjury = (injuryId, location) => {
+    setDeleteConfirm({
+      type: 'injury',
+      id: injuryId,
+      title: 'Xóa mốc theo dõi chấn thương',
+      description: `Bạn có chắc muốn xóa dữ liệu chấn thương tại "${location || 'vị trí đã chọn'}"? Điểm chấn thương trên mô hình 3D và dòng thời gian hồi phục sẽ bị xóa vĩnh viễn.`,
+    })
+  }
+
+  const promptDeleteAddendum = (addendumId) => {
+    setDeleteConfirm({
+      type: 'addendum',
+      id: addendumId,
+      title: 'Xóa phụ lục tiến triển',
+      description: 'Bạn có chắc muốn xóa dòng phụ lục theo dõi này khỏi phiếu khám?',
+    })
+  }
+
+  const promptDeletePreventiveCare = (careId) => {
+    setDeleteConfirm({
+      type: 'preventive',
+      id: careId,
+      title: 'Hủy lịch chăm sóc phòng ngừa',
+      description: 'Bạn có chắc muốn hủy lịch tiêm phòng / chăm sóc phòng ngừa này?',
+    })
   }
 
   const loadExams = useCallback(async () => {
@@ -1411,7 +1465,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                             className="icon-button danger"
                             style={{ width: '22px', height: '22px' }}
                             title="Xóa lịch phòng ngừa"
-                            onClick={() => handleDeletePreventiveCare(p.id)}
+                            onClick={() => promptDeletePreventiveCare(p.id)}
                           >
                             <Trash2 size={12} />
                           </button>
@@ -1457,9 +1511,10 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                       <Plus size={13} /> Thêm phụ lục theo dõi
                     </button>
                     <button
+                      type="button"
                       className="icon-button danger"
                       title="Xóa phiếu khám"
-                      onClick={() => handleDeleteExam(rec.id, rec.examinationDate || rec.examDate)}
+                      onClick={() => promptDeleteExam(rec.id, rec.examinationDate || rec.examDate)}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -1497,10 +1552,11 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                           • <small style={{ color: '#777' }}>[{formatVNDate(ad.createdAt)}]:</small> {ad.notes}
                         </div>
                         <button
+                          type="button"
                           className="icon-button danger"
                           style={{ width: '24px', height: '24px' }}
                           title="Xóa phụ lục"
-                          onClick={() => handleDeleteAddendum(ad.id)}
+                          onClick={() => promptDeleteAddendum(ad.id)}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -1538,7 +1594,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                                   type="button"
                                   className="button secondary"
                                   style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#a74842' }}
-                                  onClick={() => handleDeletePreventiveCare(p.id)}
+                                  onClick={() => promptDeletePreventiveCare(p.id)}
                                 >
                                   Xóa
                                 </button>
@@ -1631,9 +1687,10 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                           <History size={14} /> Cập nhật hồi phục
                         </button>
                         <button
+                          type="button"
                           className="icon-button danger"
                           title="Xóa chấn thương"
-                          onClick={() => handleDeleteInjury(inj.id, inj.bodyLocation || inj.bodyPart)}
+                          onClick={() => promptDeleteInjury(inj.id, inj.bodyLocation || inj.bodyPart)}
                         >
                           <Trash2 size={15} />
                         </button>
@@ -1756,6 +1813,59 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                 <button type="submit" className="button primary">Cập nhật</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirm && (
+        <div className="modal-backdrop" onMouseDown={() => !deleteConfirm.busy && setDeleteConfirm(null)}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()} style={{ width: '450px', padding: '24px' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '16px' }}>
+              <div style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                background: '#ffedeb',
+                color: '#a74842',
+                display: 'grid',
+                placeItems: 'center',
+                flexShrink: 0,
+              }}>
+                <AlertTriangle size={22} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h3 style={{ margin: '0 0 6px', fontSize: '16px', color: '#173129' }}>{deleteConfirm.title}</h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#555', lineHeight: 1.5 }}>
+                  {deleteConfirm.description}
+                </p>
+              </div>
+            </div>
+
+            {deleteConfirm.error && (
+              <div style={{ padding: '8px 12px', background: '#fff2f0', color: '#a74842', borderRadius: '6px', fontSize: '12px', marginBottom: '14px', border: '1px solid #f2c6c4' }}>
+                ⚠️ {deleteConfirm.error}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+              <button
+                type="button"
+                className="button secondary"
+                disabled={deleteConfirm.busy}
+                onClick={() => setDeleteConfirm(null)}
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                className="button danger"
+                style={{ background: '#ad4b47', color: '#fff', borderColor: '#ad4b47' }}
+                disabled={deleteConfirm.busy}
+                onClick={executeDelete}
+              >
+                {deleteConfirm.busy ? 'Đang xóa…' : 'Xác nhận xóa'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -3808,7 +3918,7 @@ function HorseProfileView({ onNavigate, initialHorseId }) {
           <button
             className="button secondary"
             style={{ fontSize: '12px', padding: '6px 14px' }}
-            onClick={() => onNavigate(`preventive?horseId=${selectedHorseId}`)}
+            onClick={() => onNavigate(`medical-records?horseId=${selectedHorseId}`)}
           >
             <Syringe size={14} /> Lịch phòng ngừa
           </button>

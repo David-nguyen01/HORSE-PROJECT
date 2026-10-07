@@ -63,7 +63,7 @@ public class InjuryController {
 
     @DeleteMapping("/api/injuries/{injuryId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    @PreAuthorize("hasAnyRole('VETERINARIAN','CLUB_MANAGER') and (hasAuthority('PERM_MEDICAL_EDIT') or hasRole('CLUB_MANAGER'))")
     public void delete(
             @PathVariable UUID injuryId,
             @AuthenticationPrincipal Jwt jwt) {

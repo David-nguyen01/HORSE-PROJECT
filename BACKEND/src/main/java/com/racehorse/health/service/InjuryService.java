@@ -105,6 +105,8 @@ public class InjuryService {
                 horseId,
                 req.examinationId(),
                 effectiveBodyLocation,
+                req.bodyRegions() != null ? req.bodyRegions() : List.of(),
+                trimToNull(req.additionalNotes()),
                 x,
                 y,
                 z,
@@ -209,6 +211,8 @@ public class InjuryService {
             String examIdStr = node.path("examinationId").isNull() ? null : node.path("examinationId").asText(null);
             UUID examId = examIdStr != null && !examIdStr.isBlank() ? UUID.fromString(examIdStr) : null;
             String bodyLocation = node.path("bodyLocation").asText("");
+            List<String> bodyRegions = parseStringList(node.path("bodyRegions"));
+            String additionalNotes = node.path("additionalNotes").isNull() ? null : node.path("additionalNotes").asText(null);
             Double x = node.path("x").asDouble();
             Double y = node.path("y").asDouble();
             Double z = node.path("z").asDouble();
@@ -220,6 +224,7 @@ public class InjuryService {
 
             return new InjuryDetailResponse(
                     id, horseId, horseCode, horseName, examId, bodyLocation,
+                    bodyRegions, additionalNotes,
                     x, y, z, severity, currentStatus, notes, attachmentFileIds,
                     vetId, vetName, createdAt, updatedAt, List.of());
         }, injuryId);
@@ -311,6 +316,8 @@ public class InjuryService {
             String examIdStr = node.path("examinationId").isNull() ? null : node.path("examinationId").asText(null);
             UUID examId = examIdStr != null && !examIdStr.isBlank() ? UUID.fromString(examIdStr) : null;
             String bodyLocation = node.path("bodyLocation").asText("");
+            List<String> bodyRegions = parseStringList(node.path("bodyRegions"));
+            String additionalNotes = node.path("additionalNotes").isNull() ? null : node.path("additionalNotes").asText(null);
             Double x = node.path("x").asDouble();
             Double y = node.path("y").asDouble();
             Double z = node.path("z").asDouble();
@@ -321,6 +328,7 @@ public class InjuryService {
 
             return new InjuryResponse(
                     id, horseId, examId, bodyLocation,
+                    bodyRegions, additionalNotes,
                     x, y, z, severity, currentStatus, notes,
                     attachmentFileIds, vetId, vetName,
                     createdAt, updatedAt, updateCount);
@@ -356,6 +364,18 @@ public class InjuryService {
             String text = item.asText(null);
             if (text != null && !text.isBlank()) {
                 list.add(UUID.fromString(text));
+            }
+        }
+        return list;
+    }
+
+    private List<String> parseStringList(JsonNode node) {
+        if (node == null || !node.isArray()) return List.of();
+        List<String> list = new ArrayList<>();
+        for (JsonNode item : node) {
+            String text = item.asText(null);
+            if (text != null && !text.isBlank()) {
+                list.add(text.trim());
             }
         }
         return list;

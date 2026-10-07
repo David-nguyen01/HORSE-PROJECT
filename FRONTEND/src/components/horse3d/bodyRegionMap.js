@@ -66,3 +66,68 @@ export const SEVERITY_COLOR = {
   CRITICAL: '#7b1fa2',  // tím — cực kỳ nghiêm trọng
   DEFAULT:  '#e53935',  // đỏ mặc định khi không có severity
 }
+
+/**
+ * Trích xuất danh sách mã vùng giải phẫu từ một bản ghi chấn thương.
+ * Hỗ trợ cả mảng bodyRegions chuẩn lẫn chuỗi bodyLocation tiếng Việt.
+ */
+export function resolveRegionsFromInjury(inj) {
+  if (!inj) return ['OTHER']
+
+  // 1. Trực tiếp từ mảng bodyRegions
+  if (Array.isArray(inj.bodyRegions) && inj.bodyRegions.length > 0) {
+    const valid = inj.bodyRegions.filter((r) => BODY_REGION_MAP[r])
+    if (valid.length > 0) return valid
+  }
+
+  // 2. Trực tiếp từ chuỗi bodyRegions ngăn cách bởi dấu phẩy
+  if (typeof inj.bodyRegions === 'string' && inj.bodyRegions.trim()) {
+    const parts = inj.bodyRegions.split(',').map((s) => s.trim()).filter(Boolean)
+    const valid = parts.filter((r) => BODY_REGION_MAP[r])
+    if (valid.length > 0) return valid
+  }
+
+  // 3. Phân giải từ chuỗi bodyLocation hoặc bodyPart (kể cả tiếng Việt)
+  const locationStr = String(inj.bodyLocation || inj.bodyPart || '').trim()
+  if (locationStr) {
+    const parts = locationStr.split(/[,;\n]+/).map((s) => s.trim()).filter(Boolean)
+    const matched = []
+
+    parts.forEach((part) => {
+      // Khớp trực tiếp mã code
+      if (BODY_REGION_MAP[part]) {
+        if (!matched.includes(part)) matched.push(part)
+        return
+      }
+
+      // Khớp gần đúng qua nhãn tiếng Việt / tiếng Anh
+      const cleanPart = part.toLowerCase().replace(/[\(\)\[\]]/g, ' ').replace(/\s+/g, ' ').trim()
+      let bestKey = null
+
+      for (const [key, meta] of Object.entries(BODY_REGION_MAP)) {
+        if (key === 'OTHER') continue
+        const cleanKey = key.toLowerCase()
+        const cleanLabel = meta.label.toLowerCase().replace(/[\(\)\[\]]/g, ' ').replace(/\s+/g, ' ').trim()
+
+        if (cleanPart === cleanKey || cleanPart === cleanLabel) {
+          bestKey = key
+          break
+        }
+        // So khớp từ khóa chính (vd: "gối trước trái", "ống chân trước phải", "vai trái")
+        const labelBase = cleanLabel.split(' ')[0] + ' ' + (cleanLabel.split(' ')[1] || '')
+        if (cleanPart.includes(cleanKey) || cleanLabel.includes(cleanPart) || (cleanPart.includes(labelBase) && labelBase.length > 5)) {
+          bestKey = key
+          break
+        }
+      }
+
+      if (bestKey && !matched.includes(bestKey)) {
+        matched.push(bestKey)
+      }
+    })
+
+    if (matched.length > 0) return matched
+  }
+
+  return ['OTHER']
+}
