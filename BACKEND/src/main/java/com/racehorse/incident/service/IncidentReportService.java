@@ -97,7 +97,7 @@ public class IncidentReportService {
         IncidentReportResponse existing = getReport(incidentId);
         String targetStatus = request.status().trim().toUpperCase(Locale.ROOT);
 
-        if (!List.of("REPORTED", "UNDER_REVIEW", "RESOLVED").contains(targetStatus)) {
+        if (!List.of("REPORTED", "UNDER_REVIEW", "ACKNOWLEDGED", "RESOLVED", "DISMISSED").contains(targetStatus)) {
             throw new BusinessException("Trạng thái sự cố không hợp lệ: " + targetStatus);
         }
 
@@ -105,16 +105,21 @@ public class IncidentReportService {
                 "select data_json from module_records where id=?", String.class, incidentId);
         Map<String, Object> data = readMap(currentJson);
 
-        if ("RESOLVED".equals(targetStatus)) {
-            List<String> names = jdbc.query(
-                    "select username from users where id=?",
-                    (rs, rn) -> rs.getString("username"), actorId);
-            String resolverName = names.isEmpty() ? "Người xử lý" : names.getFirst();
+        List<String> names = jdbc.query(
+                "select username from users where id=?",
+                (rs, rn) -> rs.getString("username"), actorId);
+        String actorName = names.isEmpty() ? "Người xử lý" : names.getFirst();
 
+        if ("RESOLVED".equals(targetStatus) || "DISMISSED".equals(targetStatus)) {
             data.put("resolvedByUserId", actorId.toString());
-            data.put("resolvedByName", resolverName);
+            data.put("resolvedByName", actorName);
             data.put("resolvedAt", OffsetDateTime.now(clock).toString());
             data.put("resolutionNotes", request.resolutionNotes() == null ? null : request.resolutionNotes().trim());
+        } else if ("ACKNOWLEDGED".equals(targetStatus)) {
+            data.put("acknowledgedByUserId", actorId.toString());
+            data.put("acknowledgedByName", actorName);
+            data.put("acknowledgedAt", OffsetDateTime.now(clock).toString());
+            data.put("acknowledgementNotes", request.resolutionNotes() == null ? null : request.resolutionNotes().trim());
         }
 
         jdbc.update(

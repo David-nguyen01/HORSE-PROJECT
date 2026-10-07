@@ -142,10 +142,17 @@ export default function StableCarePage() {
   const isManager = userRoles.includes('CLUB_MANAGER')
   const isTrainer = userRoles.includes('HEAD_TRAINER')
   const isStaff = userRoles.includes('STABLE_STAFF')
+  const isVet = userRoles.includes('VETERINARIAN') && !isManager && !isTrainer && !isStaff
   const canEditRoutine = isManager || isTrainer
   const canApproveInventory = isManager
 
-  const currentMeta = PAGE_META[activeTab] || PAGE_META.tasks
+  useEffect(() => {
+    if (isVet && activeTab !== 'nutrition') {
+      navigate('/stable-care/nutrition', { replace: true })
+    }
+  }, [isVet, activeTab, navigate])
+
+  const currentMeta = isVet ? PAGE_META.nutrition : (PAGE_META[activeTab] || PAGE_META.tasks)
 
   return (
     <>
@@ -157,7 +164,7 @@ export default function StableCarePage() {
         </div>
       </div>
 
-      {!isStaff && (
+      {!isStaff && !isVet && (
         <div className="flow4-tabs">
           <button
             className={`flow4-tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
@@ -192,11 +199,17 @@ export default function StableCarePage() {
         </div>
       )}
 
-      {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
-      {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
-      {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
-      {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
-      {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
+      {isVet ? (
+        <NutritionView canEditPlan={true} />
+      ) : (
+        <>
+          {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
+          {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
+          {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
+          {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
+          {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
+        </>
+      )}
     </>
   )
 }
@@ -719,7 +732,12 @@ function NutritionView({ canEditPlan }) {
           </div>
 
           {canEditPlan && (
-            <button className="button primary" onClick={() => setShowCreatePlan(true)}>
+            <button
+              className="button primary"
+              disabled={!selectedStall?.horseId}
+              title={!selectedStall?.horseId ? 'Vui lòng chọn ô chuồng có ngựa để lập khẩu phần' : 'Lập khẩu phần mới cho ngựa'}
+              onClick={() => setShowCreatePlan(true)}
+            >
               <Plus size={15} /> Lập khẩu phần mới
             </button>
           )}
@@ -1158,6 +1176,7 @@ function NutritionView({ canEditPlan }) {
       {showCreatePlan && (
         <CreateNutritionPlanModal
           horseId={selectedStall?.horseId}
+          horseInfo={selectedStall ? `${selectedStall.horseDisplay || selectedStall.horseName} · ${selectedStall.stallLocationDisplay}` : ''}
           onClose={() => setShowCreatePlan(false)}
           onSaved={() => {
             setShowCreatePlan(false)
@@ -1169,7 +1188,7 @@ function NutritionView({ canEditPlan }) {
   )
 }
 
-function CreateNutritionPlanModal({ horseId, onClose, onSaved }) {
+function CreateNutritionPlanModal({ horseId, horseInfo, onClose, onSaved }) {
   const [effectiveDate, setEffectiveDate] = useState(today())
   const [notes, setNotes] = useState('')
   const [meals, setMeals] = useState([
@@ -1196,6 +1215,10 @@ function CreateNutritionPlanModal({ horseId, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!horseId) {
+      setError('Vui lòng chọn một ô chuồng đang nuôi ngựa để lập kế hoạch khẩu phần.')
+      return
+    }
     setBusy(true)
     setError('')
     try {
@@ -1221,7 +1244,7 @@ function CreateNutritionPlanModal({ horseId, onClose, onSaved }) {
       <div className="modal" style={{ width: 'min(860px, 100%)' }} onMouseDown={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <p className="eyebrow">KẾ HOẠCH DINH DƯỠNG</p>
+            <p className="eyebrow">KẾ HOẠCH DINH DƯỠNG {horseInfo ? `· ${horseInfo}` : ''}</p>
             <h2>Lập kế hoạch dinh dưỡng mới</h2>
           </div>
           <button className="icon-button" onClick={onClose}><X /></button>

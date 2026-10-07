@@ -86,10 +86,10 @@ public class NutritionPlanService {
         horseAccess.requireActive(horseId);
         LocalDate targetDate = date == null ? LocalDate.now() : date;
 
-        // 1. Look for plan where event_date <= targetDate (effective on or before target date)
+        // 1. Look for active plan where event_date <= targetDate (effective on or before target date)
         List<NutritionPlanResponse> rows = jdbc.query(
                 "select id, horse_id, user_id, status, event_date, data_json, created_at from module_records " +
-                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and event_date <= ? " +
+                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE' and event_date <= ? " +
                         "order by event_date desc, cast(JSON_VALUE(data_json,'$.version') as int) desc",
                 (rs, rowNum) -> mapResponse(rs), horseId, targetDate);
 
@@ -424,6 +424,18 @@ public class NutritionPlanService {
         return new NutritionPlanResponse(
                 id, horseId, version, effectiveDate, status, notes, meals, userId, createdAt
         );
+    }
+
+    @Transactional
+    public void deleteActivePlan(UUID horseId, UUID actor) {
+        horseAccess.requireActive(horseId);
+        int updated = jdbc.update(
+                "update module_records set status='CANCELLED', updated_at=SYSDATETIMEOFFSET() " +
+                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE'",
+                horseId);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy kế hoạch dinh dưỡng đang kích hoạt của ngựa: " + horseId);
+        }
     }
 
     private JsonNode read(String value) {

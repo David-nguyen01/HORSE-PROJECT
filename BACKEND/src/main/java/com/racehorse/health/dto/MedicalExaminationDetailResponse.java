@@ -20,8 +20,31 @@ public record MedicalExaminationDetailResponse(
         LocalDate followUpDate,
         String healthStatusAfter,
         OffsetDateTime createdAt,
-        List<AddendumView> addenda
+        List<AddendumView> addenda,
+        List<UUID> preventiveScheduleIds
 ) {
+    public MedicalExaminationDetailResponse(
+            UUID id,
+            UUID horseId,
+            String horseCode,
+            String horseName,
+            UUID veterinarianId,
+            String veterinarianName,
+            LocalDate examinationDate,
+            String symptoms,
+            String diagnosis,
+            String treatmentProtocol,
+            String medicationNotes,
+            LocalDate followUpDate,
+            String healthStatusAfter,
+            OffsetDateTime createdAt,
+            List<AddendumView> addenda
+    ) {
+        this(id, horseId, horseCode, horseName, veterinarianId, veterinarianName,
+                examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes,
+                followUpDate, healthStatusAfter, createdAt, addenda, List.of());
+    }
+
     public record AddendumView(
             UUID id,
             UUID authoredByUserId,

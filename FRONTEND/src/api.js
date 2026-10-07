@@ -81,6 +81,7 @@ export const stableCareApi = {
   getHorsesActivePlans: (date) => api(`/api/nutrition/horses-active${date ? `?date=${date}` : ''}`),
   getStablesWorkload: (date) => api(`/api/nutrition/stables-workload${date ? `?date=${date}` : ''}`),
   createNutritionPlan: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'POST', body: JSON.stringify(payload) }),
+  deleteNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'DELETE' }),
 
   // FR15 Care Tasks
   getCareTasks: (params = {}) => {

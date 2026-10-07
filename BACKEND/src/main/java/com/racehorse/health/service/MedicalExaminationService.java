@@ -3,10 +3,17 @@ package com.racehorse.health.service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import com.racehorse.auth.entity.Role;
+import com.racehorse.auth.entity.UserAccount;
+import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.health.dto.*;
+import com.racehorse.health.repository.TrainingLockRepository;
+import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
+import com.racehorse.notification.entity.NotificationPriority;
+import com.racehorse.notification.service.NotificationService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +27,38 @@ public class MedicalExaminationService {
 
     private final JdbcTemplate jdbc;
     private final HorseAccessService horseAccessService;
+    private final TrainingLockRepository trainingLockRepository;
+    private final TrainingLockService trainingLockService;
+    private final PreventiveCareService preventiveCareService;
+    private final UserAccountRepository userRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper json;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public MedicalExaminationService(
+            JdbcTemplate jdbc,
+            HorseAccessService horseAccessService,
+            TrainingLockRepository trainingLockRepository,
+            TrainingLockService trainingLockService,
+            PreventiveCareService preventiveCareService,
+            UserAccountRepository userRepository,
+            NotificationService notificationService,
+            ObjectMapper json) {
+        this.jdbc = jdbc;
+        this.horseAccessService = horseAccessService;
+        this.trainingLockRepository = trainingLockRepository;
+        this.trainingLockService = trainingLockService;
+        this.preventiveCareService = preventiveCareService;
+        this.userRepository = userRepository;
+        this.notificationService = notificationService;
+        this.json = json;
+    }
 
     public MedicalExaminationService(
             JdbcTemplate jdbc,
             HorseAccessService horseAccessService,
             ObjectMapper json) {
-        this.jdbc = jdbc;
-        this.horseAccessService = horseAccessService;
-        this.json = json;
+        this(jdbc, horseAccessService, null, null, null, null, null, json);
     }
 
     @Transactional
@@ -36,7 +66,7 @@ public class MedicalExaminationService {
             UUID horseId,
             UUID veterinarianId,
             CreateMedicalExaminationRequest req) {
-        horseAccessService.requireActive(horseId);
+        Horse horse = horseAccessService.requireActive(horseId);
 
         LocalDate today = LocalDate.now();
         if (req.examinationDate().isAfter(today)) {
@@ -83,6 +113,67 @@ public class MedicalExaminationService {
                     healthStatusAfter, veterinarianId, examId, horseId);
         }
 
+        // Tự động tạo Training Lock nếu chẩn đoán liên quan đến chấn thương
+        boolean isInjury = isInjuryDiagnosis(req.diagnosis(), healthStatusAfter);
+        if (isInjury && trainingLockService != null && trainingLockRepository != null) {
+            if (trainingLockRepository.findByHorseIdAndReleasedAtIsNull(horseId).isEmpty()) {
+                String lockReason = "Khóa tự động từ kết quả khám: " + req.diagnosis().trim();
+                trainingLockService.lock(horseId, veterinarianId,
+                        new CreateTrainingLockRequest(lockReason, req.followUpDate()));
+            }
+            if (userRepository != null && notificationService != null) {
+                List<UserAccount> headTrainers = userRepository.findByRoles(List.of(Role.HEAD_TRAINER));
+                for (UserAccount ht : headTrainers) {
+                    notificationService.create(
+                            ht,
+                            "TRAINING_LOCK_AUTOMATIC",
+                            NotificationPriority.HIGH,
+                            "Khóa lịch tập y tế: " + horse.getCode() + " - " + horse.getName(),
+                            "Ngựa " + horse.getCode() + " bị khóa lịch tập do kết quả chẩn đoán: " + req.diagnosis().trim(),
+                            "HORSE",
+                            horseId);
+                }
+            }
+        }
+
+        // Tích hợp tạo lịch chăm sóc phòng ngừa nếu có
+        List<CreatePreventiveCareRequest> schedules = new ArrayList<>();
+        if (req.preventiveSchedules() != null && !req.preventiveSchedules().isEmpty()) {
+            schedules.addAll(req.preventiveSchedules());
+        }
+        if (req.preventiveCareSchedule() != null) {
+            schedules.add(req.preventiveCareSchedule());
+        }
+
+        List<UUID> createdScheduleIds = new ArrayList<>();
+        if (!schedules.isEmpty() && preventiveCareService != null) {
+            List<UserAccount> staffList = userRepository != null ? userRepository.findByRoles(List.of(Role.STABLE_STAFF)) : List.of();
+            for (CreatePreventiveCareRequest schedule : schedules) {
+                if (schedule == null || schedule.dueDate() == null) continue;
+                PreventiveCareResponse care = preventiveCareService.create(horseId, veterinarianId, schedule);
+                if (care != null && care.id() != null) {
+                    createdScheduleIds.add(care.id());
+                }
+                if (notificationService != null && !staffList.isEmpty()) {
+                    for (UserAccount staff : staffList) {
+                        notificationService.create(
+                                staff,
+                                "PREVENTIVE_CARE_SCHEDULED",
+                                NotificationPriority.NORMAL,
+                                "Lịch chăm sóc phòng ngừa: " + horse.getCode() + " - " + horse.getName(),
+                                "Bác sĩ đã lên lịch " + schedule.careType() + " cho ngựa " + horse.getName() + " vào ngày " + schedule.dueDate(),
+                                "HORSE",
+                                horseId);
+                    }
+                }
+            }
+        }
+
+        if (!createdScheduleIds.isEmpty()) {
+            data.put("preventiveScheduleIds", createdScheduleIds.stream().map(UUID::toString).toList());
+            jdbc.update("update module_records set data_json = ? where id = ?", toJson(data), examId);
+        }
+
         String vetName = findUsername(veterinarianId);
         OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -116,7 +207,7 @@ public class MedicalExaminationService {
             throw new ResourceNotFoundException("Không tìm thấy hồ sơ khám bệnh: " + examId);
         }
 
-        UUID horseId = (UUID) rows.getFirst().get("horse_id");
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         horseAccessService.requireActive(horseId);
 
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
@@ -195,11 +286,19 @@ public class MedicalExaminationService {
             String followUpStr = node.path("followUpDate").isNull() ? null : node.path("followUpDate").asText(null);
             LocalDate followUpDate = followUpStr != null && !followUpStr.isBlank() ? LocalDate.parse(followUpStr) : null;
             String healthStatusAfter = node.path("healthStatusAfter").isNull() ? null : node.path("healthStatusAfter").asText(null);
+            List<UUID> scheduleIds = new ArrayList<>();
+            if (node.has("preventiveScheduleIds") && node.path("preventiveScheduleIds").isArray()) {
+                for (JsonNode sid : node.path("preventiveScheduleIds")) {
+                    try {
+                        scheduleIds.add(UUID.fromString(sid.asText()));
+                    } catch (Exception ignored) {}
+                }
+            }
 
             return new MedicalExaminationDetailResponse(
                     id, horseId, horseCode, horseName, vetId, vetName,
                     examDate, symptoms, diagnosis, treatment, medication,
-                    followUpDate, healthStatusAfter, createdAt, List.of());
+                    followUpDate, healthStatusAfter, createdAt, List.of(), scheduleIds);
         }, examId);
 
         if (rows.isEmpty()) {
@@ -235,7 +334,7 @@ public class MedicalExaminationService {
                 exam.examinationDate(), exam.symptoms(), exam.diagnosis(),
                 exam.treatmentProtocol(), exam.medicationNotes(),
                 exam.followUpDate(), exam.healthStatusAfter(),
-                exam.createdAt(), addenda);
+                exam.createdAt(), addenda, exam.preventiveScheduleIds());
     }
 
     @Transactional(readOnly = true)
@@ -282,10 +381,118 @@ public class MedicalExaminationService {
     private String normalizeHealthStatus(String status) {
         if (status == null || status.isBlank()) return null;
         String normalized = status.trim().toUpperCase(Locale.ROOT);
+        if ("HEALTHY".equals(normalized) || "ACTIVE".equals(normalized)) normalized = "FIT";
+        else if ("MONITORING".equals(normalized)) normalized = "MONITOR";
+        else if ("UNDER_TREATMENT".equals(normalized)) normalized = "INJURED";
         if (!Set.of("FIT", "MONITOR", "INJURED", "QUARANTINED").contains(normalized)) {
             throw new BusinessException("Trạng thái sức khỏe chỉ nhận FIT, MONITOR, INJURED hoặc QUARANTINED");
         }
         return normalized;
+    }
+
+    @Transactional
+    public void delete(UUID examId, UUID actorId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'",
+                examId);
+        if (rows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy hồ sơ khám bệnh: " + examId);
+        }
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        if (horseId != null) {
+            horseAccessService.requireActive(horseId);
+        }
+        // Delete addenda of this examination
+        jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM' and JSON_VALUE(data_json, '$.examinationId')=?", examId.toString());
+        // Delete examination record
+        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'", examId);
+
+        // Revert horse health status if this exam was the source
+        if (horseId != null) {
+            revertHorseHealthStatusIfSourceMatches(horseId, examId, actorId);
+        }
+    }
+
+    @Transactional
+    public void deleteAddendum(UUID addendumId, UUID actorId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'",
+                addendumId);
+        if (rows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy phụ lục bệnh án: " + addendumId);
+        }
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        if (horseId != null) {
+            horseAccessService.requireActive(horseId);
+        }
+        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'", addendumId);
+
+        if (horseId != null) {
+            revertHorseHealthStatusIfSourceMatches(horseId, addendumId, actorId);
+        }
+    }
+
+    private void revertHorseHealthStatusIfSourceMatches(UUID horseId, UUID deletedSourceId, UUID actorId) {
+        List<Map<String, Object>> horseRows = jdbc.queryForList(
+                "select health_source_id from horses where id=?", horseId);
+        if (horseRows.isEmpty()) return;
+        UUID currentSourceId = toUuid(horseRows.getFirst().get("health_source_id"));
+        if (currentSourceId == null || !currentSourceId.equals(deletedSourceId)) {
+            return;
+        }
+
+        List<Map<String, Object>> remainingExams = jdbc.queryForList("""
+                select top 1 id, data_json from module_records
+                where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'
+                order by event_date desc, created_at desc
+                """, horseId);
+
+        if (!remainingExams.isEmpty()) {
+            UUID prevExamId = toUuid(remainingExams.getFirst().get("id"));
+            JsonNode examData = read((String) remainingExams.getFirst().get("data_json"));
+            String prevStatus = examData.path("healthStatusAfter").asText("FIT");
+
+            List<Map<String, Object>> addenda = jdbc.queryForList("""
+                    select top 1 id, data_json from module_records
+                    where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'
+                      and JSON_VALUE(data_json, '$.examinationId')=?
+                    order by created_at desc
+                    """, prevExamId.toString());
+            if (!addenda.isEmpty()) {
+                JsonNode addendumData = read((String) addenda.getFirst().get("data_json"));
+                String addendumStatus = addendumData.path("healthStatusAfter").asText(null);
+                if (addendumStatus != null && !addendumStatus.isBlank()) {
+                    prevStatus = addendumStatus;
+                    prevExamId = toUuid(addenda.getFirst().get("id"));
+                }
+            }
+
+            jdbc.update("""
+                    update horses
+                    set health_status = ?,
+                        health_changed_by_user_id = ?,
+                        health_source_type = 'MEDICAL_EXAM',
+                        health_source_id = ?,
+                        health_changed_at = SYSDATETIMEOFFSET(),
+                        updated_at = SYSDATETIMEOFFSET(),
+                        version = version + 1
+                    where id = ?
+                    """,
+                    prevStatus, actorId, prevExamId, horseId);
+        } else {
+            jdbc.update("""
+                    update horses
+                    set health_status = 'FIT',
+                        health_changed_by_user_id = ?,
+                        health_source_type = null,
+                        health_source_id = null,
+                        health_changed_at = SYSDATETIMEOFFSET(),
+                        updated_at = SYSDATETIMEOFFSET(),
+                        version = version + 1
+                    where id = ?
+                    """,
+                    actorId, horseId);
+        }
     }
 
     private String findUsername(UUID userId) {
@@ -312,5 +519,18 @@ public class MedicalExaminationService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private boolean isInjuryDiagnosis(String diagnosis, String healthStatusAfter) {
+        if ("INJURED".equalsIgnoreCase(healthStatusAfter)) return true;
+        if (diagnosis == null) return false;
+        String lower = diagnosis.toLowerCase(Locale.ROOT);
+        return lower.contains("chấn thương") || lower.contains("injury") || lower.contains("gãy")
+                || lower.contains("bong gân") || lower.contains("rách") || lower.contains("trật khớp");
+    }
+
+    private UUID toUuid(Object value) {
+        if (value == null) return null;
+        return value instanceof UUID uuid ? uuid : UUID.fromString(value.toString());
     }
 }

@@ -46,12 +46,21 @@ public class InjuryService {
                 ? req.attachmentFileIds().stream().map(UUID::toString).toList()
                 : List.of();
 
+        String effectiveBodyLocation = req.bodyLocation() != null && !req.bodyLocation().isBlank()
+                ? req.bodyLocation().trim()
+                : (req.bodyRegions() != null && !req.bodyRegions().isEmpty() ? String.join(", ", req.bodyRegions()) : "OTHER");
+        double x = req.x() != null ? req.x() : 0.0;
+        double y = req.y() != null ? req.y() : 0.0;
+        double z = req.z() != null ? req.z() : 0.0;
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("examinationId", req.examinationId() != null ? req.examinationId().toString() : null);
-        data.put("bodyLocation", req.bodyLocation().trim());
-        data.put("x", req.x());
-        data.put("y", req.y());
-        data.put("z", req.z());
+        data.put("bodyLocation", effectiveBodyLocation);
+        data.put("bodyRegions", req.bodyRegions() != null ? req.bodyRegions() : List.of());
+        data.put("additionalNotes", trimToNull(req.additionalNotes()));
+        data.put("x", x);
+        data.put("y", y);
+        data.put("z", z);
         data.put("severity", severity);
         data.put("currentStatus", initialStatus);
         data.put("notes", trimToNull(req.notes()));
@@ -95,10 +104,12 @@ public class InjuryService {
                 injuryId,
                 horseId,
                 req.examinationId(),
-                req.bodyLocation().trim(),
-                req.x(),
-                req.y(),
-                req.z(),
+                effectiveBodyLocation,
+                req.bodyRegions() != null ? req.bodyRegions() : List.of(),
+                trimToNull(req.additionalNotes()),
+                x,
+                y,
+                z,
                 severity,
                 initialStatus,
                 trimToNull(req.notes()),
@@ -125,7 +136,7 @@ public class InjuryService {
             throw new ResourceNotFoundException("Không tìm thấy dấu chấn thương: " + injuryId);
         }
 
-        UUID horseId = (UUID) rows.getFirst().get("horse_id");
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         horseAccessService.requireActive(horseId);
 
         String newStatus = normalizeRecoveryStatus(req.recoveryStatus());
@@ -200,6 +211,8 @@ public class InjuryService {
             String examIdStr = node.path("examinationId").isNull() ? null : node.path("examinationId").asText(null);
             UUID examId = examIdStr != null && !examIdStr.isBlank() ? UUID.fromString(examIdStr) : null;
             String bodyLocation = node.path("bodyLocation").asText("");
+            List<String> bodyRegions = parseStringList(node.path("bodyRegions"));
+            String additionalNotes = node.path("additionalNotes").isNull() ? null : node.path("additionalNotes").asText(null);
             Double x = node.path("x").asDouble();
             Double y = node.path("y").asDouble();
             Double z = node.path("z").asDouble();
@@ -211,6 +224,7 @@ public class InjuryService {
 
             return new InjuryDetailResponse(
                     id, horseId, horseCode, horseName, examId, bodyLocation,
+                    bodyRegions, additionalNotes,
                     x, y, z, severity, currentStatus, notes, attachmentFileIds,
                     vetId, vetName, createdAt, updatedAt, List.of());
         }, injuryId);
@@ -302,6 +316,8 @@ public class InjuryService {
             String examIdStr = node.path("examinationId").isNull() ? null : node.path("examinationId").asText(null);
             UUID examId = examIdStr != null && !examIdStr.isBlank() ? UUID.fromString(examIdStr) : null;
             String bodyLocation = node.path("bodyLocation").asText("");
+            List<String> bodyRegions = parseStringList(node.path("bodyRegions"));
+            String additionalNotes = node.path("additionalNotes").isNull() ? null : node.path("additionalNotes").asText(null);
             Double x = node.path("x").asDouble();
             Double y = node.path("y").asDouble();
             Double z = node.path("z").asDouble();
@@ -312,6 +328,7 @@ public class InjuryService {
 
             return new InjuryResponse(
                     id, horseId, examId, bodyLocation,
+                    bodyRegions, additionalNotes,
                     x, y, z, severity, currentStatus, notes,
                     attachmentFileIds, vetId, vetName,
                     createdAt, updatedAt, updateCount);
@@ -352,6 +369,40 @@ public class InjuryService {
         return list;
     }
 
+    private List<String> parseStringList(JsonNode node) {
+        if (node == null || !node.isArray()) return List.of();
+        List<String> list = new ArrayList<>();
+        for (JsonNode item : node) {
+            String text = item.asText(null);
+            if (text != null && !text.isBlank()) {
+                list.add(text.trim());
+            }
+        }
+        return list;
+    }
+
+    @Transactional
+    public void delete(UUID injuryId, UUID actorId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select horse_id from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')",
+                injuryId);
+        if (rows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy thông tin chấn thương: " + injuryId);
+        }
+        UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        if (horseId != null) {
+            horseAccessService.requireActive(horseId);
+        }
+        // Delete recovery updates of this injury
+        jdbc.update("""
+                delete from module_records
+                where module_code='MEDICAL' and record_type='INJURY_RECOVERY_UPDATE'
+                  and (JSON_VALUE(data_json, '$.injuryMarkerId')=? or JSON_VALUE(data_json, '$.injuryId')=? or data_json like ?)
+                """, injuryId.toString(), injuryId.toString(), "%" + injuryId + "%");
+        // Delete injury record
+        jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')", injuryId);
+    }
+
     private String findUsername(UUID userId) {
         List<String> names = jdbc.query("select username from users where id = ?",
                 (rs, rowNum) -> rs.getString(1), userId);
@@ -376,5 +427,10 @@ public class InjuryService {
 
     private String trimToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private UUID toUuid(Object value) {
+        if (value == null) return null;
+        return value instanceof UUID uuid ? uuid : UUID.fromString(value.toString());
     }
 }

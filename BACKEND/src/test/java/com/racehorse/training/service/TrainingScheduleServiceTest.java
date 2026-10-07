@@ -11,9 +11,11 @@ import com.racehorse.horse.entity.HorseGender;
 import com.racehorse.horse.entity.HorseStatus;
 import com.racehorse.notification.service.NotificationService;
 import com.racehorse.training.dto.CreateTrainingScheduleRequest;
+import com.racehorse.training.dto.TrainingScheduleResponse;
 import com.racehorse.training.entity.SurfaceType;
 import com.racehorse.training.entity.TrainingPlan;
 import com.racehorse.training.entity.TrainingPlanPhase;
+import com.racehorse.training.entity.TrainingSchedule;
 import com.racehorse.training.entity.WorkloadIntensity;
 import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import com.racehorse.training.repository.TrainingScheduleRepository;
@@ -71,6 +73,124 @@ class TrainingScheduleServiceTest {
         assertThatThrownBy(() -> service.create(UUID.randomUUID(), request(phaseId, staffId)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("đang bị khóa");
+        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void rejectsScheduleWhenHorseIsInMedical() {
+        UUID phaseId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
+        Horse inMedicalHorse = horse();
+        inMedicalHorse.setPaymentStatus("IN_MEDICAL");
+
+        TrainingPlan plan = new TrainingPlan(inMedicalHorse, "Active", null, user("trainer", Role.HEAD_TRAINER), true);
+        TrainingPlanPhase phase = new TrainingPlanPhase(
+                1, "Phase", LocalDate.of(2026, 9, 15), LocalDate.of(2026, 9, 20),
+                new BigDecimal("1500"), WorkloadIntensity.LOW, SurfaceType.GRASS);
+        plan.replacePhases(List.of(phase));
+
+        UserAccount staff = user("staff", Role.STABLE_STAFF);
+        when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
+        when(userRepository.findById(staffId)).thenReturn(Optional.of(staff));
+
+        assertThatThrownBy(() -> service.create(UUID.randomUUID(), request(phaseId, staffId)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("đang trong ca khám y tế");
+        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void vetCanClaimScheduleBeforeDeadline() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        UserAccount vet = user("vet", Role.VETERINARIAN);
+
+        TrainingPlanPhase phase = phase(WorkloadIntensity.LOW);
+        UserAccount staff = user("staff", Role.STABLE_STAFF);
+        TrainingSchedule schedule = new TrainingSchedule(
+                phase, horse(), staff, "Supervised training", WorkloadIntensity.LOW,
+                Instant.parse("2026-09-16T03:00:00Z"),
+                Instant.parse("2026-09-16T04:00:00Z"),
+                user("trainer", Role.HEAD_TRAINER)
+        );
+
+        when(repository.findByIdWithLock(scheduleId)).thenReturn(Optional.of(schedule));
+        when(repository.existsByVetOnDate(org.mockito.ArgumentMatchers.eq(vetId), org.mockito.ArgumentMatchers.any(LocalDate.class))).thenReturn(false);
+        when(userRepository.findById(vetId)).thenReturn(Optional.of(vet));
+        when(repository.save(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TrainingScheduleResponse response = service.claim(scheduleId, vetId, true);
+
+        org.assertj.core.api.Assertions.assertThat(response.veterinarianUserId()).isEqualTo(vet.getId());
+        org.assertj.core.api.Assertions.assertThat(response.vetAssignedBy()).isEqualTo("USER");
+        verify(repository).save(schedule);
+    }
+
+    @Test
+    void claimFailsWhenDeadlineExceeded() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+
+        TrainingPlanPhase phase = phase(WorkloadIntensity.LOW);
+        UserAccount staff = user("staff", Role.STABLE_STAFF);
+        TrainingSchedule schedule = new TrainingSchedule(
+                phase, horse(), staff, "Same day training", WorkloadIntensity.LOW,
+                Instant.parse("2026-09-15T05:00:00Z"),
+                Instant.parse("2026-09-15T06:00:00Z"),
+                user("trainer", Role.HEAD_TRAINER)
+        );
+
+        when(repository.findByIdWithLock(scheduleId)).thenReturn(Optional.of(schedule));
+
+        assertThatThrownBy(() -> service.claim(scheduleId, vetId, true))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Thời hạn tự nhận phiên tập đã kết thúc");
+        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void claimFailsWhenVetAlreadyAssigned() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+
+        TrainingPlanPhase phase = phase(WorkloadIntensity.LOW);
+        UserAccount staff = user("staff", Role.STABLE_STAFF);
+        TrainingSchedule schedule = new TrainingSchedule(
+                phase, horse(), staff, "Already claimed", WorkloadIntensity.LOW,
+                Instant.parse("2026-09-16T03:00:00Z"),
+                Instant.parse("2026-09-16T04:00:00Z"),
+                user("trainer", Role.HEAD_TRAINER)
+        );
+        schedule.setVeterinarianUser(user("otherVet", Role.VETERINARIAN));
+
+        when(repository.findByIdWithLock(scheduleId)).thenReturn(Optional.of(schedule));
+
+        assertThatThrownBy(() -> service.claim(scheduleId, vetId, true))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("đã có bác sĩ thú y đăng ký");
+        verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void claimFailsWhenVetAlreadyHasShiftOnDate() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+
+        TrainingPlanPhase phase = phase(WorkloadIntensity.LOW);
+        UserAccount staff = user("staff", Role.STABLE_STAFF);
+        TrainingSchedule schedule = new TrainingSchedule(
+                phase, horse(), staff, "Second session", WorkloadIntensity.LOW,
+                Instant.parse("2026-09-16T03:00:00Z"),
+                Instant.parse("2026-09-16T04:00:00Z"),
+                user("trainer", Role.HEAD_TRAINER)
+        );
+
+        when(repository.findByIdWithLock(scheduleId)).thenReturn(Optional.of(schedule));
+        when(repository.existsByVetOnDate(org.mockito.ArgumentMatchers.eq(vetId), org.mockito.ArgumentMatchers.any(LocalDate.class))).thenReturn(true);
+
+        assertThatThrownBy(() -> service.claim(scheduleId, vetId, true))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("tối đa 1 phiên/ngày");
         verify(repository, never()).save(org.mockito.ArgumentMatchers.any());
     }
 

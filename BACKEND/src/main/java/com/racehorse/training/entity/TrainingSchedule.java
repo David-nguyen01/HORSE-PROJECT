@@ -26,9 +26,29 @@ public class TrainingSchedule extends BaseEntity {
     @JoinColumn(name = "horse_id", nullable = false)
     private Horse horse;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "assigned_staff_id", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_staff_id")
     private UserAccount assignedStaff;
+
+    @Column(name = "staff_assigned_by", length = 20)
+    private String staffAssignedBy;
+
+    @Column(name = "staff_assigned_at")
+    private Instant staffAssignedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "racetrack_id")
+    private Racetrack racetrack;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "veterinarian_user_id")
+    private UserAccount veterinarianUser;
+
+    @Column(name = "vet_assigned_by", length = 20)
+    private String vetAssignedBy;
+
+    @Column(name = "vet_assigned_at")
+    private Instant vetAssignedAt;
 
     @Column(name = "task_name", nullable = false, length = 300)
     private String taskName;
@@ -93,6 +113,22 @@ public class TrainingSchedule extends BaseEntity {
     public TrainingPlanPhase getPhase() { return phase; }
     public Horse getHorse() { return horse; }
     public UserAccount getAssignedStaff() { return assignedStaff; }
+    public void setAssignedStaff(UserAccount assignedStaff) { this.assignedStaff = assignedStaff; }
+    public String getStaffAssignedBy() { return staffAssignedBy; }
+    public void setStaffAssignedBy(String staffAssignedBy) { this.staffAssignedBy = staffAssignedBy; }
+    public Instant getStaffAssignedAt() { return staffAssignedAt; }
+    public void setStaffAssignedAt(Instant staffAssignedAt) { this.staffAssignedAt = staffAssignedAt; }
+
+    public Racetrack getRacetrack() { return racetrack; }
+    public void setRacetrack(Racetrack racetrack) { this.racetrack = racetrack; }
+
+    public UserAccount getVeterinarianUser() { return veterinarianUser; }
+    public void setVeterinarianUser(UserAccount veterinarianUser) { this.veterinarianUser = veterinarianUser; }
+    public String getVetAssignedBy() { return vetAssignedBy; }
+    public void setVetAssignedBy(String vetAssignedBy) { this.vetAssignedBy = vetAssignedBy; }
+    public Instant getVetAssignedAt() { return vetAssignedAt; }
+    public void setVetAssignedAt(Instant vetAssignedAt) { this.vetAssignedAt = vetAssignedAt; }
+
     public String getTaskName() { return taskName; }
     public WorkloadIntensity getWorkloadIntensity() { return workloadIntensity; }
     public Instant getScheduledStart() { return scheduledStart; }

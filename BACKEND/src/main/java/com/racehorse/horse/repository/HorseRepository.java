@@ -47,6 +47,16 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
 
     @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
     @Query("""
+            select h from Horse h
+            where h.archivedAt is null
+              and (h.serviceOverride = true
+                   or h.paymentStatus in ('PAID', 'IN_MEDICAL', 'PENDING_TRAINING', 'TRAINING', 'ACTIVE'))
+            order by h.name asc
+            """)
+    List<Horse> findEligibleForMedical();
+
+    @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
+    @Query("""
             select distinct h from Horse h
             join HorseOwnership ho on ho.horse = h
             where ho.owner.id = :ownerId
@@ -54,5 +64,20 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             """)
     Page<Horse> findOwnedBy(
             @Param("ownerId") UUID ownerId,
+            Pageable pageable);
+
+    @Query("""
+            select h from Horse h
+            where h.archivedAt is null
+              and (h.serviceOverride = true
+                   or h.paymentStatus in ('PAID', 'IN_MEDICAL', 'PENDING_TRAINING', 'TRAINING', 'ACTIVE'))
+              and (:query is null
+                   or lower(h.code) like lower(concat('%', :query, '%'))
+                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:status is null or h.status = :status)
+            """)
+    Page<Horse> searchPaidOnly(
+            @Param("query") String query,
+            @Param("status") HorseStatus status,
             Pageable pageable);
 }
