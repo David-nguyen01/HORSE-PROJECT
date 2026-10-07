@@ -111,12 +111,19 @@ export const stableCareApi = {
   },
   getInventoryItem: (id) => api(`/api/inventory/items/${id}`),
   createInventoryItem: (payload) => api('/api/inventory/items', { method: 'POST', body: JSON.stringify(payload) }),
+  updateInventoryItem: (id, payload) => api(`/api/inventory/items/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteInventoryItem: (id) => api(`/api/inventory/items/${id}`, { method: 'DELETE' }),
   updateStock: (id, payload) => api(`/api/inventory/items/${id}/stock`, { method: 'PUT', body: JSON.stringify(payload) }),
+  recordUsage: (id, payload) => api(`/api/inventory/items/${id}/usage`, { method: 'POST', body: JSON.stringify(payload) }),
+  getUsage: (limit = 20) => api(`/api/inventory/usage?limit=${limit}`),
   getReplenishments: (status) => api(`/api/inventory/replenishments${status ? `?status=${status}` : ''}`),
   getReplenishment: (id) => api(`/api/inventory/replenishments/${id}`),
   createReplenishment: (payload) => api('/api/inventory/replenishments', { method: 'POST', body: JSON.stringify(payload) }),
   reviewReplenishment: (id, payload) => api(`/api/inventory/replenishments/${id}/review`, { method: 'POST', body: JSON.stringify(payload) }),
+  receiveReplenishment: (id, payload) => api(`/api/inventory/replenishments/${id}/receive`, { method: 'POST', body: JSON.stringify(payload) }),
 }
+
+export const inventoryApi = stableCareApi
 
 export const financeApi = {
   getTransactions: (params = {}) => {

@@ -2,6 +2,7 @@ package com.racehorse.inventory.service;
 
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.finance.service.FinanceService;
 import com.racehorse.inventory.dto.*;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 @Service
@@ -21,11 +24,13 @@ public class InventoryService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final Clock clock;
+    private final FinanceService finance;
 
-    public InventoryService(JdbcTemplate jdbc, ObjectMapper json, Clock clock) {
+    public InventoryService(JdbcTemplate jdbc, ObjectMapper json, Clock clock, FinanceService finance) {
         this.jdbc = jdbc;
         this.json = json;
         this.clock = clock;
+        this.finance = finance;
     }
 
     // ==================== INVENTORY ITEMS ====================
@@ -70,10 +75,22 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<InventoryItemResponse> listItems(String category, Boolean lowStockOnly) {
+        return listItems(category, lowStockOnly, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryItemResponse> listItems(String category, Boolean lowStockOnly, String status) {
         StringBuilder sql = new StringBuilder(
                 "select id, status, data_json, created_at, updated_at from module_records " +
-                        "where module_code='INVENTORY' and record_type='INVENTORY_ITEM' and status='ACTIVE'");
+                        "where module_code='INVENTORY' and record_type='INVENTORY_ITEM'");
         List<Object> args = new ArrayList<>();
+
+        if (status == null || status.isBlank()) {
+            sql.append(" and status='ACTIVE'");
+        } else if (!"ALL".equalsIgnoreCase(status.trim())) {
+            sql.append(" and status=?");
+            args.add(status.trim().toUpperCase(Locale.ROOT));
+        }
 
         if (category != null && !category.isBlank()) {
             sql.append(" and JSON_VALUE(data_json, '$.category') = ?");
@@ -87,6 +104,48 @@ public class InventoryService {
             return results.stream().filter(InventoryItemResponse::isLowStock).toList();
         }
         return results;
+    }
+
+    @Transactional
+    public InventoryItemResponse updateItem(UUID itemId, UUID actorId, UpdateInventoryItemRequest request) {
+        getItem(itemId);
+        String currentJson = jdbc.queryForObject(
+                "select data_json from module_records where id=?", String.class, itemId);
+        Map<String, Object> data = readMap(currentJson);
+
+        data.put("itemName", request.itemName().trim());
+        data.put("category", request.category().trim().toUpperCase(Locale.ROOT));
+        data.put("unit", request.unit().trim());
+        data.put("minThreshold", request.minThreshold());
+        data.put("location", request.location() == null ? "" : request.location().trim());
+        data.put("description", request.description() == null ? "" : request.description().trim());
+        if (request.referencePrice() != null) {
+            data.put("referencePrice", request.referencePrice());
+        }
+
+        String targetStatus = (request.status() != null && !request.status().isBlank())
+                ? request.status().trim().toUpperCase(Locale.ROOT)
+                : null;
+
+        if (targetStatus != null) {
+            jdbc.update(
+                    "update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                    targetStatus, toJson(data), itemId);
+        } else {
+            jdbc.update(
+                    "update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                    toJson(data), itemId);
+        }
+
+        return getItem(itemId);
+    }
+
+    @Transactional
+    public void deleteItem(UUID itemId, UUID actorId) {
+        getItem(itemId);
+        jdbc.update(
+                "update module_records set status='INACTIVE', updated_at=SYSDATETIMEOFFSET() where id=?",
+                itemId);
     }
 
     @Transactional
@@ -105,6 +164,99 @@ public class InventoryService {
                 toJson(data), itemId);
 
         return getItem(itemId);
+    }
+
+    @Transactional
+    public InventoryUsageResponse recordUsage(UUID itemId, UUID actorId, RecordInventoryUsageRequest request) {
+        if (request.horseId() == null && request.stableId() == null) {
+            throw new BusinessException("Cần chọn ngựa hoặc chuồng sử dụng vật tư");
+        }
+        if (request.horseId() != null && request.stableId() != null) {
+            throw new BusinessException("Chỉ chọn một đối tượng sử dụng: ngựa hoặc chuồng");
+        }
+        if (request.quantity() == null || request.quantity().signum() <= 0 || request.unitPriceVnd() == null
+                || request.unitPriceVnd().signum() <= 0) {
+            throw new BusinessException("Số lượng và đơn giá phải lớn hơn 0");
+        }
+
+        // Lock the item row until the stock movement and its financial entry commit.
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select status,data_json from module_records with (updlock,holdlock) "
+                        + "where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'", itemId);
+        if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy mặt hàng trong kho: " + itemId);
+        Map<String, Object> row = rows.getFirst();
+        if (!"ACTIVE".equals(row.get("status"))) throw new BusinessException("Mặt hàng đã ngừng sử dụng");
+        Map<String, Object> item = readMap((String) row.get("data_json"));
+        BigDecimal available = new BigDecimal(item.getOrDefault("quantityOnHand", 0).toString());
+        if (available.compareTo(request.quantity()) < 0) throw new BusinessException("Số lượng xuất vượt quá tồn kho hiện tại");
+
+        String category = Objects.toString(item.get("category"), "");
+        String financeCategory = switch (category) {
+            case "FEED", "SUPPLEMENT" -> "FEED_COST";
+            case "MEDICATION" -> "MEDICAL_COST";
+            case "EQUIPMENT" -> "OPERATING_COST";
+            default -> throw new BusinessException("Danh mục vật tư không hỗ trợ ghi chi phí: " + category);
+        };
+        if ("MEDICAL_COST".equals(financeCategory) && request.horseId() == null) {
+            throw new BusinessException("Vật tư y tế cần chọn ngựa được sử dụng");
+        }
+        String itemName = Objects.toString(item.get("itemName"), "");
+        String unit = Objects.toString(item.get("unit"), "");
+        BigDecimal remaining = available.subtract(request.quantity());
+        BigDecimal totalCost = request.quantity().multiply(request.unitPriceVnd()).setScale(2, RoundingMode.HALF_UP);
+        if (totalCost.signum() <= 0) throw new BusinessException("Chi phí xuất dùng phải tối thiểu 0,01 VND");
+        if (totalCost.precision() > 19) throw new BusinessException("Giá trị xuất dùng vượt giới hạn tiền tệ");
+        UUID usageId = UUID.randomUUID();
+        LocalDate today = LocalDate.now(clock);
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        String notes = request.notes() == null ? "" : request.notes().trim();
+
+        item.put("quantityOnHand", remaining);
+        item.put("lastStockUpdateReason", "Xuất dùng " + request.quantity().toPlainString() + " " + unit);
+        item.put("lastUpdatedByUserId", actorId.toString());
+        jdbc.update("update module_records set data_json=?,updated_at=SYSDATETIMEOFFSET() where id=?", toJson(item), itemId);
+
+        Map<String, Object> movement = new LinkedHashMap<>();
+        movement.put("itemId", itemId.toString());
+        movement.put("itemName", itemName);
+        movement.put("category", category);
+        movement.put("quantity", request.quantity());
+        movement.put("unit", unit);
+        movement.put("remainingQuantity", remaining);
+        movement.put("unitPriceVnd", request.unitPriceVnd());
+        movement.put("totalCostVnd", totalCost);
+        movement.put("stableId", request.stableId() == null ? null : request.stableId().toString());
+        movement.put("notes", notes);
+        jdbc.update("insert into module_records(id,module_code,record_type,horse_id,user_id,event_date,status,data_json) "
+                        + "values(?,'INVENTORY','STOCK_USAGE',?,?,?,'RECORDED',?)",
+                usageId, request.horseId(), actorId, today, toJson(movement));
+
+        FinanceService.TransactionView transaction = finance.create(
+                actorId, request.horseId(), request.stableId(), today, "EXPENSE", financeCategory,
+                totalCost, "Xuất dùng " + request.quantity().toPlainString() + " " + unit + " " + itemName
+                        + (notes.isBlank() ? "" : ": " + notes), "INVENTORY_USAGE", usageId);
+        return new InventoryUsageResponse(usageId, itemId, itemName, request.quantity(), unit, remaining,
+                request.unitPriceVnd(), totalCost, request.horseId(), request.stableId(), transaction.id(), notes, now);
+    }
+
+    @Transactional(readOnly = true)
+    public List<InventoryUsageResponse> listUsage(int limit) {
+        if (limit < 1 || limit > 100) throw new BusinessException("Giới hạn lịch sử xuất dùng không hợp lệ");
+        return jdbc.query("select top (?) m.id,m.horse_id,m.data_json,m.created_at,ft.id finance_id "
+                        + "from module_records m left join financial_transactions ft "
+                        + "on ft.source_entity_type='INVENTORY_USAGE' and ft.source_entity_id=m.id "
+                        + "where m.module_code='INVENTORY' and m.record_type='STOCK_USAGE' "
+                        + "order by m.created_at desc,m.id desc", (rs, row) -> {
+                    JsonNode data = read(rs.getString("data_json"));
+                    String stable = data.path("stableId").asText(null);
+                    return new InventoryUsageResponse(rs.getObject("id", UUID.class),
+                            UUID.fromString(data.path("itemId").asText()), data.path("itemName").asText(),
+                            data.path("quantity").decimalValue(), data.path("unit").asText(),
+                            data.path("remainingQuantity").decimalValue(), data.path("unitPriceVnd").decimalValue(),
+                            data.path("totalCostVnd").decimalValue(), rs.getObject("horse_id", UUID.class),
+                            stable == null ? null : UUID.fromString(stable), rs.getObject("finance_id", UUID.class),
+                            data.path("notes").asText(""), rs.getObject("created_at", OffsetDateTime.class));
+                }, limit);
     }
 
     // ==================== REPLENISHMENT REQUESTS ====================
@@ -189,11 +341,13 @@ public class InventoryService {
 
     @Transactional
     public ReplenishmentResponse reviewReplenishment(UUID id, UUID actorId, ReviewReplenishmentRequest request) {
-        ReplenishmentResponse existing = getReplenishment(id);
-        if (!"PENDING_APPROVAL".equals(existing.status())) {
+        List<Map<String, Object>> locked = jdbc.queryForList(
+                "select status from module_records with (updlock,holdlock) "
+                        + "where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'", id);
+        if (locked.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy đề xuất bổ sung tồn kho: " + id);
+        if (!"PENDING_APPROVAL".equals(locked.getFirst().get("status"))) {
             throw new BusinessException("Đề xuất bổ sung này đã được xử lý trước đó");
         }
-
         String targetStatus = request.status().trim().toUpperCase(Locale.ROOT);
         if (!List.of("APPROVED", "REJECTED").contains(targetStatus)) {
             throw new BusinessException("Trạng thái phê duyệt không hợp lệ (chỉ chấp nhận APPROVED hoặc REJECTED)");
@@ -215,27 +369,68 @@ public class InventoryService {
         data.put("reviewedAt", now.toString());
         data.put("reviewNotes", request.reviewNotes() == null ? null : request.reviewNotes().trim());
 
-        // If approved and attached to an existing item, automatically increase quantityOnHand
-        if ("APPROVED".equals(targetStatus) && existing.itemId() != null) {
-            increaseItemStock(existing.itemId(), existing.requestedQuantity(), actorId);
-        }
-
         jdbc.update(
                 "update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
                 targetStatus, toJson(data), id);
 
+        if ("APPROVED".equals(targetStatus) && Boolean.TRUE.equals(request.receiveImmediately())) {
+            return receiveReplenishment(id, actorId, new ReceiveReplenishmentRequest(null, null, null, null));
+        }
         return getReplenishment(id);
     }
 
-    private void increaseItemStock(UUID itemId, double addedQuantity, UUID actorId) {
-        String itemJson = jdbc.queryForObject(
-                "select data_json from module_records where id=?", String.class, itemId);
-        Map<String, Object> data = readMap(itemJson);
+    @Transactional
+    public ReplenishmentResponse receiveReplenishment(UUID id, UUID actorId, ReceiveReplenishmentRequest request) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "select status,data_json from module_records with (updlock,holdlock) "
+                        + "where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'", id);
+        if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy đề xuất bổ sung tồn kho: " + id);
+        Map<String, Object> row = rows.getFirst();
+        if (!"APPROVED".equals(row.get("status"))) {
+            throw new BusinessException("Chỉ có thể nhập kho đề xuất đã duyệt và chưa nhập kho");
+        }
+        Map<String, Object> data = readMap((String) row.get("data_json"));
+        ReplenishmentResponse proposal = getReplenishment(id);
+        UUID itemId = proposal.itemId() != null ? proposal.itemId() : request.catalogItemId();
+        if (proposal.itemId() != null && request.catalogItemId() != null
+                && !proposal.itemId().equals(request.catalogItemId())) {
+            throw new BusinessException("Không thể chuyển đề xuất sang mặt hàng khác");
+        }
+        if (itemId == null) {
+            InventoryItemResponse created = createItem(actorId, new CreateInventoryItemRequest(
+                    proposal.itemName(), proposal.category(), proposal.unit(), 0.0,
+                    request.minThreshold() == null ? 0.0 : request.minThreshold(),
+                    request.location(), "Tạo từ đề xuất vật tư " + id,
+                    request.referencePriceVnd() == null ? null : request.referencePriceVnd().doubleValue()));
+            itemId = created.id();
+        } else {
+            InventoryItemResponse catalog = getItem(itemId);
+            if (!"ACTIVE".equals(catalog.status())) throw new BusinessException("Mặt hàng trong danh mục đã ngừng sử dụng");
+            if (!proposal.category().equals(catalog.category()) || !proposal.unit().equals(catalog.unit())) {
+                throw new BusinessException("Danh mục hoặc đơn vị của vật tư nhận không khớp đề xuất");
+            }
+        }
+        increaseItemStock(itemId, BigDecimal.valueOf(proposal.requestedQuantity()), actorId,
+                request.referencePriceVnd());
+        data.put("itemId", itemId.toString());
+        data.put("receivedByUserId", actorId.toString());
+        data.put("receivedAt", OffsetDateTime.now(clock).toString());
+        jdbc.update("update module_records set status='FULFILLED',data_json=?,updated_at=SYSDATETIMEOFFSET() where id=?",
+                toJson(data), id);
+        return getReplenishment(id);
+    }
 
-        double currentQty = ((Number) data.getOrDefault("quantityOnHand", 0.0)).doubleValue();
-        double newQty = currentQty + addedQuantity;
-        data.put("quantityOnHand", newQty);
-        data.put("lastStockUpdateReason", "Bổ sung theo đề xuất được duyệt (" + addedQuantity + ")");
+    private void increaseItemStock(UUID itemId, BigDecimal addedQuantity, UUID actorId, BigDecimal price) {
+        List<Map<String, Object>> rows = jdbc.queryForList("select status,data_json from module_records with (updlock,holdlock) "
+                + "where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'", itemId);
+        if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy mặt hàng trong kho: " + itemId);
+        Map<String, Object> row = rows.getFirst();
+        if (!"ACTIVE".equals(row.get("status"))) throw new BusinessException("Mặt hàng trong danh mục đã ngừng sử dụng");
+        Map<String, Object> data = readMap((String) row.get("data_json"));
+        BigDecimal currentQty = new BigDecimal(data.getOrDefault("quantityOnHand", 0).toString());
+        data.put("quantityOnHand", currentQty.add(addedQuantity));
+        if (price != null) data.put("referencePrice", price);
+        data.put("lastStockUpdateReason", "Nhập kho theo đề xuất được duyệt (" + addedQuantity.toPlainString() + ")");
         data.put("lastUpdatedByUserId", actorId.toString());
 
         jdbc.update(

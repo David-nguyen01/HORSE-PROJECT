@@ -2,6 +2,7 @@ package com.racehorse.inventory.service;
 
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.finance.service.FinanceService;
 import com.racehorse.inventory.dto.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,7 +13,9 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,13 +29,15 @@ class InventoryServiceTest {
     private ObjectMapper json;
     private Clock clock;
     private InventoryService service;
+    private FinanceService finance;
 
     @BeforeEach
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         json = new ObjectMapper();
         clock = Clock.fixed(Instant.parse("2026-09-25T10:00:00Z"), ZoneOffset.UTC);
-        service = new InventoryService(jdbc, json, clock);
+        finance = mock(FinanceService.class);
+        service = new InventoryService(jdbc, json, clock, finance);
     }
 
     @Test
@@ -117,10 +122,12 @@ class InventoryServiceTest {
     }
 
     @Test
-    void reviewReplenishmentApprovedIncreasesItemStock() {
+    void reviewReplenishmentApprovalWaitsForReceiptBeforeIncreasingStock() {
         UUID reqId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(reqId)))
+                .thenReturn(List.of(Map.of("status", "PENDING_APPROVAL")));
 
         String reqJson = """
                 {
@@ -171,15 +178,17 @@ class InventoryServiceTest {
         verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
                 eq("APPROVED"), anyString(), eq(reqId));
 
-        // Verify item stock auto-increment (40 + 100 = 140)
-        verify(jdbc).update(contains("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
-                contains("\"quantityOnHand\":140.0"), eq(itemId));
+        // Approval alone does not claim that the goods physically arrived.
+        verify(jdbc, never()).update(contains("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+                anyString(), eq(itemId));
     }
 
     @Test
     void reviewReplenishmentRejectsAlreadyProcessed() {
         UUID reqId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(reqId)))
+                .thenReturn(List.of(Map.of("status", "APPROVED")));
 
         when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'"),
                 any(RowMapper.class), eq(reqId)))
@@ -362,5 +371,184 @@ class InventoryServiceTest {
                 argThat(jsonStr -> jsonStr.toString().contains("Yến mạch nguyên hạt")
                         && jsonStr.toString().contains("FEED")
                         && jsonStr.toString().contains("\"unit\":\"kg\"")));
+    }
+
+    @Test
+    void updateItemUpdatesMasterDetails() {
+        UUID itemId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        String itemJson = """
+                {
+                  "itemName": "Gạc y tế tiệt trùng",
+                  "category": "MEDICATION",
+                  "unit": "hộp",
+                  "quantityOnHand": 10.0,
+                  "minThreshold": 15.0,
+                  "location": "Tủ y tế 1",
+                  "description": "Gạc thấm hút",
+                  "referencePrice": 120000.0
+                }
+                """;
+
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'"),
+                any(RowMapper.class), eq(itemId)))
+                .thenAnswer(inv -> {
+                    RowMapper<InventoryItemResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(itemId);
+                    when(rs.getString("status")).thenReturn("ACTIVE");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getObject("updated_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(itemJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        when(jdbc.queryForObject(eq("select data_json from module_records where id=?"), eq(String.class), eq(itemId)))
+                .thenReturn(itemJson);
+
+        UpdateInventoryItemRequest req = new UpdateInventoryItemRequest(
+                "Gạc y tế tiệt trùng cao cấp", "MEDICATION", "hộp", 20.0,
+                "Tủ y tế trung tâm", "Gạc tiệt trùng chất lượng cao", 135000.0, "ACTIVE");
+
+        service.updateItem(itemId, actorId, req);
+
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+                eq("ACTIVE"),
+                argThat(jsonStr -> jsonStr.toString().contains("Gạc y tế tiệt trùng cao cấp")
+                        && jsonStr.toString().contains("135000")),
+                eq(itemId));
+    }
+
+    @Test
+    void deleteItemDeactivatesItem() {
+        UUID itemId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+
+        String itemJson = """
+                {
+                  "itemName": "Thuốc xịt sát trùng",
+                  "category": "MEDICATION",
+                  "unit": "chai"
+                }
+                """;
+
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'"),
+                any(RowMapper.class), eq(itemId)))
+                .thenAnswer(inv -> {
+                    RowMapper<InventoryItemResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(itemId);
+                    when(rs.getString("status")).thenReturn("ACTIVE");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getObject("updated_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(itemJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        service.deleteItem(itemId, actorId);
+
+        verify(jdbc).update(contains("update module_records set status='INACTIVE', updated_at=SYSDATETIMEOFFSET() where id=?"), eq(itemId));
+    }
+
+    @Test
+    void usageSubtractsStockAndCreatesLinkedExpense() {
+        UUID itemId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        UUID stableId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(itemId)))
+                .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
+                        {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":5.0}
+                        """)));
+        FinanceService.TransactionView transaction = mock(FinanceService.TransactionView.class);
+        when(transaction.id()).thenReturn(transactionId);
+        when(finance.create(eq(managerId), isNull(), eq(stableId), any(), eq("EXPENSE"), eq("FEED_COST"),
+                eq(new BigDecimal("300.00")), anyString(), eq("INVENTORY_USAGE"), any()))
+                .thenReturn(transaction);
+
+        InventoryUsageResponse result = service.recordUsage(itemId, managerId,
+                new RecordInventoryUsageRequest(new BigDecimal("3"), new BigDecimal("100"), null, stableId, "Ca sáng"));
+
+        assertThat(result.remainingQuantity()).isEqualByComparingTo("2.0");
+        assertThat(result.financeTransactionId()).isEqualTo(transactionId);
+        verify(jdbc).update(contains("update module_records set data_json=?"),
+                contains("\"quantityOnHand\":2.0"), eq(itemId));
+        verify(jdbc).update(contains("'STOCK_USAGE'"), any(), isNull(), eq(managerId), any(), anyString());
+    }
+
+    @Test
+    void usageCannotExceedAvailableStockOrCreateExpense() {
+        UUID itemId = UUID.randomUUID();
+        UUID stableId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(itemId)))
+                .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
+                        {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":2.0}
+                        """)));
+
+        assertThatThrownBy(() -> service.recordUsage(itemId, UUID.randomUUID(),
+                new RecordInventoryUsageRequest(new BigDecimal("3"), new BigDecimal("100"), null, stableId, "")))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("vượt quá tồn kho");
+        verifyNoInteractions(finance);
+    }
+
+    @Test
+    void alreadyFulfilledReplenishmentCannotIncreaseStockAgain() {
+        UUID requestId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(requestId)))
+                .thenReturn(List.of(Map.of("status", "FULFILLED", "data_json", "{}")));
+
+        assertThatThrownBy(() -> service.receiveReplenishment(requestId, UUID.randomUUID(),
+                new ReceiveReplenishmentRequest(null, null, null, null)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("chưa nhập kho");
+        verify(jdbc, never()).update(anyString(), org.mockito.ArgumentMatchers.<Object[]>any());
+        verifyNoInteractions(finance);
+    }
+
+    @Test
+    void receivingApprovedRequestAddsStockAndMarksItFulfilled() {
+        UUID requestId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        String requestJson = """
+                {"itemId":"%s","itemName":"Cỏ khô","category":"FEED",
+                 "requestedQuantity":4,"unit":"kg","reason":"Bổ sung"}
+                """.formatted(itemId);
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(requestId)))
+                .thenReturn(List.of(Map.of("status", "APPROVED", "data_json", requestJson)));
+        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(itemId)))
+                .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
+                        {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":6}
+                        """)));
+        when(jdbc.query(contains("record_type='REPLENISHMENT_REQUEST'"), any(RowMapper.class), eq(requestId)))
+                .thenAnswer(inv -> {
+                    RowMapper<ReplenishmentResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(requestId);
+                    when(rs.getString("status")).thenReturn("APPROVED");
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class))
+                            .thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn(requestJson);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+        when(jdbc.query(contains("record_type='INVENTORY_ITEM'"), any(RowMapper.class), eq(itemId)))
+                .thenAnswer(inv -> {
+                    RowMapper<InventoryItemResponse> mapper = inv.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(itemId);
+                    when(rs.getString("status")).thenReturn("ACTIVE");
+                    when(rs.getString("data_json")).thenReturn("""
+                            {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":6}
+                            """);
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+
+        service.receiveReplenishment(requestId, managerId,
+                new ReceiveReplenishmentRequest(null, null, null, null));
+
+        verify(jdbc).update(contains("update module_records set data_json=?"),
+                contains("\"quantityOnHand\":10"), eq(itemId));
+        verify(jdbc).update(contains("status='FULFILLED'"),
+                contains("\"receivedByUserId\":\"" + managerId + "\""), eq(requestId));
     }
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, ArchiveRestore, ArrowRight, Check, ChevronLeft, ChevronRight, ChevronUp, DollarSign, Download, KeyRound, Lock, LogOut, Monitor, Pencil, Plus, RotateCcw, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Smartphone, Trash2, Unlock, UserPlus, Warehouse, X } from 'lucide-react'
-import { api } from './api'
+import { AlertTriangle, ArchiveRestore, ArrowRight, Boxes, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronUp, DollarSign, Download, Filter, HeartPulse, KeyRound, Lock, LogOut, Monitor, Package, Pencil, Plus, RotateCcw, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Smartphone, Tag, Trash2, Unlock, UserPlus, Utensils, Warehouse, X, XCircle } from 'lucide-react'
+import { api, inventoryApi, stableCareApi } from './api'
 
 const initials = (name = '') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'RC'
 
@@ -1518,4 +1518,630 @@ function AssignHorseDialog({ stallInfo, stables, horses, onClose, onSaved }) {
       </form>
     </Dialog>
   );
+}
+
+// ============================================================
+// INVENTORY CATALOG PAGE  –  Quản lý danh mục vật tư tổng
+// ============================================================
+const INV_CATEGORY_LABELS = {
+  FEED:      'Thức ăn & Cỏ',
+  MEDICATION:'Vật tư y tế',
+  EQUIPMENT: 'Thiết bị & Dụng cụ',
+  SUPPLEMENT:'Thực phẩm bổ sung',
+}
+const INV_CATEGORY_COLORS = {
+  FEED:      '#d4edda',
+  MEDICATION:'#fde8e8',
+  EQUIPMENT: '#e8eaf6',
+  SUPPLEMENT:'#fff3cd',
+}
+const INV_CATEGORY_TEXT = {
+  FEED:      '#1a4d2e',
+  MEDICATION:'#7b1f1f',
+  EQUIPMENT: '#283593',
+  SUPPLEMENT:'#856404',
+}
+
+const fmtPrice = (v) =>
+  v != null ? new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(v) : '—'
+
+export function InventoryCatalogPage() {
+  const [items, setItems]       = useState([])
+  const [requests, setRequests] = useState([])
+  const [usage, setUsage] = useState([])
+  const [horses, setHorses] = useState([])
+  const [stables, setStables] = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
+  const [catFilter, setCatFilter] = useState('')
+  const [query, setQuery]       = useState('')
+  const [statusFilter, setStatusFilter] = useState('ACTIVE')
+  const [creating, setCreating] = useState(false)
+  const [editing, setEditing]   = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
+  const [reviewing, setReviewing] = useState(null)
+  const [reviewNotes, setReviewNotes] = useState('')
+  const [reviewBusy, setReviewBusy] = useState(false)
+  const [receiveImmediately, setReceiveImmediately] = useState(false)
+  const [receiving, setReceiving] = useState(null)
+  const [usingItem, setUsingItem] = useState(null)
+  const [allActiveItems, setAllActiveItems] = useState([])
+
+  const load = useCallback(async () => {
+    setLoading(true); setError('')
+    try {
+      const params = {}
+      if (catFilter) params.category = catFilter
+      if (statusFilter && statusFilter !== 'ALL') params.status = statusFilter
+      const [data, proposals, recentUsage, activeCatalog] = await Promise.all([
+        stableCareApi.getInventoryItems(params),
+        stableCareApi.getReplenishments(),
+        stableCareApi.getUsage(20),
+        stableCareApi.getInventoryItems({status:'ACTIVE'}),
+      ])
+      setItems(Array.isArray(data) ? data : [])
+      setRequests(Array.isArray(proposals) ? proposals : [])
+      setUsage(Array.isArray(recentUsage) ? recentUsage : [])
+      setAllActiveItems(Array.isArray(activeCatalog) ? activeCatalog : [])
+    } catch(e) { setError(e.message) }
+    finally { setLoading(false) }
+  }, [catFilter, statusFilter])
+
+  useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    Promise.all([
+      api('/api/horses?size=200'),
+      api('/api/stables'),
+    ]).then(([horsePage, stableList]) => {
+      setHorses(Array.isArray(horsePage) ? horsePage : horsePage?.content || [])
+      setStables(Array.isArray(stableList) ? stableList : [])
+    }).catch(e => setError(e.message))
+  }, [])
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return items
+    const q = query.toLowerCase()
+    return items.filter(i =>
+      i.itemName?.toLowerCase().includes(q) ||
+      i.location?.toLowerCase().includes(q) ||
+      i.description?.toLowerCase().includes(q)
+    )
+  }, [items, query])
+
+  const handleDelete = async (item) => {
+    if (!confirm(`Xác nhận vô hiệu hóa mặt hàng "${item.itemName}"?\n\nMặt hàng sẽ bị ẩn khỏi danh sách tồn kho nhưng dữ liệu lịch sử vẫn được giữ lại.`)) return
+    setDeletingId(item.id)
+    try {
+      await stableCareApi.deleteInventoryItem(item.id)
+      await load()
+    } catch(e) { setError(e.message) }
+    finally { setDeletingId(null) }
+  }
+
+  const reviewRequest = async (status) => {
+    if (!reviewing) return
+    setReviewBusy(true); setError('')
+    try {
+      await stableCareApi.reviewReplenishment(reviewing.id, {
+        status,
+        reviewNotes: reviewNotes.trim() || null,
+        receiveImmediately: status === 'APPROVED' && receiveImmediately,
+      })
+      setReviewing(null); setReviewNotes(''); setReceiveImmediately(false)
+      await load()
+    } catch (e) { setError(e.message) }
+    finally { setReviewBusy(false) }
+  }
+
+  const stats = useMemo(() => ({
+    total:      items.length,
+    feed:       items.filter(i=>i.category==='FEED').length,
+    medication: items.filter(i=>i.category==='MEDICATION').length,
+    equipment:  items.filter(i=>i.category==='EQUIPMENT').length,
+    supplement: items.filter(i=>i.category==='SUPPLEMENT').length,
+    lowStock:   items.filter(i=>i.isLowStock).length,
+    pendingRequests: requests.filter(r => r.status === 'PENDING_APPROVAL').length,
+  }), [items, requests])
+
+  const pendingRequests = requests.filter(r => r.status === 'PENDING_APPROVAL')
+  const approvedRequests = requests.filter(r => r.status === 'APPROVED')
+
+  return (
+    <>
+      <Heading
+        eyebrow="QUẢN TRỊ KHO VẬT TƯ"
+        title="Danh mục vật tư & thức ăn"
+        text="Quản lý toàn bộ danh mục mặt hàng tồn kho: thức ăn ngựa, vật tư y tế, thiết bị chuồng trại và thực phẩm bổ sung."
+        action={
+          <button className="button primary" onClick={() => setCreating(true)}>
+            <Plus size={16}/> Thêm mặt hàng mới
+          </button>
+        }
+      />
+
+      {/* Stats strip */}
+      <div className="admin-kpis" style={{gridTemplateColumns:'repeat(6,1fr)',marginBottom:'16px'}}>
+        {[
+          ['Tổng mặt hàng', stats.total,       '#2d6a4f'],
+          ['Thức ăn & Cỏ',  stats.feed,        '#52b788'],
+          ['Vật tư y tế',   stats.medication,  '#e76f51'],
+          ['Thiết bị',      stats.equipment,   '#4361ee'],
+          ['Bổ sung',       stats.supplement,  '#f4a261'],
+          ['Tồn thấp ⚠',   stats.lowStock,    '#d62828'],
+        ].map(([label,val,color])=>(
+          <div className="card comparison-card" key={label} style={{borderTop:`3px solid ${color}`}}>
+            <span>{label}</span>
+            <strong style={{color}}>{val}</strong>
+          </div>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="toolbar card" style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
+        <label className="search-box" style={{flex:'1 1 200px'}}>
+          <Search size={15}/>
+          <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tìm tên, vị trí, mô tả…"/>
+        </label>
+        <select value={catFilter} onChange={e=>setCatFilter(e.target.value)} style={{minWidth:'160px'}}>
+          <option value="">Tất cả danh mục</option>
+          {Object.entries(INV_CATEGORY_LABELS).map(([k,v])=>(
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{minWidth:'140px'}}>
+          <option value="ACTIVE">Đang hoạt động</option>
+          <option value="INACTIVE">Đã vô hiệu hóa</option>
+          <option value="ALL">Tất cả trạng thái</option>
+        </select>
+        <button className="button secondary" onClick={load} style={{minHeight:'36px',padding:'0 12px'}}>
+          <RotateCcw size={14}/> Làm mới
+        </button>
+      </div>
+
+      {error && <div className="notice error"><X size={16}/>{error}</div>}
+
+      <section className="card inventory-request-panel">
+        <div className="card-head">
+          <div>
+            <h3>Đề xuất vật tư chờ Club Manager xử lý ({stats.pendingRequests})</h3>
+            <p className="muted" style={{margin:'5px 0 0',fontSize:'11px'}}>
+              Có thể đề xuất mặt hàng đã có trong kho hoặc vật tư mới chưa nằm trong danh mục.
+            </p>
+          </div>
+        </div>
+        {loading ? <div className="simple-empty">Đang tải đề xuất…</div> : !pendingRequests.length ? (
+          <div className="simple-empty">Không có đề xuất đang chờ duyệt.</div>
+        ) : <div className="inventory-request-list">
+          {pendingRequests.map(request => <div className="inventory-request-row" key={request.id}>
+            <div>
+              <b>{request.itemName}</b>
+              <small>{request.itemId ? 'Vật tư đã có trong danh mục' : 'Vật tư mới cần bổ sung danh mục'} · {request.proposedByName || 'Nhân viên'} · {request.requestedQuantity} {request.unit}</small>
+              <p>{request.reason}</p>
+            </div>
+            <button type="button" className="button secondary" onClick={() => {setReviewing(request);setReviewNotes('');setReceiveImmediately(false)}}>Xem xét</button>
+          </div>)}
+        </div>}
+      </section>
+
+      {approvedRequests.length > 0 && <section className="card inventory-request-panel">
+        <div className="card-head"><div><h3>Đã duyệt, chờ xác nhận nhập kho ({approvedRequests.length})</h3><p className="muted" style={{margin:'5px 0 0',fontSize:'11px'}}>Số tồn chỉ tăng sau khi xác nhận hàng thực sự đã vào kho.</p></div></div>
+        <div className="inventory-request-list">{approvedRequests.map(request => <div className="inventory-request-row" key={request.id}>
+          <div><b>{request.itemName}</b><small>{request.requestedQuantity} {request.unit} · {request.itemId ? 'Mặt hàng đã có' : 'Mặt hàng mới'}</small><p>{request.reviewNotes || request.reason}</p></div>
+          <button type="button" className="button primary" onClick={() => setReceiving(request)}>Xác nhận nhập kho</button>
+        </div>)}</div>
+      </section>}
+
+      <section className="card" style={{overflow:'auto',marginTop:'2px'}}>
+        <div className="card-head">
+          <h3>Danh sách mặt hàng ({filtered.length})</h3>
+          <span className="record-count">{filtered.length}/{items.length} hiển thị</span>
+        </div>
+
+        {loading ? (
+          <div className="simple-empty">Đang tải danh mục vật tư…</div>
+        ) : !filtered.length ? (
+          <div className="simple-empty">Không tìm thấy mặt hàng phù hợp.</div>
+        ) : (
+          <div className="data-table" style={{minWidth:'900px'}}>
+            <div className="table-header" style={{gridTemplateColumns:'2fr 120px 110px 90px 90px 110px 150px'}}>
+              <span>Tên mặt hàng</span>
+              <span>Danh mục</span>
+              <span>Vị trí kho</span>
+              <span>Hiện có</span>
+              <span>Ngưỡng an toàn</span>
+              <span>Đơn giá TK</span>
+              <span>Thao tác</span>
+            </div>
+            {filtered.map(item => (
+              <div
+                className="table-row"
+                style={{gridTemplateColumns:'2fr 120px 110px 90px 90px 110px 150px'}}
+                key={item.id}
+              >
+                <div>
+                  <b style={{fontSize:'12px'}}>{item.itemName}</b>
+                  {item.description && <small className="muted" style={{display:'block',marginTop:'2px'}}>{item.description}</small>}
+                  {item.status === 'INACTIVE' && (
+                    <span style={{fontSize:'9px',color:'#b73830',fontWeight:700,marginTop:'2px',display:'block'}}>VÔ HIỆU HÓA</span>
+                  )}
+                </div>
+                <div>
+                  <span style={{
+                    fontSize:'9px',fontWeight:700,padding:'3px 7px',borderRadius:'6px',
+                    background: INV_CATEGORY_COLORS[item.category]||'#eee',
+                    color: INV_CATEGORY_TEXT[item.category]||'#333',
+                  }}>
+                    {INV_CATEGORY_LABELS[item.category]||item.category}
+                  </span>
+                </div>
+                <span style={{fontSize:'11px',color:'#24483c'}}>{item.location||'Kho chung'}</span>
+                <div>
+                  <b style={{fontSize:'13px',color: item.isLowStock ? '#b73830' : '#123f32'}}>
+                    {item.quantityOnHand}
+                  </b> <small>{item.unit}</small>
+                  {item.isLowStock && (
+                    <span style={{display:'block',fontSize:'8px',color:'#b73830',fontWeight:700}}>TỒN THẤP</span>
+                  )}
+                </div>
+                <span style={{fontSize:'11px',color:'var(--muted)'}}>{item.minThreshold} {item.unit}</span>
+                <span style={{fontSize:'12px',color:'#1a3c31'}}>
+                  {fmtPrice(item.referencePrice)}
+                  {item.referencePrice && <small className="muted" style={{display:'block',fontSize:'9px'}}>/{item.unit}</small>}
+                </span>
+                <div style={{display:'flex',gap:'5px'}}>
+                  {item.status === 'ACTIVE' && <button className="button secondary" type="button" title="Ghi nhận vật tư đã sử dụng" style={{minHeight:'30px',padding:'0 8px',fontSize:'10px'}} onClick={() => setUsingItem(item)}>Xuất dùng</button>}
+                  <button
+                    className="icon-button"
+                    title="Sửa thông tin"
+                    onClick={() => setEditing(item)}
+                  >
+                    <Pencil size={14}/>
+                  </button>
+                  {item.status !== 'INACTIVE' && (
+                    <button
+                      className="icon-button"
+                      title="Vô hiệu hóa"
+                      style={{color:'#b73830'}}
+                      disabled={deletingId === item.id}
+                      onClick={() => handleDelete(item)}
+                    >
+                      <Trash2 size={14}/>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="card inventory-request-panel" style={{marginTop:'16px'}}>
+        <div className="card-head"><div><h3>Lịch sử xuất dùng gần đây</h3><p className="muted" style={{margin:'5px 0 0',fontSize:'11px'}}>Mỗi lần xuất dùng trừ số tồn và ghi một khoản chi trong sổ tài chính Club Manager.</p></div></div>
+        {!usage.length ? <div className="simple-empty">Chưa ghi nhận lần xuất dùng nào.</div> : <div className="inventory-request-list">
+          {usage.map(record => <div className="inventory-request-row" key={record.id}>
+            <div><b>{record.itemName}</b><small>{record.quantity} {record.unit} · còn {record.remainingQuantity} {record.unit} · {record.recordedAt ? new Date(record.recordedAt).toLocaleString('vi-VN') : '—'}</small><p>{record.notes || 'Xuất dùng vật tư'}</p></div>
+            <strong>{fmtPrice(record.totalCostVnd)}</strong>
+          </div>)}
+        </div>}
+      </section>
+
+      {creating && (
+        <CreateInventoryItemModal
+          onClose={() => setCreating(false)}
+          onSaved={() => { setCreating(false); load() }}
+        />
+      )}
+      {editing && (
+        <EditInventoryItemModal
+          item={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load() }}
+        />
+      )}
+      {reviewing && <div className="modal-backdrop" onMouseDown={() => !reviewBusy && setReviewing(null)}>
+        <div className="modal admin-modal" onMouseDown={e => e.stopPropagation()}>
+          <div className="modal-head"><div><p className="eyebrow">ĐỀ XUẤT VẬT TƯ</p><h2>Xem xét yêu cầu</h2></div><button type="button" className="icon-button" disabled={reviewBusy} onClick={() => setReviewing(null)}><X size={18}/></button></div>
+          <dl className="audit-detail">
+            <div><dt>Mặt hàng</dt><dd>{reviewing.itemName} · {reviewing.requestedQuantity} {reviewing.unit}</dd></div>
+            <div><dt>Danh mục</dt><dd>{INV_CATEGORY_LABELS[reviewing.category] || reviewing.category}</dd></div>
+            <div><dt>Người đề xuất</dt><dd>{reviewing.proposedByName || '—'}</dd></div>
+            <div><dt>Lý do</dt><dd>{reviewing.reason}</dd></div>
+          </dl>
+          <label className="field" style={{marginTop:'16px'}}><span>Ghi chú quyết định</span><textarea rows={3} value={reviewNotes} onChange={e => setReviewNotes(e.target.value)} placeholder="Lý do duyệt hoặc từ chối…" /></label>
+          <label className="inventory-checkbox"><input type="checkbox" checked={receiveImmediately} onChange={e => setReceiveImmediately(e.target.checked)} /><span>Duyệt và xác nhận hàng đã nhập kho ngay. Nếu chưa nhận hàng, bỏ chọn để xác nhận sau.</span></label>
+          <div className="modal-actions">
+            <button type="button" className="button secondary" disabled={reviewBusy} onClick={() => reviewRequest('REJECTED')}>Từ chối</button>
+            <button type="button" className="button primary" disabled={reviewBusy} onClick={() => reviewRequest('APPROVED')}>{reviewBusy ? 'Đang xử lý…' : 'Duyệt đề xuất'}</button>
+          </div>
+        </div>
+      </div>}
+      {receiving && <ReceiveInventoryModal request={receiving} items={allActiveItems} onClose={() => setReceiving(null)} onSaved={() => {setReceiving(null);void load()}} />}
+      {usingItem && <RecordInventoryUsageModal item={usingItem} horses={horses} stables={stables} onClose={() => setUsingItem(null)} onSaved={() => {setUsingItem(null);void load()}} />}
+    </>
+  )
+}
+
+function ReceiveInventoryModal({ request, items, onClose, onSaved }) {
+  const [catalogItemId, setCatalogItemId] = useState('')
+  const [referencePrice, setReferencePrice] = useState('')
+  const [minThreshold, setMinThreshold] = useState('0')
+  const [location, setLocation] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const compatibleItems = items.filter(item => item.status === 'ACTIVE' && item.category === request.category && item.unit === request.unit)
+
+  const submit = async (event) => {
+    event.preventDefault(); setError('')
+    if (referencePrice && Number(referencePrice) <= 0) { setError('Đơn giá tham chiếu phải lớn hơn 0.'); return }
+    setBusy(true)
+    try {
+      await stableCareApi.receiveReplenishment(request.id, {
+        catalogItemId: request.itemId || catalogItemId || null,
+        referencePriceVnd: referencePrice ? Number(referencePrice) : null,
+        minThreshold: Number(minThreshold),
+        location: location.trim(),
+      })
+      onSaved()
+    } catch (e) { setError(e.message) }
+    finally { setBusy(false) }
+  }
+
+  return <Dialog title={`Xác nhận nhập kho: ${request.itemName}`} onClose={onClose}>
+    <form className="form-stack" onSubmit={submit}>
+      <p className="muted" style={{fontSize:'12px',margin:0}}>Nhập {request.requestedQuantity} {request.unit}. Số tồn được cộng khi bạn xác nhận.</p>
+      {!request.itemId && <label className="field"><span>Gắn vào mặt hàng sẵn có (nếu trùng)</span>
+        <select value={catalogItemId} onChange={e => setCatalogItemId(e.target.value)}>
+          <option value="">Tạo mặt hàng mới trong danh mục</option>
+          {compatibleItems.map(item => <option value={item.id} key={item.id}>{item.itemName} · còn {item.quantityOnHand} {item.unit}</option>)}
+        </select>
+      </label>}
+      <label className="field"><span>Đơn giá tham chiếu VND / {request.unit}</span><input type="number" min="0.01" step="0.01" value={referencePrice} onChange={e => setReferencePrice(e.target.value)} placeholder="Bỏ trống nếu chưa có giá" /></label>
+      {!request.itemId && !catalogItemId && <div className="form-grid">
+        <label className="field"><span>Ngưỡng cảnh báo mặt hàng mới</span><input type="number" min="0" step="0.001" value={minThreshold} onChange={e => setMinThreshold(e.target.value)} /></label>
+        <label className="field"><span>Vị trí kho</span><input value={location} onChange={e => setLocation(e.target.value)} /></label>
+      </div>}
+      {error && <div className="notice error">{error}</div>}
+      <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose} disabled={busy}>Hủy</button><button type="submit" className="button primary" disabled={busy}>{busy ? 'Đang nhập kho…' : 'Xác nhận đã nhập kho'}</button></div>
+    </form>
+  </Dialog>
+}
+
+function RecordInventoryUsageModal({ item, horses, stables, onClose, onSaved }) {
+  const [quantity, setQuantity] = useState('')
+  const [unitPrice, setUnitPrice] = useState(item.referencePrice != null ? String(item.referencePrice) : '')
+  const [targetType, setTargetType] = useState(item.category === 'MEDICATION' ? 'HORSE' : 'STABLE')
+  const [targetId, setTargetId] = useState('')
+  const [notes, setNotes] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const estimatedCost = Number(quantity) > 0 && Number(unitPrice) > 0 ? Number(quantity) * Number(unitPrice) : null
+
+  const submit = async (event) => {
+    event.preventDefault(); setError('')
+    if (!Number.isFinite(Number(quantity)) || Number(quantity) <= 0 || Number(quantity) > item.quantityOnHand) {
+      setError(`Số lượng phải lớn hơn 0 và không vượt quá ${item.quantityOnHand} ${item.unit}.`); return
+    }
+    if (!Number.isFinite(Number(unitPrice)) || Number(unitPrice) <= 0) { setError('Nhập đơn giá xuất dùng lớn hơn 0.'); return }
+    if (!targetId) { setError('Chọn ngựa hoặc chuồng sử dụng.'); return }
+    setBusy(true)
+    try {
+      await stableCareApi.recordUsage(item.id, {
+        quantity: Number(quantity),
+        unitPriceVnd: Number(unitPrice),
+        horseId: targetType === 'HORSE' ? targetId : null,
+        stableId: targetType === 'STABLE' ? targetId : null,
+        notes: notes.trim(),
+      })
+      onSaved()
+    } catch (e) { setError(e.message) }
+    finally { setBusy(false) }
+  }
+
+  return <Dialog title={`Ghi nhận xuất dùng: ${item.itemName}`} onClose={onClose}>
+    <form className="form-stack" onSubmit={submit}>
+      <p className="muted" style={{fontSize:'12px',margin:0}}>Tồn hiện tại: <b>{item.quantityOnHand} {item.unit}</b>. Xác nhận sẽ trừ tồn và ghi chi phí vào sổ tài chính.</p>
+      <div className="form-grid">
+        <label className="field"><span>Số lượng sử dụng *</span><input type="number" required min="0.001" max={item.quantityOnHand} step="0.001" value={quantity} onChange={e => setQuantity(e.target.value)} /></label>
+        <label className="field"><span>Đơn giá xuất dùng (VND / {item.unit}) *</span><input type="number" required min="0.01" step="0.01" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} /></label>
+      </div>
+      <div className="form-grid">
+        <label className="field"><span>Đối tượng sử dụng</span><select value={targetType} onChange={e => {setTargetType(e.target.value);setTargetId('')}}>
+          <option value="HORSE">Ngựa</option>{item.category !== 'MEDICATION' && <option value="STABLE">Chuồng</option>}
+        </select></label>
+        <label className="field"><span>{targetType === 'HORSE' ? 'Chọn ngựa *' : 'Chọn chuồng *'}</span><select required value={targetId} onChange={e => setTargetId(e.target.value)}>
+          <option value="">Chọn {targetType === 'HORSE' ? 'ngựa' : 'chuồng'}</option>
+          {(targetType === 'HORSE' ? horses : stables).map(target => <option key={target.id} value={target.id}>{targetType === 'HORSE' ? `${target.code} · ${target.name}` : target.name}</option>)}
+        </select></label>
+      </div>
+      <label className="field"><span>Ghi chú sử dụng</span><textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder="VD: Dùng trong ca chăm sóc buổi sáng" /></label>
+      <p className="inventory-cost-preview">Chi phí sẽ ghi nhận: <b>{fmtPrice(estimatedCost)}</b></p>
+      {error && <div className="notice error">{error}</div>}
+      <div className="modal-actions"><button type="button" className="button secondary" onClick={onClose} disabled={busy}>Hủy</button><button type="submit" className="button primary" disabled={busy}>{busy ? 'Đang ghi nhận…' : 'Xác nhận xuất dùng'}</button></div>
+    </form>
+  </Dialog>
+}
+
+function CreateInventoryItemModal({ onClose, onSaved }) {
+  const [form, setForm] = useState({
+    itemName:'', category:'FEED', unit:'', initialQuantity:'0',
+    minThreshold:'0', location:'', description:'', referencePrice:'',
+  })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const set = (k) => (v) => setForm(f => ({...f, [k]: typeof v === 'string' ? v : v.target.value}))
+
+  const submit = async (e) => {
+    e.preventDefault(); setError('')
+    const payload = {
+      itemName: form.itemName.trim(),
+      category: form.category,
+      unit: form.unit.trim(),
+      initialQuantity: Number(form.initialQuantity) || 0,
+      minThreshold: Number(form.minThreshold) || 0,
+      location: form.location.trim(),
+      description: form.description.trim(),
+      referencePrice: form.referencePrice !== '' ? Number(form.referencePrice) : null,
+    }
+    if (!payload.itemName) { setError('Tên mặt hàng không được để trống.'); return }
+    if (!payload.unit)     { setError('Đơn vị tính không được để trống.'); return }
+    setBusy(true)
+    try {
+      await stableCareApi.createInventoryItem(payload)
+      onSaved()
+    } catch(err) { setError(err.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <Dialog title="Thêm mặt hàng mới vào danh mục" onClose={onClose}>
+      <form onSubmit={submit} className="form-stack">
+        <label className="field">
+          <span>Tên mặt hàng *</span>
+          <input required value={form.itemName} onChange={set('itemName')} placeholder="VD: Cỏ khô Alfalfa (Mỹ vụ mới)"/>
+        </label>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+          <label className="field">
+            <span>Danh mục *</span>
+            <select value={form.category} onChange={set('category')}>
+              {Object.entries(INV_CATEGORY_LABELS).map(([k,v])=>(
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Đơn vị tính *</span>
+            <input required value={form.unit} onChange={set('unit')} placeholder="VD: kg, cuộn, hộp…"/>
+          </label>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+          <label className="field">
+            <span>Số lượng ban đầu</span>
+            <input type="number" min="0" step="0.001" value={form.initialQuantity} onChange={set('initialQuantity')}/>
+          </label>
+          <label className="field">
+            <span>Ngưỡng an toàn (cảnh báo tồn thấp)</span>
+            <input type="number" min="0" step="0.001" value={form.minThreshold} onChange={set('minThreshold')}/>
+          </label>
+        </div>
+        <label className="field">
+          <span>Vị trí lưu kho</span>
+          <input value={form.location} onChange={set('location')} placeholder="VD: Kho Thức Ăn A - Dãy 1"/>
+        </label>
+        <label className="field">
+          <span>Đơn giá tham chiếu (VNĐ)</span>
+          <input type="number" min="0" step="100" value={form.referencePrice} onChange={set('referencePrice')} placeholder="Bỏ trống nếu chưa có"/>
+        </label>
+        <label className="field">
+          <span>Mô tả / Ghi chú</span>
+          <input value={form.description} onChange={set('description')} placeholder="Mô tả ngắn về mặt hàng…"/>
+        </label>
+        {error && <div className="notice error"><X size={14}/>{error}</div>}
+        <div className="modal-actions">
+          <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+          <button className="button primary" disabled={busy}>
+            <Plus size={15}/> {busy ? 'Đang lưu…' : 'Thêm mặt hàng'}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
+
+function EditInventoryItemModal({ item, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    itemName: item.itemName || '',
+    category: item.category || 'FEED',
+    unit: item.unit || '',
+    minThreshold: String(item.minThreshold ?? 0),
+    location: item.location || '',
+    description: item.description || '',
+    referencePrice: item.referencePrice != null ? String(item.referencePrice) : '',
+    status: item.status || 'ACTIVE',
+  })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const set = (k) => (v) => setForm(f => ({...f, [k]: typeof v === 'string' ? v : v.target.value}))
+
+  const submit = async (e) => {
+    e.preventDefault(); setError('')
+    const payload = {
+      itemName: form.itemName.trim(),
+      category: form.category,
+      unit: form.unit.trim(),
+      minThreshold: Number(form.minThreshold) || 0,
+      location: form.location.trim(),
+      description: form.description.trim(),
+      referencePrice: form.referencePrice !== '' ? Number(form.referencePrice) : null,
+      status: form.status,
+    }
+    if (!payload.itemName) { setError('Tên mặt hàng không được để trống.'); return }
+    if (!payload.unit)     { setError('Đơn vị tính không được để trống.'); return }
+    setBusy(true)
+    try {
+      await stableCareApi.updateInventoryItem(item.id, payload)
+      onSaved()
+    } catch(err) { setError(err.message) }
+    finally { setBusy(false) }
+  }
+
+  return (
+    <Dialog title={`Sửa mặt hàng: ${item.itemName}`} onClose={onClose}>
+      <form onSubmit={submit} className="form-stack">
+        <label className="field">
+          <span>Tên mặt hàng *</span>
+          <input required value={form.itemName} onChange={set('itemName')}/>
+        </label>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+          <label className="field">
+            <span>Danh mục *</span>
+            <select value={form.category} onChange={set('category')}>
+              {Object.entries(INV_CATEGORY_LABELS).map(([k,v])=>(
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Đơn vị tính *</span>
+            <input required value={form.unit} onChange={set('unit')}/>
+          </label>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
+          <label className="field">
+            <span>Ngưỡng an toàn (cảnh báo tồn thấp)</span>
+            <input type="number" min="0" step="0.001" value={form.minThreshold} onChange={set('minThreshold')}/>
+          </label>
+          <label className="field">
+            <span>Đơn giá tham chiếu (VNĐ)</span>
+            <input type="number" min="0" step="100" value={form.referencePrice} onChange={set('referencePrice')} placeholder="Bỏ trống nếu chưa có"/>
+          </label>
+        </div>
+        <label className="field">
+          <span>Vị trí lưu kho</span>
+          <input value={form.location} onChange={set('location')}/>
+        </label>
+        <label className="field">
+          <span>Mô tả / Ghi chú</span>
+          <input value={form.description} onChange={set('description')}/>
+        </label>
+        <label className="field">
+          <span>Trạng thái</span>
+          <select value={form.status} onChange={set('status')}>
+            <option value="ACTIVE">Đang hoạt động</option>
+            <option value="INACTIVE">Vô hiệu hóa</option>
+          </select>
+        </label>
+        <div className="notice" style={{fontSize:'10px',background:'#f0f4ff',border:'1px solid #c5d0f5',borderRadius:'8px',padding:'8px 10px',color:'#283593',display:'flex',gap:'6px',alignItems:'flex-start'}}>
+          <Package size={13} style={{flexShrink:0,marginTop:'1px'}}/>
+          <span>Số lượng tồn kho hiện tại: <b>{item.quantityOnHand} {item.unit}</b>. Để điều chỉnh tồn kho, dùng nút <b>Sửa kho</b> trong màn hình Tồn kho &amp; Đề xuất vật tư.</span>
+        </div>
+        {error && <div className="notice error"><X size={14}/>{error}</div>}
+        <div className="modal-actions">
+          <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+          <button className="button primary" disabled={busy}>
+            <Save size={15}/> {busy ? 'Đang lưu…' : 'Lưu thay đổi'}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  )
 }

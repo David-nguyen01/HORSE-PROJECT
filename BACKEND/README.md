@@ -534,6 +534,12 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 - `/api/admin/dashboard?month=YYYY-MM&compareTo=YYYY-MM` — dashboard tháng gồm số buổi tập, số ngựa được tập, trạng thái xanh/vàng/đỏ, doanh thu, chi phí và chênh lệch VND.
 - `/api/admin/audit-logs` và `/api/admin/audit-logs/{id}` — tra cứu danh sách và chi tiết nhật ký; thao tác quản trị tài khoản lưu dữ liệu trước/sau thay đổi.
 - `/api/stables` — CRUD chuồng; thêm/ngừng ô chuồng; phân bổ hoặc kết thúc phân bổ ngựa.
+- `GET /api/inventory/items` — cùng nguồn tồn kho cho Club Manager và các màn hình nghiệp vụ; `status=ACTIVE|INACTIVE|ALL`, `category`, `lowStockOnly`.
+- `POST /api/inventory/items/{id}/usage` — Club Manager ghi xuất dùng; body `{ "quantity": 2.5, "unitPriceVnd": 45000, "horseId": null, "stableId": "UUID", "notes": "Ca sáng" }`. Chọn đúng một ngựa hoặc chuồng; vật tư y tế bắt buộc chọn ngựa. Trong một transaction, API khóa dòng hàng, chặn xuất quá tồn, trừ `quantityOnHand`, lưu `STOCK_USAGE` trong `module_records` và tạo khoản chi VND trong `financial_transactions` với `source_entity_type=INVENTORY_USAGE`. Khoản chi phát sinh lúc xuất dùng theo đơn giá được xác nhận, không phát sinh khi duyệt/nhập kho.
+- `GET /api/inventory/usage?limit=20` — Club Manager xem lịch sử xuất dùng, số tồn sau xuất và ID giao dịch tài chính liên kết; `limit` từ 1 đến 100.
+- `GET /api/inventory/replenishments` — Club Manager xem đề xuất, bao gồm mặt hàng chưa có trong danh mục (`itemId=null`).
+- `POST /api/inventory/replenishments/{id}/review` — body `{ "status": "APPROVED", "reviewNotes": "...", "receiveImmediately": false }`. Club Manager có thể duyệt trước hoặc vừa duyệt vừa xác nhận nhập kho; từ chối không thay đổi tồn.
+- `POST /api/inventory/replenishments/{id}/receive` — body `{ "catalogItemId": null, "referencePriceVnd": 45000, "minThreshold": 10, "location": "Kho A" }`. Chỉ áp dụng đề xuất `APPROVED`; tăng tồn đúng một lần và đổi thành `FULFILLED`. Nếu đề xuất là vật tư mới, API tạo mặt hàng mới khi nhập kho hoặc gắn với `catalogItemId` cùng danh mục/đơn vị.
 - `/api/financial-transactions` — ghi sổ thu/chi VND, tra cứu và tổng hợp. Giao dịch là sổ cái chỉ thêm, không sửa/xóa.
 - `/api/races` — CRUD giải đua; đăng ký, xác nhận và rút đăng ký ngựa.
 - `/api/owner-reports` — xem, tạo và tải báo cáo JSON. Job 06:00 tạo báo cáo ngày và thông báo cho chủ sở hữu.

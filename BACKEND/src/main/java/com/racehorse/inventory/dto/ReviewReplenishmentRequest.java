@@ -6,6 +6,10 @@ public record ReviewReplenishmentRequest(
         @NotBlank(message = "status không được để trống (APPROVED hoặc REJECTED)")
         String status,
 
-        String reviewNotes
+        String reviewNotes,
+        Boolean receiveImmediately
 ) {
+    public ReviewReplenishmentRequest(String status, String reviewNotes) {
+        this(status, reviewNotes, false);
+    }
 }
