@@ -1,0 +1,2 @@
+# This file preserves the DATABASE/sync directory in Git when no active sync scripts are pending.
+# Reproducible shared team runtime data scripts (e.g. YYYYMMDD_<description>.sql) belong here.

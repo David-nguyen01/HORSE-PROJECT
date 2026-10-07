@@ -2,7 +2,8 @@ param(
     [string]$SqlServer = "localhost,1433",
     [string]$SqlUsername = "sa",
     [string]$SqlPassword = "sa12345",
-    [switch]$RecreateDatabase
+    [switch]$RecreateDatabase,
+    [switch]$IncludeSync
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,4 +56,28 @@ foreach ($scriptName in $baselineScripts) {
 
 Write-Host ""
 Write-Host "CURRENT BACKEND LOCAL BASELINE applied successfully!" -ForegroundColor Green
+
+if ($IncludeSync) {
+    Write-Host ""
+    Write-Host "==========================================================" -ForegroundColor Cyan
+    Write-Host "Applying optional SHARED TEAM DATA from DATABASE/sync..." -ForegroundColor Cyan
+    Write-Host "==========================================================" -ForegroundColor Cyan
+    $syncDir = Join-Path $PSScriptRoot "sync"
+    if (Test-Path -LiteralPath $syncDir) {
+        $syncFiles = Get-ChildItem -Path $syncDir -Filter "*.sql" -File | Sort-Object Name
+        if ($syncFiles.Count -gt 0) {
+            foreach ($sFile in $syncFiles) {
+                Write-Host "Executing sync script [$($sFile.Name)]..." -ForegroundColor Yellow
+                & $sqlcmdCommand.Source -b -f 65001 -S $SqlServer -U $SqlUsername -P $SqlPassword -C -i $sFile.FullName
+                if ($LASTEXITCODE -ne 0) {
+                    throw "Execution failed on sync script: $($sFile.Name)"
+                }
+            }
+            Write-Host "All shared team sync scripts applied successfully." -ForegroundColor Green
+        } else {
+            Write-Host "No sync scripts found in $syncDir. Skipping." -ForegroundColor Gray
+        }
+    }
+}
+
 Write-Host "Database racehorse_local is ready." -ForegroundColor Green
