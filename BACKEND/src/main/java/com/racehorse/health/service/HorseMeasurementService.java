@@ -23,15 +23,17 @@ public class HorseMeasurementService {
     public HorseWeightResponse addWeight(UUID horseId, UUID veterinarianId, CreateHorseWeightRequest request) {
         access.requireActive(horseId);
         UUID id=UUID.randomUUID();
-        jdbc.update("insert into horse_weight_records(id,horse_id,measured_by_user_id,weight_kg,measured_at,notes) values(?,?,?,?,?,?)",
-                id,horseId,veterinarianId,request.weightKg(),request.measuredAt(),request.notes());
+        jdbc.update("update horses set weight_kg=?,weight_record_id=?,weight_measured_at=?,"
+                        + "weight_measured_by_user_id=?,weight_notes=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                request.weightKg(),id,request.measuredAt(),veterinarianId,request.notes(),horseId);
         return new HorseWeightResponse(id,horseId,veterinarianId,request.weightKg(),request.measuredAt(),request.notes());
     }
 
     @Transactional(readOnly=true)
     public List<HorseWeightResponse> weights(UUID horseId, UUID userId, boolean privileged) {
         access.requireReadable(horseId,userId,privileged);
-        return jdbc.query("select id,horse_id,measured_by_user_id,weight_kg,measured_at,notes from horse_weight_records where horse_id=? order by measured_at desc",
+        return jdbc.query("select weight_record_id, id, weight_measured_by_user_id, weight_kg, weight_measured_at, weight_notes "
+                        + "from horses where id=? and weight_kg is not null",
                 this::weight,horseId);
     }
 
@@ -52,7 +54,7 @@ public class HorseMeasurementService {
                 order by tr.recorded_at desc
                 """,horseId);
         if (restingHr==null || restingHr<30 || restingHr>42) failed.add("Nhịp tim nghỉ phải trong khoảng 30-42 bpm");
-        BigDecimal weight=firstDecimal("select top 1 weight_kg from horse_weight_records where horse_id=? order by measured_at desc",horseId);
+        BigDecimal weight=firstDecimal("select weight_kg from horses where id=?",horseId);
         if (weight==null) failed.add("Chưa có cân nặng do bác sĩ thú y nhập");
         if (raceEventId!=null) {
             List<Map<String,Object>> event=jdbc.queryForList("select minimum_weight_kg,maximum_weight_kg from race_events where id=? and is_active=1",raceEventId);

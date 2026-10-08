@@ -52,9 +52,31 @@ public class Horse extends BaseEntity {
     @JoinColumn(name = "dam_id")
     private Horse dam;
 
+    @Nationalized
+    @Column(name = "sire_manual_name", length = 150)
+    private String sireManualName;
+
+    @Column(name = "sire_manual_id", length = 50)
+    private String sireManualId;
+
+    @Nationalized
+    @Column(name = "dam_manual_name", length = 150)
+    private String damManualName;
+
+    @Column(name = "dam_manual_id", length = 50)
+    private String damManualId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "current_trainer_id")
     private UserAccount currentTrainer;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "caretaker_user_id")
+    private UserAccount caretaker;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "diagnosing_vet_user_id")
+    private UserAccount diagnosingVet;
 
     @Nationalized
     @Column(name = "stable_location", nullable = false, length = 150)
@@ -63,6 +85,9 @@ public class Horse extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private HorseStatus status;
+
+    @Column(name = "health_status", length = 20)
+    private String healthStatus;
 
     @Column(name = "archived_at")
     private Instant archivedAt;
@@ -106,6 +131,15 @@ public class Horse extends BaseEntity {
     public void assignParents(Horse sire, Horse dam) {
         this.sire = sire;
         this.dam = dam;
+        if (sire != null) { sireManualName = null; sireManualId = null; }
+        if (dam != null) { damManualName = null; damManualId = null; }
+    }
+
+    public void assignManualParents(String sireName, String sireId, String damName, String damId) {
+        sireManualName = sireName;
+        sireManualId = sireId;
+        damManualName = damName;
+        damManualId = damId;
     }
 
     public void assignCurrentTrainer(UserAccount currentTrainer) {
@@ -173,8 +207,21 @@ public class Horse extends BaseEntity {
         return dam;
     }
 
+    public String getSireManualName() { return sireManualName; }
+    public String getSireManualId() { return sireManualId; }
+    public String getDamManualName() { return damManualName; }
+    public String getDamManualId() { return damManualId; }
+
     public UserAccount getCurrentTrainer() {
         return currentTrainer;
+    }
+
+    public UserAccount getCaretaker() {
+        return caretaker;
+    }
+
+    public UserAccount getDiagnosingVet() {
+        return diagnosingVet;
     }
 
     public String getStableLocation() {
@@ -183,6 +230,14 @@ public class Horse extends BaseEntity {
 
     public HorseStatus getStatus() {
         return status;
+    }
+
+    public String getHealthStatus() {
+        return healthStatus;
+    }
+
+    public void clearOperationalInjury() {
+        if (this.status == HorseStatus.INJURED) this.status = HorseStatus.ACTIVE;
     }
 
     public Instant getArchivedAt() {

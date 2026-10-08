@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
+import java.util.UUID;
 
 @Entity
 @Table(name = "training_schedules")
@@ -26,32 +27,15 @@ public class TrainingSchedule extends BaseEntity {
     @JoinColumn(name = "horse_id", nullable = false)
     private Horse horse;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "assigned_staff_id")
-    private UserAccount assignedStaff;
-
-    @Column(name = "staff_assigned_by", length = 20)
-    private String staffAssignedBy;
-
-    @Column(name = "staff_assigned_at")
-    private Instant staffAssignedAt;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "racetrack_id")
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "racetrack_id", nullable = false)
     private Racetrack racetrack;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "veterinarian_user_id")
-    private UserAccount veterinarianUser;
-
-    @Column(name = "vet_assigned_by", length = 20)
-    private String vetAssignedBy;
-
-    @Column(name = "vet_assigned_at")
-    private Instant vetAssignedAt;
 
     @Column(name = "task_name", nullable = false, length = 300)
     private String taskName;
+
+    @Column(name = "notes", length = 2000)
+    private String notes;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "workload_intensity", nullable = false, length = 10)
@@ -76,13 +60,25 @@ public class TrainingSchedule extends BaseEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "session_status", length = 20)
+    private String sessionStatus = "PREPARING";
+
+    @Column(name = "ready_at")
+    private Instant readyAt;
+
+    @Column(name = "ready_by_user_id")
+    private UUID readyByUserId;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
     protected TrainingSchedule() {
     }
 
     public TrainingSchedule(
             TrainingPlanPhase phase,
             Horse horse,
-            UserAccount assignedStaff,
+            Racetrack racetrack,
             String taskName,
             WorkloadIntensity workloadIntensity,
             Instant scheduledStart,
@@ -90,7 +86,7 @@ public class TrainingSchedule extends BaseEntity {
             UserAccount createdBy) {
         this.phase = phase;
         this.horse = horse;
-        this.assignedStaff = assignedStaff;
+        this.racetrack = racetrack;
         this.taskName = taskName;
         this.workloadIntensity = workloadIntensity;
         this.scheduledStart = scheduledStart;
@@ -106,30 +102,47 @@ public class TrainingSchedule extends BaseEntity {
         if (completedAt == null) completedAt = time;
     }
 
+    public void markReady(UUID userId, Instant time) {
+        sessionStatus = "READY";
+        readyByUserId = userId;
+        readyAt = time;
+    }
+
+    public void startTraining(Instant time) {
+        sessionStatus = "IN_PROGRESS";
+        startedAt = time;
+    }
+
+    public void finishTraining(Instant time) {
+        sessionStatus = "COMPLETED";
+        completedAt = time;
+    }
+    public void updateDetails(Racetrack track, String name, Instant start, Instant end) {
+        racetrack = track;
+        taskName = name;
+        scheduledStart = start;
+        scheduledEnd = end;
+    }
+
+    public void updateEditableFields(Racetrack track, String name, String sessionNotes,
+            WorkloadIntensity intensity, Instant start, Instant end) {
+        racetrack = track;
+        taskName = name;
+        notes = sessionNotes;
+        if (intensity != null) workloadIntensity = intensity;
+        scheduledStart = start;
+        scheduledEnd = end;
+    }
+
     public void cancel(Instant time) {
         if (cancelledAt == null) cancelledAt = time;
     }
 
     public TrainingPlanPhase getPhase() { return phase; }
     public Horse getHorse() { return horse; }
-    public UserAccount getAssignedStaff() { return assignedStaff; }
-    public void setAssignedStaff(UserAccount assignedStaff) { this.assignedStaff = assignedStaff; }
-    public String getStaffAssignedBy() { return staffAssignedBy; }
-    public void setStaffAssignedBy(String staffAssignedBy) { this.staffAssignedBy = staffAssignedBy; }
-    public Instant getStaffAssignedAt() { return staffAssignedAt; }
-    public void setStaffAssignedAt(Instant staffAssignedAt) { this.staffAssignedAt = staffAssignedAt; }
-
     public Racetrack getRacetrack() { return racetrack; }
-    public void setRacetrack(Racetrack racetrack) { this.racetrack = racetrack; }
-
-    public UserAccount getVeterinarianUser() { return veterinarianUser; }
-    public void setVeterinarianUser(UserAccount veterinarianUser) { this.veterinarianUser = veterinarianUser; }
-    public String getVetAssignedBy() { return vetAssignedBy; }
-    public void setVetAssignedBy(String vetAssignedBy) { this.vetAssignedBy = vetAssignedBy; }
-    public Instant getVetAssignedAt() { return vetAssignedAt; }
-    public void setVetAssignedAt(Instant vetAssignedAt) { this.vetAssignedAt = vetAssignedAt; }
-
     public String getTaskName() { return taskName; }
+    public String getNotes() { return notes; }
     public WorkloadIntensity getWorkloadIntensity() { return workloadIntensity; }
     public Instant getScheduledStart() { return scheduledStart; }
     public Instant getScheduledEnd() { return scheduledEnd; }
@@ -137,4 +150,8 @@ public class TrainingSchedule extends BaseEntity {
     public Instant getPublishedAt() { return publishedAt; }
     public Instant getCancelledAt() { return cancelledAt; }
     public Instant getCompletedAt() { return completedAt; }
+    public String getSessionStatus() { return sessionStatus; }
+    public Instant getReadyAt() { return readyAt; }
+    public UUID getReadyByUserId() { return readyByUserId; }
+    public Instant getStartedAt() { return startedAt; }
 }

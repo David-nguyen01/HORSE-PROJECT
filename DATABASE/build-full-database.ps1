@@ -20,7 +20,32 @@ $migrationNames = @(
     "09_racing_reporting_rbac_audit.sql",
     "10_confirmed_business_rules.sql",
     "11_confirmed_automation_and_governance.sql",
-    "12_compact_schema.sql"
+    "12_compact_schema.sql",
+    "13_horse_service_payment.sql",
+    "14_fix_vietnamese_unicode.sql",
+    "15_daily_routine_care_tasks.sql",
+    "16_seed_sample_inventory.sql",
+    "17_fix_inventory_unicode.sql",
+    "18_seed_sample_nutrition.sql",
+    "19_revise_stable_nutrition_model.sql",
+    "20_align_nutrition_data.sql",
+    "15_training_operational_window.sql",
+    "16_seed_training_racetracks.sql",
+    "17_align_training_operational_schema.sql",
+    "18_training_plan_rest_days_and_evaluation_metrics.sql",
+    "19_training_lanes_expiry_and_metrics.sql",
+    "20_evaluation_exertion_nullable_and_session_notes.sql",
+    "21_training_v3_fields.sql",
+    "22_training_v3_rules.sql",
+    "23_drop_evaluation_training_load.sql",
+    "24_payos_wallet_schema.sql",
+    "25_horse_specific_service_plans.sql",
+    "26_align_training_evaluation_schema.sql",
+    "27_manual_horse_pedigree.sql",
+    "28_remove_training_session_assignees.sql",
+    "29_training_emergency_injured_status.sql",
+    "30_horse_current_weight.sql",
+    "31_race_completion_and_emergency_stop.sql"
 )
 
 $header = @"
@@ -74,6 +99,7 @@ foreach ($migrationName in $migrationNames) {
     }
 
     $content = [System.IO.File]::ReadAllText($migrationPath)
+    $content = [System.Text.RegularExpressions.Regex]::Replace($content, '(?m)[ \t]+(?=\r?$)', '')
     if ($DatabaseName -ne "racehorse") {
         $content = $content.Replace("[racehorse]", "[$DatabaseName]")
         $content = $content.Replace("N'racehorse'", "N'$DatabaseName'")

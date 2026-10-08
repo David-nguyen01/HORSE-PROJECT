@@ -34,13 +34,7 @@ mvn spring-boot:run
 
 Mặc định API chạy tại `http://localhost:8080`. Script `02_seed_data.sql` tạo tài khoản quản lý câu lạc bộ `admin@gmail.com / Admin123` nếu email này chưa tồn tại. Mật khẩu được mã hóa BCrypt trước khi lưu vào database. Hãy thay thông tin đăng nhập mặc định khi triển khai production.
 
-Chuỗi kết nối mặc định:
-
-```text
-jdbc:sqlserver://racehorse-training-management.database.windows.net:1433;databaseName=racehorse;encrypt=true;trustServerCertificate=true
-```
-
-Backend mặc định trỏ tới Azure SQL với username `racehorse_admin`. Mật khẩu không được lưu trong source; bắt buộc cung cấp bằng biến môi trường `DB_PASSWORD`. Có thể ghi đè kết nối bằng `DB_URL` và `DB_USERNAME`.
+Backend dùng profile `local` để kết nối SQL Server trên máy phát triển. Khi chạy trên host, không bật profile `local`; đặt `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` bằng biến môi trường của host. Không lưu mật khẩu DB trong source hoặc image.
 
 Để bật upload Cloudinary, đặt các biến môi trường sau trước khi chạy backend. Không commit API secret vào repository:
 
@@ -52,6 +46,18 @@ CLOUDINARY_FOLDER=racehorse
 ```
 
 Cấu hình nằm tại `src/main/resources/application.properties`. `spring.jpa.hibernate.ddl-auto=none` bảo đảm ứng dụng không tự tạo hoặc thay đổi schema; mọi thay đổi database phải được viết thành script mới trong `../DATABASE` và chạy chủ động bằng SSMS.
+
+## Triển khai ví demo lên host
+
+Luồng thanh toán hiện tại là mô phỏng: mã hiển thị không thể quét để chuyển tiền thật; nút xác nhận demo cộng tiền vào ví. Chỉ dùng dữ liệu demo, kể cả khi triển khai công khai. Để chạy trên host:
+
+1. Cấp một địa chỉ HTTPS ổn định cho web và API. Nếu cùng origin, reverse proxy chuyển `/api/**` và `/actuator/health` tới backend, phục vụ frontend tĩnh và chuyển các đường dẫn giao diện như `/wallet` về `index.html`; để `VITE_API_URL` trống khi build frontend. Nếu khác origin, đặt `VITE_API_URL` thành URL API **trước khi build** và đặt `CORS_ALLOWED_ORIGINS` bằng origin của frontend.
+2. Thiết lập biến môi trường backend theo `.env.example`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `PAYOS_GATEWAY=fake`. Không cần khóa PayOS hay tunnel cho bản demo. Không đưa mật khẩu vào biến `VITE_*`.
+3. Sau khi duyệt thay đổi DB, áp dụng lần lượt `DATABASE/24_payos_wallet_schema.sql` và `DATABASE/25_horse_specific_service_plans.sql` lên DB đích. Hai script không thêm bảng. Không chạy script lên Azure chỉ vì deploy code.
+4. Build JAR Java 21, chạy JAR hoặc `Dockerfile` hiện có với biến môi trường của host; build và phục vụ thư mục `FRONTEND/dist` bằng web server tĩnh. Xác nhận `/actuator/health` trả trạng thái khỏe.
+5. Kiểm tra tạo mã demo, xác nhận nạp ví, mua gói cho từng ngựa và tự gia hạn khi đến hạn. Mỗi ngựa có kỳ hạn và gói riêng; gói được đổi có hiệu lực ở kỳ tiếp theo.
+
+`run-local-real.cmd` và webhook PayOS vẫn còn trong mã nguồn cho thí nghiệm riêng; giao diện hiện tại không cung cấp checkout thanh toán thật.
 
 Kiểm tra health endpoint không cần đăng nhập:
 

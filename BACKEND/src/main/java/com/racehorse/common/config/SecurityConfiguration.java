@@ -2,6 +2,8 @@ package com.racehorse.common.config;
 
 import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.audit.security.AuditMutationFilter;
+import com.racehorse.wallet.OwnerOverdueFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -28,10 +30,18 @@ import java.util.UUID;
 public class SecurityConfiguration {
 
     @Bean
+    FilterRegistrationBean<OwnerOverdueFilter> ownerOverdueFilterRegistration(OwnerOverdueFilter filter) {
+        FilterRegistrationBean<OwnerOverdueFilter> registration = new FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
-            AuditMutationFilter auditMutationFilter) throws Exception {
+            AuditMutationFilter auditMutationFilter,
+            OwnerOverdueFilter ownerOverdueFilter) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults())
@@ -45,7 +55,8 @@ public class SecurityConfiguration {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
-                                "/api/care-tasks/*/photo")
+                                "/api/care-tasks/*/photo",
+                                "/api/wallet/payos/webhook")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2

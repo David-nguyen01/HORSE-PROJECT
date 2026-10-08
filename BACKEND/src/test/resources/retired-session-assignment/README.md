@@ -1,0 +1,1 @@
+Session auto-assignment was rejected during the develop merge on 2026-10-08. Training uses the horse caretaker and diagnosing veterinarian. These original incoming sources are retained as reference, not compiled or scheduled.

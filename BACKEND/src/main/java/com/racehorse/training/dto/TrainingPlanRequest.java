@@ -21,11 +21,23 @@ public record TrainingPlanRequest(
         @NotEmpty List<@Valid Phase> phases
 ) {
     public record Phase(
+            UUID id,
             @NotBlank @Size(max = 200) String name,
             @NotNull LocalDate startDate,
             @NotNull LocalDate endDate,
             @NotNull @DecimalMin("0.01") BigDecimal targetDistanceMeters,
             @NotNull WorkloadIntensity workloadIntensity,
-            @NotNull SurfaceType surfaceType
-    ) {}
+            @NotNull SurfaceType surfaceType,
+            List<@NotNull LocalDate> restDays
+    ) {
+        public Phase(String name, LocalDate startDate, LocalDate endDate, BigDecimal targetDistanceMeters,
+                WorkloadIntensity workloadIntensity, SurfaceType surfaceType) {
+            this(null, name, startDate, endDate, targetDistanceMeters, workloadIntensity, surfaceType, List.of());
+        }
+
+        public Phase(String name, LocalDate startDate, LocalDate endDate, BigDecimal targetDistanceMeters,
+                WorkloadIntensity workloadIntensity, SurfaceType surfaceType, List<LocalDate> restDays) {
+            this(null, name, startDate, endDate, targetDistanceMeters, workloadIntensity, surfaceType, restDays);
+        }
+    }
 }

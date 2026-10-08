@@ -4,6 +4,7 @@ import com.racehorse.horse.dto.CreateHorseRequest;
 import com.racehorse.horse.dto.HorseResponse;
 import com.racehorse.horse.dto.ReplaceOwnershipRequest;
 import com.racehorse.horse.dto.UpdateHorseRequest;
+import com.racehorse.horse.dto.UpdateOwnedHorseRequest;
 import com.racehorse.horse.entity.HorseStatus;
 import com.racehorse.horse.service.HorseService;
 import jakarta.validation.Valid;
@@ -48,13 +49,27 @@ public class HorseController {
                 .body(response);
     }
 
+    @PostMapping("/mine")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER')")
+    ResponseEntity<HorseResponse> createForOwner(@Valid @RequestBody CreateHorseRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+        HorseResponse response = horseService.createForOwner(request, userId(jwt));
+        return ResponseEntity.created(URI.create("/api/horses/" + response.id())).body(response);
+    }
+
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
     Page<HorseResponse> search(
-            @RequestParam(required = false) String query,
-            @RequestParam(required = false) HorseStatus status,
-            @RequestParam(required = false, defaultValue = "false") boolean paidOnly,
-            @PageableDefault(size = 20, sort = "name") Pageable pageable) {
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "status", required = false) HorseStatus status,
+            @RequestParam(name = "paidOnly", defaultValue = "false") boolean paidOnly,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable,
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        boolean trainer = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_HEAD_TRAINER"));
+        boolean manager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_CLUB_MANAGER"));
+        if (trainer && !manager) return horseService.searchForTrainer(query, status, userId(jwt), pageable);
         return horseService.search(query, status, paidOnly, pageable);
     }
 
@@ -74,29 +89,36 @@ public class HorseController {
 
     @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
     @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF','HORSE_OWNER')")
-    HorseResponse getById(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+    HorseResponse getById(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         return horseService.getByIdForUser(id, userId(jwt), isPrivileged(authentication));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     HorseResponse update(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody UpdateHorseRequest request) {
         return horseService.update(id, request);
+    }
+
+    @PutMapping("/{id}/mine")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER')")
+    HorseResponse updateForOwner(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UpdateOwnedHorseRequest request) {
+        return horseService.updateForOwner(id, userId(jwt), request);
     }
 
     @PutMapping("/{id}/ownership")
     @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     HorseResponse replaceOwnership(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ReplaceOwnershipRequest request) {
         return horseService.replaceOwnership(id, request);
     }
 
     @PatchMapping("/{id}/archive")
     @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    HorseResponse archive(@PathVariable UUID id) {
+    HorseResponse archive(@PathVariable("id") UUID id) {
         return horseService.archive(id);
     }
 

@@ -133,7 +133,9 @@ public class FitnessDashboardService {
                 .filter(e -> visibleHorseIds.contains(e.getHorse().getId()))
                 .map(e -> new FitnessDashboardResponse.FitnessDataPoint(
                         e.getId(), e.getHorse().getId(), e.getHorse().getCode(), e.getHorse().getName(),
-                        e.getSessionDate(), e.getTrainingLoad(), e.getAverageSpeedKmh(),
+                        e.getSessionDate(), e.getAverageSpeedKmh(),
+                        e.getMaxSpeedKmh(), e.getIntensityPercent(), e.getHeartRateAtStopBpm(),
+                        e.getHeartRateAfter1minBpm(), e.getHeartRateRecoveryRate(), 6,
                         e.getHeartRateRecoveryBpm(), e.getFitnessStatus()))
                 .toList();
         return new FitnessDashboardResponse(

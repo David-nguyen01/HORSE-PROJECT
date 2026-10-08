@@ -1,6 +1,7 @@
 package com.racehorse.incident.controller;
 
 import com.racehorse.incident.dto.CreateIncidentReportRequest;
+import com.racehorse.incident.dto.CreateTrainingEmergencyRequest;
 import com.racehorse.incident.dto.IncidentReportResponse;
 import com.racehorse.incident.dto.UpdateIncidentStatusRequest;
 import com.racehorse.incident.service.IncidentReportService;
@@ -33,6 +34,36 @@ public class IncidentReportController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateIncidentReportRequest request) {
         return service.createReport(UUID.fromString(jwt.getSubject()), request);
+    }
+
+    @PostMapping("/training-emergency")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('HEAD_TRAINER') and hasAuthority('PERM_TRAINING_VIEW')")
+    public IncidentReportResponse createTrainingEmergency(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateTrainingEmergencyRequest request) {
+        return service.createTrainingEmergency(UUID.fromString(jwt.getSubject()), request);
+    }
+
+    @GetMapping("/training-emergency/sent")
+    @PreAuthorize("hasRole('HEAD_TRAINER') and hasAuthority('PERM_TRAINING_VIEW')")
+    public List<IncidentReportResponse> sentTrainingEmergencies(@AuthenticationPrincipal Jwt jwt) {
+        return service.sentTrainingEmergencies(UUID.fromString(jwt.getSubject()));
+    }
+
+    @GetMapping("/training-emergency/horses/{horseId}")
+    @PreAuthorize("hasRole('HORSE_OWNER') and hasAuthority('PERM_PROFILE_VIEW')")
+    public List<IncidentReportResponse> ownerTrainingEmergencies(@PathVariable UUID horseId, @AuthenticationPrincipal Jwt jwt) {
+        return service.ownerTrainingEmergencies(horseId, UUID.fromString(jwt.getSubject()));
+    }
+
+    @GetMapping("/training-emergency/{id}")
+    @PreAuthorize("hasAnyRole('HEAD_TRAINER','HORSE_OWNER')")
+    public IncidentReportResponse trainingEmergency(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+            org.springframework.security.core.Authentication authentication) {
+        boolean owner = authentication.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_HORSE_OWNER"));
+        return service.trainingEmergency(id, UUID.fromString(jwt.getSubject()), owner);
     }
 
     @GetMapping

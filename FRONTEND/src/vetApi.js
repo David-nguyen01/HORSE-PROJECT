@@ -183,16 +183,7 @@ export const vetApi = {
   getHorseRaceReadiness: (horseId) =>
     api(`/api/horses/${horseId}/race-readiness`),
 
-  // Training Supervision & Distributed Claiming
-  getOpenTrainingSessions: (from, to) => {
-    const q = new URLSearchParams()
-    if (from) q.set('from', from)
-    if (to)   q.set('to', to)
-    const qs = q.toString()
-    return api(`/api/training-schedules/open${qs ? `?${qs}` : ''}`)
-  },
-  claimTrainingSession: (scheduleId) =>
-    api(`/api/training-schedules/${scheduleId}/claim`, { method: 'POST' }),
+  // Sessions of horses assigned to the diagnosing veterinarian
   getMyTrainingSessions: (from, to) => {
     const q = new URLSearchParams()
     if (from) q.set('from', from)
@@ -201,4 +192,3 @@ export const vetApi = {
     return api(`/api/training-schedules/mine${qs ? `?${qs}` : ''}`)
   },
 }
-

@@ -38,6 +38,15 @@ public class NotificationService {
                 recipient, type, priority, title, message, relatedEntityType, relatedEntityId, clock.instant()));
     }
 
+    @Transactional
+    public Notification createDeduplicated(UserAccount recipient, String type, NotificationPriority priority,
+            String title, String message, String relatedEntityType, UUID relatedEntityId, String key) {
+        if (key == null || key.isBlank() || key.length() > 200)
+            throw new IllegalArgumentException("A valid notification deduplication key is required");
+        return repository.findByDeduplicationKey(key).orElseGet(() -> repository.save(new Notification(
+                recipient, type, priority, title, message, relatedEntityType, relatedEntityId, key, clock.instant())));
+    }
+
     @Transactional(readOnly = true)
     public Page<NotificationResponse> list(UUID recipientId, boolean unreadOnly, Pageable pageable) {
         Page<Notification> page = unreadOnly
@@ -52,6 +61,11 @@ public class NotificationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông báo: " + notificationId));
         notification.markRead(clock.instant());
         return toResponse(repository.save(notification));
+    }
+
+    @Transactional
+    public int markAllRead(UUID recipientId) {
+        return repository.markAllRead(recipientId, clock.instant());
     }
 
     private NotificationResponse toResponse(Notification value) {

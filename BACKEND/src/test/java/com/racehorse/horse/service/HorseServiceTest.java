@@ -7,6 +7,7 @@ import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.horse.dto.CreateHorseRequest;
 import com.racehorse.horse.dto.HorseResponse;
 import com.racehorse.horse.dto.ReplaceOwnershipRequest;
+import com.racehorse.horse.dto.UpdateOwnedHorseRequest;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.entity.HorseGender;
 import com.racehorse.horse.entity.HorseOwnership;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -64,6 +66,8 @@ class HorseServiceTest {
     @Test
     void createNormalizesIdentifiersAndUsesActiveAsDefaultStatus() {
         CreateHorseRequest request = request("  h-001  ", null);
+        when(userRepository.findById(request.initialOwnerId())).thenReturn(Optional.of(
+                new UserAccount("owner", "encoded", "owner@example.com", Set.of(Role.HORSE_OWNER))));
         when(horseRepository.save(any(Horse.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -106,6 +110,104 @@ class HorseServiceTest {
         assertThat(response.owners().get(0).username()).isEqualTo("owner1");
         assertThat(response.owners().get(0).percentage()).isEqualByComparingTo("100.00");
         verify(ownershipRepository).save(any(HorseOwnership.class));
+    }
+
+    @Test
+    void ownerCannotChooseStallOrPaymentStatusWhenCreatingHorse() {
+        UUID ownerId = UUID.randomUUID();
+        UserAccount owner = new UserAccount("owner", "owner@example.com", "encoded", Set.of(Role.HORSE_OWNER));
+        CreateHorseRequest request = new CreateHorseRequest("H-NEW", "New horse", null,
+                LocalDate.of(2023, 1, 1), HorseGender.STALLION, "Bay", "Thoroughbred",
+                null, null, null, "Other staff's stall", HorseStatus.INJURED, null);
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        when(horseRepository.save(any(Horse.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseResponse response = horseService.createForOwner(request, ownerId);
+
+        assertThat(response.stableLocation()).isEmpty();
+        assertThat(response.status()).isEqualTo(HorseStatus.PENDING_PAYMENT);
+        assertThat(response.paymentStatus()).isEqualTo("UNPAID");
+    }
+
+    @Test
+    void ownerCanChooseOwnedSireAndDamWhenCreatingHorse() {
+        UUID ownerId = UUID.randomUUID();
+        UUID sireId = UUID.randomUUID();
+        UUID damId = UUID.randomUUID();
+        Horse sire = horseEntity("SIRE");
+        Horse dam = new Horse("DAM", "Dam", null, LocalDate.of(2021, 2, 1),
+                HorseGender.MARE, "Bay", "Thoroughbred", "Stable A", HorseStatus.ACTIVE);
+        CreateHorseRequest request = new CreateHorseRequest("FOAL", "Foal", null,
+                LocalDate.of(2024, 1, 1), HorseGender.MARE, "Bay", "Thoroughbred",
+                sireId, damId, null, null, null, null);
+        when(ownershipRepository.existsByHorseIdAndOwnerId(sireId, ownerId)).thenReturn(true);
+        when(ownershipRepository.existsByHorseIdAndOwnerId(damId, ownerId)).thenReturn(true);
+        when(horseRepository.findById(sireId)).thenReturn(Optional.of(sire));
+        when(horseRepository.findById(damId)).thenReturn(Optional.of(dam));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(
+                new UserAccount("owner", "encoded", "owner@example.com", Set.of(Role.HORSE_OWNER))));
+        when(horseRepository.save(any(Horse.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseResponse response = horseService.createForOwner(request, ownerId);
+
+        assertThat(response.sire().name()).isEqualTo("Lightning");
+        assertThat(response.dam().name()).isEqualTo("Dam");
+        assertThat(response.status()).isEqualTo(HorseStatus.PENDING_PAYMENT);
+    }
+
+    @Test
+    void ownerCannotChooseAnotherOwnersHorseAsParent() {
+        UUID ownerId = UUID.randomUUID();
+        UUID sireId = UUID.randomUUID();
+        CreateHorseRequest request = new CreateHorseRequest("FOAL", "Foal", null,
+                LocalDate.of(2024, 1, 1), HorseGender.MARE, "Bay", "Thoroughbred",
+                sireId, null, null, null, null, null);
+
+        assertThatThrownBy(() -> horseService.createForOwner(request, ownerId))
+                .isInstanceOf(com.racehorse.common.exception.ResourceNotFoundException.class);
+        verify(horseRepository, never()).save(any(Horse.class));
+    }
+
+    @Test
+    void ownerProfileEditPreservesAssignedStallAndOperationalStatus() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        Horse horse = horseEntity("H-EDIT");
+        when(horseRepository.findDetailById(horseId)).thenReturn(Optional.of(horse));
+        when(ownershipRepository.existsByHorseIdAndOwnerId(horseId, ownerId)).thenReturn(true);
+        UpdateOwnedHorseRequest request = new UpdateOwnedHorseRequest("Renamed", null,
+                LocalDate.of(2022, 3, 10), HorseGender.STALLION, "White blaze", "Thoroughbred");
+
+        HorseResponse updated = horseService.updateForOwner(horseId, ownerId, request);
+
+        assertThat(updated.name()).isEqualTo("Renamed");
+        assertThat(updated.stableLocation()).isEqualTo("Stable A-01");
+        assertThat(updated.status()).isEqualTo(HorseStatus.ACTIVE);
+    }
+
+    @Test
+    void ownerCanEditPedigreeWithAnOwnedEligibleSire() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        UUID sireId = UUID.randomUUID();
+        Horse foal = horseEntity("H-EDIT");
+        ReflectionTestUtils.setField(foal, "id", horseId);
+        Horse sire = new Horse("SIRE", "Sire", null, LocalDate.of(2021, 1, 1),
+                HorseGender.STALLION, "Bay", "Thoroughbred", "Stable A-01", HorseStatus.ACTIVE);
+        when(horseRepository.findDetailById(horseId)).thenReturn(Optional.of(foal));
+        when(ownershipRepository.existsByHorseIdAndOwnerId(horseId, ownerId)).thenReturn(true);
+        when(ownershipRepository.existsByHorseIdAndOwnerId(sireId, ownerId)).thenReturn(true);
+        when(horseRepository.findById(sireId)).thenReturn(Optional.of(sire));
+        when(horseRepository.findDetailById(sireId)).thenReturn(Optional.of(sire));
+
+        UpdateOwnedHorseRequest request = new UpdateOwnedHorseRequest("Lightning", null,
+                LocalDate.of(2023, 1, 1), HorseGender.STALLION, "White blaze", "Thoroughbred",
+                sireId, null, null, null, null, null);
+
+        HorseResponse response = horseService.updateForOwner(horseId, ownerId, request);
+
+        assertThat(response.sire()).isNotNull();
+        assertThat(response.sire().name()).isEqualTo("Sire");
     }
 
     @Test
@@ -180,7 +282,8 @@ class HorseServiceTest {
                 null,
                 null,
                 "Stable A-01",
-                status);
+                status,
+                UUID.fromString("00000000-0000-0000-0000-000000000001"));
     }
 
     private Horse horseEntity(String code) {

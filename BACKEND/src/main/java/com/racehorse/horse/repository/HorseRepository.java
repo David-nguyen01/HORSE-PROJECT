@@ -25,7 +25,7 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             String microchipPassportNumber,
             UUID id);
 
-    @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
+    @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer", "caretaker", "diagnosingVet"})
     @Query("""
             select h from Horse h
             where h.id = :id
@@ -45,7 +45,17 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             @Param("status") HorseStatus status,
             Pageable pageable);
 
-    @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
+    @Query("""
+            select h from Horse h
+            where h.archivedAt is null and h.currentTrainer.id = :trainerId
+              and (:query is null or lower(h.code) like lower(concat('%', :query, '%'))
+                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:status is null or h.status = :status)
+            """)
+    Page<Horse> searchForTrainer(@Param("query") String query, @Param("status") HorseStatus status,
+                                @Param("trainerId") UUID trainerId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer", "caretaker", "diagnosingVet"})
     @Query("""
             select h from Horse h
             where h.archivedAt is null

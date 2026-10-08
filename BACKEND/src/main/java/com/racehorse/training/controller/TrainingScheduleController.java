@@ -2,6 +2,7 @@ package com.racehorse.training.controller;
 
 import com.racehorse.training.dto.CreateTrainingScheduleRequest;
 import com.racehorse.training.dto.TrainingScheduleResponse;
+import com.racehorse.training.dto.UpdateTrainingScheduleRequest;
 import com.racehorse.training.service.TrainingScheduleService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -11,8 +12,11 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -36,76 +40,95 @@ public class TrainingScheduleController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingScheduleResponse create(
+    List<TrainingScheduleResponse> create(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CreateTrainingScheduleRequest request) {
-        return service.create(userId(jwt), request);
+            @Valid @RequestBody CreateTrainingScheduleRequest request, Authentication authentication) {
+        return service.create(userId(jwt), request,
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
+    }
+
+    @PutMapping("/{scheduleId}")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    TrainingScheduleResponse update(@PathVariable("scheduleId") UUID scheduleId,
+            @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UpdateTrainingScheduleRequest request,
+            Authentication authentication) {
+        return service.update(scheduleId, userId(jwt), request,
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
+    }
+
+    @DeleteMapping("/{scheduleId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    void cancel(@PathVariable("scheduleId") UUID scheduleId, @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+        service.cancel(scheduleId, userId(jwt),
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
+    }
+
+    @PatchMapping("/{scheduleId}/ready")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','STABLE_STAFF')")
+    TrainingScheduleResponse ready(@PathVariable("scheduleId") UUID scheduleId, @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+        return service.markReady(scheduleId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"));
+    }
+
+    @PostMapping("/{scheduleId}/start")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasRole('HEAD_TRAINER')")
+    TrainingScheduleResponse start(@PathVariable("scheduleId") UUID scheduleId, @AuthenticationPrincipal Jwt jwt) {
+        return service.startTraining(scheduleId, userId(jwt));
+    }
+
+    @PostMapping("/{scheduleId}/finish")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasRole('HEAD_TRAINER')")
+    TrainingScheduleResponse finish(@PathVariable("scheduleId") UUID scheduleId, @AuthenticationPrincipal Jwt jwt) {
+        return service.finishTraining(scheduleId, userId(jwt));
     }
 
     @PostMapping("/{scheduleId}/publish")
     @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
-    TrainingScheduleResponse publish(@PathVariable UUID scheduleId) {
-        return service.publish(scheduleId);
+    TrainingScheduleResponse publish(@PathVariable("scheduleId") UUID scheduleId, @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication) {
+        return service.publish(scheduleId, userId(jwt),
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
+    }
+
+    @GetMapping("/{scheduleId}")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','STABLE_STAFF')")
+    TrainingScheduleResponse get(@PathVariable("scheduleId") UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        return service.get(scheduleId, userId(jwt),
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"), false);
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN')")
     List<TrainingScheduleResponse> calendar(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-            @RequestParam(required = false) UUID horseId) {
-        LocalDate actualFrom = date != null ? date : from;
-        LocalDate actualTo = date != null ? date : to;
-        return service.calendar(actualFrom, actualTo, horseId);
-    }
-
-    @GetMapping("/open")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_CLAIM') and hasAnyRole('STABLE_STAFF','VETERINARIAN')")
-    List<TrainingScheduleResponse> openSessions(
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return service.findOpenSessions(userId(jwt), isVet(authentication), from, to);
-    }
-
-    @PostMapping("/{scheduleId:[0-9a-fA-F\\-]{36}}/claim")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_CLAIM') and hasAnyRole('STABLE_STAFF','VETERINARIAN')")
-    TrainingScheduleResponse claim(
-            @PathVariable UUID scheduleId,
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication) {
-        return service.claim(scheduleId, userId(jwt), isVet(authentication));
+            @RequestParam(name = "date", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(name = "horseId", required = false) UUID horseId,
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        if (date != null) { from = date; to = date; }
+        if (hasRole(authentication, "VETERINARIAN") && !hasRole(authentication, "HEAD_TRAINER") && !hasRole(authentication, "CLUB_MANAGER"))
+            return service.forDiagnosingVet(userId(jwt), from, to).stream()
+                    .filter(s -> horseId == null || horseId.equals(s.horse().id())).toList();
+        return service.calendar(from, to, horseId, userId(jwt),
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"), false);
     }
 
     @GetMapping("/mine")
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('STABLE_STAFF','VETERINARIAN')")
     List<TrainingScheduleResponse> mine(
-            @AuthenticationPrincipal Jwt jwt,
-            Authentication authentication,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return service.mine(userId(jwt), isVet(authentication), from, to);
-    }
-
-    @GetMapping("/{scheduleId:[0-9a-fA-F\\-]{36}}")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
-    TrainingScheduleResponse get(@PathVariable UUID scheduleId, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        return service.get(scheduleId, userId(jwt), isPrivileged(authentication));
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return hasRole(authentication, "VETERINARIAN")
+                ? service.forDiagnosingVet(userId(jwt), from, to) : service.mine(userId(jwt), from, to);
     }
 
     private UUID userId(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 
-    private boolean isPrivileged(Authentication authentication) {
+    private boolean hasRole(Authentication authentication, String role) {
         return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
-                || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
-                || authority.getAuthority().equals("ROLE_VETERINARIAN"));
-    }
-
-    private boolean isVet(Authentication authentication) {
-        return authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_VETERINARIAN"));
+                authority.getAuthority().equals("ROLE_" + role));
     }
 }

@@ -2,6 +2,7 @@ package com.racehorse.horse.service;
 
 import com.racehorse.horse.dto.PedigreeResponse;
 import com.racehorse.horse.entity.Horse;
+import com.racehorse.horse.entity.HorseGender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,12 +31,17 @@ public class PedigreeService {
         if (horse == null) {
             return null;
         }
-        return new PedigreeResponse.PedigreeNode(
-                horse.getId(),
-                horse.getCode(),
-                horse.getName(),
-                horse.getGender(),
-                remainingAncestorLevels == 0 ? null : buildNode(horse.getSire(), remainingAncestorLevels - 1),
-                remainingAncestorLevels == 0 ? null : buildNode(horse.getDam(), remainingAncestorLevels - 1));
+        return new PedigreeResponse.PedigreeNode(horse.getId(), horse.getCode(), horse.getName(), horse.getGender(),
+                remainingAncestorLevels == 0 ? null : parentNode(horse.getSire(), horse.getSireManualId(),
+                        horse.getSireManualName(), HorseGender.STALLION, remainingAncestorLevels - 1),
+                remainingAncestorLevels == 0 ? null : parentNode(horse.getDam(), horse.getDamManualId(),
+                        horse.getDamManualName(), HorseGender.MARE, remainingAncestorLevels - 1));
+    }
+
+    private PedigreeResponse.PedigreeNode parentNode(Horse parent, String manualId, String manualName,
+            HorseGender gender, int remainingAncestorLevels) {
+        if (parent != null) return buildNode(parent, remainingAncestorLevels);
+        if (manualName == null) return null;
+        return new PedigreeResponse.PedigreeNode(null, manualId, manualName, gender, null, null);
     }
 }

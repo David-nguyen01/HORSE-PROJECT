@@ -21,6 +21,16 @@ public record UpdateHorseRequest(
         UUID damId,
         UUID currentTrainerId,
         @NotBlank @Size(max = 150) String stableLocation,
-        @NotNull HorseStatus status
+        @NotNull HorseStatus status,
+        @Size(max = 150) String sireManualName,
+        @Size(max = 50) String sireManualId,
+        @Size(max = 150) String damManualName,
+        @Size(max = 50) String damManualId
 ) {
+    public UpdateHorseRequest(String name, String microchipPassportNumber, LocalDate birthDate,
+            HorseGender gender, String colorMarkings, String breed, UUID sireId, UUID damId,
+            UUID currentTrainerId, String stableLocation, HorseStatus status) {
+        this(name, microchipPassportNumber, birthDate, gender, colorMarkings, breed, sireId, damId,
+                currentTrainerId, stableLocation, status, null, null, null, null);
+    }
 }

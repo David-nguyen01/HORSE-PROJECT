@@ -21,10 +21,23 @@ public record CreateHorseRequest(
         UUID sireId,
         UUID damId,
         UUID currentTrainerId,
-        @NotBlank @Size(max = 150) String stableLocation,
+        @Size(max = 150) String stableLocation,
         HorseStatus status,
-        UUID initialOwnerId
+        UUID initialOwnerId,
+        @Size(max = 150) String sireManualName,
+        @Size(max = 50) String sireManualId,
+        @Size(max = 150) String damManualName,
+        @Size(max = 50) String damManualId
 ) {
+    public CreateHorseRequest(String code, String name, String microchipPassportNumber,
+            LocalDate birthDate, HorseGender gender, String colorMarkings, String breed,
+            UUID sireId, UUID damId, UUID currentTrainerId, String stableLocation,
+            HorseStatus status, UUID initialOwnerId) {
+        this(code, name, microchipPassportNumber, birthDate, gender, colorMarkings, breed,
+                sireId, damId, currentTrainerId, stableLocation, status, initialOwnerId,
+                null, null, null, null);
+    }
+
     public CreateHorseRequest(
             String code,
             String name,
@@ -39,6 +52,7 @@ public record CreateHorseRequest(
             String stableLocation,
             HorseStatus status
     ) {
-        this(code, name, microchipPassportNumber, birthDate, gender, colorMarkings, breed, sireId, damId, currentTrainerId, stableLocation, status, null);
+        this(code, name, microchipPassportNumber, birthDate, gender, colorMarkings, breed,
+                sireId, damId, currentTrainerId, stableLocation, status, null, null, null, null, null);
     }
 }

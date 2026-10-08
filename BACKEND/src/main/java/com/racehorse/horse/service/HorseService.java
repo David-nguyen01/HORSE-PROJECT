@@ -9,19 +9,27 @@ import com.racehorse.horse.dto.CreateHorseRequest;
 import com.racehorse.horse.dto.HorseResponse;
 import com.racehorse.horse.dto.ReplaceOwnershipRequest;
 import com.racehorse.horse.dto.UpdateHorseRequest;
+import com.racehorse.horse.dto.UpdateOwnedHorseRequest;
 import com.racehorse.horse.entity.Horse;
+import com.racehorse.horse.entity.HorseGender;
 import com.racehorse.horse.entity.HorseOwnership;
 import com.racehorse.horse.entity.HorseStatus;
 import com.racehorse.horse.mapper.HorseMapper;
 import com.racehorse.horse.repository.HorseOwnershipRepository;
 import com.racehorse.horse.repository.HorseRepository;
+import com.racehorse.notification.entity.NotificationPriority;
+import com.racehorse.notification.service.NotificationService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.Arrays;
 import java.util.List;
@@ -36,30 +44,56 @@ public class HorseService {
     private final UserAccountRepository userRepository;
     private final HorseMapper horseMapper;
     private final Clock clock;
+    private final JdbcTemplate jdbc;
+    private final NotificationService notifications;
 
+    @Autowired
     public HorseService(
             HorseRepository horseRepository,
             HorseOwnershipRepository ownershipRepository,
             UserAccountRepository userRepository,
             HorseMapper horseMapper,
-            Clock clock) {
+            Clock clock,
+            JdbcTemplate jdbc,
+            NotificationService notifications) {
         this.horseRepository = horseRepository;
         this.ownershipRepository = ownershipRepository;
         this.userRepository = userRepository;
         this.horseMapper = horseMapper;
         this.clock = clock;
+        this.jdbc = jdbc;
+        this.notifications = notifications;
+    }
+
+    public HorseService(HorseRepository horseRepository, HorseOwnershipRepository ownershipRepository,
+                        UserAccountRepository userRepository, HorseMapper horseMapper, Clock clock, JdbcTemplate jdbc) {
+        this(horseRepository, ownershipRepository, userRepository, horseMapper, clock, jdbc, null);
+    }
+
+    public HorseService(HorseRepository horseRepository, HorseOwnershipRepository ownershipRepository,
+                        UserAccountRepository userRepository, HorseMapper horseMapper, Clock clock) {
+        this(horseRepository, ownershipRepository, userRepository, horseMapper, clock, null, null);
     }
 
     @Transactional
     public HorseResponse create(CreateHorseRequest request) {
+        if (request.initialOwnerId() == null) {
+            throw new BusinessException("Mỗi ngựa phải có đúng một chủ sở hữu");
+        }
         validateUniqueIdentifiers(request);
         validateDistinctParents(request.sireId(), request.damId());
+        validateManualParents(request.sireId(), request.sireManualName(), request.sireManualId(),
+                request.damId(), request.damManualName(), request.damManualId());
 
-        Horse sire = findOptionalParent(request.sireId(), "Không tìm thấy ngựa bố");
-        Horse dam = findOptionalParent(request.damId(), "Không tìm thấy ngựa mẹ");
+        Horse sire = findOwnedParent(request.sireId(), request.initialOwnerId(), HorseGender.STALLION,
+                request.birthDate(), "ngựa cha");
+        Horse dam = findOwnedParent(request.damId(), request.initialOwnerId(), HorseGender.MARE,
+                request.birthDate(), "ngựa mẹ");
 
         Horse horse = horseMapper.toEntity(request);
         horse.assignParents(sire, dam);
+        horse.assignManualParents(trimToNull(request.sireManualName()), trimToNull(request.sireManualId()),
+                trimToNull(request.damManualName()), trimToNull(request.damManualId()));
         horse.assignCurrentTrainer(findTrainer(request.currentTrainerId()));
         Horse saved = horseRepository.save(horse);
 
@@ -71,6 +105,28 @@ public class HorseService {
         }
 
         return toResponse(saved);
+    }
+
+    @Transactional
+    public HorseResponse createForOwner(CreateHorseRequest request, UUID ownerId) {
+        validateUniqueIdentifiers(request);
+        if (request.currentTrainerId() != null || request.initialOwnerId() != null) {
+            throw new BusinessException("Chủ ngựa không được tự gán huấn luyện viên hoặc chủ sở hữu khác");
+        }
+        validateDistinctParents(request.sireId(), request.damId());
+        validateManualParents(request.sireId(), request.sireManualName(), request.sireManualId(),
+                request.damId(), request.damManualName(), request.damManualId());
+        Horse sire = findOwnedParent(request.sireId(), ownerId, HorseGender.STALLION, request.birthDate(), "ngựa cha");
+        Horse dam = findOwnedParent(request.damId(), ownerId, HorseGender.MARE, request.birthDate(), "ngựa mẹ");
+        UserAccount owner = findUserWithRole(ownerId, Role.HORSE_OWNER, "Chủ sở hữu");
+        Horse horse = horseMapper.toEntityForOwner(request);
+        horse.assignParents(sire, dam);
+        horse.assignManualParents(trimToNull(request.sireManualName()), trimToNull(request.sireManualId()),
+                trimToNull(request.damManualName()), trimToNull(request.damManualId()));
+        Horse saved = horseRepository.save(horse);
+        HorseOwnership ownership = new HorseOwnership(saved, owner, new BigDecimal("100.00"));
+        ownershipRepository.save(ownership);
+        return horseMapper.toResponse(saved, List.of(ownership));
     }
 
     @Transactional(readOnly = true)
@@ -98,6 +154,12 @@ public class HorseService {
     }
 
     @Transactional(readOnly = true)
+    public Page<HorseResponse> searchForTrainer(String query, HorseStatus status, UUID trainerId, Pageable pageable) {
+        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, pageable).map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
     public List<HorseResponse> getEligibleForMedical() {
         return horseRepository.findEligibleForMedical().stream()
                 .map(this::toResponse)
@@ -113,7 +175,15 @@ public class HorseService {
     public HorseResponse update(UUID id, UpdateHorseRequest request) {
         Horse horse = findHorse(id);
         validateDistinctParents(request.sireId(), request.damId());
-        validateParentCycle(horse, request.sireId(), request.damId());
+        validateManualParents(request.sireId(), request.sireManualName(), request.sireManualId(),
+                request.damId(), request.damManualName(), request.damManualId());
+
+        UUID ownerId = soleOwnerId(horse);
+        boolean sireChanged = parentChanged(horse.getSire(), horse.getSireManualName(), horse.getSireManualId(),
+                request.sireId(), request.sireManualName(), request.sireManualId());
+        boolean damChanged = parentChanged(horse.getDam(), horse.getDamManualName(), horse.getDamManualId(),
+                request.damId(), request.damManualName(), request.damManualId());
+        if (sireChanged || damChanged) validateParentCycle(horse, request.sireId(), request.damId());
 
         String chip = normalizeNullable(request.microchipPassportNumber());
         if (chip != null
@@ -121,8 +191,10 @@ public class HorseService {
             throw new BusinessException("Số chip/hộ chiếu đã tồn tại: " + chip);
         }
 
-        Horse sire = findOptionalParent(request.sireId(), "Không tìm thấy ngựa bố");
-        Horse dam = findOptionalParent(request.damId(), "Không tìm thấy ngựa mẹ");
+        Horse sire = sireChanged ? findEditableParent(request.sireId(), ownerId, HorseGender.STALLION,
+                request.birthDate(), "ngựa cha") : horse.getSire();
+        Horse dam = damChanged ? findEditableParent(request.damId(), ownerId, HorseGender.MARE,
+                request.birthDate(), "ngựa mẹ") : horse.getDam();
         horse.update(
                 request.name().trim(),
                 chip,
@@ -133,14 +205,63 @@ public class HorseService {
                 request.stableLocation().trim(),
                 request.status());
         horse.assignParents(sire, dam);
+        horse.assignManualParents(trimToNull(request.sireManualName()), trimToNull(request.sireManualId()),
+                trimToNull(request.damManualName()), trimToNull(request.damManualId()));
         horse.assignCurrentTrainer(findTrainer(request.currentTrainerId()));
+        notifyResponsible(horse);
         return toResponse(horse);
+    }
+
+    @Transactional
+    public HorseResponse updateForOwner(UUID id, UUID ownerId, UpdateOwnedHorseRequest request) {
+        Horse horse = findHorse(id);
+        if (horse.getArchivedAt() != null || !ownershipRepository.existsByHorseIdAndOwnerId(id, ownerId))
+            throw new ResourceNotFoundException("Không tìm thấy ngựa được phép chỉnh sửa: " + id);
+        validateDistinctParents(request.sireId(), request.damId());
+        validateManualParents(request.sireId(), request.sireManualName(), request.sireManualId(),
+                request.damId(), request.damManualName(), request.damManualId());
+        boolean sireChanged = parentChanged(horse.getSire(), horse.getSireManualName(), horse.getSireManualId(),
+                request.sireId(), request.sireManualName(), request.sireManualId());
+        boolean damChanged = parentChanged(horse.getDam(), horse.getDamManualName(), horse.getDamManualId(),
+                request.damId(), request.damManualName(), request.damManualId());
+        if (sireChanged || damChanged) validateParentCycle(horse, request.sireId(), request.damId());
+        Horse sire = sireChanged ? findEditableParent(request.sireId(), ownerId, HorseGender.STALLION,
+                request.birthDate(), "ngựa cha") : horse.getSire();
+        Horse dam = damChanged ? findEditableParent(request.damId(), ownerId, HorseGender.MARE,
+                request.birthDate(), "ngựa mẹ") : horse.getDam();
+        String chip = normalizeNullable(request.microchipPassportNumber());
+        if (chip != null && horseRepository.existsByMicrochipPassportNumberIgnoreCaseAndIdNot(chip, id))
+            throw new BusinessException("Số chip/hộ chiếu đã tồn tại: " + chip);
+        horse.update(request.name().trim(), chip, request.birthDate(), request.gender(),
+                request.colorMarkings().trim(), request.breed().trim(),
+                horse.getStableLocation(), horse.getStatus());
+        horse.assignParents(sire, dam);
+        horse.assignManualParents(trimToNull(request.sireManualName()), trimToNull(request.sireManualId()),
+                trimToNull(request.damManualName()), trimToNull(request.damManualId()));
+        notifyResponsible(horse);
+        return toResponse(horse);
+    }
+
+    private void notifyResponsible(Horse horse) {
+        if (notifications == null) return;
+        UUID changeId = UUID.randomUUID();
+        Set<UUID> sent = new HashSet<>();
+        for (UserAccount recipient : Arrays.asList(horse.getCurrentTrainer(), horse.getCaretaker(),
+                horse.getDiagnosingVet()).stream().filter(java.util.Objects::nonNull).toList()) {
+            if (recipient.getId() != null && sent.add(recipient.getId()))
+                notifications.createDeduplicated(recipient, "HORSE_PROFILE_UPDATED", NotificationPriority.NORMAL,
+                        "Hồ sơ ngựa đã được cập nhật", horse.getCode() + " - " + horse.getName(),
+                        "HORSE", horse.getId(), "HORSE_PROFILE_UPDATED_" + changeId + "_" + recipient.getId());
+        }
     }
 
     @Transactional
     public HorseResponse replaceOwnership(UUID horseId, ReplaceOwnershipRequest request) {
         if (!request.confirmed()) {
             throw new BusinessException("Phải xác nhận trước khi thay đổi tỷ lệ sở hữu");
+        }
+        if (request.owners().size() != 1) {
+            throw new BusinessException("Mỗi ngựa phải có đúng một chủ sở hữu");
         }
         Horse horse = findHorse(horseId);
         Set<UUID> uniqueOwnerIds = new HashSet<>();
@@ -193,12 +314,65 @@ public class HorseService {
         }
     }
 
+    private void validateManualParents(UUID sireId, String sireName, String sireManualId,
+            UUID damId, String damName, String damManualId) {
+        validateManualParent(sireId, sireName, sireManualId, "ngựa cha");
+        validateManualParent(damId, damName, damManualId, "ngựa mẹ");
+        if (sireManualId != null && damManualId != null
+                && sireManualId.trim().equalsIgnoreCase(damManualId.trim()))
+            throw new BusinessException("ID ngựa cha và ngựa mẹ phải khác nhau");
+    }
+
+    private boolean parentChanged(Horse linkedParent, String currentManualName, String currentManualId,
+            UUID requestedParentId, String requestedManualName, String requestedManualId) {
+        UUID currentParentId = linkedParent == null ? null : linkedParent.getId();
+        return !java.util.Objects.equals(currentParentId, requestedParentId)
+                || !java.util.Objects.equals(trimToNull(currentManualName), trimToNull(requestedManualName))
+                || !java.util.Objects.equals(trimToNull(currentManualId), trimToNull(requestedManualId));
+    }
+
+    private Horse findEditableParent(UUID parentId, UUID ownerId, HorseGender gender,
+            LocalDate childBirthDate, String label) {
+        if (parentId == null) return null;
+        if (ownerId == null)
+            throw new BusinessException("Ngựa cha/mẹ được chọn phải thuộc cùng chủ sở hữu");
+        return findOwnedParent(parentId, ownerId, gender, childBirthDate, label);
+    }
+
+    private UUID soleOwnerId(Horse horse) {
+        List<HorseOwnership> ownerships = ownershipRepository.findByHorseIdOrderByOwnerUsernameAsc(horse.getId());
+        return ownerships.size() == 1 ? ownerships.getFirst().getOwner().getId() : null;
+    }
+
+    private void validateManualParent(UUID parentId, String name, String manualId, String label) {
+        boolean hasName = name != null && !name.isBlank();
+        boolean hasManualId = manualId != null && !manualId.isBlank();
+        if ((hasName || hasManualId) && parentId != null)
+            throw new BusinessException("Chọn một cách khai báo cho " + label + ": hồ sơ có sẵn hoặc nhập tay");
+        if (hasName != hasManualId)
+            throw new BusinessException("Khi nhập tay " + label + ", cần nhập cả tên và ID");
+    }
+
     private Horse findOptionalParent(UUID id, String errorMessage) {
         if (id == null) {
             return null;
         }
         return horseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(errorMessage + ": " + id));
+    }
+
+    private Horse findOwnedParent(UUID id, UUID ownerId, HorseGender expectedGender,
+                                  LocalDate childBirthDate, String label) {
+        if (id == null) return null;
+        if (!ownershipRepository.existsByHorseIdAndOwnerId(id, ownerId))
+            throw new ResourceNotFoundException("Không tìm thấy " + label + " được phép chọn: " + id);
+        Horse parent = findOptionalParent(id, "Không tìm thấy " + label);
+        LocalDate fourYearsAgo = LocalDate.now(clock.withZone(ZoneId.of("Asia/Ho_Chi_Minh"))).minusYears(4);
+        if (parent.getArchivedAt() != null || parent.getGender() != expectedGender
+                || !parent.getBirthDate().isBefore(fourYearsAgo)
+                || !parent.getBirthDate().isBefore(childBirthDate))
+            throw new BusinessException("Hồ sơ " + label + " phải chưa lưu trữ, trên 4 tuổi, đúng giới tính và lớn tuổi hơn ngựa con");
+        return parent;
     }
 
     private Horse findHorse(UUID id) {
@@ -255,5 +429,9 @@ public class HorseService {
 
     private String normalizeNullable(String value) {
         return value == null || value.isBlank() ? null : value.trim().toUpperCase();
+    }
+
+    private String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

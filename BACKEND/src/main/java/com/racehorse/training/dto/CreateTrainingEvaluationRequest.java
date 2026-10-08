@@ -1,46 +1,34 @@
 package com.racehorse.training.dto;
 
-import com.racehorse.training.entity.FitnessStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateTrainingEvaluationRequest(
         @NotNull UUID horseId,
         UUID trainingScheduleId,
-        @NotNull @PastOrPresent LocalDate sessionDate,
-        @Min(1) int durationMinutes,
-        @NotNull @DecimalMin(value = "0.01") BigDecimal distanceMeters,
-        @NotNull @DecimalMin(value = "0.01") BigDecimal averageSpeedKmh,
-        @NotNull @DecimalMin(value = "0.00") BigDecimal trainingLoad,
-        @Min(0) @Max(300) int heartRateRecoveryBpm,
-        @Min(1) @Max(10) int perceivedExertion,
-        @NotNull FitnessStatus fitnessStatus,
+        @NotNull LocalDate sessionDate,
+        @NotNull @Min(1) Integer durationMinutes,
+        @NotNull @DecimalMin("0.01") BigDecimal distanceMeters,
+        @DecimalMin("0.00") BigDecimal averageSpeedKmh,
         @NotBlank @Size(max = 4000) String trainerNotes,
-        @Size(max = 2000) String videoUrl
+        @Size(max = 2000) String videoUrl,
+        @NotNull @DecimalMin("0.01") BigDecimal maxSpeedKmh,
+        @NotNull @Min(0) @Max(300) Integer stopBpm,
+        @NotNull @Min(0) @Max(300) Integer oneMinuteBpm,
+        @NotNull @DecimalMin("0.001") BigDecimal trackCompletionSeconds,
+        @Min(1) @Max(10) Integer perceivedExertion,
+        @NotNull Boolean injured,
+        @Size(max = 200) String injuryLocation,
+        @Size(max = 4000) String injuryNotes
 ) {
-    public CreateTrainingEvaluationRequest(
-            UUID horseId,
-            LocalDate sessionDate,
-            int durationMinutes,
-            BigDecimal distanceMeters,
-            BigDecimal averageSpeedKmh,
-            BigDecimal trainingLoad,
-            int heartRateRecoveryBpm,
-            int perceivedExertion,
-            FitnessStatus fitnessStatus,
-            String trainerNotes,
-            String videoUrl
-    ) {
-        this(horseId, null, sessionDate, durationMinutes, distanceMeters, averageSpeedKmh,
-                trainingLoad, heartRateRecoveryBpm, perceivedExertion, fitnessStatus, trainerNotes, videoUrl);
-    }
 }

@@ -33,7 +33,7 @@ public class ManagementDashboardService {
         return result;
     }
     private BigDecimal amount(LocalDate start,LocalDate end,String type,String category){
-        String sql="select coalesce(sum(amount),0) from financial_transactions where currency='VND' and transaction_date>=? and transaction_date<? and transaction_type=?";
+        String sql="select coalesce(sum(amount),0) from financial_transactions where currency='VND' and (source_entity_type is null or source_entity_type<>'WALLET') and transaction_date>=? and transaction_date<? and transaction_type=?";
         return category==null?jdbc.queryForObject(sql,BigDecimal.class,start,end,type):jdbc.queryForObject(sql+" and category=?",BigDecimal.class,start,end,type,category);
     }
 }

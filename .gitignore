@@ -430,6 +430,10 @@ FodyWeavers.xsd
 *.msp
 # Java / Maven
 **/target/
+/.tools/
+/BACKEND/.m2/
+/.idea/
+/.vscode/
 VetDashboard_Plan.md
 VetDashboard_Completion_Report.md
 VetDashboard_Revamp_Plan.md

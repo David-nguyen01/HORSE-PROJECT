@@ -41,5 +41,10 @@ public class NotificationController {
         return service.markRead(userId(jwt), notificationId);
     }
 
+    @PatchMapping("/read-all")
+    int markAllRead(@AuthenticationPrincipal Jwt jwt) {
+        return service.markAllRead(userId(jwt));
+    }
+
     private UUID userId(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 }

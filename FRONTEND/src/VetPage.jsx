@@ -2999,7 +2999,7 @@ const MUSCLE_OPTIONS = {
 }
 
 function TrainingAssessmentView({ onNavigate }) {
-  const [subTab, setSubTab] = useState('open') // 'open' | 'mine' | 'calendar'
+  const [subTab, setSubTab] = useState('mine') // 'mine' | 'calendar'
   const todayStr = () => new Date().toISOString().split('T')[0]
   const futureDt = (days) => new Date(Date.now() + days * 86400000).toISOString().split('T')[0]
 
@@ -3011,28 +3011,11 @@ function TrainingAssessmentView({ onNavigate }) {
   const [selectedDate, setSelectedDate] = useState(todayStr())
 
   // Data states
-  const [openSessions, setOpenSessions] = useState([])
   const [mySessions, setMySessions] = useState([])
   const [calendarSessions, setCalendarSessions] = useState([])
   const [assessmentsMap, setAssessmentsMap] = useState({})
   const [loading, setLoading] = useState(false)
-  const [actionBusyId, setActionBusyId] = useState(null)
   const [activeSession, setActiveSession] = useState(null)
-
-  // Load Open Sessions
-  const loadOpenSessions = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await vetApi.getOpenTrainingSessions(dateFrom, dateTo)
-      const list = Array.isArray(res) ? res : pageContent(res) || []
-      setOpenSessions(list)
-    } catch (err) {
-      console.error('Lỗi tải phiên tập mở:', err)
-      setOpenSessions([])
-    } finally {
-      setLoading(false)
-    }
-  }, [dateFrom, dateTo])
 
   // Load My Sessions and their clinical assessments
   const loadMySessions = useCallback(async () => {
@@ -3106,49 +3089,15 @@ function TrainingAssessmentView({ onNavigate }) {
   }, [selectedDate])
 
   useEffect(() => {
-    if (subTab === 'open') {
-      loadOpenSessions()
-    } else if (subTab === 'mine') {
+    if (subTab === 'mine') {
       loadMySessions()
     } else if (subTab === 'calendar') {
       loadCalendarSessions()
     }
-  }, [subTab, loadOpenSessions, loadMySessions, loadCalendarSessions])
+  }, [subTab, loadMySessions, loadCalendarSessions])
 
-  const handleClaim = async (sess) => {
-    const horseName = sess.horse?.name || sess.horseName || 'ngựa'
-    const dateStr = formatVNDate(sess.scheduledStart)
-    const confirmed = window.confirm(`Xác nhận đăng ký theo dõi phiên tập ngày ${dateStr} cho ${horseName}?\n\nLưu ý: Bác sĩ cần có mặt trực tiếp tại sân lúc 10:00–11:00 để kiểm tra lâm sàng.`)
-    if (!confirmed) return
-
-    setActionBusyId(sess.id)
-    try {
-      await vetApi.claimTrainingSession(sess.id)
-      alert(`Đã đăng ký theo dõi phiên tập cho ${horseName} thành công!`)
-      loadOpenSessions()
-    } catch (err) {
-      alert(`Lỗi đăng ký theo dõi: ${err.message}`)
-    } finally {
-      setActionBusyId(null)
-    }
-  }
-
-  const renderVetBadge = (s) => {
-    if (!s.veterinarianUserId && !s.veterinarianName)
-      return <span style={{ background: '#fef3c7', color: '#92400e', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>⏳ Chờ nhận</span>
-    if (s.vetAssignedBy === 'USER')
-      return <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>✓ Tự nhận</span>
-    return <span style={{ background: '#e0e7ff', color: '#3730a3', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>🤖 Hệ thống điều phối</span>
-  }
-
-  const renderStaffBadge = (s) => {
-    const name = s.assignedStaff?.username || s.staffName
-    if (!s.assignedStaff && !s.staffName)
-      return <span style={{ background: '#fef3c7', color: '#92400e', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>Chờ nhận</span>
-    if (s.staffAssignedBy === 'USER')
-      return <span style={{ background: '#dcfce7', color: '#166534', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>{name} (Tự nhận)</span>
-    return <span style={{ background: '#f1f5f9', color: '#475569', padding: '3px 8px', borderRadius: '4px', fontSize: '11px', fontWeight: 600 }}>{name || 'Hệ thống'}</span>
-  }
+  const renderVetBadge = (s) => <span>{s.horse?.diagnosingVet?.username || 'Chưa có bác sĩ chẩn đoán'}</span>
+  const renderStaffBadge = (s) => <span>{s.horse?.caretaker?.username || 'Chưa có nhân viên chăm sóc'}</span>
 
   return (
     <>
@@ -3156,19 +3105,12 @@ function TrainingAssessmentView({ onNavigate }) {
         <div>
           <p className="eyebrow">THEO DÕI & ĐÁNH GIÁ BUỔI TẬP</p>
           <h1>Theo dõi & Đánh giá buổi tập lâm sàng</h1>
-          <p>Bác sĩ thú y chủ động nhận ca theo dõi buổi tập (05:00–11:00) và trực tiếp kiểm tra lâm sàng thể trạng sau tập (10:00–11:00).</p>
+          <p>Xem buổi tập và đánh giá lâm sàng cho những ngựa bạn phụ trách chẩn đoán.</p>
         </div>
       </div>
 
       {/* Sub-tab Switcher */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e0e6e2', paddingBottom: '10px' }}>
-        <button
-          className={`button ${subTab === 'open' ? 'primary' : 'secondary'}`}
-          style={{ height: '36px', fontSize: '13px' }}
-          onClick={() => setSubTab('open')}
-        >
-          <Clock size={15} /> Phiên tập cần theo dõi {openSessions.length > 0 ? `(${openSessions.length})` : ''}
-        </button>
         <button
           className={`button ${subTab === 'mine' ? 'primary' : 'secondary'}`}
           style={{ height: '36px', fontSize: '13px' }}
@@ -3184,34 +3126,6 @@ function TrainingAssessmentView({ onNavigate }) {
           <Calendar size={15} /> Tất cả lịch tập theo ngày
         </button>
       </div>
-
-      {/* BANNER QUY CHUẨN CA TRỰC Y TẾ (Khi xem open / mine) */}
-      {subTab === 'open' && (
-        <div
-          className="card"
-          style={{
-            background: '#e8f4fd',
-            border: '1px solid #b3d7f5',
-            borderRadius: '10px',
-            padding: '14px 20px',
-            marginBottom: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-          }}
-        >
-          <Clock size={24} color="#0369a1" style={{ flexShrink: 0 }} />
-          <div style={{ fontSize: '13px', color: '#0c4a6e', lineHeight: 1.5 }}>
-            <strong style={{ fontSize: '14px', display: 'block', marginBottom: '3px' }}>
-              ⏰ Quy định ca trực y tế buổi tập (05:00 – 11:00)
-            </strong>
-            Bác sĩ thú y tự đăng ký phiên tập và yêu cầu <strong>có mặt trực tiếp tại sân lúc 10:00 – 11:00</strong> (giờ vận hành cuối) để kiểm tra hô hấp, nhịp tim hồi phục và dáng đi sau vận động.
-            <div style={{ fontSize: '12px', color: '#0284c7', marginTop: '4px' }}>
-              • Hạn tự nhận ca: trước <strong>23:00 ngày hôm trước (T-1)</strong>. Sau 23:00 hệ thống tự động phân công bác sĩ có số ca ít nhất. Tối đa 1 ca/ngày/bác sĩ.
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* FILTER TOOLBAR */}
       <div className="toolbar card" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
@@ -3252,8 +3166,7 @@ function TrainingAssessmentView({ onNavigate }) {
         <button
           className="button secondary"
           onClick={() => {
-            if (subTab === 'open') loadOpenSessions()
-            else if (subTab === 'mine') loadMySessions()
+            if (subTab === 'mine') loadMySessions()
             else loadCalendarSessions()
           }}
           disabled={loading}
@@ -3263,95 +3176,11 @@ function TrainingAssessmentView({ onNavigate }) {
         </button>
 
         <span className="record-count" style={{ marginLeft: 'auto', fontSize: '12px', color: '#666' }}>
-          {subTab === 'open' && `${openSessions.length} phiên tập đang chờ Bác sĩ thú y`}
           {subTab === 'mine' && `${mySessions.length} phiên tập trong lịch theo dõi của bạn`}
           {subTab === 'calendar' && `${calendarSessions.length} buổi tập trong ngày ${formatVNDate(selectedDate)}`}
         </span>
       </div>
 
-      {/* ----------------------------------------------------------------- */}
-      {/* SUBTAB 1: PHIÊN TẬP CẦN THEO DÕI (OPEN SESSIONS FOR CLAIMING)     */}
-      {/* ----------------------------------------------------------------- */}
-      {subTab === 'open' && (
-        <div style={{ display: 'grid', gap: '14px' }}>
-          {loading ? (
-            <div className="empty card">Đang tải danh sách phiên tập mở…</div>
-          ) : openSessions.length === 0 ? (
-            <div className="empty card" style={{ padding: '36px' }}>
-              <CheckCircle2 size={36} color="#27714d" />
-              <b>Tất cả các phiên tập sắp tới đã có Bác sĩ thú y tiếp nhận</b>
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
-                Không còn phiên tập nào cần nhận trong khoảng thời gian từ {formatVNDate(dateFrom)} đến {formatVNDate(dateTo)}.
-              </p>
-            </div>
-          ) : (
-            openSessions.map((sess) => {
-              const horseName = sess.horse?.name || sess.horseName || 'Ngựa tập'
-              const horseCode = sess.horse?.code || sess.horseCode || ''
-              const racetrack = sess.racetrackName || 'Sân tập CLB'
-              const dateStr = formatVNDate(sess.scheduledStart)
-              const task = sess.taskName || sess.phase?.name || 'Huấn luyện'
-              const canClaim = sess.canClaim !== false
-              const isClaiming = actionBusyId === sess.id
-
-              return (
-                <div
-                  key={sess.id}
-                  className="card"
-                  style={{
-                    padding: '18px 22px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderLeft: '4px solid #0284c7',
-                    flexWrap: 'wrap',
-                    gap: '16px',
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: '280px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
-                        {horseName} {horseCode && `(${horseCode})`}
-                      </span>
-                      <span style={{ fontSize: '11px', background: '#e0f2fe', color: '#0369a1', padding: '2px 8px', borderRadius: '4px', fontWeight: 600 }}>
-                        {dateStr}
-                      </span>
-                      <span style={{ fontSize: '11px', background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '4px' }}>
-                        {task}
-                      </span>
-                      {renderVetBadge(sess)}
-                    </div>
-
-                    <div style={{ fontSize: '12px', color: '#475569', marginTop: '8px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                      <span>Sân tập: <b>{racetrack}</b></span>
-                      <span>Khung giờ vận hành: <b style={{ color: '#0369a1' }}>05:00 – 11:00</b></span>
-                      <span>Ca trực kiểm tra lâm sàng: <b style={{ color: '#b45309' }}>10:00 – 11:00</b></span>
-                      <span>Nhân viên chuồng: {renderStaffBadge(sess)}</span>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <button
-                      className="button primary"
-                      style={{ padding: '8px 18px', fontSize: '13px' }}
-                      disabled={!canClaim || isClaiming}
-                      title={!canClaim ? 'Bạn đã có lịch theo dõi trong ngày này (tối đa 1 ca/ngày)' : 'Đăng ký theo dõi phiên tập này'}
-                      onClick={() => handleClaim(sess)}
-                    >
-                      <Stethoscope size={14} />
-                      {isClaiming ? 'Đang đăng ký…' : canClaim ? 'Đăng ký theo dõi' : 'Đã kín lịch ngày này'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* SUBTAB 2: LỊCH THEO DÕI CỦA TÔI & ĐÁNH GIÁ LÂM SÀNG                 */}
-      {/* ----------------------------------------------------------------- */}
       {subTab === 'mine' && (
         <div style={{ display: 'grid', gap: '14px' }}>
           {loading ? (
@@ -3361,15 +3190,8 @@ function TrainingAssessmentView({ onNavigate }) {
               <Clock size={36} color="#718078" />
               <b>Bạn chưa có lịch theo dõi nào trong khoảng thời gian này</b>
               <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>
-                Hãy chuyển sang tab "Phiên tập cần theo dõi" để đăng ký nhận các phiên tập sắp tới.
+                Các buổi tập sẽ xuất hiện khi ngựa bạn phụ trách chẩn đoán có lịch trong khoảng ngày này.
               </p>
-              <button
-                className="button primary"
-                style={{ marginTop: '14px' }}
-                onClick={() => setSubTab('open')}
-              >
-                Xem phiên tập cần theo dõi →
-              </button>
             </div>
           ) : (
             mySessions.map((sess) => {
@@ -3378,7 +3200,7 @@ function TrainingAssessmentView({ onNavigate }) {
               const horseName = sess.horse?.name || sess.horseName || 'Ngựa tập'
               const horseCode = sess.horse?.code || sess.horseCode || ''
               const horseId = sess.horse?.id || sess.horseId
-              const racetrack = sess.racetrackName || 'Sân tập CLB'
+              const racetrack = sess.racetrack?.name || 'Sân tập CLB'
               const dateStr = formatVNDate(sess.scheduledStart)
               const task = sess.taskName || sess.phase?.name || 'Huấn luyện'
 
@@ -3422,7 +3244,6 @@ function TrainingAssessmentView({ onNavigate }) {
                     <div style={{ fontSize: '12px', color: '#555', marginTop: '8px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                       <span>Sân tập: <b>{racetrack}</b></span>
                       <span>Khung giờ: <b>05:00 – 11:00</b></span>
-                      <span>Trực kiểm tra: <b style={{ color: '#b45309' }}>10:00 – 11:00</b></span>
                       <span>Nhân viên chuồng: {renderStaffBadge(sess)}</span>
                     </div>
 
@@ -3533,7 +3354,7 @@ function TrainingAssessmentView({ onNavigate }) {
                     </div>
                     <div style={{ fontSize: '12px', color: '#555', marginTop: '6px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
                       <span>Thời gian: <b>{timeSlot}</b></span>
-                      <span>Sân: <b>{sess.racetrackName || 'CLB'}</b></span>
+                      <span>Sân: <b>{sess.racetrack?.name || 'CLB'}</b></span>
                       <span>Cường độ: <b>{sess.workloadIntensity || 'Tiêu chuẩn'}</b></span>
                       <span>Nhân viên: {renderStaffBadge(sess)}</span>
                     </div>
@@ -3569,8 +3390,7 @@ function TrainingAssessmentView({ onNavigate }) {
           onClose={() => setActiveSession(null)}
           onSaved={() => {
             setActiveSession(null)
-            if (subTab === 'open') loadOpenSessions()
-            else if (subTab === 'mine') loadMySessions()
+            if (subTab === 'mine') loadMySessions()
             else loadCalendarSessions()
           }}
         />
@@ -4117,6 +3937,3 @@ function HorseProfileView({ onNavigate, initialHorseId }) {
     </>
   )
 }
-
-
-

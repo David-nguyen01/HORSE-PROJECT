@@ -47,6 +47,10 @@ public class RaceEventController {
     @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
     void deactivate(@PathVariable UUID id) { service.deactivate(id); }
 
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    RaceEventService.EventView complete(@PathVariable UUID id) { return service.complete(id); }
+
     @PostMapping("/{eventId}/registrations") @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
     RaceEventService.RegistrationView register(@PathVariable UUID eventId, @AuthenticationPrincipal Jwt jwt,
@@ -54,10 +58,20 @@ public class RaceEventController {
         return service.register(eventId, request.horseId(), user(jwt), request.registeredWeightKg());
     }
 
-    @GetMapping("/registrations") @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @GetMapping("/registrations") @PreAuthorize("hasAuthority('PERM_RACING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     List<RaceEventService.RegistrationView> registrations(@RequestParam(required=false) UUID eventId,
-             @RequestParam(required=false) UUID horseId, @RequestParam(required=false) String status) {
-        return service.registrations(eventId, horseId, status);
+             @RequestParam(required=false) UUID horseId, @RequestParam(required=false) String status,
+             @AuthenticationPrincipal Jwt jwt, org.springframework.security.core.Authentication authentication) {
+        boolean owner = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_HORSE_OWNER"))
+                && authentication.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_CLUB_MANAGER") || a.getAuthority().equals("ROLE_HEAD_TRAINER"));
+        return service.registrations(eventId, horseId, status, owner ? user(jwt) : null);
+    }
+
+    @PostMapping("/registrations/{id}/decision")
+    @PreAuthorize("hasRole('HORSE_OWNER') and hasAuthority('PERM_RACING_VIEW')")
+    RaceEventService.RegistrationView decide(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
+                                               @RequestBody DecisionRequest request) {
+        return service.decide(id, user(jwt), request.approve(), request.reason());
     }
 
     @PostMapping("/registrations/{id}/confirm")
@@ -83,4 +97,5 @@ public class RaceEventController {
                 minimumWeightKg,maximumWeightKg,activeValue); }
     }
     public record RegistrationRequest(@NotNull UUID horseId, @DecimalMin("0.01") BigDecimal registeredWeightKg) {}
+    public record DecisionRequest(boolean approve, String reason) {}
 }

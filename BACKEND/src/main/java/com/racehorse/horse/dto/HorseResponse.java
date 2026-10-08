@@ -20,6 +20,8 @@ public record HorseResponse(
         ParentSummary sire,
         ParentSummary dam,
         UserSummary currentTrainer,
+        UserSummary caretaker,
+        UserSummary diagnosingVet,
         List<OwnerSummary> owners,
         String stableLocation,
         HorseStatus status,

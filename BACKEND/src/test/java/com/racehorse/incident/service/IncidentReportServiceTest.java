@@ -8,6 +8,7 @@ import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.incident.dto.CreateIncidentReportRequest;
+import com.racehorse.incident.dto.CreateTrainingEmergencyRequest;
 import com.racehorse.incident.dto.IncidentReportResponse;
 import com.racehorse.incident.dto.UpdateIncidentStatusRequest;
 import com.racehorse.notification.entity.NotificationPriority;
@@ -22,6 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,6 +51,17 @@ class IncidentReportServiceTest {
         json = new ObjectMapper();
         clock = Clock.fixed(Instant.parse("2026-09-25T10:00:00Z"), ZoneOffset.UTC);
         service = new IncidentReportService(jdbc, horseAccess, userRepository, notificationService, json, clock);
+    }
+
+    @Test
+    void ownerCannotReadAnotherHorsesEmergencyHistory() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        doThrow(new ResourceNotFoundException("not owned")).when(horseAccess).requireOwned(horseId, ownerId);
+
+        assertThatThrownBy(() -> service.ownerTrainingEmergencies(horseId, ownerId))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(jdbc, never()).query(anyString(), any(RowMapper.class), any(UUID.class));
     }
 
     @Test
@@ -133,6 +146,94 @@ class IncidentReportServiceTest {
         assertThatThrownBy(() -> service.createReport(reporterId, request))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Mức độ nghiêm trọng (severity) không hợp lệ");
+    }
+
+    @Test
+    void emergencyRequiresAnInProgressSessionOwnedByTrainer() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+        var request = new CreateTrainingEmergencyRequest(scheduleId, "Cần hỗ trợ ngay",
+                Set.of(CreateTrainingEmergencyRequest.Recipient.CARETAKER));
+        when(jdbc.query(contains("s.session_status='IN_PROGRESS'"), any(RowMapper.class),
+                eq(scheduleId), eq(trainerId))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.createTrainingEmergency(trainerId, request))
+                .isInstanceOf(ResourceNotFoundException.class).hasMessageContaining("đang huấn luyện");
+        verify(jdbc).query(contains("s.session_status='IN_PROGRESS'"), any(RowMapper.class),
+                eq(scheduleId), eq(trainerId));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"CARETAKER", "DIAGNOSING_VET", "BOTH"})
+    @SuppressWarnings("unchecked")
+    void sendingTrainingEmergencyImmediatelyMarksSessionAndHorseInjured(String selectedRecipient) {
+        UUID scheduleId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+        UUID caretakerId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        Set<CreateTrainingEmergencyRequest.Recipient> recipients = selectedRecipient.equals("BOTH")
+                ? Set.of(CreateTrainingEmergencyRequest.Recipient.CARETAKER, CreateTrainingEmergencyRequest.Recipient.DIAGNOSING_VET)
+                : Set.of(CreateTrainingEmergencyRequest.Recipient.valueOf(selectedRecipient));
+        var request = new CreateTrainingEmergencyRequest(scheduleId, "Ngựa bị chấn thương",
+                recipients);
+        when(jdbc.query(contains("where s.id=? and h.current_trainer_id=?"), any(RowMapper.class),
+                eq(scheduleId), eq(trainerId))).thenAnswer(invocation -> {
+            RowMapper<Object> mapper = invocation.getArgument(1);
+            java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+            when(rs.getObject("schedule_id", UUID.class)).thenReturn(scheduleId);
+            when(rs.getObject("horse_id", UUID.class)).thenReturn(horseId);
+            when(rs.getString("horse_code")).thenReturn("H-001");
+            when(rs.getString("horse_name")).thenReturn("Flash");
+            when(rs.getObject("ground_id", UUID.class)).thenReturn(null);
+            when(rs.getString("ground_name")).thenReturn(null);
+            when(rs.getObject("lane_id", UUID.class)).thenReturn(null);
+            when(rs.getObject("lane_number")).thenReturn(null);
+            when(rs.getObject("training_date", java.time.LocalDate.class)).thenReturn(java.time.LocalDate.of(2026, 10, 7));
+            when(rs.getObject("caretaker_user_id", UUID.class)).thenReturn(caretakerId);
+            when(rs.getObject("diagnosing_vet_user_id", UUID.class)).thenReturn(vetId);
+            return List.of(mapper.mapRow(rs, 1));
+        });
+        when(jdbc.query(contains("where m.id=? and m.module_code='STABLE_CARE'"), any(RowMapper.class), any(UUID.class)))
+                .thenAnswer(invocation -> {
+                    RowMapper<Object> mapper = invocation.getArgument(1);
+                    java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+                    when(rs.getObject("id", UUID.class)).thenReturn(UUID.randomUUID());
+                    when(rs.getObject("horse_id", UUID.class)).thenReturn(horseId);
+                    when(rs.getString("horse_code")).thenReturn("H-001");
+                    when(rs.getString("horse_name")).thenReturn("Flash");
+                    when(rs.getString("status")).thenReturn("REPORTED");
+                    when(rs.getObject("event_date", java.time.LocalDate.class)).thenReturn(java.time.LocalDate.of(2026, 10, 7));
+                    when(rs.getObject("created_at", java.time.OffsetDateTime.class)).thenReturn(java.time.OffsetDateTime.now());
+                    when(rs.getString("data_json")).thenReturn("{\"incidentType\":\"Khẩn cấp từ huấn luyện viên\",\"severity\":\"HIGH\",\"description\":\"Ngựa bị chấn thương\",\"reportedByUserId\":\"" + trainerId + "\"}");
+                    return List.of(mapper.mapRow(rs, 1));
+                });
+        when(userRepository.findById(caretakerId)).thenReturn(Optional.of(
+                new UserAccount("caretaker", "caretaker@test.local", "encoded", Set.of(Role.STABLE_STAFF))));
+        when(jdbc.update(contains("update training_schedules set session_status='EMERGENCY_STOPPED'"), eq(scheduleId)))
+                .thenReturn(1);
+        when(jdbc.update(contains("update horses set status='INJURED',health_status='INJURED'"),
+                any(UUID.class), eq(trainerId), eq(horseId))).thenReturn(1);
+
+        UserAccount vet = new UserAccount("vet", "vet@test.local", "encoded", Set.of(Role.VETERINARIAN));
+        when(userRepository.findById(vetId)).thenReturn(Optional.of(vet));
+        UUID ownerId = UUID.randomUUID();
+        UserAccount owner = new UserAccount("owner", "owner@test.local", "encoded", Set.of(Role.HORSE_OWNER));
+        when(jdbc.query(contains("select owner_id from horse_ownerships"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of(ownerId));
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        service.createTrainingEmergency(trainerId, request);
+        verify(notificationService).create(eq(owner), eq("TRAINING_EMERGENCY"), eq(NotificationPriority.HIGH),
+                anyString(), contains("Ngựa bị chấn thương"), eq("INCIDENT_REPORT"), any(UUID.class));
+        verify(notificationService, times(recipients.size() + 1)).create(any(), eq("TRAINING_EMERGENCY"), any(), anyString(), anyString(), anyString(), any());
+
+        if (!recipients.contains(CreateTrainingEmergencyRequest.Recipient.DIAGNOSING_VET))
+            verify(userRepository, never()).findById(vetId);
+        if (!recipients.contains(CreateTrainingEmergencyRequest.Recipient.CARETAKER))
+            verify(userRepository, never()).findById(caretakerId);
+        verify(jdbc).update(contains("update training_schedules set session_status='EMERGENCY_STOPPED'"), eq(scheduleId));
+        verify(jdbc).update(contains("update horses set status='INJURED',health_status='INJURED'"),
+                any(UUID.class), eq(trainerId), eq(horseId));
     }
 
     @Test
@@ -237,4 +338,3 @@ class IncidentReportServiceTest {
                 .hasMessageContaining("Không tìm thấy báo cáo sự cố");
     }
 }
-

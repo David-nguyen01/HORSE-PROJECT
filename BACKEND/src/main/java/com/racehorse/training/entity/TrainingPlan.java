@@ -15,7 +15,11 @@ import jakarta.persistence.Table;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "training_plans")
@@ -65,6 +69,19 @@ public class TrainingPlan extends BaseEntity {
             phase.assignTo(this);
             phases.add(phase);
         });
+    }
+
+    public void updatePhases(List<TrainingPlanPhase> replacement) {
+        Set<UUID> retainedIds = replacement.stream().map(BaseEntity::getId).filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toCollection(HashSet::new));
+        phases.removeIf(phase -> phase.getId() != null && !retainedIds.contains(phase.getId()));
+        for (TrainingPlanPhase phase : replacement) {
+            if (!phases.contains(phase)) {
+                phase.assignTo(this);
+                phases.add(phase);
+            }
+        }
+        phases.sort(Comparator.comparingInt(TrainingPlanPhase::getPhaseOrder));
     }
 
     public Horse getHorse() { return horse; }

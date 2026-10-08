@@ -154,10 +154,10 @@ END
         $ins.Parameters.AddWithValue("@module_code", $r["module_code"]) | Out-Null
         $ins.Parameters.AddWithValue("@record_type", $r["record_type"]) | Out-Null
         $ins.Parameters.AddWithValue("@source_table", $r["source_table"]) | Out-Null
-        
+
         $hId = if ($r["horse_id"] -ne [DBNull]::Value) { $r["horse_id"] } else { [DBNull]::Value }
         $ins.Parameters.AddWithValue("@horse_id", $hId) | Out-Null
-        
+
         $uId = if ($r["user_id"] -ne [DBNull]::Value) {
             $candidateId = $r["user_id"]
             $checkUser = $localConn.CreateCommand()
@@ -172,12 +172,12 @@ END
             }
         } else { [DBNull]::Value }
         $ins.Parameters.AddWithValue("@user_id", $uId) | Out-Null
-        
+
         $ins.Parameters.AddWithValue("@status", $r["status"]) | Out-Null
-        
+
         $eDate = if ($r["event_date"] -ne [DBNull]::Value) { $r["event_date"] } else { [DBNull]::Value }
         $ins.Parameters.AddWithValue("@event_date", $eDate) | Out-Null
-        
+
         $ins.Parameters.AddWithValue("@data_json", $r["data_json"]) | Out-Null
         $ins.Parameters.AddWithValue("@created_at", $r["created_at"]) | Out-Null
         $ins.Parameters.AddWithValue("@updated_at", $r["updated_at"]) | Out-Null

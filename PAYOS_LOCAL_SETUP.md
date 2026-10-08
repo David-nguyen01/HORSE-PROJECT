@@ -1,0 +1,11 @@
+# Local wallet and PayOS setup
+
+The wallet schema is installed by `DATABASE/24_payos_wallet_schema.sql`, followed by `DATABASE/25_horse_specific_service_plans.sql` for per-horse subscriptions. Neither adds tables. Review and run these against the **local** `racehorse` database with an account that has `ALTER` rights. Windows integrated SQL authentication worked on this machine. The rollback file for migration 24 refuses to discard wallets or payment records that contain data. Do not run these scripts against the shared Azure database without separate approval.
+
+The app uses `RACEHORSE_LOCAL_DB_PASSWORD` with the less privileged `racehorse_local_app` login. Restart Codex or the terminal after changing Windows User variables.
+
+For demo UI testing, set `PAYOS_GATEWAY=fake` (also the default). The owner wallet displays a non-scannable illustration and a **simulated payment success** action. This also runs on a public demo deployment if configured there; it does not collect real money. Only use disposable demo data.
+
+The repository retains a real PayOS gateway and webhook for separate development. The current frontend intentionally provides only the demo checkout; `run-local-real.cmd` does not make the demo UI accept real payments.
+
+After installing the migrations, run backend tests and the frontend build, then test one simulated top-up, per-horse purchase, plan selection for the next cycle, and overdue renewal with the local database.

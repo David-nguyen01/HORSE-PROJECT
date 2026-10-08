@@ -54,7 +54,7 @@ public class FinanceService {
     @Transactional(readOnly = true)
     public TransactionView get(UUID id, UUID requester, boolean manager) {
         List<Object> args = new ArrayList<>();
-        String sql = baseSelect() + " where ft.id=?";
+        String sql = baseSelect() + " where ft.id=? and (ft.source_entity_type is null or ft.source_entity_type<>'WALLET')";
         args.add(id);
         if (!manager) {
             sql += " and exists(select 1 from horse_ownerships ho where ho.horse_id=ft.horse_id and ho.owner_id=?)";
@@ -70,7 +70,7 @@ public class FinanceService {
                                       LocalDate from, LocalDate to, String type, String category,
                                       int page, int size) {
         if (page < 0 || size < 1 || size > 200) throw new BusinessException("Phân trang không hợp lệ");
-        StringBuilder sql = new StringBuilder(baseSelect()).append(" where 1=1");
+        StringBuilder sql = new StringBuilder(baseSelect()).append(" where (ft.source_entity_type is null or ft.source_entity_type<>'WALLET')");
         List<Object> args = new ArrayList<>();
         if (!manager) {
             sql.append(" and exists(select 1 from horse_ownerships ho where ho.horse_id=ft.horse_id and ho.owner_id=?)");
@@ -90,7 +90,7 @@ public class FinanceService {
     @Transactional(readOnly = true)
     public long count(UUID requester, boolean manager, UUID horseId, UUID stableId,
                       LocalDate from, LocalDate to, String type, String category) {
-        StringBuilder sql = new StringBuilder("select count(*) from financial_transactions ft where 1=1");
+        StringBuilder sql = new StringBuilder("select count(*) from financial_transactions ft where (ft.source_entity_type is null or ft.source_entity_type<>'WALLET')");
         List<Object> args = new ArrayList<>();
         if (!manager) {
             sql.append(" and exists(select 1 from horse_ownerships ho where ho.horse_id=ft.horse_id and ho.owner_id=?)");
@@ -129,7 +129,7 @@ public class FinanceService {
 
     @Transactional(readOnly = true)
     public SummaryView summary(UUID requester, boolean manager, UUID horseId, LocalDate from, LocalDate to) {
-        StringBuilder sql = new StringBuilder("select ft.transaction_type,sum(ft.amount) total from financial_transactions ft where 1=1");
+        StringBuilder sql = new StringBuilder("select ft.transaction_type,sum(ft.amount) total from financial_transactions ft where (ft.source_entity_type is null or ft.source_entity_type<>'WALLET')");
         List<Object> args = new ArrayList<>();
         if (!manager) {
             sql.append(" and exists(select 1 from horse_ownerships ho where ho.horse_id=ft.horse_id and ho.owner_id=?)");

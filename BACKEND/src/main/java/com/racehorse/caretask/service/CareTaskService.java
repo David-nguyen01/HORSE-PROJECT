@@ -39,7 +39,7 @@ public class CareTaskService {
                 title, description, task_type, scheduled_date, scheduled_time, status,
                 created_at, updated_at
             )
-            SELECT 
+            SELECT
                 NEWID(), d.id, 'ROUTINE', d.scope, NULL,
                 d.title, d.description, d.task_type, ?, d.scheduled_time, 'PENDING',
                 SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET()
@@ -63,8 +63,8 @@ public class CareTaskService {
     public void createRecoveryTask(com.racehorse.training.entity.TrainingSchedule schedule, UUID staffId) {
         if (schedule == null || staffId == null || schedule.getHorse() == null) return;
         LocalDate date = schedule.getScheduledStart().atZone(clubZone).toLocalDate();
-        LocalTime time = schedule.getScheduledEnd() != null 
-                ? schedule.getScheduledEnd().atZone(clubZone).toLocalTime() 
+        LocalTime time = schedule.getScheduledEnd() != null
+                ? schedule.getScheduledEnd().atZone(clubZone).toLocalTime()
                 : LocalTime.of(11, 0);
 
         String title = "Hồi phục sau buổi tập - " + schedule.getHorse().getName();
@@ -293,7 +293,7 @@ public class CareTaskService {
 
     private String baseSelect() {
         return """
-            SELECT 
+            SELECT
                 t.id,
                 t.routine_definition_id,
                 t.task_category,

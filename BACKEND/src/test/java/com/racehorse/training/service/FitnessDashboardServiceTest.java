@@ -70,7 +70,6 @@ class FitnessDashboardServiceTest {
 
         assertThat(response.dataPoints()).singleElement().satisfies(point -> {
             assertThat(point.evaluationId()).isEqualTo(evaluationId);
-            assertThat(point.trainingLoad()).isEqualByComparingTo("61.50");
             assertThat(point.averageSpeedKmh()).isEqualByComparingTo("52.40");
             assertThat(point.heartRateRecoveryBpm()).isEqualTo(35);
         });
@@ -152,7 +151,7 @@ class FitnessDashboardServiceTest {
                 horse,
                 new UserAccount("trainer", "trainer@test.local", "encoded", Set.of(Role.HEAD_TRAINER)),
                 date, 40, new BigDecimal("1600"), new BigDecimal("52.40"),
-                new BigDecimal("61.50"), 35, 6, status, "Ổn định", null,
+                35, 6, status, "Ổn định", null,
                 Instant.parse("2026-09-08T03:00:00Z"));
     }
 }

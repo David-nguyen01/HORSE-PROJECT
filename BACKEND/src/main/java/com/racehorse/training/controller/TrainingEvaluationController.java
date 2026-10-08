@@ -19,6 +19,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -41,29 +42,40 @@ public class TrainingEvaluationController {
 
     @PostMapping("/training-evaluations")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasRole('HEAD_TRAINER')")
     TrainingEvaluationResponse create(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CreateTrainingEvaluationRequest request) {
-        return service.create(userId(jwt), request);
+            @Valid @RequestBody CreateTrainingEvaluationRequest request, Authentication authentication) {
+        return service.create(userId(jwt), request,
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
+    }
+
+    @PutMapping("/training-evaluations/{evaluationId}")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasRole('HEAD_TRAINER')")
+    TrainingEvaluationResponse update(@PathVariable UUID evaluationId, @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateTrainingEvaluationRequest request, Authentication authentication) {
+        return service.update(evaluationId, userId(jwt), request,
+                hasRole(authentication, "CLUB_MANAGER"), hasRole(authentication, "HEAD_TRAINER"));
     }
 
     @GetMapping("/training-evaluations/{evaluationId}")
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     TrainingEvaluationResponse get(
-            @PathVariable UUID evaluationId,
+            @PathVariable("evaluationId") UUID evaluationId,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        return service.getById(evaluationId, userId(jwt), isPrivileged(authentication));
+        return service.getById(evaluationId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"),
+                hasRole(authentication, "HEAD_TRAINER"), hasRole(authentication, "HORSE_OWNER"));
     }
 
     @GetMapping("/horses/{horseId}/training-evaluations")
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER')")
     Page<TrainingEvaluationResponse> listForHorse(
-            @PathVariable UUID horseId,
+            @PathVariable("horseId") UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication,
             @PageableDefault(size = 20) Pageable pageable) {
-        return service.listForHorse(horseId, userId(jwt), isPrivileged(authentication), pageable);
+        return service.listForHorse(horseId, userId(jwt), hasRole(authentication, "CLUB_MANAGER"),
+                hasRole(authentication, "HEAD_TRAINER"), hasRole(authentication, "HORSE_OWNER"), pageable);
     }
 
     @PostMapping("/training-evaluations/{scheduleId}/vet-assessment")
@@ -93,10 +105,8 @@ public class TrainingEvaluationController {
         return UUID.fromString(jwt.getSubject());
     }
 
-    private boolean isPrivileged(Authentication authentication) {
+    private boolean hasRole(Authentication authentication, String role) {
         return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
-                || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
-                || authority.getAuthority().equals("ROLE_VETERINARIAN"));
+                authority.getAuthority().equals("ROLE_" + role));
     }
 }

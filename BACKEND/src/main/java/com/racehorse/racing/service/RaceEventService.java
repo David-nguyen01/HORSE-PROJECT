@@ -5,6 +5,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.health.dto.RaceReadinessResponse;
 import com.racehorse.health.service.HorseMeasurementService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -20,9 +21,11 @@ public class RaceEventService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final HorseMeasurementService measurement;
+    private final HorseAccessService horseAccess;
 
-    public RaceEventService(JdbcTemplate jdbc, ObjectMapper json, HorseMeasurementService measurement) {
-        this.jdbc = jdbc; this.json = json; this.measurement = measurement;
+    public RaceEventService(JdbcTemplate jdbc, ObjectMapper json, HorseMeasurementService measurement,
+                            HorseAccessService horseAccess) {
+        this.jdbc = jdbc; this.json = json; this.measurement = measurement; this.horseAccess = horseAccess;
     }
 
     @Transactional
@@ -52,6 +55,15 @@ public class RaceEventService {
         jdbc.update("update race_events set is_active=0,updated_at=SYSDATETIMEOFFSET() where id=?", id);
     }
 
+    @Transactional
+    public EventView complete(UUID id) {
+        EventView value = event(id);
+        if (value.raceDate().isAfter(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"))))
+            throw new BusinessException("Không thể hoàn thành giải đua trước ngày đua");
+        jdbc.update("update race_events set completed_at=coalesce(completed_at,SYSDATETIMEOFFSET()),updated_at=SYSDATETIMEOFFSET() where id=?", id);
+        return event(id);
+    }
+
     @Transactional(readOnly = true)
     public EventView event(UUID id) {
         List<EventView> rows = jdbc.query("select * from race_events where id=?", (rs,row)->event(rs,row), id);
@@ -73,13 +85,23 @@ public class RaceEventService {
     @Transactional
     public RegistrationView register(UUID eventId, UUID horseId, UUID actor, BigDecimal registeredWeight) {
         EventView event = event(eventId);
+        // Serialize registrations for one horse across different race events.
+        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
         if (!event.active()) throw new BusinessException("Giải đua đã ngừng nhận đăng ký");
+        if (event.completedAt() != null) throw new BusinessException("Giải đua đã hoàn thành");
         OffsetDateTime now = OffsetDateTime.now();
         if (now.isAfter(event.registrationDeadline())) throw new BusinessException("Đã quá hạn đăng ký giải đua");
         Integer duplicate = jdbc.queryForObject("select count(*) from module_records where module_code='RACING' "
                 + "and record_type='RACE_REGISTRATION' and horse_id=? and JSON_VALUE(data_json,'$.raceEventId')=?",
                 Integer.class, horseId, eventId.toString());
         if (duplicate != null && duplicate > 0) throw new BusinessException("Ngựa đã được đăng ký cho giải này");
+        Integer pending = jdbc.queryForObject("select count(*) from module_records m join race_events e "
+                + "on cast(e.id as varchar(36))=JSON_VALUE(m.data_json,'$.raceEventId') "
+                + "where m.module_code='RACING' and m.record_type='RACE_REGISTRATION' and m.horse_id=? "
+                + "and m.status in ('SUBMITTED','APPROVE','CONFIRMED') and e.completed_at is null",
+                Integer.class, horseId);
+        if (pending != null && pending > 0)
+            throw new BusinessException("Ngựa đã đăng ký một giải đua chưa hoàn thành");
         validateAge(event, horseId);
         RaceReadinessResponse readiness = measurement.readiness(horseId, eventId, actor, true);
         if (!readiness.ready()) throw new BusinessException("Ngựa chưa sẵn sàng dự đua: " + String.join("; ", readiness.failedRules()));
@@ -106,6 +128,19 @@ public class RaceEventService {
     }
 
     @Transactional
+    public RegistrationView decide(UUID registrationId, UUID ownerId, boolean approve, String reason) {
+        RegistrationView value = registration(registrationId);
+        horseAccess.requireOwned(value.horseId(), ownerId);
+        if (!"SUBMITTED".equals(value.status())) throw new BusinessException("Chỉ đăng ký đang chờ mới có thể quyết định");
+        if (!approve && (reason == null || reason.isBlank())) throw new BusinessException("Cần nhập lý do từ chối");
+        String normalizedReason = reason == null || reason.isBlank() ? null : reason.trim();
+        if (normalizedReason != null && normalizedReason.length() > 500) throw new BusinessException("Lý do tối đa 500 ký tự");
+        jdbc.update("update module_records set status=?,data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.decisionReason',?),'$.decidedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='SUBMITTED'",
+                approve ? "APPROVE" : "REJECT", normalizedReason, OffsetDateTime.now().toString(), registrationId);
+        return registration(registrationId);
+    }
+
+    @Transactional
     public RegistrationView withdraw(UUID registrationId, UUID actor) {
         RegistrationView value = registration(registrationId);
         if ("WITHDRAWN".equals(value.status())) throw new BusinessException("Đăng ký đã được rút");
@@ -116,12 +151,13 @@ public class RaceEventService {
     }
 
     @Transactional(readOnly = true)
-    public List<RegistrationView> registrations(UUID eventId, UUID horseId, String status) {
+    public List<RegistrationView> registrations(UUID eventId, UUID horseId, String status, UUID ownerId) {
         StringBuilder sql = new StringBuilder(registrationSelect()).append(" where m.module_code='RACING' and m.record_type='RACE_REGISTRATION'");
         List<Object> args = new ArrayList<>();
         if (eventId != null) { sql.append(" and JSON_VALUE(m.data_json,'$.raceEventId')=?"); args.add(eventId.toString()); }
         if (horseId != null) { sql.append(" and m.horse_id=?"); args.add(horseId); }
         if (status != null && !status.isBlank()) { sql.append(" and m.status=?"); args.add(status.trim().toUpperCase(Locale.ROOT)); }
+        if (ownerId != null) { sql.append(" and exists (select 1 from horse_ownerships ho where ho.horse_id=m.horse_id and ho.owner_id=?)"); args.add(ownerId); }
         sql.append(" order by m.created_at desc");
         return jdbc.query(sql.toString(), (rs,row)->registration(rs,row), args.toArray());
     }
@@ -146,7 +182,8 @@ public class RaceEventService {
                 rs.getString("horse_name"), rs.getObject("user_id", UUID.class), rs.getString("status"),
                 node.path("registeredWeightKg").decimalValue(), parseTime(node, "submittedAt"),
                 parseTime(node, "confirmedAt"), parseTime(node, "withdrawnAt"),
-                uuidOrNull(node.path("withdrawnByUserId").asText(null)));
+                uuidOrNull(node.path("withdrawnByUserId").asText(null)),
+                node.path("decisionReason").asText(null));
     }
 
     private EventView event(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
@@ -154,7 +191,8 @@ public class RaceEventService {
                 rs.getObject("race_date", LocalDate.class), rs.getObject("registration_deadline", OffsetDateTime.class),
                 rs.getBigDecimal("distance_meters"), rs.getString("race_class"),
                 rs.getObject("minimum_age_years", Integer.class), rs.getObject("maximum_age_years", Integer.class),
-                rs.getBigDecimal("minimum_weight_kg"), rs.getBigDecimal("maximum_weight_kg"), rs.getBoolean("is_active"));
+                rs.getBigDecimal("minimum_weight_kg"), rs.getBigDecimal("maximum_weight_kg"), rs.getBoolean("is_active"),
+                rs.getObject("completed_at", OffsetDateTime.class));
     }
 
     private void validate(EventCommand c) {
@@ -184,13 +222,14 @@ public class RaceEventService {
 
     public record EventCommand(String raceName, String racecourse, LocalDate raceDate, OffsetDateTime registrationDeadline,
                                BigDecimal distanceMeters, String raceClass, Integer minimumAgeYears, Integer maximumAgeYears,
-                               BigDecimal minimumWeightKg, BigDecimal maximumWeightKg, boolean active) {}
+                            BigDecimal minimumWeightKg, BigDecimal maximumWeightKg, boolean active) {}
     public record EventView(UUID id, String raceName, String racecourse, LocalDate raceDate,
                             OffsetDateTime registrationDeadline, BigDecimal distanceMeters, String raceClass,
                             Integer minimumAgeYears, Integer maximumAgeYears, BigDecimal minimumWeightKg,
-                            BigDecimal maximumWeightKg, boolean active) {}
+                            BigDecimal maximumWeightKg, boolean active, OffsetDateTime completedAt) {}
     public record RegistrationView(UUID id, UUID raceEventId, String raceName, LocalDate raceDate,
                                    UUID horseId, String horseName, UUID registeredBy, String status,
                                    BigDecimal registeredWeightKg, OffsetDateTime submittedAt,
-                                   OffsetDateTime confirmedAt, OffsetDateTime withdrawnAt, UUID withdrawnBy) {}
+                                   OffsetDateTime confirmedAt, OffsetDateTime withdrawnAt, UUID withdrawnBy,
+                                   String decisionReason) {}
 }
