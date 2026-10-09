@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   Boxes,
@@ -120,6 +120,11 @@ const PAGE_META = {
     title: 'Báo cáo sự cố',
     description: 'Ghi nhận kịp thời các sự cố phát sinh tại khu vực chuồng trại để phối hợp xử lý khẩn cấp.',
   },
+  training: {
+    eyebrow: 'VẬN HÀNH HIỆN TRƯỜNG · HUẤN LUYỆN',
+    title: 'Chuẩn bị huấn luyện',
+    description: 'Theo dõi các buổi tập của ngựa phụ trách, chuẩn bị trang thiết bị và xác nhận sẵn sàng ra sân.',
+  },
   inventory: {
     eyebrow: 'VẬN HÀNH HIỆN TRƯỜNG · KHO VẬT TƯ',
     title: 'Vật tư & Tồn kho',
@@ -173,6 +178,12 @@ export default function StableCarePage() {
             <Clock size={16} /> Nhiệm vụ trong ngày
           </button>
           <button
+            className={`flow4-tab-btn ${activeTab === 'training' ? 'active' : ''}`}
+            onClick={() => setTab('training')}
+          >
+            <Calendar size={16} /> Chuẩn bị huấn luyện
+          </button>
+          <button
             className={`flow4-tab-btn ${activeTab === 'stables' ? 'active' : ''}`}
             onClick={() => setTab('stables')}
           >
@@ -204,6 +215,7 @@ export default function StableCarePage() {
       ) : (
         <>
           {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
+          {activeTab === 'training' && <TrainingPreparationView isStaff={isStaff} />}
           {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
           {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
           {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
@@ -218,6 +230,8 @@ export default function StableCarePage() {
 // 1. FR13: STABLES & DAILY ROUTINES
 // =========================================================================
 function StablesView({ canEditRoutine, isStaff }) {
+  const [searchParams] = useSearchParams()
+  const targetHorseId = searchParams.get('horseId')
   const [stables, setStables] = useState([])
   const [selectedStableId, setSelectedStableId] = useState('')
   const [selectedHorse, setSelectedHorse] = useState(null)
@@ -261,7 +275,7 @@ function StablesView({ canEditRoutine, isStaff }) {
     }
   }, [])
 
-  const handleSelectStall = (stall) => {
+  const handleSelectStall = useCallback((stall) => {
     if (stall.currentAssignment) {
       const horse = {
         id: stall.currentAssignment.horseId,
@@ -270,6 +284,9 @@ function StablesView({ canEditRoutine, isStaff }) {
         stallCode: stall.code,
         healthStatus: stall.currentAssignment.horseHealthStatus,
         assignedFrom: stall.currentAssignment.assignedFrom,
+        trainingLocked: stall.currentAssignment.trainingLocked,
+        trainingLockReason: stall.currentAssignment.trainingLockReason,
+        emergencyActive: stall.currentAssignment.emergencyActive,
       }
       setSelectedHorse(horse)
       loadRoutines(horse.id)
@@ -277,7 +294,20 @@ function StablesView({ canEditRoutine, isStaff }) {
       setSelectedHorse(null)
       setRoutines([])
     }
-  }
+  }, [loadRoutines])
+
+  useEffect(() => {
+    if (targetHorseId && stables.length > 0) {
+      for (const s of stables) {
+        const matchingStall = (s.stalls || []).find((st) => st.currentAssignment?.horseId === targetHorseId)
+        if (matchingStall) {
+          setSelectedStableId(s.id)
+          handleSelectStall(matchingStall)
+          break
+        }
+      }
+    }
+  }, [targetHorseId, stables, handleSelectStall])
 
   const handleDeleteRoutine = async (routineId) => {
     if (!window.confirm('Xóa hoạt động sinh hoạt này?')) return
@@ -372,9 +402,28 @@ function StablesView({ canEditRoutine, isStaff }) {
                     <div className="stall-head">
                       <span className="stall-code">{stall.code}</span>
                       {assigned ? (
-                        <span className={`status ${HEALTH_STATUS_MAP[assigned.horseHealthStatus]?.cls || 'active'}`}>
-                          <i /> {HEALTH_STATUS_MAP[assigned.horseHealthStatus]?.label || assigned.horseHealthStatus || 'Khỏe mạnh'}
-                        </span>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '3px' }}>
+                          <span className={`status ${HEALTH_STATUS_MAP[assigned.horseHealthStatus]?.cls || 'active'}`}>
+                            <i /> {HEALTH_STATUS_MAP[assigned.horseHealthStatus]?.label || assigned.horseHealthStatus || 'Khỏe mạnh'}
+                          </span>
+                          {assigned.trainingLocked && (
+                            <span
+                              className="status locked"
+                              style={{ backgroundColor: '#fff1f0', color: '#cf1322', borderColor: '#ffa39e', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', padding: '1px 5px', borderRadius: '4px' }}
+                              title={assigned.trainingLockReason || 'Đang khóa tập luyện'}
+                            >
+                              <ShieldAlert size={10} /> Khóa tập
+                            </span>
+                          )}
+                          {(assigned.emergencyActive || assigned.horseHealthStatus === 'INJURED') && (
+                            <span
+                              className="status emergency"
+                              style={{ backgroundColor: '#fff2e8', color: '#d4380d', borderColor: '#ffbb96', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', padding: '1px 5px', borderRadius: '4px' }}
+                            >
+                              <AlertTriangle size={10} /> Chấn thương
+                            </span>
+                          )}
+                        </div>
                       ) : (
                         <span className="muted" style={{ fontSize: '10px' }}>Trống</span>
                       )}
@@ -421,6 +470,18 @@ function StablesView({ canEditRoutine, isStaff }) {
                   Mã: <b>{selectedHorse.code}</b> · Ô chuồng: <b>{selectedHorse.stallCode}</b>
                   {selectedHorse.assignedFrom && <span> · Nhận chuồng: <b>{formatVNDate(selectedHorse.assignedFrom)}</b></span>}
                 </div>
+                {selectedHorse.trainingLocked && (
+                  <div style={{ marginTop: '8px', padding: '6px 10px', background: '#fff1f0', border: '1px solid #ffa39e', borderRadius: '6px', fontSize: '11px', color: '#cf1322', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldAlert size={14} style={{ flexShrink: 0 }} />
+                    <span><b>Lưu ý y tế:</b> Ngựa đang có lệnh khóa tập luyện ({selectedHorse.trainingLockReason || 'Bác sĩ chỉ định'}). Không xuất chuồng tập.</span>
+                  </div>
+                )}
+                {(selectedHorse.emergencyActive || selectedHorse.healthStatus === 'INJURED') && (
+                  <div style={{ marginTop: '8px', padding: '6px 10px', background: '#fff2e8', border: '1px solid #ffbb96', borderRadius: '6px', fontSize: '11px', color: '#d4380d', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                    <span><b>Cảnh báo chấn thương:</b> Ngựa đang trong chế độ theo dõi y tế / chấn thương. Không thực hiện bài tập nặng.</span>
+                  </div>
+                )}
                 {isStaff && (
                   <div className="notice success" style={{ fontSize: '11px', margin: '8px 0 0' }}>
                     Nhân viên chuồng: Xem lịch trình sinh hoạt theo giờ để thực hiện chăm sóc.
@@ -531,6 +592,257 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
           </div>
         </form>
       </div>
+    </div>
+  )
+}
+
+// =========================================================================
+// 1b. TRAINING PREPARATION / READINESS (STABLE STAFF)
+// =========================================================================
+function TrainingPreparationView({ isStaff }) {
+  const [searchParams] = useSearchParams()
+  const highlightScheduleId = searchParams.get('scheduleId')
+  const [selectedDate, setSelectedDate] = useState(today())
+  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [schedules, setSchedules] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [actionSuccess, setActionSuccess] = useState('')
+  const [actionLoadingId, setActionLoadingId] = useState(null)
+
+  const loadSchedules = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const data = await stableCareApi.getMyTrainingSchedules({ from: selectedDate, to: selectedDate })
+      setSchedules(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setError(err.message || 'Không thể tải lịch huấn luyện cần chuẩn bị.')
+      setSchedules([])
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedDate])
+
+  useEffect(() => {
+    loadSchedules()
+  }, [loadSchedules])
+
+  const handleMarkReady = async (scheduleId) => {
+    setActionLoadingId(scheduleId)
+    setError('')
+    setActionSuccess('')
+    try {
+      await stableCareApi.markTrainingReady(scheduleId)
+      setActionSuccess('Đã xác nhận sẵn sàng thành công! Buổi tập đã chuyển sang trạng thái Sẵn sàng.')
+      await loadSchedules()
+    } catch (err) {
+      setError(err.message || 'Xác nhận sẵn sàng thất bại.')
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const filtered = useMemo(() => {
+    if (statusFilter === 'ALL') return schedules
+    return schedules.filter((s) => s.status === statusFilter)
+  }, [schedules, statusFilter])
+
+  const preparingCount = useMemo(() => schedules.filter((s) => s.status === 'PREPARING').length, [schedules])
+  const readyCount = useMemo(() => schedules.filter((s) => s.status === 'READY').length, [schedules])
+
+  const STATUS_CONFIG = {
+    PREPARING: { label: 'Đang chuẩn bị', color: '#d46b08', bg: '#fffbe6', border: '#ffe58f' },
+    READY: { label: 'Sẵn sàng ra sân', color: '#27704e', bg: '#f6ffed', border: '#b7eb8f' },
+    IN_PROGRESS: { label: 'Đang huấn luyện', color: '#0958d9', bg: '#e6f4ff', border: '#91caff' },
+    COMPLETED: { label: 'Đã hoàn thành', color: '#135200', bg: '#f6ffed', border: '#b7eb8f' },
+    CANCELLED: { label: 'Đã hủy', color: '#cf1322', bg: '#fff1f0', border: '#ffa39e' },
+    EMERGENCY_STOPPED: { label: 'Dừng khẩn cấp', color: '#cf1322', bg: '#fff1f0', border: '#ffa39e' },
+    PUBLISHED: { label: 'Đã công bố', color: '#d46b08', bg: '#fffbe6', border: '#ffe58f' },
+    PLANNED: { label: 'Đã lên lịch', color: '#595959', bg: '#f5f5f5', border: '#d9d9d9' },
+  }
+
+  const INTENSITY_LABELS = {
+    LOW: 'Nhẹ',
+    MEDIUM: 'Trung bình',
+    HIGH: 'Cường độ cao',
+  }
+
+  return (
+    <div className="flow4-view">
+      <div className="toolbar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <label htmlFor="prep-date" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Ngày tập:</label>
+          <input
+            id="prep-date"
+            type="date"
+            className="input"
+            style={{ width: '160px', padding: '6px 10px', fontSize: '13px' }}
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+          />
+          <button type="button" className="button secondary" style={{ minHeight: '34px', fontSize: '12px' }} onClick={() => setSelectedDate(today())}>
+            Hôm nay
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className={`button ${statusFilter === 'ALL' ? 'primary' : 'secondary'}`}
+            style={{ minHeight: '32px', fontSize: '12px' }}
+            onClick={() => setStatusFilter('ALL')}
+          >
+            Tất cả ({schedules.length})
+          </button>
+          <button
+            type="button"
+            className={`button ${statusFilter === 'PREPARING' ? 'primary' : 'secondary'}`}
+            style={{ minHeight: '32px', fontSize: '12px' }}
+            onClick={() => setStatusFilter('PREPARING')}
+          >
+            Cần chuẩn bị ({preparingCount})
+          </button>
+          <button
+            type="button"
+            className={`button ${statusFilter === 'READY' ? 'primary' : 'secondary'}`}
+            style={{ minHeight: '32px', fontSize: '12px' }}
+            onClick={() => setStatusFilter('READY')}
+          >
+            Đã sẵn sàng ({readyCount})
+          </button>
+        </div>
+      </div>
+
+      {actionSuccess && (
+        <div className="notice success" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{actionSuccess}</span>
+          <button type="button" className="icon-button" onClick={() => setActionSuccess('')}><X size={14} /></button>
+        </div>
+      )}
+
+      {error && (
+        <div className="notice error" style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{error}</span>
+          <button type="button" className="icon-button" onClick={() => setError('')}><X size={14} /></button>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="empty" style={{ minHeight: '180px' }}>Đang tải danh sách buổi tập cần chuẩn bị…</div>
+      ) : filtered.length === 0 ? (
+        <div className="empty" style={{ minHeight: '180px', padding: '32px 18px' }}>
+          <Clock size={32} style={{ color: 'var(--muted)', opacity: 0.6, marginBottom: '8px' }} />
+          <b>Không có buổi tập nào trong ngày {formatVNDate(selectedDate)}</b>
+          <span>Hiện tại chưa có lịch huấn luyện nào cho ngựa do bạn phụ trách cần chuẩn bị trong ngày này.</span>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
+          {filtered.map((item) => {
+            const isHighlighted = highlightScheduleId && highlightScheduleId === item.id
+            const cfg = STATUS_CONFIG[item.status] || { label: item.status, color: '#595959', bg: '#f5f5f5', border: '#d9d9d9' }
+            const isPreparing = item.status === 'PREPARING'
+            const isActionBusy = actionLoadingId === item.id
+
+            return (
+              <div
+                key={item.id}
+                className="card"
+                style={{
+                  padding: '18px',
+                  borderRadius: '10px',
+                  border: isHighlighted ? '2px solid #2f765e' : '1px solid var(--line)',
+                  boxShadow: isHighlighted ? '0 0 0 3px rgba(47, 118, 94, 0.15)' : 'none',
+                  backgroundColor: '#ffffff',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '14px',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <div>
+                      <b style={{ fontSize: '16px', color: '#15352c' }}>{item.horse?.name || 'Ngựa'}</b>
+                      <span className="muted" style={{ fontSize: '12px', marginLeft: '6px' }}>({item.horse?.code || '—'})</span>
+                    </div>
+                    <span
+                      style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        color: cfg.color,
+                        background: cfg.bg,
+                        border: `1px solid ${cfg.border}`,
+                      }}
+                    >
+                      {cfg.label}
+                    </span>
+                  </div>
+
+                  <div style={{ fontSize: '13px', fontWeight: 600, color: '#27704e', marginBottom: '6px' }}>
+                    {item.taskName || 'Bài tập huấn luyện'}
+                  </div>
+
+                  <div style={{ fontSize: '12px', color: 'var(--muted)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {item.phase?.trainingPlanName && (
+                      <div>Kế hoạch: <b>{item.phase.trainingPlanName}</b> — {item.phase.phaseName}</div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={13} />
+                      <span>{formatVNDate(item.sessionDate)} · {item.startTime || '05:00'} - {item.endTime || '11:00'}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <MapPin size={13} />
+                      <span>{item.racetrack?.name || 'Sân chạy'} · Làn {item.lane?.laneNumber || 'Chưa gán'}</span>
+                    </div>
+                    {item.workloadIntensity && (
+                      <div>Cường độ: <b>{INTENSITY_LABELS[item.workloadIntensity] || item.workloadIntensity}</b></div>
+                    )}
+                    {item.notes && (
+                      <div style={{ fontStyle: 'italic', marginTop: '2px', background: '#fafafa', padding: '4px 8px', borderRadius: '4px' }}>
+                        "{item.notes}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ paddingTop: '10px', borderTop: '1px solid var(--line)', display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                  {isPreparing ? (
+                    <button
+                      type="button"
+                      className="button primary"
+                      style={{ minHeight: '34px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}
+                      disabled={isActionBusy}
+                      onClick={() => handleMarkReady(item.id)}
+                    >
+                      <CheckCircle size={15} />
+                      {isActionBusy ? 'Đang xác nhận…' : 'Xác nhận sẵn sàng'}
+                    </button>
+                  ) : item.status === 'READY' ? (
+                    <span style={{ fontSize: '12px', color: '#27704e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={14} /> Ngựa đã sẵn sàng ra sân
+                    </span>
+                  ) : item.status === 'IN_PROGRESS' ? (
+                    <span style={{ fontSize: '12px', color: '#0958d9', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Clock size={14} /> Buổi tập đang diễn ra
+                    </span>
+                  ) : item.status === 'COMPLETED' ? (
+                    <span style={{ fontSize: '12px', color: '#135200', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <CheckCircle size={14} /> Buổi tập đã hoàn thành
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                      Trạng thái: {cfg.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

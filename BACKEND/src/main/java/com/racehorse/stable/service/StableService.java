@@ -234,39 +234,78 @@ public class StableService {
     }
 
     private AssignmentView activeAssignmentForStall(UUID stallId, UUID stableId, String stableName) {
-        List<AssignmentView> rows = jdbc.query("select top 1 m.id,m.horse_id,m.user_id,m.data_json,h.name horse_name,h.code horse_code "
+        List<AssignmentView> rows = jdbc.query("select top 1 m.id,m.horse_id,m.user_id,m.data_json,h.name horse_name,h.code horse_code, "
+                        + "h.health_status, h.status horse_status, h.health_source_type, "
+                        + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
+                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason "
                         + "from module_records m left join horses h on h.id=m.horse_id "
                         + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
                         + "and JSON_VALUE(m.data_json,'$.stallId')=? order by m.created_at desc",
-                (rs, row) -> assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
-                        rs.getString("horse_name"), rs.getString("horse_code"),
-                        rs.getObject("user_id", UUID.class), rs.getString("data_json"), stableId, stableName, true),
+                (rs, row) -> {
+                    String healthStatus = rs.getString("health_status");
+                    String healthSourceType = rs.getString("health_source_type");
+                    String horseStatus = rs.getString("horse_status");
+                    int lockCount = rs.getInt("active_lock_count");
+                    String lockReason = rs.getString("active_lock_reason");
+                    boolean trainingLocked = lockCount > 0;
+                    boolean emergencyActive = "INJURED".equalsIgnoreCase(healthStatus)
+                            || "INJURED".equalsIgnoreCase(horseStatus)
+                            || "TRAINING_EMERGENCY".equalsIgnoreCase(healthSourceType);
+                    return assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
+                            rs.getString("horse_name"), rs.getString("horse_code"),
+                            rs.getObject("user_id", UUID.class), rs.getString("data_json"), stableId, stableName, true,
+                            healthStatus != null && !healthStatus.isBlank() ? healthStatus : "ACTIVE",
+                            trainingLocked, lockReason, emergencyActive);
+                },
                 stallId.toString());
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
     private AssignmentView requireAssignment(UUID id) {
-        List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name,h.name horse_name,h.code horse_code "
+        List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name,h.name horse_name,h.code horse_code, "
+                        + "h.health_status, h.status horse_status, h.health_source_type, "
+                        + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
+                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason "
                         + "from module_records m join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
                         + "left join horses h on h.id=m.horse_id "
                         + "where m.id=? and m.record_type='STALL_ASSIGNMENT'",
-                (rs, row) -> assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
-                        rs.getString("horse_name"), rs.getString("horse_code"),
-                        rs.getObject("user_id", UUID.class), rs.getString("data_json"),
-                        UUID.fromString(read(rs.getString("data_json")).path("stableId").asText()),
-                        rs.getString("stable_name"), "ACTIVE".equals(rs.getString("status"))), id);
+                (rs, row) -> {
+                    String healthStatus = rs.getString("health_status");
+                    String healthSourceType = rs.getString("health_source_type");
+                    String horseStatus = rs.getString("horse_status");
+                    int lockCount = rs.getInt("active_lock_count");
+                    String lockReason = rs.getString("active_lock_reason");
+                    boolean trainingLocked = lockCount > 0;
+                    boolean emergencyActive = "INJURED".equalsIgnoreCase(healthStatus)
+                            || "INJURED".equalsIgnoreCase(horseStatus)
+                            || "TRAINING_EMERGENCY".equalsIgnoreCase(healthSourceType);
+                    return assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
+                            rs.getString("horse_name"), rs.getString("horse_code"),
+                            rs.getObject("user_id", UUID.class), rs.getString("data_json"),
+                            UUID.fromString(read(rs.getString("data_json")).path("stableId").asText()),
+                            rs.getString("stable_name"), "ACTIVE".equals(rs.getString("status")),
+                            healthStatus != null && !healthStatus.isBlank() ? healthStatus : "ACTIVE",
+                            trainingLocked, lockReason, emergencyActive);
+                }, id);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy phân bổ chuồng: " + id);
         return rows.getFirst();
     }
 
     private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
                                       UUID stableId, String stableName, boolean active) {
+        return assignment(id, horseId, horseName, horseCode, actor, jsonValue, stableId, stableName, active, null, false, null, false);
+    }
+
+    private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
+                                      UUID stableId, String stableName, boolean active,
+                                      String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive) {
         JsonNode node = read(jsonValue);
         String until = node.path("assignedUntil").isNull() ? null : node.path("assignedUntil").asText(null);
         return new AssignmentView(id, stableId, stableName, UUID.fromString(node.path("stallId").asText()),
                 node.path("stallCode").asText(), horseId, horseName, horseCode, actor,
                 OffsetDateTime.parse(node.path("assignedFrom").asText()),
-                until == null || until.isBlank() ? null : OffsetDateTime.parse(until), active);
+                until == null || until.isBlank() ? null : OffsetDateTime.parse(until), active,
+                horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive);
     }
 
     private void addStallInternal(UUID stableId, UUID actor, String code) {
@@ -411,7 +450,15 @@ public class StableService {
     public record StallView(UUID id, String code, boolean active, AssignmentView currentAssignment) {}
     public record AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
                                  UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
-                                 OffsetDateTime assignedUntil, boolean active) {}
+                                 OffsetDateTime assignedUntil, boolean active,
+                                 String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive) {
+        public AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
+                              UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
+                              OffsetDateTime assignedUntil, boolean active) {
+            this(id, stableId, stableName, stallId, stallCode, horseId, horseName, horseCode, assignedBy,
+                    assignedFrom, assignedUntil, active, null, false, null, false);
+        }
+    }
     public record DailyRoutineView(UUID id, UUID horseId, String activityType, LocalTime startTime, LocalTime endTime, String notes, boolean active) {}
     public record DailyRoutineRequest(String activityType, LocalTime startTime, LocalTime endTime, String notes) {}
 }

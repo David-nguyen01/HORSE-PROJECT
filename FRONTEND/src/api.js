@@ -136,6 +136,14 @@ export const stableCareApi = {
   createReplenishment: (payload) => api('/api/inventory/replenishments', { method: 'POST', body: JSON.stringify(payload) }),
   reviewReplenishment: (id, payload) => api(`/api/inventory/replenishments/${id}/review`, { method: 'POST', body: JSON.stringify(payload) }),
   receiveReplenishment: (id, payload) => api(`/api/inventory/replenishments/${id}/receive`, { method: 'POST', body: JSON.stringify(payload) }),
+
+  // Training Preparation for Stable Staff
+  getMyTrainingSchedules: (params = {}) => {
+    const q = new URLSearchParams()
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
+    return api(`/api/training-schedules/mine${q.toString() ? `?${q}` : ''}`)
+  },
+  markTrainingReady: (scheduleId) => api(`/api/training-schedules/${scheduleId}/ready`, { method: 'PATCH' }),
 }
 
 export const inventoryApi = stableCareApi

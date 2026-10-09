@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import static org.mockito.ArgumentMatchers.eq;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -312,6 +313,33 @@ class TrainingScheduleServiceTest {
         verify(jdbc).update("delete from training_evaluations where training_schedule_id=?", scheduleId);
         verify(jdbc).update("delete from training_schedules where id=?", scheduleId);
     }
+
+    @Test
+    void finishTrainingCreatesRecoveryTaskForCaretaker() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID caretakerId = UUID.randomUUID();
+        UserAccount caretaker = new UserAccount("caretaker", "caretaker@test.local", "encoded", Set.of(Role.STABLE_STAFF));
+        ReflectionTestUtils.setField(caretaker, "id", caretakerId);
+        ReflectionTestUtils.setField(horse, "caretaker", caretaker);
+
+        TrainingSchedule current = schedule();
+        current.publish(NOW);
+        current.markReady(caretakerId, NOW);
+        current.startTraining(NOW);
+
+        com.racehorse.caretask.service.CareTaskService mockCareTaskService = org.mockito.Mockito.mock(com.racehorse.caretask.service.CareTaskService.class);
+        ReflectionTestUtils.setField(service, "careTaskService", mockCareTaskService);
+
+        when(repository.findByIdForUpdate(scheduleId)).thenReturn(Optional.of(current));
+        when(horseAccessService.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
+        when(repository.save(any(TrainingSchedule.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.finishTraining(scheduleId, actorId);
+
+        assertThat(current.getSessionStatus()).isEqualTo("COMPLETED");
+        verify(mockCareTaskService).createRecoveryTask(eq(current), eq(caretakerId));
+    }
+
 
     private void prepareCreate(boolean occupiedLane) {
         when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));

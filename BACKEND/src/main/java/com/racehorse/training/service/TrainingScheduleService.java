@@ -27,6 +27,7 @@ import com.racehorse.training.repository.TrialRunBookingRepository;
 import com.racehorse.training.repository.TrainingEvaluationRepository;
 import com.racehorse.training.repository.TrainingPlanPhaseRepository;
 import com.racehorse.training.repository.TrainingScheduleRepository;
+import com.racehorse.caretask.service.CareTaskService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +56,7 @@ public class TrainingScheduleService {
     private final TrainingEvaluationRepository evaluationRepository;
     private final NotificationService notificationService;
     private final JdbcTemplate jdbc;
+    private final CareTaskService careTaskService;
 
     @Autowired
     public TrainingScheduleService(
@@ -69,7 +71,8 @@ public class TrainingScheduleService {
             Clock clock,
             TrainingEvaluationRepository evaluationRepository,
             NotificationService notificationService,
-            JdbcTemplate jdbc) {
+            JdbcTemplate jdbc,
+            @Autowired(required = false) CareTaskService careTaskService) {
         this.repository = repository;
         this.phaseRepository = phaseRepository;
         this.racetrackRepository = racetrackRepository;
@@ -82,6 +85,24 @@ public class TrainingScheduleService {
         this.evaluationRepository = evaluationRepository;
         this.notificationService = notificationService;
         this.jdbc = jdbc;
+        this.careTaskService = careTaskService;
+    }
+
+    public TrainingScheduleService(
+            TrainingScheduleRepository repository,
+            TrainingPlanPhaseRepository phaseRepository,
+            RacetrackRepository racetrackRepository,
+            RacetrackLaneRepository laneRepository,
+            TrialRunBookingRepository bookingRepository,
+            TrainingLockRepository lockRepository,
+            UserAccountRepository userRepository,
+            HorseAccessService horseAccessService,
+            Clock clock,
+            TrainingEvaluationRepository evaluationRepository,
+            NotificationService notificationService,
+            JdbcTemplate jdbc) {
+        this(repository, phaseRepository, racetrackRepository, laneRepository, bookingRepository, lockRepository,
+                userRepository, horseAccessService, clock, evaluationRepository, notificationService, jdbc, null);
     }
 
     public TrainingScheduleService(TrainingScheduleRepository repository, TrainingPlanPhaseRepository phaseRepository,
@@ -301,7 +322,32 @@ public class TrainingScheduleService {
         if (!"IN_PROGRESS".equals(value.getSessionStatus()))
             throw new BusinessException("Chỉ buổi tập đang diễn ra mới có thể kết thúc");
         value.finishTraining(clock.instant());
-        return toResponse(repository.save(value));
+        TrainingSchedule saved = repository.save(value);
+        createRecoveryCareTask(saved);
+        return toResponse(saved);
+    }
+
+    private void createRecoveryCareTask(TrainingSchedule schedule) {
+        if (careTaskService == null || schedule == null || schedule.getHorse() == null) return;
+        UUID caretakerId = null;
+        if (schedule.getHorse().getCaretaker() != null) {
+            caretakerId = schedule.getHorse().getCaretaker().getId();
+        }
+        if (caretakerId == null && jdbc != null) {
+            caretakerId = jdbc.query(
+                    "select caretaker_user_id from horses where id=?",
+                    rs -> rs.next() ? rs.getObject(1, UUID.class) : null,
+                    schedule.getHorse().getId()
+            );
+        }
+        if (caretakerId != null) {
+            try {
+                careTaskService.createRecoveryTask(schedule, caretakerId);
+            } catch (Exception ex) {
+                System.getLogger(getClass().getName()).log(System.Logger.Level.WARNING,
+                        "Failed to create recovery task for schedule {0}: {1}", schedule.getId(), ex.getMessage());
+            }
+        }
     }
 
     private TrainingSchedule lockedSchedule(UUID id) {

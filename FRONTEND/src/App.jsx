@@ -129,6 +129,7 @@ function AppLayout() {
 
   const navItems = isStaff ? [
     { to: '/stable-care/tasks', label: 'Nhiệm vụ trong ngày', icon: Clock },
+    { to: '/stable-care/training', label: 'Chuẩn bị huấn luyện', icon: Calendar },
     { to: '/stable-care/stables', label: 'Ô chuồng & Sinh hoạt', icon: Home },
     { to: '/stable-care/nutrition', label: 'Khẩu phần & Cho ăn', icon: Utensils },
     { to: '/stable-care/incidents', label: 'Báo cáo sự cố', icon: AlertTriangle, badge: incidentBadge > 0 ? incidentBadge : null },
@@ -216,26 +217,46 @@ function NotificationBell() {
     setLinkError('')
     try {
       let target = null
+      const isStaffUser = hasAny(user, 'STABLE_STAFF')
       const canOpenTraining = hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER')
       const id = encodeURIComponent(item.relatedEntityId || '')
-      if (item.relatedEntityType === 'HORSE' && item.relatedEntityId) target = '/horses/' + id
-      if (item.relatedEntityType === 'INCIDENT_REPORT' && item.relatedEntityId && hasAny(user, 'HORSE_OWNER', 'HEAD_TRAINER')) {
-        const emergency = await api('/api/incidents/training-emergency/' + id)
-        target = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER')
-          ? `/horses/${encodeURIComponent(emergency.horseId)}?emergencyId=${id}`
-          : `/training-emergency?emergencyId=${id}`
+
+      if (isStaffUser) {
+        if (item.notificationType === 'TRAINING_SCHEDULE_PUBLISHED' || item.relatedEntityType === 'TRAINING_SCHEDULE') {
+          target = id ? `/stable-care/training?scheduleId=${id}` : '/stable-care/training'
+        } else if (item.notificationType === 'TRAINING_EVALUATION_YELLOW_CARETAKER' || item.relatedEntityType === 'TRAINING_EVALUATION') {
+          target = '/stable-care/training'
+        } else if (item.notificationType === 'PREVENTIVE_CARE_SCHEDULED' || item.relatedEntityType === 'PREVENTIVE_CARE') {
+          target = '/stable-care/tasks'
+        } else if (item.notificationType === 'HORSE_PROFILE_UPDATED' || item.relatedEntityType === 'HORSE') {
+          target = id ? `/stable-care/stables?horseId=${id}` : '/stable-care/stables'
+        } else if (item.relatedEntityType === 'INCIDENT_REPORT') {
+          target = id ? `/stable-care/incidents?incidentId=${id}` : '/stable-care/incidents'
+        } else if (item.relatedEntityType === 'INVENTORY' || item.relatedEntityType === 'REPLENISHMENT') {
+          target = '/stable-care/inventory'
+        } else {
+          target = '/stable-care/tasks'
+        }
+      } else {
+        if (item.relatedEntityType === 'HORSE' && item.relatedEntityId) target = '/horses/' + id
+        if (item.relatedEntityType === 'INCIDENT_REPORT' && item.relatedEntityId && hasAny(user, 'HORSE_OWNER', 'HEAD_TRAINER')) {
+          const emergency = await api('/api/incidents/training-emergency/' + id)
+          target = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER')
+            ? `/horses/${encodeURIComponent(emergency.horseId)}?emergencyId=${id}`
+            : `/training-emergency?emergencyId=${id}`
+        }
+        if (item.relatedEntityType === 'WALLET' && hasAny(user, 'HORSE_OWNER')) target = '/wallet'
+        if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_EVALUATION') target = '/fitness?evaluationId=' + id
+        if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_SCHEDULE') {
+          const owner = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER', 'CLUB_MANAGER')
+          const schedule = await api('/api/training-schedules/' + id + (owner ? '/owner-view' : ''))
+          target = schedule.evaluation?.id ? '/fitness?evaluationId=' + encodeURIComponent(schedule.evaluation.id)
+            : schedule.horse?.id ? '/fitness?horseId=' + encodeURIComponent(schedule.horse.id) : '/training-schedule'
+        }
+        if (item.relatedEntityId && item.relatedEntityType === 'RACE_REGISTRATION'
+            && hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER'))
+          target = '/races?registrationId=' + id
       }
-      if (item.relatedEntityType === 'WALLET' && hasAny(user, 'HORSE_OWNER')) target = '/wallet'
-      if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_EVALUATION') target = '/fitness?evaluationId=' + id
-      if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_SCHEDULE') {
-        const owner = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER', 'CLUB_MANAGER')
-        const schedule = await api('/api/training-schedules/' + id + (owner ? '/owner-view' : ''))
-        target = schedule.evaluation?.id ? '/fitness?evaluationId=' + encodeURIComponent(schedule.evaluation.id)
-          : schedule.horse?.id ? '/fitness?horseId=' + encodeURIComponent(schedule.horse.id) : '/training-schedule'
-      }
-      if (item.relatedEntityId && item.relatedEntityType === 'RACE_REGISTRATION'
-          && hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER'))
-        target = '/races?registrationId=' + id
       await markRead(item.id)
       if (target) { navigate(target); setOpen(false) }
     } catch (error) { setLinkError(error.message || 'Không mở được thông báo.') }
