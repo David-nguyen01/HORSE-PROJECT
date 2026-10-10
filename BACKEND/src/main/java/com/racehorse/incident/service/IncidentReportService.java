@@ -203,8 +203,12 @@ public class IncidentReportService {
     }
 
     @Transactional
-    public IncidentReportResponse updateStatus(UUID incidentId, UUID actorId, UpdateIncidentStatusRequest request) {
+    public IncidentReportResponse updateStatus(UUID incidentId, UUID actorId,
+            UpdateIncidentStatusRequest request, boolean managerOrVet) {
         IncidentReportResponse existing = getReport(incidentId);
+        if (!managerOrVet && !actorId.equals(existing.reportedByUserId())) {
+            throw new BusinessException("Chỉ nhân viên gửi báo cáo mới được cập nhật sự cố này");
+        }
         String targetStatus = request.status().trim().toUpperCase(Locale.ROOT);
 
         if (!List.of("REPORTED", "UNDER_REVIEW", "ACKNOWLEDGED", "RESOLVED", "DISMISSED").contains(targetStatus)) {

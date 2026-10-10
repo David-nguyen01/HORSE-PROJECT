@@ -27,18 +27,24 @@ public class PreventiveCareService {
     }
     @Transactional
     public PreventiveCareResponse complete(UUID id,UUID actor,CompletePreventiveCareRequest r){
-        List<Map<String,Object>> rows=jdbc.queryForList("select * from preventive_care_schedules where id=? and cancelled_at is null",id);
+        // Serialize completions of the same schedule before creating its recurring successor.
+        List<Map<String,Object>> rows=jdbc.queryForList(
+                "select * from preventive_care_schedules with (UPDLOCK,HOLDLOCK) where id=?",id);
         if(rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy lịch chăm sóc: "+id);
         Map<String,Object> s=rows.getFirst();
+        if(s.get("cancelled_at")!=null) throw new BusinessException("Lịch này đã bị hủy");
         if(s.get("completed_at")!=null) throw new BusinessException("Lịch này đã được hoàn thành");
         Integer recurrence=(Integer)s.get("recurrence_days"); UUID next=null;
+        int changed=jdbc.update("update preventive_care_schedules set completed_by_user_id=?,completed_at=?,completion_notes=? "
+                        + "where id=? and completed_at is null and cancelled_at is null",
+                actor,r.performedAt(),r.notes(),id);
+        if(changed!=1) throw new BusinessException("Lịch này đã được xử lý trước đó");
         if(recurrence!=null){
             next=UUID.randomUUID();
             jdbc.update("insert into preventive_care_schedules(id,horse_id,care_type,details,due_date,recurrence_days,reminder_lead_days,created_by_user_id) values(?,?,?,?,dateadd(day,?,?),?,?,?)",
                     next,s.get("horse_id"),s.get("care_type"),s.get("details"),recurrence,s.get("due_date"),recurrence,s.get("reminder_lead_days"),actor);
+            jdbc.update("update preventive_care_schedules set next_schedule_id=? where id=?",next,id);
         }
-        jdbc.update("update preventive_care_schedules set completed_by_user_id=?,completed_at=?,completion_notes=?,next_schedule_id=? where id=? and completed_at is null",
-                actor,r.performedAt(),r.notes(),next,id);
         Object dueValue=s.get("due_date");
         java.time.LocalDate dueDate=dueValue instanceof java.time.LocalDate value
                 ? value : ((java.sql.Date)dueValue).toLocalDate();

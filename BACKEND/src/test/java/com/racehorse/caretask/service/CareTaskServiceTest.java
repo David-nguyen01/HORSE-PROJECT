@@ -107,6 +107,7 @@ class CareTaskServiceTest {
 
         when(jdbc.query(contains("SELECT username FROM dbo.users"), any(RowMapper.class), eq(staffId)))
                 .thenReturn(List.of("stable_groom"));
+        when(jdbc.update(contains("UPDATE dbo.care_tasks"), any(Object[].class))).thenReturn(1);
 
         CompleteCareTaskRequest completeReq = new CompleteCareTaskRequest("Đã dọn sạch", "https://img.example.com/clean.jpg");
 
@@ -114,7 +115,8 @@ class CareTaskServiceTest {
 
         verify(jdbc).update(
                 contains("UPDATE dbo.care_tasks"),
-                eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"), eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId)
+                eq(false), eq(staffId), eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"),
+                eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId), eq(false), eq(staffId)
         );
     }
 
@@ -139,6 +141,7 @@ class CareTaskServiceTest {
 
         when(jdbc.query(contains("SELECT username FROM dbo.users"), any(RowMapper.class), eq(staffId)))
                 .thenReturn(List.of("stable_groom"));
+        when(jdbc.update(contains("UPDATE dbo.care_tasks"), any(Object[].class))).thenReturn(1);
 
         byte[] fakeImage = new byte[] { (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x01 };
         MockMultipartFile file = new MockMultipartFile("file", "evidence.jpg", "image/jpeg", fakeImage);
@@ -147,9 +150,9 @@ class CareTaskServiceTest {
 
         verify(jdbc).update(
                 contains("UPDATE dbo.care_tasks"),
-                eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
+                eq(false), eq(staffId), eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
                 eq("/api/care-tasks/" + taskId + "/photo"),
-                eq(fakeImage), eq("image/jpeg"), eq(taskId)
+                eq(fakeImage), eq("image/jpeg"), eq(taskId), eq(false), eq(staffId)
         );
     }
 
@@ -237,6 +240,86 @@ class CareTaskServiceTest {
         assertThatThrownBy(() -> service.completeTask(taskId, actor, new CompleteCareTaskRequest("Notes", null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Không thể hoàn thành nhiệm vụ đã bị hủy");
+    }
+
+    @Test
+    void staffCannotCompleteTaskAssignedToAnotherStaff() {
+        UUID taskId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        CareTaskService guarded = spy(service);
+        CareTaskResponse task = mock(CareTaskResponse.class);
+        when(task.status()).thenReturn("PENDING");
+        when(task.taskCategory()).thenReturn("SPECIAL");
+        when(task.assignedStaffId()).thenReturn(UUID.randomUUID());
+        doReturn(task).when(guarded).getTask(taskId);
+
+        assertThatThrownBy(() -> guarded.completeTask(taskId, actorId,
+                new CompleteCareTaskRequest("Xong", null)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("không được phân công");
+        verify(jdbc, never()).update(contains("UPDATE dbo.care_tasks"), any(Object[].class));
+    }
+
+    @Test
+    void staffCannotCompleteUnassignedSpecialTask() {
+        UUID taskId = UUID.randomUUID();
+        CareTaskService guarded = spy(service);
+        CareTaskResponse task = mock(CareTaskResponse.class);
+        when(task.status()).thenReturn("PENDING");
+        when(task.taskCategory()).thenReturn("SPECIAL");
+        doReturn(task).when(guarded).getTask(taskId);
+
+        assertThatThrownBy(() -> guarded.completeTask(taskId, UUID.randomUUID(),
+                new CompleteCareTaskRequest("Xong", null)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("không được phân công");
+    }
+
+    @Test
+    void completionRejectsConcurrentStatusChange() {
+        UUID taskId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        CareTaskService guarded = spy(service);
+        CareTaskResponse task = mock(CareTaskResponse.class);
+        when(task.status()).thenReturn("PENDING");
+        when(task.assignedStaffId()).thenReturn(actorId);
+        doReturn(task).when(guarded).getTask(taskId);
+        when(jdbc.query(contains("SELECT username FROM dbo.users"), any(RowMapper.class), eq(actorId)))
+                .thenReturn(List.of("staff"));
+        when(jdbc.update(contains("UPDATE dbo.care_tasks"), any(Object[].class))).thenReturn(0);
+
+        assertThatThrownBy(() -> guarded.completeTask(taskId, actorId,
+                new CompleteCareTaskRequest("Xong", null)))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("đã thay đổi trạng thái");
+    }
+
+    @Test
+    void cancelRejectsConcurrentCompletion() {
+        UUID taskId = UUID.randomUUID();
+        CareTaskService guarded = spy(service);
+        CareTaskResponse task = mock(CareTaskResponse.class);
+        when(task.status()).thenReturn("PENDING");
+        doReturn(task).when(guarded).getTask(taskId);
+        when(jdbc.update(contains("status = 'CANCELLED'"), eq(taskId))).thenReturn(0);
+
+        assertThatThrownBy(() -> guarded.cancelTask(taskId, UUID.randomUUID()))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("đã thay đổi trạng thái");
+    }
+
+    @Test
+    void managerCanCompleteAssignedTaskForAbsentStaff() {
+        UUID taskId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        CareTaskService guarded = spy(service);
+        CareTaskResponse task = mock(CareTaskResponse.class);
+        when(task.status()).thenReturn("PENDING");
+        when(task.assignedStaffId()).thenReturn(UUID.randomUUID());
+        doReturn(task).when(guarded).getTask(taskId);
+        when(jdbc.query(contains("SELECT username FROM dbo.users"), any(RowMapper.class), eq(managerId)))
+                .thenReturn(List.of("manager"));
+        when(jdbc.update(contains("UPDATE dbo.care_tasks"), any(Object[].class))).thenReturn(1);
+
+        guarded.completeTask(taskId, managerId, new CompleteCareTaskRequest("Xong", null), true);
+        verify(jdbc).update(contains("UPDATE dbo.care_tasks"), eq(true), eq(managerId), eq(managerId),
+                eq("manager"), eq("Xong"), isNull(), isNull(), isNull(), eq(taskId), eq(true), eq(managerId));
     }
 
     @Test

@@ -42,7 +42,7 @@ public class HorseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     ResponseEntity<HorseResponse> create(@Valid @RequestBody CreateHorseRequest request) {
         HorseResponse response = horseService.create(request);
         return ResponseEntity
@@ -113,7 +113,7 @@ public class HorseController {
     }
 
     @PutMapping("/{id}/ownership")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     HorseResponse replaceOwnership(
             @PathVariable("id") UUID id,
             @Valid @RequestBody ReplaceOwnershipRequest request) {
@@ -121,7 +121,7 @@ public class HorseController {
     }
 
     @PatchMapping("/{id}/archive")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     HorseResponse archive(@PathVariable("id") UUID id) {
         return horseService.archive(id);
     }

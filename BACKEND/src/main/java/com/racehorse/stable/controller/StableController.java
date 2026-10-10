@@ -1,6 +1,7 @@
 package com.racehorse.stable.controller;
 
 import com.racehorse.stable.service.StableService;
+import com.racehorse.horse.service.OwnerHorseReadGuard;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -8,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,16 +20,20 @@ import java.util.UUID;
 @RequestMapping("/api/stables")
 public class StableController {
     private final StableService service;
-    public StableController(StableService service) { this.service = service; }
+    private final OwnerHorseReadGuard ownerGuard;
+    public StableController(StableService service, OwnerHorseReadGuard ownerGuard) {
+        this.service = service;
+        this.ownerGuard = ownerGuard;
+    }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     List<StableService.StableView> list(@RequestParam(defaultValue = "false") boolean includeInactive) {
         return service.list(includeInactive);
     }
 
     @GetMapping("/{stableId}")
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     StableService.StableView get(@PathVariable UUID stableId) { return service.get(stableId); }
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
@@ -77,7 +83,9 @@ public class StableController {
     // Daily Routines (FR13)
     @GetMapping("/horses/{horseId}/daily-routines")
     @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
-    List<StableService.DailyRoutineView> listDailyRoutines(@PathVariable UUID horseId) {
+    List<StableService.DailyRoutineView> listDailyRoutines(@PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        ownerGuard.requireHorse(horseId, jwt, authentication);
         return service.listDailyRoutines(horseId);
     }
 

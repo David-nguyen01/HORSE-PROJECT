@@ -275,7 +275,7 @@ class IncidentReportServiceTest {
 
         UpdateIncidentStatusRequest updateReq = new UpdateIncidentStatusRequest("RESOLVED", "Đã tiêm hạ sốt và dịch truyền, nhiệt độ hạ còn 38.2");
 
-        service.updateStatus(incidentId, actorId, updateReq);
+        service.updateStatus(incidentId, actorId, updateReq, true);
 
         verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
                 eq("RESOLVED"), anyString(), eq(incidentId));
@@ -317,12 +317,12 @@ class IncidentReportServiceTest {
                 .thenReturn(List.of("dr_vet"));
 
         // Test ACKNOWLEDGED
-        service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã tiếp nhận tạo phiếu khám"));
+        service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã tiếp nhận tạo phiếu khám"), true);
         verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
                 eq("ACKNOWLEDGED"), contains("acknowledgedByName"), eq(incidentId));
 
         // Test DISMISSED
-        service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("DISMISSED", "Không cần can thiệp y tế"));
+        service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("DISMISSED", "Không cần can thiệp y tế"), true);
         verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
                 eq("DISMISSED"), contains("resolvedByName"), eq(incidentId));
     }
@@ -336,5 +336,39 @@ class IncidentReportServiceTest {
         assertThatThrownBy(() -> service.getReport(incidentId))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Không tìm thấy báo cáo sự cố");
+    }
+
+    @Test
+    void staffCannotUpdateAnotherStaffIncident() {
+        UUID incidentId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        IncidentReportService guarded = spy(service);
+        IncidentReportResponse report = mock(IncidentReportResponse.class);
+        when(report.reportedByUserId()).thenReturn(UUID.randomUUID());
+        doReturn(report).when(guarded).getReport(incidentId);
+
+        assertThatThrownBy(() -> guarded.updateStatus(incidentId, actorId,
+                new UpdateIncidentStatusRequest("RESOLVED", "Đã xử lý"), false))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("nhân viên gửi báo cáo");
+        verify(jdbc, never()).update(contains("update module_records set status"), any(Object[].class));
+    }
+
+    @Test
+    void reportingStaffCanUpdateOwnIncident() {
+        UUID incidentId = UUID.randomUUID();
+        UUID reporterId = UUID.randomUUID();
+        IncidentReportService guarded = spy(service);
+        IncidentReportResponse report = mock(IncidentReportResponse.class);
+        when(report.reportedByUserId()).thenReturn(reporterId);
+        doReturn(report).when(guarded).getReport(incidentId);
+        when(jdbc.queryForObject(eq("select data_json from module_records where id=?"), eq(String.class), eq(incidentId)))
+                .thenReturn("{}");
+        when(jdbc.query(eq("select username from users where id=?"), any(RowMapper.class), eq(reporterId)))
+                .thenReturn(List.of("reporter"));
+
+        guarded.updateStatus(incidentId, reporterId,
+                new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã nhận"), false);
+        verify(jdbc).update(contains("update module_records set status"),
+                eq("ACKNOWLEDGED"), anyString(), eq(incidentId));
     }
 }

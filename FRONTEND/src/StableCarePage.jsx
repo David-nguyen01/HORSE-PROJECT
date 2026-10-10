@@ -214,11 +214,11 @@ export default function StableCarePage() {
         <NutritionView canEditPlan={true} />
       ) : (
         <>
-          {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
+          {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canEdit={canEditRoutine} />}
           {activeTab === 'training' && <TrainingPreparationView isStaff={isStaff} />}
           {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
           {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
-          {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
+          {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canUpdateStatus={isManager || isStaff} />}
           {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
         </>
       )}
@@ -1639,7 +1639,7 @@ function CreateNutritionPlanModal({ horseId, horseInfo, onClose, onSaved }) {
 // =========================================================================
 // 3. FR15: CARE TASKS & CHECKLIST
 // =========================================================================
-function CareTasksView({ isStaff, canEdit }) {
+function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
   const [tasks, setTasks] = useState([])
   const [selectedDate, setSelectedDate] = useState(today())
   const [activeFilter, setActiveFilter] = useState('ALL')
@@ -1987,7 +1987,8 @@ function CareTasksView({ isStaff, canEdit }) {
                         <Eye size={13} /> Xem ảnh
                       </a>
                     )}
-                    {task.status === 'PENDING' && (
+                    {task.status === 'PENDING' && (isManager || (isStaff && (task.assignedStaffId === currentUserId
+                      || (task.assignedStaffId == null && task.taskCategory === 'ROUTINE')))) && (
                       <button className="button primary" style={{ minHeight: '34px', fontSize: '11px' }} onClick={() => setCompletingTask(task)}>
                         <Check size={14} /> Hoàn thành
                       </button>
@@ -2232,7 +2233,7 @@ function CreateTaskModal({ onClose, onSaved }) {
 // =========================================================================
 // 4. FR16: EMERGENCY INCIDENT REPORT
 // =========================================================================
-function IncidentsView({ isStaff, canUpdateStatus }) {
+function IncidentsView({ isStaff, isManager, currentUserId, canUpdateStatus }) {
   const [incidents, setIncidents] = useState([])
   const [severityFilter, setSeverityFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -2352,7 +2353,7 @@ function IncidentsView({ isStaff, canUpdateStatus }) {
                       <Eye size={15} />
                     </a>
                   )}
-                  {canUpdateStatus && inc.status !== 'RESOLVED' && (
+                  {canUpdateStatus && (isManager || !isStaff || inc.reportedByUserId === currentUserId) && inc.status !== 'RESOLVED' && (
                     <button className="icon-button" title="Cập nhật tiến độ" onClick={() => setSelectedIncident(inc)}>
                       <FileText size={15} />
                     </button>

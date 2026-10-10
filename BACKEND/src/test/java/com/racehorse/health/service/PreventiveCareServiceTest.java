@@ -88,8 +88,10 @@ class PreventiveCareServiceTest {
                 "reminder_lead_days", 5
         );
 
-        when(jdbc.queryForList(contains("select * from preventive_care_schedules where id=? and cancelled_at is null"), eq(id)))
+        when(jdbc.queryForList(contains("select * from preventive_care_schedules with (UPDLOCK,HOLDLOCK) where id=?"), eq(id)))
                 .thenReturn(List.of(scheduleMap));
+        when(jdbc.update(contains("where id=? and completed_at is null and cancelled_at is null"),
+                eq(vetId), any(OffsetDateTime.class), eq("Completed without issue"), eq(id))).thenReturn(1);
 
         CompletePreventiveCareRequest req = new CompletePreventiveCareRequest(OffsetDateTime.now(), "Completed without issue");
 
@@ -106,7 +108,37 @@ class PreventiveCareServiceTest {
 
         // Verify current schedule was updated with completion details
         verify(jdbc).update(contains("update preventive_care_schedules set completed_by_user_id=?"),
-                eq(vetId), eq(req.performedAt()), eq("Completed without issue"), eq(response.nextScheduleId()), eq(id));
+                eq(vetId), eq(req.performedAt()), eq("Completed without issue"), eq(id));
+        verify(jdbc).update(contains("set next_schedule_id=?"), eq(response.nextScheduleId()), eq(id));
+    }
+
+    @Test
+    void completingAlreadyCompletedScheduleDoesNotCreateAnotherSuccessor() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (UPDLOCK,HOLDLOCK)"), eq(id)))
+                .thenReturn(List.of(Map.of("completed_at", OffsetDateTime.now())));
+
+        assertThatThrownBy(() -> service.complete(id, UUID.randomUUID(),
+                new CompletePreventiveCareRequest(OffsetDateTime.now(), "done")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("đã được hoàn thành");
+        verify(jdbc, never()).update(contains("insert into preventive_care_schedules"), any(Object[].class));
+    }
+
+    @Test
+    void failedConditionalCompletionDoesNotCreateRecurringSchedule() {
+        UUID id = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (UPDLOCK,HOLDLOCK)"), eq(id)))
+                .thenReturn(List.of(Map.of("recurrence_days", 30)));
+        when(jdbc.update(contains("where id=? and completed_at is null and cancelled_at is null"),
+                eq(actor), any(OffsetDateTime.class), anyString(), eq(id))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.complete(id, actor,
+                new CompletePreventiveCareRequest(OffsetDateTime.now(), "done")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("đã được xử lý");
+        verify(jdbc, never()).update(contains("insert into preventive_care_schedules"), any(Object[].class));
     }
 
     @Test

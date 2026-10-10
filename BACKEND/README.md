@@ -137,10 +137,11 @@ Luồng tiếp nhận dùng `intakeStatus` trong `HorseResponse`: `PENDING_WAITI
 | Chức năng | CLUB_MANAGER | HEAD_TRAINER | HORSE_OWNER | STABLE_STAFF | VETERINARIAN |
 |---|---:|---:|---:|---:|---:|
 | Quản lý tài khoản và role | Có | Không | Không | Không | Không |
-| Tạo/sửa/lưu trữ hồ sơ ngựa | Có | Có | Không | Không | Không |
+| Tạo hồ sơ ngựa | Có | Không | Có, ngựa của mình | Không | Không |
+| Sửa/lưu trữ hồ sơ quản trị | Có | Không | Chỉ sửa thông tin được phép của ngựa mình | Không | Không |
 | HLV tự tiếp nhận ngựa đã khám, đủ điều kiện và có ô chuồng | Không | Có | Không | Không | Không |
-| Quản lý tỷ lệ sở hữu | Có | Có | Không | Không | Không |
-| Tìm kiếm toàn bộ ngựa | Có | Có | Không | Không | Không |
+| Quản lý tỷ lệ sở hữu | Có | Không | Không | Không | Không |
+| Tìm kiếm ngựa | Toàn bộ | Chỉ ngựa đang phụ trách | Chỉ ngựa đang sở hữu | Theo điều kiện tiếp nhận | Theo điều kiện tiếp nhận |
 | Xem hồ sơ/phả hệ/lịch sử đua | Có | Có | Chỉ ngựa đang sở hữu | Không | Không |
 | Thêm/sửa kết quả đua lịch sử | Có | Có | Không | Không | Không |
 | Xem file hồ sơ chính | Có | Có | Có | Có | Có |
@@ -159,6 +160,10 @@ Luồng tiếp nhận dùng `intakeStatus` trong `HorseResponse`: `PENDING_WAITI
 | Xem thông báo của chính mình | Có | Có | Có | Có | Có |
 
 `CLUB_MANAGER` là admin nghiệp vụ. `HORSE_OWNER` bị kiểm tra quyền sở hữu theo dữ liệu `horse_ownerships`, không chỉ kiểm tra role trong JWT. Hồ sơ đã lưu trữ không xuất hiện trong tìm kiếm hoặc danh sách của chủ sở hữu.
+
+Với API chăm sóc, Owner chỉ đọc dữ liệu của ngựa mình sở hữu: `GET /api/care-tasks` và `GET /api/incidents` bắt buộc truyền `horseId`; API chi tiết, ảnh nhiệm vụ, dinh dưỡng và lịch sinh hoạt đều kiểm tra sở hữu trước khi trả dữ liệu. Các danh sách toàn câu lạc bộ (`/api/stables`, `/api/nutrition/*`, `/api/inventory/*`) không cấp cho Owner. Nhân viên và các role nghiệp vụ khác vẫn dùng quyền được phân trong ma trận RBAC.
+
+Hoàn thành nhiệm vụ chăm sóc (`POST /api/care-tasks/{id}/complete`): Stable Staff chỉ hoàn thành nhiệm vụ được giao cho chính mình; nhiệm vụ định kỳ chưa phân công là việc chung, người hoàn thành đầu tiên được ghi vào `assigned_staff_id`. Club Manager có thể hoàn thành thay khi cần; Head Trainer chỉ tạo/phân công/hủy, không đánh dấu hoàn thành; Stable Staff không tự tạo hoặc hủy nhiệm vụ. Cập nhật trạng thái sự cố (`PUT /api/incidents/{id}/status`, `POST /acknowledge`, `POST /dismiss`): Stable Staff chỉ thao tác báo cáo do mình gửi; Veterinarian và Club Manager có thể xử lý báo cáo của người khác.
 
 Các endpoint phân trang trả cấu trúc ổn định gồm `content` và `page` (`size`, `number`, `totalElements`, `totalPages`). Tham số `sort` có dạng `field,direction`, ví dụ `sort=name,asc`.
 
@@ -498,7 +503,7 @@ Module `training` chứa FR03–FR07; telemetry FR06 do Head Trainer nhập th�
 - `HORSE_OWNER`
 - `VETERINARIAN`
 
-`CLUB_MANAGER` là admin nghiệp vụ: quản lý tài khoản, gán role và quản lý dữ liệu câu lạc bộ. API chỉnh sửa hồ sơ ngựa dành cho `CLUB_MANAGER` và `HEAD_TRAINER`. `HORSE_OWNER` chỉ xem được ngựa có liên kết sở hữu thực tế trong database.
+`CLUB_MANAGER` là admin nghiệp vụ: quản lý tài khoản, gán role và quản lý dữ liệu câu lạc bộ. Chỉ Club Manager được tạo hồ sơ thay chủ ngựa, chuyển quyền sở hữu hoặc lưu trữ hồ sơ; Horse Owner có thể tạo và sửa các trường được phép trên ngựa của mình. Head Trainer không được thực hiện các thao tác quản trị hồ sơ này.
 
 Khi đổi role, `CLUB_MANAGER` gửi toàn bộ danh sách role thay thế tới `PUT /api/users/{id}/roles`. Danh sách phải có đúng một role. Chỉ tài khoản chưa có dữ liệu nghiệp vụ hoặc phân công mới được đổi role; phiên đăng nhập và thông báo không tính là nghiệp vụ. Quản lý câu lạc bộ không thể tự đổi role của chính mình. Gửi lại role hiện tại không thu hồi phiên và không ghi audit thay đổi giả.
 
@@ -528,7 +533,7 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 - `POST /api/horses/{horseId}/preventive-care` — bác sĩ tạo lịch, chu kỳ và số ngày báo trước.
 - `GET /api/horses/{horseId}/preventive-care` — xem và lọc lịch theo loại, trạng thái, khoảng ngày.
 - `PUT|DELETE /api/preventive-care/{id}` — bác sĩ sửa hoặc hủy lịch chưa hoàn thành.
-- `POST /api/preventive-care/{id}/complete` — bác sĩ xác nhận hoàn thành; lịch kế tiếp tự sinh nếu có `recurrenceDays`.
+- `POST /api/preventive-care/{id}/complete` — xác nhận hoàn thành; lịch kế tiếp tự sinh đúng một lần nếu có `recurrenceDays`. Các yêu cầu hoàn thành đồng thời được khóa theo lịch, yêu cầu đến sau nhận lỗi đã xử lý.
 - Job chạy 06:00 theo `app.club-time-zone`, tạo nhắc lịch đến hạn và báo cáo ngày cho chủ sở hữu. Báo cáo hiện dùng VND; phân bổ chi phí cho nhiều chủ sở hữu được để lại cho giai đoạn sau.
 
 ### Ma trận quyền và audit
@@ -553,7 +558,7 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 - `POST /api/inventory/replenishments/{id}/review` — body `{ "status": "APPROVED", "reviewNotes": "...", "receiveImmediately": false }`. Club Manager có thể duyệt trước hoặc vừa duyệt vừa xác nhận nhập kho; từ chối không thay đổi tồn.
 - `POST /api/inventory/replenishments/{id}/receive` — body `{ "catalogItemId": null, "referencePriceVnd": 45000, "minThreshold": 10, "location": "Kho A" }`. Chỉ áp dụng đề xuất `APPROVED`; tăng tồn đúng một lần và đổi thành `FULFILLED`. Nếu đề xuất là vật tư mới, API tạo mặt hàng mới khi nhập kho hoặc gắn với `catalogItemId` cùng danh mục/đơn vị.
 - `/api/financial-transactions` — ghi sổ thu/chi VND, tra cứu và tổng hợp. Giao dịch là sổ cái chỉ thêm, không sửa/xóa.
-- `/api/races` — CRUD giải đua; đăng ký, xác nhận và rút đăng ký ngựa.
+- `/api/races` — Club Manager tạo/sửa/ngừng/hoàn thành giải đua. Head Trainer đăng ký, xác nhận sau khi chủ ngựa duyệt và rút đăng ký chỉ cho ngựa mình đang phụ trách; Club Manager có thể thao tác đăng ký toàn CLB. Horse Owner chỉ duyệt/từ chối đăng ký của ngựa mình, không thể xác nhận chính thức. Danh sách đăng ký của Head Trainer được lọc theo ngựa đang phụ trách và còn đủ điều kiện dịch vụ.
 - `/api/owner-reports` — xem, tạo và tải báo cáo JSON. Job 06:00 tạo báo cáo ngày và thông báo cho chủ sở hữu.
 - `/api/trial-run-bookings` — đặt, xem danh sách và hủy lượt chạy thử.
 - `/api/files` — upload, xem metadata và xóa file Cloudinary dùng chung; chỉ nhận ảnh, PDF hoặc DOCX.

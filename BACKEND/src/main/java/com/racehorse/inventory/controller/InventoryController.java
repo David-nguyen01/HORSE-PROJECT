@@ -25,7 +25,7 @@ public class InventoryController {
     // ==================== ITEMS ====================
 
     @GetMapping("/items")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public List<InventoryItemResponse> listItems(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Boolean lowStockOnly,
@@ -34,7 +34,7 @@ public class InventoryController {
     }
 
     @GetMapping("/items/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public InventoryItemResponse getItem(@PathVariable UUID id) {
         return service.getItem(id);
     }
@@ -84,7 +84,7 @@ public class InventoryController {
     }
 
     @GetMapping("/usage")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') or hasRole('CLUB_MANAGER')")
+    @PreAuthorize("(hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') or hasRole('CLUB_MANAGER')) and !hasRole('HORSE_OWNER')")
     public List<InventoryUsageResponse> listUsage(@RequestParam(defaultValue = "20") int limit) {
         return service.listUsage(limit);
     }
@@ -92,14 +92,14 @@ public class InventoryController {
     // ==================== REPLENISHMENTS ====================
 
     @GetMapping("/replenishments")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public List<ReplenishmentResponse> listReplenishments(
             @RequestParam(required = false) String status) {
         return service.listReplenishments(status);
     }
 
     @GetMapping("/replenishments/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public ReplenishmentResponse getReplenishment(@PathVariable UUID id) {
         return service.getReplenishment(id);
     }

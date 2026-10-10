@@ -37,11 +37,58 @@ class RaceEventOwnerAccessTest {
         UUID ownerId = UUID.randomUUID();
 
         new RaceEventService(jdbc, json, measurement, horseAccess)
-                .registrations(null, null, null, ownerId);
+                .registrations(null, null, null, ownerId, null);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(jdbc).query(sql.capture(), any(RowMapper.class), eq(new Object[]{ownerId}));
         assertThat(sql.getValue()).contains("horse_ownerships ho", "ho.owner_id=?");
+    }
+
+    @Test
+    void trainerListIsScopedToAssignedActiveHorses() {
+        UUID trainerId = UUID.randomUUID();
+        when(jdbc.query(any(String.class), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        new RaceEventService(jdbc, json, measurement, horseAccess)
+                .registrations(null, null, null, null, trainerId);
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), eq(new Object[]{trainerId}));
+        assertThat(sql.getValue()).contains("h.current_trainer_id=?", "h.archived_at is null",
+                "h.intake_status='STABLED'", "h.payment_status='PAID'");
+    }
+
+    @Test
+    void trainerCannotRegisterAnotherTrainersHorse() {
+        UUID eventId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        doReturn(event(eventId, null)).when(service).event(eventId);
+        doThrow(new ResourceNotFoundException("not assigned"))
+                .when(horseAccess).requireTrainingAccess(horseId, trainerId, false, true, false);
+
+        assertThatThrownBy(() -> service.register(eventId, horseId, trainerId, null, false))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(jdbc, never()).update(any(String.class), any(Object[].class));
+    }
+
+    @Test
+    void trainerCannotConfirmOrWithdrawAnotherTrainersRegistration() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        doReturn(registration(registrationId, horseId, "APPROVE", UUID.randomUUID()))
+                .when(service).registration(registrationId);
+        doThrow(new ResourceNotFoundException("not assigned"))
+                .when(horseAccess).requireTrainingAccess(horseId, trainerId, false, true, false);
+
+        assertThatThrownBy(() -> service.confirm(registrationId, trainerId, false))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> service.withdraw(registrationId, trainerId, false))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(jdbc, never()).update(any(String.class), any(Object[].class));
     }
 
     @Test
@@ -86,7 +133,7 @@ class RaceEventOwnerAccessTest {
         doReturn(reg).when(service).registration(registrationId);
         doReturn(event(eventId, null)).when(service).event(eventId);
 
-        assertThatThrownBy(() -> service.confirm(registrationId))
+        assertThatThrownBy(() -> service.confirm(registrationId, UUID.randomUUID(), true))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Đăng ký đang chờ chủ ngựa duyệt, chưa thể xác nhận");
     }
@@ -101,7 +148,7 @@ class RaceEventOwnerAccessTest {
         doReturn(reg).when(service).registration(registrationId);
         doReturn(event(eventId, null)).when(service).event(eventId);
 
-        service.confirm(registrationId);
+        service.confirm(registrationId, UUID.randomUUID(), true);
 
         verify(jdbc).update(contains("status='CONFIRMED'"), any(String.class), eq(registrationId));
     }
@@ -116,7 +163,7 @@ class RaceEventOwnerAccessTest {
         doReturn(reg).when(service).registration(registrationId);
         doReturn(event(eventId, OffsetDateTime.now())).when(service).event(eventId);
 
-        assertThatThrownBy(() -> service.confirm(registrationId))
+        assertThatThrownBy(() -> service.confirm(registrationId, UUID.randomUUID(), true))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Không thể xác nhận đăng ký khi giải đua đã hoàn thành");
     }
@@ -132,7 +179,7 @@ class RaceEventOwnerAccessTest {
         doReturn(reg).when(service).registration(registrationId);
         doReturn(event(eventId, null)).when(service).event(eventId);
 
-        assertThatThrownBy(() -> service.withdraw(registrationId, actor))
+        assertThatThrownBy(() -> service.withdraw(registrationId, actor, true))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Không thể rút đăng ký đã được xác nhận");
     }
@@ -148,7 +195,7 @@ class RaceEventOwnerAccessTest {
         doReturn(reg).when(service).registration(registrationId);
         doReturn(event(eventId, OffsetDateTime.now())).when(service).event(eventId);
 
-        assertThatThrownBy(() -> service.withdraw(registrationId, actor))
+        assertThatThrownBy(() -> service.withdraw(registrationId, actor, true))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Không thể rút đăng ký sau khi giải đua đã hoàn thành");
     }
@@ -164,7 +211,7 @@ class RaceEventOwnerAccessTest {
         doReturn(reg).when(service).registration(registrationId);
         doReturn(event(eventId, null)).when(service).event(eventId);
 
-        service.withdraw(registrationId, actor);
+        service.withdraw(registrationId, actor, true);
 
         verify(jdbc).update(contains("status='WITHDRAWN'"), any(String.class), eq(actor.toString()), eq(registrationId));
     }
@@ -182,7 +229,7 @@ class RaceEventOwnerAccessTest {
         when(jdbc.queryForObject(contains("e.completed_at is null"), eq(Integer.class), eq(horseId)))
                 .thenReturn(1);
 
-        assertThatThrownBy(() -> service.register(eventId, horseId, UUID.randomUUID(), null))
+        assertThatThrownBy(() -> service.register(eventId, horseId, UUID.randomUUID(), null, true))
                 .isInstanceOf(BusinessException.class).hasMessageContaining("chưa hoàn thành");
         verify(jdbc, never()).update(contains("insert into module_records"), any(Object[].class));
     }

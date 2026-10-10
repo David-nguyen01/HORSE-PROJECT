@@ -20,20 +20,20 @@ public class NutritionOverviewController {
     }
 
     @GetMapping("/standard-plans")
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public List<Map<String, Object>> getStandardPlans() {
         return service.listStandardPlans();
     }
 
     @GetMapping("/horses-active")
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public List<Map<String, Object>> getHorsesActive(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.listHorsesActivePlans(date);
     }
 
     @GetMapping("/stables-workload")
-    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public Map<String, Object> getStablesWorkload(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.getStableWorkload(date);

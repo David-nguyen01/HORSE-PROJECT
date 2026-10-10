@@ -143,13 +143,23 @@ public class CareTaskService {
 
     @Transactional
     public CareTaskResponse completeTask(UUID taskId, UUID actor, CompleteCareTaskRequest request) {
+        return completeTask(taskId, actor, request, false);
+    }
+
+    @Transactional
+    public CareTaskResponse completeTask(UUID taskId, UUID actor, CompleteCareTaskRequest request, boolean manager) {
         String notes = request == null || request.notes() == null ? null : request.notes().trim();
         String photoUrl = request == null || request.photoUrl() == null ? null : request.photoUrl().trim();
-        return executeCompleteTask(taskId, actor, notes, photoUrl, null, null);
+        return executeCompleteTask(taskId, actor, notes, photoUrl, null, null, manager);
     }
 
     @Transactional
     public CareTaskResponse completeTask(UUID taskId, UUID actor, String notes, MultipartFile file) {
+        return completeTask(taskId, actor, notes, file, false);
+    }
+
+    @Transactional
+    public CareTaskResponse completeTask(UUID taskId, UUID actor, String notes, MultipartFile file, boolean manager) {
         String cleanNotes = notes == null ? null : notes.trim();
         byte[] photoBytes = null;
         String contentType = null;
@@ -171,11 +181,12 @@ public class CareTaskService {
             photoUrl = "/api/care-tasks/" + taskId + "/photo";
         }
 
-        return executeCompleteTask(taskId, actor, cleanNotes, photoUrl, photoBytes, contentType);
+        return executeCompleteTask(taskId, actor, cleanNotes, photoUrl, photoBytes, contentType, manager);
     }
 
     private CareTaskResponse executeCompleteTask(
-            UUID taskId, UUID actor, String notes, String photoUrl, byte[] photoBytes, String photoContentType) {
+            UUID taskId, UUID actor, String notes, String photoUrl, byte[] photoBytes, String photoContentType,
+            boolean manager) {
         CareTaskResponse existing = getTask(taskId);
         if ("COMPLETED".equals(existing.status())) {
             throw new BusinessException("Nhiệm vụ này đã được hoàn thành trước đó");
@@ -183,16 +194,21 @@ public class CareTaskService {
         if ("CANCELLED".equals(existing.status())) {
             throw new BusinessException("Không thể hoàn thành nhiệm vụ đã bị hủy");
         }
+        boolean sharedRoutine = existing.assignedStaffId() == null && "ROUTINE".equals(existing.taskCategory());
+        if (!manager && !actor.equals(existing.assignedStaffId()) && !sharedRoutine) {
+            throw new BusinessException("Bạn không được phân công nhiệm vụ chăm sóc này");
+        }
 
         List<String> names = jdbc.query(
                 "SELECT username FROM dbo.users WHERE id = ?",
                 (rs, rn) -> rs.getString("username"), actor);
         String staffName = names.isEmpty() ? "Nhân viên chuồng" : names.getFirst();
 
-        jdbc.update(
+        int updated = jdbc.update(
                 """
                 UPDATE dbo.care_tasks
                 SET status = 'COMPLETED',
+                    assigned_staff_id = CASE WHEN ? = 1 THEN assigned_staff_id ELSE COALESCE(assigned_staff_id, ?) END,
                     completed_at = SYSDATETIMEOFFSET(),
                     completed_by_user_id = ?,
                     completed_by_name = ?,
@@ -201,10 +217,16 @@ public class CareTaskService {
                     photo_bytes = ?,
                     photo_content_type = ?,
                     updated_at = SYSDATETIMEOFFSET()
-                WHERE id = ?
+                WHERE id = ? AND status = 'PENDING'
+                  AND (? = 1 OR assigned_staff_id = ?
+                       OR (assigned_staff_id IS NULL AND task_category = 'ROUTINE'))
                 """,
-                actor, staffName, notes, photoUrl, photoBytes, photoContentType, taskId
+                manager, actor, actor, staffName, notes, photoUrl, photoBytes, photoContentType,
+                taskId, manager, actor
         );
+        if (updated != 1) {
+            throw new BusinessException("Nhiệm vụ đã thay đổi trạng thái hoặc không còn được phân công cho bạn");
+        }
 
         return getTask(taskId);
     }
@@ -238,9 +260,12 @@ public class CareTaskService {
         if ("COMPLETED".equals(existing.status())) {
             throw new BusinessException("Không thể hủy nhiệm vụ đã hoàn thành");
         }
-        jdbc.update(
-                "UPDATE dbo.care_tasks SET status = 'CANCELLED', updated_at = SYSDATETIMEOFFSET() WHERE id = ?",
+        int updated = jdbc.update(
+                "UPDATE dbo.care_tasks SET status = 'CANCELLED', updated_at = SYSDATETIMEOFFSET() WHERE id = ? AND status = 'PENDING'",
                 taskId);
+        if (updated != 1) {
+            throw new BusinessException("Nhiệm vụ đã thay đổi trạng thái; không thể hủy");
+        }
         return getTask(taskId);
     }
 

@@ -84,8 +84,11 @@ public class RaceEventService {
     }
 
     @Transactional
-    public RegistrationView register(UUID eventId, UUID horseId, UUID actor, BigDecimal registeredWeight) {
+    public RegistrationView register(UUID eventId, UUID horseId, UUID actor, BigDecimal registeredWeight,
+                                     boolean manager) {
         EventView event = event(eventId);
+        requireRegistrationAccess(horseId, actor, manager);
+        horseAccess.requireTrainingReady(horseId);
         // Serialize registrations for one horse across different race events.
         jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
         if (!event.active()) throw new BusinessException("Giải đua đã ngừng nhận đăng ký");
@@ -119,9 +122,10 @@ public class RaceEventService {
     }
 
     @Transactional
-    public RegistrationView confirm(UUID registrationId) {
+    public RegistrationView confirm(UUID registrationId, UUID actor, boolean manager) {
         jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
         RegistrationView value = registration(registrationId);
+        requireRegistrationAccess(value.horseId(), actor, manager);
         EventView event = event(value.raceEventId());
         if (!event.active()) throw new BusinessException("Giải đua đã ngừng kích hoạt");
         if (event.completedAt() != null) throw new BusinessException("Không thể xác nhận đăng ký khi giải đua đã hoàn thành");
@@ -173,9 +177,10 @@ public class RaceEventService {
     }
 
     @Transactional
-    public RegistrationView withdraw(UUID registrationId, UUID actor) {
+    public RegistrationView withdraw(UUID registrationId, UUID actor, boolean manager) {
         jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
         RegistrationView value = registration(registrationId);
+        requireRegistrationAccess(value.horseId(), actor, manager);
         EventView event = event(value.raceEventId());
         if (event.completedAt() != null) {
             throw new BusinessException("Không thể rút đăng ký sau khi giải đua đã hoàn thành");
@@ -208,15 +213,26 @@ public class RaceEventService {
     }
 
     @Transactional(readOnly = true)
-    public List<RegistrationView> registrations(UUID eventId, UUID horseId, String status, UUID ownerId) {
+    public List<RegistrationView> registrations(UUID eventId, UUID horseId, String status, UUID ownerId,
+                                                UUID trainerId) {
         StringBuilder sql = new StringBuilder(registrationSelect()).append(" where m.module_code='RACING' and m.record_type='RACE_REGISTRATION'");
         List<Object> args = new ArrayList<>();
         if (eventId != null) { sql.append(" and JSON_VALUE(m.data_json,'$.raceEventId')=?"); args.add(eventId.toString()); }
         if (horseId != null) { sql.append(" and m.horse_id=?"); args.add(horseId); }
         if (status != null && !status.isBlank()) { sql.append(" and m.status=?"); args.add(status.trim().toUpperCase(Locale.ROOT)); }
         if (ownerId != null) { sql.append(" and exists (select 1 from horse_ownerships ho where ho.horse_id=m.horse_id and ho.owner_id=?)"); args.add(ownerId); }
+        if (trainerId != null) {
+            sql.append(" and h.current_trainer_id=? and h.archived_at is null and h.intake_status='STABLED'");
+            sql.append(" and (h.service_override=1 or (h.payment_status='PAID' "
+                    + "and (h.paid_until is null or h.paid_until>=cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date))))");
+            args.add(trainerId);
+        }
         sql.append(" order by m.created_at desc");
         return jdbc.query(sql.toString(), (rs,row)->registration(rs,row), args.toArray());
+    }
+
+    private void requireRegistrationAccess(UUID horseId, UUID actor, boolean manager) {
+        horseAccess.requireTrainingAccess(horseId, actor, manager, !manager, false);
     }
 
     @Transactional(readOnly = true)
