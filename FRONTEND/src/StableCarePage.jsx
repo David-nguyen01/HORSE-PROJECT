@@ -791,7 +791,7 @@ function TrainingPreparationView({ isStaff }) {
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Clock size={13} />
-                      <span>{formatVNDate(item.sessionDate)} · {item.startTime || '05:00'} - {item.endTime || '11:00'}</span>
+                      <span>{formatVNDate(item.sessionDate)} · {item.startTime || '06:00'} - {item.endTime || '07:00'}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <MapPin size={13} />

@@ -1,12 +1,16 @@
 param(
     [string]$SqlServer = "localhost,1433",
     [string]$SqlUsername = "sa",
-    [string]$SqlPassword = "sa12345",
+    [string]$SqlPassword = "",
     [switch]$UseWindowsAuth,
     [string]$Script = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $UseWindowsAuth -and [string]::IsNullOrWhiteSpace($SqlPassword)) {
+    throw "Specify -SqlPassword for SQL Authentication, or use -UseWindowsAuth."
+}
 
 $sqlcmdCommand = Get-Command sqlcmd -ErrorAction SilentlyContinue
 if (-not $sqlcmdCommand) {

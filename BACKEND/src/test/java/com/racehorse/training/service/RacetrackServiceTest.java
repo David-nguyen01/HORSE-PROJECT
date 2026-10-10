@@ -16,12 +16,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -67,10 +70,40 @@ class RacetrackServiceTest {
                 any(), any(), any())).thenReturn(List.of(booking));
 
         List<TrackLaneAvailabilityResponse> availability =
-                service.availability(trackId, LocalDate.of(2026, 9, 16));
+                service.availability(trackId, LocalDate.of(2026, 9, 16), LocalTime.of(6, 0));
 
         assertThat(availability).extracting(TrackLaneAvailabilityResponse::laneNumber)
                 .containsExactly(1, 3, 4);
         assertThat(availability).allMatch(lane -> lane.date().equals(LocalDate.of(2026, 9, 16)));
+    }
+
+    @Test
+    void lastSlotChecksOnlyFrom23ToMidnight() {
+        UUID trackId = UUID.randomUUID();
+        LocalDate date = LocalDate.of(2026, 9, 16);
+        Racetrack track = new Racetrack("Track", null);
+        ReflectionTestUtils.setField(track, "id", trackId);
+        when(trackRepository.findById(trackId)).thenReturn(java.util.Optional.of(track));
+        when(laneRepository.findByRacetrackIdOrderByLaneNumberAsc(trackId)).thenReturn(List.of());
+        when(bookingRepository.findByLaneRacetrackIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
+                any(), any(), any())).thenReturn(List.of());
+
+        service.availability(trackId, date, LocalTime.of(23, 0));
+
+        var start = date.atTime(23, 0).atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        verify(bookingRepository).findByLaneRacetrackIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
+                eq(trackId), eq(start.plusSeconds(3600)), eq(start));
+    }
+
+    @Test
+    void rejectsAvailabilityForNonHourlyOrClosedSlots() {
+        UUID trackId = UUID.randomUUID();
+        Racetrack track = new Racetrack("Track", null);
+        ReflectionTestUtils.setField(track, "id", trackId);
+        when(trackRepository.findById(trackId)).thenReturn(java.util.Optional.of(track));
+        assertThatThrownBy(() -> service.availability(trackId, LocalDate.of(2026, 9, 16), LocalTime.of(5, 0)))
+                .isInstanceOf(InvalidInputException.class);
+        assertThatThrownBy(() -> service.availability(trackId, LocalDate.of(2026, 9, 16), LocalTime.of(6, 30)))
+                .isInstanceOf(InvalidInputException.class);
     }
 }

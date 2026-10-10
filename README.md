@@ -20,18 +20,18 @@ Xem hướng dẫn riêng trong từng thư mục để cài đặt và chạy t
 Yêu cầu trên máy:
 
 - SQL Server chạy tại `localhost:1433`, bật SQL Authentication.
-- Database `racehorse` đã được tạo bằng các script trong `DATABASE` theo đúng thứ tự ghi trong `DATABASE/README.md`.
+- Công cụ `sqlcmd` và SQL Server cục bộ tại `localhost:1433`.
 - Java 21 trở lên, Maven, Node.js và npm.
 
 Lần đầu mở project:
 
 1. Mở đúng thư mục gốc `HORSE-PROJECT` bằng VS Code.
-2. Cài các extension được VS Code đề xuất cho Java, Spring Boot và Maven.
-3. Nếu chưa có database, chọn **Terminal → Run Task → Database: initialize local**. Task này chạy file tổng `DATABASE/racehorse_database_full.sql`.
-4. Chọn **Terminal → Run Task → Frontend: install dependencies** một lần.
-5. Mở **Run and Debug**, chọn **Full Stack (Local)** rồi nhấn `F5`.
+2. Cài Java 21, Maven và Node.js; cài extension Java/Spring Boot trong VS Code nếu cần.
+3. Khởi tạo `racehorse_local` theo [DATABASE/README.md](DATABASE/README.md). Script `DATABASE/setup-local.ps1` chạy các file SQL theo đúng thứ tự; **không dùng `-RecreateDatabase` khi muốn giữ dữ liệu hiện có**.
+4. Tạo biến môi trường `JWT_SECRET` theo [BACKEND/README.md](BACKEND/README.md), rồi trong thư mục `BACKEND` chạy `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`.
+5. Trong thư mục `FRONTEND`, chạy `npm install` (lần đầu) rồi `npm run dev`.
 
-VS Code sẽ chạy backend tại `http://localhost:8080` và frontend tại `http://localhost:5173`. Backend mặc định trỏ tới Azure SQL; mật khẩu phải được cung cấp qua biến môi trường `DB_PASSWORD`. Khi cần chạy SQL Server local, ghi đè `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` trong môi trường local, không commit credential vào repository.
+Backend chạy tại `http://localhost:8080`, frontend tại `http://localhost:5173`. Profile `local` trỏ `racehorse_local`; profile mặc định dành cho môi trường được cấu hình bằng `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` và `JWT_SECRET`. Không để credential thật trong source.
 
 Tài khoản quản lý mặc định sau khi chạy seed database:
 

@@ -67,8 +67,9 @@ export const vetApi = {
       body: JSON.stringify(payload),
     }),
 
-  // Medical Queue Workflow (PAID -> IN_MEDICAL -> PENDING_TRAINING)
+  // Shared waiting room: first veterinarian to receive an unclaimed horse takes the case.
   getMedicalQueue: () => api('/api/medical/queue'),
+  getMedicalQueueOverview: () => api('/api/medical/queue/overview'),
   getMyAssignments: () => api('/api/medical/queue/my-assignments'),
   receiveMedicalQueue: (horseId) =>
     api(`/api/medical/queue/${horseId}/receive`, {

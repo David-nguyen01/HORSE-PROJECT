@@ -23,14 +23,14 @@ Tài liệu này là đặc tả chuẩn quản trị cơ sở dữ liệu cho d
 
 ## 2. DATABASE STRUCTURE (MODULAR BASELINE)
 
-Thư mục `DATABASE/` được chuẩn hóa thành 11 script baseline độc lập, sạch sẽ và có thứ tự thực thi rõ ràng:
+Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`35`) được `setup-local.ps1` áp dụng sau baseline:
 
 ```text
 DATABASE/
 ├── 00_create_database.sql          # Khởi tạo DB racehorse_local, collation & login racehorse_local_app
 ├── 01_core_auth.sql                # Người dùng (users, wallet, plan), user_roles, login_sessions, role_permissions
 ├── 02_horses_and_profiles.sql      # Hồ sơ ngựa, phả hệ thủ công, cân nặng, gói dịch vụ, quyền sở hữu, file đính kèm
-├── 03_facilities.sql               # Chuồng trại (stables), sân tập (racetracks 05:00-11:00), 4 làn chạy/sân (racetrack_lanes)
+├── 03_facilities.sql               # Chuồng trại, sân tập 06:00-00:00, 4 làn chạy/sân
 ├── 04_training_management.sql      # Kế hoạch/giai đoạn tập, khóa an toàn (training_locks), lịch tập (schedules), đặt làn & đánh giá
 ├── 05_health_and_care.sql          # Định nghĩa quy trình chăm sóc (definitions), việc chăm sóc (care_tasks), lịch phòng ngừa
 ├── 06_telemetry_and_alerts.sql     # Ngưỡng sinh trắc, phiên đo dữ liệu (telemetry_sessions), chỉ số (readings), cảnh báo
@@ -38,6 +38,10 @@ DATABASE/
 ├── 08_compact_records.sql          # Kho lưu trữ bán cấu trúc đa năng (module_records) & đơn nạp tiền ví PayOS
 ├── 09_seed_reference_data.sql      # Dữ liệu danh mục: 5 tài khoản role chuẩn, ma trận 54 quyền RBAC, 2 chuồng, 10 sân tập (40 làn), 5 quy trình
 ├── 10_seed_demo_data.sql           # Dữ liệu nghiệp vụ mẫu: 3 ngựa (H01, H02, H03), ô chuồng, khẩu phần, care tasks hôm nay, telemetry, tài chính
+├── 32_stall_assignment_concurrency_lock.sql # Chống phân ô trùng khi đồng thời
+├── 33_race_registration_lifecycle_integrity.sql # Ràng buộc trạng thái đăng ký đua
+├── 34_hourly_racetrack_slots.sql   # Nâng cấp DB đã tồn tại sang slot 1 giờ
+├── 35_horse_intake_workflow.sql     # Tách trạng thái tiếp nhận khỏi trạng thái thanh toán, giữ phân chuồng cũ
 ├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
 ├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
 ├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên
@@ -60,15 +64,15 @@ DATABASE/
    - Bảng `dbo.stored_files` & `dbo.horse_profile_files`: Lưu trữ siêu dữ liệu Cloudinary cho ảnh hồ sơ, tài liệu phê duyệt và file báo cáo.
 4. **`03_facilities.sql`**
    - Bảng `dbo.stables`: Danh mục khu chuồng nuôi.
-   - Bảng `dbo.racetracks`: Cố định khung giờ hoạt động tiêu chuẩn từ `05:00:00` đến `11:00:00`.
+   - Bảng `dbo.racetracks`: Mở `06:00:00`, đóng `00:00:00` ngày hôm sau; slot 60 phút, bắt đầu mỗi giờ từ 06:00 đến 23:00.
    - Bảng `dbo.racetrack_lanes`: Mỗi sân tập có đúng 4 làn chạy được đánh số từ 1 đến 4.
 5. **`04_training_management.sql`**
    - Bảng `dbo.training_plans` & `dbo.training_plan_phases`: Kế hoạch và các giai đoạn tập luyện (`rest_days_json` lưu dạng JSON).
    - Bảng `dbo.training_locks`: Quản lý khóa huấn luyện an toàn (cột `reason`, `review_date`, `release_reason`), ngăn xếp lịch bài tập nặng khi ngựa đang có khóa chưa mở.
    - Bảng `dbo.training_schedules`: Lịch tập huấn luyện. Không còn phụ thuộc gán người trực tiếp trên lịch; kiểm soát trạng thái phiên tập theo `ck_training_v3_session_status` hỗ trợ `PREPARING`, `READY`, `IN_PROGRESS`, `COMPLETED`, `INJURED`, `EMERGENCY_STOPPED`.
-   - Bảng `dbo.trial_run_bookings`: Ràng buộc đặt làn chạy độc quyền trong ngày cho mỗi buổi tập.
+   - Bảng `dbo.trial_run_bookings`: Ràng buộc đặt làn chạy độc quyền trong cùng slot 1 giờ; làn có thể dùng ở slot khác.
    - Bảng `dbo.training_evaluations`: Lưu trữ đầy đủ các chỉ số chạy, nhịp tim, hồi phục (không có cột `training_load`), `perceived_exertion` (1..10, nullable).
-   - Triggers: Ràng buộc khung giờ 05:00–11:00 (`tr_enforce_training_window`), chống trùng lịch tập trên làn (`tr_trial_run_bookings_no_lane_overlap`), kiểm soát khớp ngựa và kế hoạch còn hạn (`tr_training_schedules_plan_and_lock`), chặn đánh giá kế hoạch hết hạn (`tr_training_evaluations_plan_expiry`).
+   - Triggers: Ràng buộc slot 1 giờ trong khung 06:00–00:00 (`tr_enforce_training_window`), chống trùng slot trên làn (`tr_trial_run_bookings_no_lane_overlap`), kiểm soát khớp ngựa và kế hoạch còn hạn (`tr_training_schedules_plan_and_lock`), chặn đánh giá kế hoạch hết hạn (`tr_training_evaluations_plan_expiry`).
 6. **`05_health_and_care.sql`**
    - Bảng `dbo.care_routine_definitions`: 5 quy trình chăm sóc tiêu chuẩn hàng ngày.
    - Bảng `dbo.care_tasks`: Các nhiệm vụ chăm sóc thực tế theo ngày dành cho `STABLE_STAFF` (hỗ trợ ghi chú hoàn thành và hình ảnh xác thực).
@@ -98,12 +102,14 @@ DATABASE/
 Chạy lệnh sau từ thư mục gốc của dự án hoặc trong thư mục `DATABASE/`:
 
 ```powershell
-# Chạy với Windows Authentication (khuyến nghị cho local SQL Server Express / Developer)
-powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -UseWindowsAuth -RecreateDatabase
+# Lần đầu khởi tạo hoặc nâng cấp DB hiện có, giữ nguyên dữ liệu:
+powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -UseWindowsAuth
 
 # Hoặc chạy với tài khoản sa nếu muốn dùng SQL Authentication:
-powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -SqlServer "localhost,1433" -SqlUsername "sa" -SqlPassword "sa12345" -RecreateDatabase
+powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -SqlServer "localhost,1433" -SqlUsername "sa" -SqlPassword "<mật khẩu SQL Server của bạn>"
 ```
+
+Chỉ dùng `-RecreateDatabase` khi chủ động muốn **xóa toàn bộ dữ liệu cũ**. Các bản vá `32`–`35` hướng tới `racehorse_local`; không chạy chúng trực tiếp trên Azure. Dữ liệu lịch 05:00–11:00 cũ được giữ nguyên khi nâng cấp; lịch tương lai cần được kiểm tra và chuyển thủ công sang slot mới nếu còn dùng.
 
 ### Bước 2: Kiểm tra cấu hình Backend (`application-local.properties`)
 
@@ -114,7 +120,7 @@ spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=racehorse_loc
 spring.datasource.username=racehorse_local_app
 spring.datasource.password=${RACEHORSE_LOCAL_DB_PASSWORD:LocalApp@123}
 app.payos.gateway=${PAYOS_GATEWAY:fake}
-app.jwt.secret=${JWT_SECRET:cmFjZWhvcnNlLWRldmVsb3BtZW50LWtleS1jaGFuZ2UtbWUtbm93}
+app.jwt.secret=${JWT_SECRET}
 ```
 
 ### Bước 3: Khởi chạy Backend với profile `local`

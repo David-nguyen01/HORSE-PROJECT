@@ -12,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDate;
 
 public interface HorseRepository extends JpaRepository<Horse, UUID> {
 
@@ -48,22 +49,41 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
     @Query("""
             select h from Horse h
             where h.archivedAt is null and h.currentTrainer.id = :trainerId
+              and h.intakeStatus = 'STABLED'
+              and (h.serviceOverride = true or (h.paymentStatus = 'PAID'
+                   and (h.paidUntil is null or h.paidUntil >= :today)))
               and (:query is null or lower(h.code) like lower(concat('%', :query, '%'))
                    or lower(h.name) like lower(concat('%', :query, '%')))
               and (:status is null or h.status = :status)
             """)
     Page<Horse> searchForTrainer(@Param("query") String query, @Param("status") HorseStatus status,
-                                @Param("trainerId") UUID trainerId, Pageable pageable);
+                                @Param("trainerId") UUID trainerId, @Param("today") LocalDate today,
+                                Pageable pageable);
 
     @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer", "caretaker", "diagnosingVet"})
     @Query("""
             select h from Horse h
             where h.archivedAt is null
+              and h.intakeStatus in ('WAITING_FOR_VET', 'IN_MEDICAL', 'PENDING_STALL', 'STABLED')
               and (h.serviceOverride = true
-                   or h.paymentStatus in ('PAID', 'IN_MEDICAL', 'PENDING_TRAINING', 'TRAINING', 'ACTIVE'))
+                   or (h.paymentStatus = 'PAID'
+                       and (h.paidUntil is null or h.paidUntil >= :today)))
             order by h.name asc
             """)
-    List<Horse> findEligibleForMedical();
+    List<Horse> findEligibleForMedical(@Param("today") LocalDate today);
+
+    @Query("""
+            select h from Horse h
+            where h.archivedAt is null
+              and h.intakeStatus in ('WAITING_FOR_VET', 'IN_MEDICAL', 'PENDING_STALL', 'STABLED')
+              and (h.serviceOverride = true or (h.paymentStatus = 'PAID'
+                   and (h.paidUntil is null or h.paidUntil >= :today)))
+              and (:query is null or lower(h.code) like lower(concat('%', :query, '%'))
+                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:status is null or h.status = :status)
+            """)
+    Page<Horse> searchForVeterinarian(@Param("query") String query, @Param("status") HorseStatus status,
+                                     @Param("today") LocalDate today, Pageable pageable);
 
     @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
     @Query("""
@@ -80,7 +100,8 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             select h from Horse h
             where h.archivedAt is null
               and (h.serviceOverride = true
-                   or h.paymentStatus in ('PAID', 'IN_MEDICAL', 'PENDING_TRAINING', 'TRAINING', 'ACTIVE'))
+                   or (h.paymentStatus = 'PAID'
+                       and (h.paidUntil is null or h.paidUntil >= :today)))
               and (:query is null
                    or lower(h.code) like lower(concat('%', :query, '%'))
                    or lower(h.name) like lower(concat('%', :query, '%')))
@@ -89,5 +110,6 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
     Page<Horse> searchPaidOnly(
             @Param("query") String query,
             @Param("status") HorseStatus status,
+            @Param("today") LocalDate today,
             Pageable pageable);
 }

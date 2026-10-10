@@ -95,6 +95,9 @@ public class Horse extends BaseEntity {
     @Column(name = "payment_status", length = 20)
     private String paymentStatus = "UNPAID";
 
+    @Column(name = "intake_status", nullable = false, length = 20)
+    private String intakeStatus = "PENDING_WAITING_ROOM";
+
     @Column(name = "service_override")
     private Boolean serviceOverride = false;
 
@@ -250,6 +253,14 @@ public class Horse extends BaseEntity {
 
     public void setPaymentStatus(String paymentStatus) {
         this.paymentStatus = paymentStatus;
+    }
+
+    public String getIntakeStatus() {
+        return intakeStatus == null ? "PENDING_WAITING_ROOM" : intakeStatus;
+    }
+
+    public void setIntakeStatus(String intakeStatus) {
+        this.intakeStatus = intakeStatus;
     }
 
     public Boolean getServiceOverride() {

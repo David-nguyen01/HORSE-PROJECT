@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,8 +33,9 @@ public class RacetrackController {
     @GetMapping("/api/racetracks/{racetrackId}/availability")
     @PreAuthorize("hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
     List<TrackLaneAvailabilityResponse> availability(@PathVariable UUID racetrackId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return service.availability(racetrackId, date);
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime slotStart) {
+        return service.availability(racetrackId, date, slotStart);
     }
 
     @PostMapping("/api/trial-run-bookings")

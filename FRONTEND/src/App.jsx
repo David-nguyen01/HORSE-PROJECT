@@ -156,6 +156,7 @@ function AppLayout() {
       { to: '/races', label: 'Quản lý giải đua', icon: Award },
       { to: '/admin/finance-reports', label: 'Tài chính & Báo cáo', icon: DollarSign },
       { to: '/admin/stables', label: 'Chuồng trại', icon: Warehouse },
+      { to: '/admin/inventory-catalog', label: 'Vật tư & Kho hàng', icon: Package },
       { to: '/admin/accounts', label: 'Tài khoản', icon: UsersRound },
       { to: '/admin/permissions', label: 'Ma trận quyền', icon: ShieldCheck },
       { to: '/admin/archived-horses', label: 'Ngựa lưu trữ', icon: ArchiveRestore },
@@ -689,10 +690,10 @@ function Users() {
 }
 
 function RoleModal({ user, onClose, onSaved }) {
-  const roles = Object.keys(ROLE_LABELS); const [chosen, setChosen] = useState(user.roles); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
-  const toggle = (role) => setChosen((current) => current.includes(role) ? current.filter((r) => r !== role) : [...current, role])
-  const submit = async (e) => { e.preventDefault(); if (!chosen.length) { setError('Người dùng phải có ít nhất một role'); return } setBusy(true); try { await api(`/api/users/${user.id}/roles`, { method: 'PUT', body: JSON.stringify({ roles: chosen }) }); onSaved() } catch (err) { setError(err.message) } finally { setBusy(false) } }
-  return <Modal title={`Phân quyền · ${user.username}`} onClose={onClose}><form onSubmit={submit}>{error && <div className="notice error"><X size={17} />{error}</div>}<div className="role-options">{roles.map((role) => <label key={role} className={chosen.includes(role) ? 'selected' : ''}><input type="checkbox" checked={chosen.includes(role)} onChange={() => toggle(role)} /><span><ShieldCheck size={19} /></span><div><b>{ROLE_LABELS[role]}</b><small>{role}</small></div>{chosen.includes(role) && <Check size={18} />}</label>)}</div><div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button className="button primary" disabled={busy}>Lưu thay đổi</button></div></form></Modal>
+  const roles = Object.keys(ROLE_LABELS); const [chosen, setChosen] = useState(user.roles && user.roles.length ? [user.roles[0]] : ['STABLE_STAFF']); const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+  const toggle = (role) => setChosen([role])
+  const submit = async (e) => { e.preventDefault(); if (!chosen.length || chosen.length !== 1) { setError('Người dùng phải có đúng một role'); return } setBusy(true); try { await api(`/api/users/${user.id}/roles`, { method: 'PUT', body: JSON.stringify({ roles: chosen.slice(0, 1) }) }); onSaved() } catch (err) { setError(err.message) } finally { setBusy(false) } }
+  return <Modal title={`Phân quyền · ${user.username}`} onClose={onClose}><form onSubmit={submit}>{error && <div className="notice error"><X size={17} />{error}</div>}<div className="role-options">{roles.map((role) => <label key={role} className={chosen.includes(role) ? 'selected' : ''}><input type="radio" name="role-modal-choice" checked={chosen.includes(role)} onChange={() => toggle(role)} /><span><ShieldCheck size={19} /></span><div><b>{ROLE_LABELS[role]}</b><small>{role}</small></div>{chosen.includes(role) && <Check size={18} />}</label>)}</div><div className="modal-actions"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button className="button primary" disabled={busy}>Lưu thay đổi</button></div></form></Modal>
 }
 
 export default function App() {

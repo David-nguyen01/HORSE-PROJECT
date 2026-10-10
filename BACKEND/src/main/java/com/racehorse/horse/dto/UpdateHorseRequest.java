@@ -20,7 +20,7 @@ public record UpdateHorseRequest(
         UUID sireId,
         UUID damId,
         UUID currentTrainerId,
-        @NotBlank @Size(max = 150) String stableLocation,
+        @Size(max = 150) String stableLocation,
         @NotNull HorseStatus status,
         @Size(max = 150) String sireManualName,
         @Size(max = 50) String sireManualId,

@@ -16,7 +16,7 @@ public interface LoginSessionRepository extends JpaRepository<LoginSession, UUID
     @EntityGraph(attributePaths = {"user", "user.roles"})
     Optional<LoginSession> findByRefreshTokenHash(String refreshTokenHash);
 
-    boolean existsByIdAndRevokedAtIsNullAndExpiresAtAfter(UUID id, Instant now);
+    boolean existsByIdAndUser_IdAndRevokedAtIsNullAndExpiresAtAfter(UUID id, UUID userId, Instant now);
 
     @Modifying
     @Query("""

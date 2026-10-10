@@ -41,6 +41,9 @@ public class UserManagementService {
 
     @Transactional
     public UserResponse create(CreateUserRequest request) {
+        if (request.roles() == null || request.roles().size() != 1) {
+            throw new BusinessException("Mỗi tài khoản chỉ được có đúng một vai trò");
+        }
         return createAccount(
                 request.username(),
                 request.email(),
@@ -62,6 +65,9 @@ public class UserManagementService {
 
     @Transactional
     public UserResponse updateRoles(UUID actorId, UUID targetUserId, UpdateUserRolesRequest request) {
+        if (request.roles() == null || request.roles().size() != 1) {
+            throw new BusinessException("Mỗi tài khoản chỉ được có đúng một vai trò");
+        }
         if (actorId.equals(targetUserId)) {
             throw new BusinessException("CLUB_MANAGER không thể tự thay đổi role của chính mình");
         }

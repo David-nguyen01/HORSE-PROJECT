@@ -89,7 +89,7 @@ BEGIN
 END;
 GO
 
--- 4. Training Schedules (Sessions scheduled strictly within 05:00 - 11:00)
+-- 4. Training Schedules (one-hour slots starting 06:00 through 23:00)
 IF OBJECT_ID(N'dbo.training_schedules', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.training_schedules (
@@ -208,7 +208,7 @@ GO
 -- TRAINING TRIGGERS
 -- =========================================================================
 
--- Trigger: Enforce 05:00 - 11:00 Training Window on Schedules
+-- Trigger: Enforce 06:00 - midnight, one-hour training slots
 CREATE OR ALTER TRIGGER dbo.tr_enforce_training_window
 ON dbo.training_schedules
 AFTER INSERT, UPDATE
@@ -218,21 +218,25 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM inserted i
+        LEFT JOIN deleted d ON d.id = i.id
         WHERE i.cancelled_at IS NULL
+          AND (d.id IS NULL OR i.scheduled_start <> d.scheduled_start
+               OR i.scheduled_end <> d.scheduled_end OR d.cancelled_at IS NOT NULL)
           AND (
-            CAST(i.scheduled_start AT TIME ZONE 'SE Asia Standard Time' AS TIME) < '05:00:00'
-            OR CAST(i.scheduled_end AT TIME ZONE 'SE Asia Standard Time' AS TIME) > '11:00:00'
-            OR CAST(i.scheduled_start AT TIME ZONE 'SE Asia Standard Time' AS DATE) <> 
-               CAST(i.scheduled_end AT TIME ZONE 'SE Asia Standard Time' AS DATE)
+            CAST(i.scheduled_start AT TIME ZONE 'SE Asia Standard Time' AS TIME) < '06:00:00'
+            OR CAST(i.scheduled_start AT TIME ZONE 'SE Asia Standard Time' AS TIME) > '23:00:00'
+            OR DATEPART(MINUTE, i.scheduled_start AT TIME ZONE 'SE Asia Standard Time') <> 0
+            OR DATEPART(SECOND, i.scheduled_start AT TIME ZONE 'SE Asia Standard Time') <> 0
+            OR i.scheduled_end <> DATEADD(HOUR, 1, i.scheduled_start)
           )
     )
     BEGIN
-        THROW 51001, N'Lịch huấn luyện phải nằm hoàn toàn trong khung giờ hoạt động 05:00 - 11:00 cùng ngày.', 1;
+        THROW 51001, N'Lịch huấn luyện phải là slot 1 giờ bắt đầu từ 06:00 đến 23:00 (kết thúc muộn nhất 00:00 hôm sau).', 1;
     END;
 END;
 GO
 
--- Trigger: Lane Reservation Integrity (No Concurrent Overlap on Same Lane & Same Date)
+-- Trigger: Lane Reservation Integrity (No Concurrent Overlap on Same Lane)
 CREATE OR ALTER TRIGGER dbo.tr_trial_run_bookings_no_lane_overlap
 ON dbo.trial_run_bookings
 AFTER INSERT, UPDATE
@@ -247,12 +251,10 @@ BEGIN
          AND b.id <> i.id
         WHERE b.cancelled_at IS NULL
           AND i.cancelled_at IS NULL
-          AND (CONVERT(date, b.booked_start AT TIME ZONE 'SE Asia Standard Time') =
-               CONVERT(date, i.booked_start AT TIME ZONE 'SE Asia Standard Time')
-            OR (i.booked_start < b.booked_end AND i.booked_end > b.booked_start))
+          AND i.booked_start < b.booked_end AND i.booked_end > b.booked_start
     )
     BEGIN
-        THROW 51003, N'Làn chạy đã được đặt trong ngày này.', 1;
+        THROW 51003, N'Làn chạy đã được đặt trong khung giờ này.', 1;
     END;
 
     IF EXISTS (

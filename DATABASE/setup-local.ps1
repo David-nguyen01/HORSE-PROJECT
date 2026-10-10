@@ -1,13 +1,17 @@
 param(
     [string]$SqlServer = "localhost,1433",
     [string]$SqlUsername = "sa",
-    [string]$SqlPassword = "sa12345",
+    [string]$SqlPassword = "",
     [switch]$UseWindowsAuth,
     [switch]$RecreateDatabase,
     [switch]$IncludeSync
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $UseWindowsAuth -and [string]::IsNullOrWhiteSpace($SqlPassword)) {
+    throw "Specify -SqlPassword for SQL Authentication, or use -UseWindowsAuth."
+}
 
 $sqlcmdCommand = Get-Command sqlcmd -ErrorAction SilentlyContinue
 if (-not $sqlcmdCommand) {
@@ -60,7 +64,11 @@ $baselineScripts = @(
     "07_racing_and_finance.sql",
     "08_compact_records.sql",
     "09_seed_reference_data.sql",
-    "10_seed_demo_data.sql"
+    "10_seed_demo_data.sql",
+    "32_stall_assignment_concurrency_lock.sql",
+    "33_race_registration_lifecycle_integrity.sql",
+    "34_hourly_racetrack_slots.sql",
+    "35_horse_intake_workflow.sql"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan

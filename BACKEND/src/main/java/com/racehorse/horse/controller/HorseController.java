@@ -6,6 +6,7 @@ import com.racehorse.horse.dto.ReplaceOwnershipRequest;
 import com.racehorse.horse.dto.UpdateHorseRequest;
 import com.racehorse.horse.dto.UpdateOwnedHorseRequest;
 import com.racehorse.horse.entity.HorseStatus;
+import com.racehorse.auth.entity.Role;
 import com.racehorse.horse.service.HorseService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -69,12 +70,15 @@ public class HorseController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_HEAD_TRAINER"));
         boolean manager = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_CLUB_MANAGER"));
-        if (trainer && !manager) return horseService.searchForTrainer(query, status, userId(jwt), pageable);
-        return horseService.search(query, status, paidOnly, pageable);
+        if (manager) return horseService.search(query, status, paidOnly, pageable);
+        if (trainer) return horseService.searchForTrainer(query, status, userId(jwt), pageable);
+        if (authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_VETERINARIAN")))
+            return horseService.searchForVeterinarian(query, status, pageable);
+        return horseService.search(query, status, true, pageable);
     }
 
     @GetMapping("/eligible-for-medical")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','VETERINARIAN')")
     java.util.List<HorseResponse> getEligibleForMedical() {
         return horseService.getEligibleForMedical();
     }
@@ -90,7 +94,7 @@ public class HorseController {
     @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")
     @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER','VETERINARIAN','STABLE_STAFF','HORSE_OWNER')")
     HorseResponse getById(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
-        return horseService.getByIdForUser(id, userId(jwt), isPrivileged(authentication));
+        return horseService.getByIdForUser(id, userId(jwt), accessRole(authentication));
     }
 
     @PutMapping("/{id}")
@@ -126,11 +130,14 @@ public class HorseController {
         return UUID.fromString(jwt.getSubject());
     }
 
-    private boolean isPrivileged(Authentication authentication) {
-        return authentication.getAuthorities().stream().anyMatch(authority ->
-                authority.getAuthority().equals("ROLE_CLUB_MANAGER")
-                || authority.getAuthority().equals("ROLE_HEAD_TRAINER")
-                || authority.getAuthority().equals("ROLE_VETERINARIAN")
-                || authority.getAuthority().equals("ROLE_STABLE_STAFF"));
+    private Role accessRole(Authentication authentication) {
+        for (Role role : new Role[] {Role.CLUB_MANAGER, Role.HEAD_TRAINER,
+                Role.VETERINARIAN, Role.STABLE_STAFF, Role.HORSE_OWNER}) {
+            if (authentication.getAuthorities().stream()
+                    .anyMatch(authority -> authority.getAuthority().equals("ROLE_" + role.name()))) {
+                return role;
+            }
+        }
+        throw new org.springframework.security.access.AccessDeniedException("Không có quyền xem hồ sơ ngựa");
     }
 }

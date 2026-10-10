@@ -36,6 +36,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -43,6 +44,14 @@ import java.util.UUID;
 @Service
 public class TrainingScheduleService {
     private static final ZoneId CLUB_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    private static Instant slotStart(LocalDate date, LocalTime slot) {
+        if (slot == null || slot.getMinute() != 0 || slot.getSecond() != 0 || slot.getNano() != 0
+                || slot.getHour() < 6 || slot.getHour() > 23) {
+            throw new InvalidInputException("Slot tập phải bắt đầu đúng giờ từ 06:00 đến 23:00");
+        }
+        return date.atTime(slot).atZone(CLUB_ZONE).toInstant();
+    }
 
     private final TrainingScheduleRepository repository;
     private final TrainingPlanPhaseRepository phaseRepository;
@@ -128,7 +137,7 @@ public class TrainingScheduleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy giai đoạn huấn luyện"));
         Horse horse = horseAccessService.requireTrainingAccess(phase.getTrainingPlan().getHorse().getId(),
                 actorId, manager, trainer, false);
-        horseAccessService.requireServiceEligible(horse.getId());
+        horseAccessService.requireTrainingReady(horse.getId());
         requireNotInjured(horse);
         if (trainer && jdbc != null && !hasDiagnosingVet(horse.getId()))
             throw new BusinessException("Ngựa cần được bác sĩ thú y chẩn đoán trước khi xếp lịch");
@@ -157,15 +166,15 @@ public class TrainingScheduleService {
                 || !track.isActive() || !track.getId().equals(request.racetrackId())) {
             throw new InvalidInputException("Làn chạy phải thuộc sân đang hoạt động đã chọn");
         }
-        Instant start = date.atTime(5, 0).atZone(CLUB_ZONE).toInstant();
-        Instant end = date.atTime(11, 0).atZone(CLUB_ZONE).toInstant();
+        Instant start = slotStart(date, request.slotStart());
+        Instant end = start.plusSeconds(3600);
         if (repository.existsByHorseIdAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
                 horse.getId(), end, start)) {
-            throw new BusinessException("Ngựa đã có buổi tập trong ngày này");
+            throw new BusinessException("Ngựa đã có buổi tập trùng khung giờ này");
         }
         if (bookingRepository.existsByLaneIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
                 lane.getId(), end, start)) {
-            throw new BusinessException("Làn chạy đã được đặt trong ngày này");
+            throw new BusinessException("Làn chạy đã được đặt trong khung giờ này");
         }
         if (phase.getWorkloadIntensity().name().equals("HIGH")
                 && lockRepository.findByHorseIdAndReleasedAtIsNull(horse.getId()).isPresent()) {
@@ -192,6 +201,7 @@ public class TrainingScheduleService {
         TrainingSchedule schedule = lockedSchedule(scheduleId);
         horseAccessService.requireTrainingAccess(schedule.getHorse().getId(), actorId, manager, trainer, false);
         if (schedule.getCancelledAt() != null) throw new BusinessException("Buổi tập đã hủy");
+        horseAccessService.requireTrainingReady(schedule.getHorse().getId());
         TrainingPlanPhase phase = schedule.getPhase();
         LocalDate date = request.trainingDate();
         if (!date.equals(schedule.getScheduledStart().atZone(CLUB_ZONE).toLocalDate())
@@ -210,15 +220,15 @@ public class TrainingScheduleService {
                 || !track.isActive() || !track.getId().equals(request.racetrackId())) {
             throw new InvalidInputException("Làn chạy phải thuộc sân đang hoạt động đã chọn");
         }
-        Instant start = date.atTime(5, 0).atZone(CLUB_ZONE).toInstant();
-        Instant end = date.atTime(11, 0).atZone(CLUB_ZONE).toInstant();
+        Instant start = slotStart(date, request.slotStart());
+        Instant end = start.plusSeconds(3600);
         if (repository.existsByHorseIdAndIdNotAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
                 schedule.getHorse().getId(), scheduleId, end, start)) {
-            throw new BusinessException("Ngựa đã có buổi tập trong ngày này");
+            throw new BusinessException("Ngựa đã có buổi tập trùng khung giờ này");
         }
         if (bookingRepository.existsByLaneIdAndTrainingScheduleIdNotAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
                 lane.getId(), scheduleId, end, start)) {
-            throw new BusinessException("Làn chạy đã được đặt trong ngày này");
+            throw new BusinessException("Làn chạy đã được đặt trong khung giờ này");
         }
         TrialRunBooking booking = bookingRepository.findByTrainingScheduleIdForUpdate(scheduleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Buổi tập chưa có lượt đặt làn"));
@@ -306,7 +316,7 @@ public class TrainingScheduleService {
         requireTransitionable(value);
         if (!"READY".equals(value.getSessionStatus()))
             throw new BusinessException("Chỉ có thể bắt đầu buổi tập khi trạng thái là Sẵn sàng");
-        horseAccessService.requireServiceEligible(value.getHorse().getId());
+        horseAccessService.requireTrainingReady(value.getHorse().getId());
         requireNotInjured(value.getHorse());
         if (jdbc != null && !hasDiagnosingVet(value.getHorse().getId()))
             throw new BusinessException("Ngựa cần được bác sĩ thú y chẩn đoán trước khi huấn luyện");
@@ -470,7 +480,8 @@ public class TrainingScheduleService {
                 schedule.getTaskName(),
                 schedule.getWorkloadIntensity(), schedule.getNotes(),
                 status, schedule.getScheduledStart().atZone(CLUB_ZONE).toLocalDate(),
-                java.time.LocalTime.of(5, 0), java.time.LocalTime.of(11, 0),
+                schedule.getScheduledStart().atZone(CLUB_ZONE).toLocalTime(),
+                schedule.getScheduledEnd().atZone(CLUB_ZONE).toLocalTime(),
                 booking == null ? null : new TrainingScheduleResponse.LaneSummary(
                         booking.getLane().getId(), booking.getLane().getLaneNumber()),
                 evaluationSummary, schedule.getScheduledStart(), schedule.getScheduledEnd(), schedule.getPublishedAt(),
@@ -494,7 +505,8 @@ public class TrainingScheduleService {
                         evaluation.getTrainerNotes(), evaluation.getVideoUrl());
         return new OwnerTrainingScheduleResponse(schedule.getId(),
                 schedule.getScheduledStart().atZone(CLUB_ZONE).toLocalDate(),
-                java.time.LocalTime.of(5, 0), java.time.LocalTime.of(11, 0), schedule.getTaskName(),
+                schedule.getScheduledStart().atZone(CLUB_ZONE).toLocalTime(),
+                schedule.getScheduledEnd().atZone(CLUB_ZONE).toLocalTime(), schedule.getTaskName(),
                 schedule.getWorkloadIntensity(), "EMERGENCY_STOPPED".equals(schedule.getSessionStatus())
                         ? "EMERGENCY_STOPPED" : schedule.getCompletedAt() == null ? "PUBLISHED" : "COMPLETED",
                 schedule.getRacetrack() == null ? null : new OwnerTrainingScheduleResponse.Racetrack(schedule.getRacetrack().getId(),

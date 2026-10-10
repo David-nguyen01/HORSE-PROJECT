@@ -21,12 +21,18 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.util.Base64;
+import java.util.HexFormat;
 
 @Configuration
 @EnableConfigurationProperties(JwtProperties.class)
 public class AuthConfiguration {
+    // Fingerprint only: never ship the previous public development key as an active secret.
+    private static final String LEGACY_INSECURE_SECRET_SHA256 =
+            "39d83034d700174feb1111e317d25fee40613e05ec26ac254e7334c920ee63ba";
 
     @Bean
     Clock clock() {
@@ -45,6 +51,9 @@ public class AuthConfiguration {
 
     @Bean
     SecretKey jwtSecretKey(JwtProperties properties) {
+        if (properties.secret() == null || properties.secret().isBlank()) {
+            throw new IllegalStateException("Cần cấu hình JWT_SECRET riêng trước khi khởi động backend");
+        }
         byte[] decoded;
         try {
             decoded = Base64.getDecoder().decode(properties.secret());
@@ -53,6 +62,14 @@ public class AuthConfiguration {
         }
         if (decoded.length < 32) {
             throw new IllegalStateException("JWT_SECRET phải chứa ít nhất 32 byte sau khi giải mã Base64");
+        }
+        try {
+            String fingerprint = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(decoded));
+            if (LEGACY_INSECURE_SECRET_SHA256.equals(fingerprint)) {
+                throw new IllegalStateException("JWT_SECRET cũ đã công khai; cần thay bằng khóa ngẫu nhiên mới");
+            }
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("Không có thuật toán SHA-256 để kiểm tra JWT_SECRET", exception);
         }
         return new SecretKeySpec(decoded, "HmacSHA256");
     }

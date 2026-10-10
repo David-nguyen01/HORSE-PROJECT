@@ -22,13 +22,13 @@ public class Racetrack {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
     @Column(name = "opens_at", nullable = false)
-    private LocalTime opensAt = LocalTime.of(5, 0);
+    private LocalTime opensAt = LocalTime.of(6, 0);
     @Column(name = "closes_at", nullable = false)
-    private LocalTime closesAt = LocalTime.of(11, 0);
+    private LocalTime closesAt = LocalTime.MIDNIGHT;
     @Column(name = "closes_next_day", nullable = false)
-    private boolean closesNextDay = false;
+    private boolean closesNextDay = true;
     @Column(name = "slot_minutes", nullable = false)
-    private int slotMinutes = 360;
+    private int slotMinutes = 60;
 
     protected Racetrack() {}
     public Racetrack(String name, String location) { this.name = name; this.location = location; }

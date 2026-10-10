@@ -64,8 +64,11 @@ class RaceEventOwnerAccessTest {
         UUID registrationId = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();
         UUID ownerId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
         RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
-        doReturn(registration(registrationId, horseId)).when(service).registration(registrationId);
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "SUBMITTED", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, null)).when(service).event(eventId);
 
         service.decide(registrationId, ownerId, true, null);
 
@@ -74,13 +77,104 @@ class RaceEventOwnerAccessTest {
     }
 
     @Test
+    void confirmFailsWhenRegistrationIsSubmitted() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "SUBMITTED", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, null)).when(service).event(eventId);
+
+        assertThatThrownBy(() -> service.confirm(registrationId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Đăng ký đang chờ chủ ngựa duyệt, chưa thể xác nhận");
+    }
+
+    @Test
+    void confirmSucceedsWhenRegistrationIsApproved() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "APPROVE", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, null)).when(service).event(eventId);
+
+        service.confirm(registrationId);
+
+        verify(jdbc).update(contains("status='CONFIRMED'"), any(String.class), eq(registrationId));
+    }
+
+    @Test
+    void confirmFailsWhenRaceIsCompleted() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "APPROVE", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, OffsetDateTime.now())).when(service).event(eventId);
+
+        assertThatThrownBy(() -> service.confirm(registrationId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không thể xác nhận đăng ký khi giải đua đã hoàn thành");
+    }
+
+    @Test
+    void withdrawFailsWhenRegistrationIsConfirmed() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "CONFIRMED", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, null)).when(service).event(eventId);
+
+        assertThatThrownBy(() -> service.withdraw(registrationId, actor))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không thể rút đăng ký đã được xác nhận");
+    }
+
+    @Test
+    void withdrawFailsWhenRaceIsCompleted() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "APPROVE", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, OffsetDateTime.now())).when(service).event(eventId);
+
+        assertThatThrownBy(() -> service.withdraw(registrationId, actor))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không thể rút đăng ký sau khi giải đua đã hoàn thành");
+    }
+
+    @Test
+    void withdrawSucceedsWhenRegistrationIsApprovedOrSubmitted() {
+        UUID registrationId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID eventId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        RaceEventService.RegistrationView reg = registration(registrationId, horseId, "APPROVE", eventId);
+        doReturn(reg).when(service).registration(registrationId);
+        doReturn(event(eventId, null)).when(service).event(eventId);
+
+        service.withdraw(registrationId, actor);
+
+        verify(jdbc).update(contains("status='WITHDRAWN'"), any(String.class), eq(actor.toString()), eq(registrationId));
+    }
+
+    @Test
     void horseCannotRegisterWhileAnotherRaceIsUnfinished() {
         UUID eventId = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();
         RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
-        doReturn(new RaceEventService.EventView(eventId, "New race", "Track", LocalDate.now().plusDays(10),
-                OffsetDateTime.now().plusDays(5), BigDecimal.valueOf(1000), "OPEN", null, null,
-                null, null, true, null)).when(service).event(eventId);
+        doReturn(event(eventId, null)).when(service).event(eventId);
         when(jdbc.queryForObject(contains("with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
         when(jdbc.queryForObject(contains("JSON_VALUE(data_json,'$.raceEventId')=?"), eq(Integer.class),
@@ -106,9 +200,19 @@ class RaceEventOwnerAccessTest {
         verify(jdbc).update(contains("completed_at=coalesce"), eq(eventId));
     }
 
+    private RaceEventService.EventView event(UUID eventId, OffsetDateTime completedAt) {
+        return new RaceEventService.EventView(eventId, "Demo race", "Track", LocalDate.now().plusDays(10),
+                OffsetDateTime.now().plusDays(5), BigDecimal.valueOf(1000), "OPEN", null, null,
+                null, null, true, completedAt);
+    }
+
     private RaceEventService.RegistrationView registration(UUID id, UUID horseId) {
-        return new RaceEventService.RegistrationView(id, UUID.randomUUID(), "Demo race", LocalDate.now(),
-                horseId, "Demo horse", UUID.randomUUID(), "SUBMITTED", BigDecimal.valueOf(400),
+        return registration(id, horseId, "SUBMITTED", null);
+    }
+
+    private RaceEventService.RegistrationView registration(UUID id, UUID horseId, String status, UUID eventId) {
+        return new RaceEventService.RegistrationView(id, eventId != null ? eventId : UUID.randomUUID(), "Demo race", LocalDate.now(),
+                horseId, "Demo horse", UUID.randomUUID(), status, BigDecimal.valueOf(400),
                 OffsetDateTime.now(), null, null, null, null);
     }
 }

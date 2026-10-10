@@ -16,8 +16,8 @@ import java.util.UUID;
 /**
  * Controller quản lý hàng chờ tiếp nhận y tế.
  * <p>
- * Luồng: Sau khi Owner thanh toán → ngựa có paymentStatus=PAID →
- * Bác sĩ gọi receive → ghi MEDICAL_ASSIGNMENT → cập nhật paymentStatus=IN_MEDICAL.
+ * Luồng: thanh toán hoặc bảo lãnh → nhân viên đưa vào phòng chờ → bác sĩ tiếp nhận,
+ * lưu hồ sơ khám rồi hoàn tất. intakeStatus thay đổi độc lập với paymentStatus.
  */
 @RestController
 @RequestMapping("/api/medical/queue")
@@ -31,16 +31,21 @@ public class MedicalQueueController {
     }
 
     /**
-     * Danh sách ngựa đang chờ tiếp nhận y tế (paymentStatus = PAID, chưa có MEDICAL_ASSIGNMENT active).
+     * Danh sách ngựa đã ở phòng chờ và đang chờ bác sĩ tiếp nhận.
      */
     @GetMapping
     public List<MedicalQueueService.QueueItem> queue() {
         return queueService.getPendingQueue();
     }
 
+    @GetMapping("/overview")
+    public List<MedicalQueueService.QueueStatusItem> overview() {
+        return queueService.getQueueOverview();
+    }
+
     /**
      * Bác sĩ tiếp nhận ngựa vào khám y tế.
-     * Ghi module_records (MEDICAL_ASSIGNMENT), đổi paymentStatus = IN_MEDICAL.
+     * Ghi MEDICAL_ASSIGNMENT và đổi intakeStatus thành IN_MEDICAL.
      */
     @PostMapping("/{horseId}/receive")
     @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
@@ -51,8 +56,7 @@ public class MedicalQueueController {
     }
 
     /**
-     * Bác sĩ hoàn tất khám → chuyển ngựa sang chờ huấn luyện.
-     * Đổi paymentStatus = PENDING_TRAINING.
+     * Sau khi đã lưu hồ sơ khám, chuyển ngựa sang chờ nhân viên phân ô chuồng.
      */
     @PostMapping("/{horseId}/complete")
     @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")

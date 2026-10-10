@@ -49,6 +49,9 @@ class MedicalExaminationServiceTest {
         service = new MedicalExaminationService(
                 jdbc, horseAccessService, trainingLockRepository, trainingLockService,
                 preventiveCareService, userRepository, notificationService, json);
+        Horse existingHorse = mock(Horse.class);
+        lenient().when(existingHorse.getIntakeStatus()).thenReturn("STABLED");
+        lenient().when(horseAccessService.requireActive(any(UUID.class))).thenReturn(existingHorse);
     }
 
     @Test
@@ -90,6 +93,39 @@ class MedicalExaminationServiceTest {
         assertThatThrownBy(() -> service.create(horseId, vetId, req))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Trạng thái sức khỏe chỉ nhận");
+    }
+
+    @Test
+    void createRejectsHorseNotYetReceivedByAnyVeterinarian() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        Horse waiting = mock(Horse.class);
+        when(waiting.getIntakeStatus()).thenReturn("WAITING_FOR_VET");
+        when(horseAccessService.requireActive(horseId)).thenReturn(waiting);
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Check", "Normal", "Observe", null, null, "FIT");
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("tiếp nhận");
+        verify(jdbc, never()).update(contains("MEDICAL_EXAMINATION"), any(Object[].class));
+    }
+
+    @Test
+    void createRejectsVeterinarianWhoDidNotReceiveActiveCase() {
+        UUID horseId = UUID.randomUUID();
+        UUID otherVet = UUID.randomUUID();
+        Horse inMedical = mock(Horse.class);
+        when(inMedical.getIntakeStatus()).thenReturn("IN_MEDICAL");
+        when(horseAccessService.requireActive(horseId)).thenReturn(inMedical);
+        when(jdbc.queryForObject(contains("UPDLOCK,HOLDLOCK"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
+        when(jdbc.queryForObject(contains("MEDICAL_ASSIGNMENT"), eq(Integer.class), eq(horseId), eq(otherVet)))
+                .thenReturn(0);
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Check", "Normal", "Observe", null, null, "FIT");
+
+        assertThatThrownBy(() -> service.create(horseId, otherVet, req))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("bác sĩ khác");
     }
 
     @Test

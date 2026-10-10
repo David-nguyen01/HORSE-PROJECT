@@ -27,12 +27,14 @@ public class LoginSessionTokenValidator implements OAuth2TokenValidator<Jwt> {
     @Override
     public OAuth2TokenValidatorResult validate(Jwt jwt) {
         String sessionId = jwt.getClaimAsString("sid");
-        if (sessionId == null) {
+        String userId = jwt.getSubject();
+        if (sessionId == null || userId == null) {
             return OAuth2TokenValidatorResult.failure(INVALID_SESSION);
         }
         try {
-            boolean active = sessionRepository.existsByIdAndRevokedAtIsNullAndExpiresAtAfter(
+            boolean active = sessionRepository.existsByIdAndUser_IdAndRevokedAtIsNullAndExpiresAtAfter(
                     UUID.fromString(sessionId),
+                    UUID.fromString(userId),
                     clock.instant());
             return active
                     ? OAuth2TokenValidatorResult.success()

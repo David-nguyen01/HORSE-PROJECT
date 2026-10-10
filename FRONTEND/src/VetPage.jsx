@@ -291,6 +291,7 @@ export default function VetPage() {
 function VetDashboard({ onNavigate }) {
   const [horses, setHorses] = useState([])
   const [medicalQueue, setMedicalQueue] = useState([])
+  const [queueOverview, setQueueOverview] = useState([])
   const [myAssignments, setMyAssignments] = useState([])
   const [incidents, setIncidents] = useState([])
   const [duePreventive, setDuePreventive] = useState([])
@@ -300,15 +301,17 @@ function VetDashboard({ onNavigate }) {
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [horsesRes, queueRes, assignRes, incRes, prevRes] = await Promise.allSettled([
+      const [horsesRes, queueRes, overviewRes, assignRes, incRes, prevRes] = await Promise.allSettled([
         vetApi.getEligibleHorses(),
         vetApi.getMedicalQueue(),
+        vetApi.getMedicalQueueOverview(),
         vetApi.getMyAssignments(),
         vetApi.getIncidents({ status: 'REPORTED' }),
         vetApi.getDuePreventiveCare({ days: 7 }),
       ])
       if (horsesRes.status === 'fulfilled') setHorses(pageContent(horsesRes.value))
       if (queueRes.status === 'fulfilled') setMedicalQueue(Array.isArray(queueRes.value) ? queueRes.value : [])
+      if (overviewRes.status === 'fulfilled') setQueueOverview(Array.isArray(overviewRes.value) ? overviewRes.value : [])
       if (assignRes.status === 'fulfilled') setMyAssignments(Array.isArray(assignRes.value) ? assignRes.value : [])
       if (incRes.status === 'fulfilled') setIncidents(pageContent(incRes.value) || incRes.value || [])
       if (prevRes.status === 'fulfilled') setDuePreventive(pageContent(prevRes.value) || prevRes.value || [])
@@ -328,13 +331,14 @@ function VetDashboard({ onNavigate }) {
       await loadData()
     } catch (err) {
       alert(`Lỗi tiếp nhận khám: ${err.message}`)
+      await loadData()
     } finally {
       setActionBusyId(null)
     }
   }
 
   const handleComplete = async (horseId) => {
-    if (!window.confirm('Xác nhận hoàn tất khám y tế ban đầu? Ngựa sẽ được chuyển sang trạng thái "Chờ huấn luyện" (PENDING_TRAINING) để HLV trưởng tiếp nhận và thông báo cho nhân viên chăm sóc xếp chuồng.')) return
+    if (!window.confirm('Xác nhận hoàn tất khám y tế ban đầu? Ngựa sẽ chuyển sang chờ nhân viên phân ô chuồng; chỉ ngựa đủ điều kiện y tế mới được HLV tiếp nhận.')) return
     setActionBusyId(horseId)
     try {
       await vetApi.completeMedicalQueue(horseId)
@@ -390,6 +394,9 @@ function VetDashboard({ onNavigate }) {
   )
   const activeHorses = useMemo(() => horses.filter((h) => h.status === 'ACTIVE' || h.healthStatus === 'FIT' || !h.healthStatus), [horses])
   const totalCareNeeded = medicalQueue.length + injuredHorses.length + duePreventive.length
+  const myVetId = getAuth()?.user?.id
+  const claimedByOther = queueOverview.filter((item) =>
+    item.intakeStatus === 'IN_MEDICAL' && item.veterinarianId && item.veterinarianId !== myVetId)
 
   return (
     <>
@@ -480,6 +487,18 @@ function VetDashboard({ onNavigate }) {
                 <span>Tất cả ngựa trong hàng chờ đều đã được tiếp nhận khám hoặc đang huấn luyện.</span>
               </div>
             )}
+            {claimedByOther.length > 0 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid #e3eae5' }}>
+                <small className="muted">Đã có bác sĩ tiếp nhận — chỉ xem trạng thái</small>
+                {claimedByOther.map((item) => (
+                  <div key={item.horseId} className="horse-row" style={{ gridTemplateColumns: '43px 1fr auto', marginTop: '8px' }}>
+                    <div className="horse-avatar">{item.name?.slice(0, 2).toUpperCase() || 'H'}</div>
+                    <div className="horse-main"><b>{item.name}</b><span>Mã: {item.code}</span></div>
+                    <span className="muted" style={{ fontSize: '11px' }}>Đang khám bởi {item.veterinarianName || 'bác sĩ khác'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* Section 2: Ngựa đang phụ trách khám lâm sàng */}
@@ -488,7 +507,7 @@ function VetDashboard({ onNavigate }) {
               <div>
                 <h3>Ngựa đang trong ca khám y tế</h3>
                 <small className="muted" style={{ display: 'block', marginTop: '2px', fontSize: '11px' }}>
-                  Bác sĩ khám lâm sàng, kết luận thể trạng và chuyển giao cho HLV trưởng (PENDING_TRAINING).
+                  Bác sĩ khám lâm sàng, kết luận thể trạng rồi chuyển cho nhân viên phân ô chuồng.
                 </small>
               </div>
               <span className="record-count">{myAssignments.length} con ngựa</span>
@@ -3243,7 +3262,7 @@ function TrainingAssessmentView({ onNavigate }) {
 
                     <div style={{ fontSize: '12px', color: '#555', marginTop: '8px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                       <span>Sân tập: <b>{racetrack}</b></span>
-                      <span>Khung giờ: <b>05:00 – 11:00</b></span>
+                      <span>Giờ đường đua: <b>06:00 – 00:00 (slot 1 giờ)</b></span>
                       <span>Nhân viên chuồng: {renderStaffBadge(sess)}</span>
                     </div>
 

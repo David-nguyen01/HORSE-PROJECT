@@ -8,6 +8,7 @@ import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.health.dto.RaceReadinessResponse;
 import com.racehorse.health.service.HorseMeasurementService;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -119,11 +120,38 @@ public class RaceEventService {
 
     @Transactional
     public RegistrationView confirm(UUID registrationId) {
+        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
         RegistrationView value = registration(registrationId);
-        if (!"SUBMITTED".equals(value.status())) throw new BusinessException("Chỉ đăng ký SUBMITTED mới có thể xác nhận");
+        EventView event = event(value.raceEventId());
+        if (!event.active()) throw new BusinessException("Giải đua đã ngừng kích hoạt");
+        if (event.completedAt() != null) throw new BusinessException("Không thể xác nhận đăng ký khi giải đua đã hoàn thành");
+
+        if (!"APPROVE".equals(value.status())) {
+            if ("SUBMITTED".equals(value.status())) {
+                throw new BusinessException("Đăng ký đang chờ chủ ngựa duyệt, chưa thể xác nhận");
+            }
+            if ("CONFIRMED".equals(value.status())) {
+                throw new BusinessException("Đăng ký đã được xác nhận trước đó");
+            }
+            if ("REJECT".equals(value.status())) {
+                throw new BusinessException("Đăng ký đã bị từ chối, không thể xác nhận");
+            }
+            if ("WITHDRAWN".equals(value.status())) {
+                throw new BusinessException("Đăng ký đã được rút, không thể xác nhận");
+            }
+            throw new BusinessException("Chỉ đăng ký đã được chủ ngựa duyệt (APPROVE) mới có thể xác nhận");
+        }
+
         String at = OffsetDateTime.now().toString();
-        jdbc.update("update module_records set status='CONFIRMED',data_json=JSON_MODIFY(data_json,'$.confirmedAt',?),updated_at=SYSDATETIMEOFFSET() where id=?",
-                at, registrationId);
+        try {
+            jdbc.update("update module_records set status='CONFIRMED',data_json=JSON_MODIFY(data_json,'$.confirmedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='APPROVE'",
+                    at, registrationId);
+        } catch (DataAccessException ex) {
+            String msg = ex.getMessage() != null ? ex.getMessage() : "";
+            if (msg.contains("53001")) throw new BusinessException("Chỉ đăng ký đã được chủ ngựa duyệt (APPROVE) mới có thể xác nhận");
+            if (msg.contains("53003")) throw new BusinessException("Không thể xác nhận đăng ký khi giải đua đã hoàn thành");
+            throw ex;
+        }
         return registration(registrationId);
     }
 
@@ -131,10 +159,14 @@ public class RaceEventService {
     public RegistrationView decide(UUID registrationId, UUID ownerId, boolean approve, String reason) {
         RegistrationView value = registration(registrationId);
         horseAccess.requireOwned(value.horseId(), ownerId);
+        EventView event = event(value.raceEventId());
+        if (event.completedAt() != null) throw new BusinessException("Không thể duyệt đăng ký sau khi giải đua đã hoàn thành");
         if (!"SUBMITTED".equals(value.status())) throw new BusinessException("Chỉ đăng ký đang chờ mới có thể quyết định");
         if (!approve && (reason == null || reason.isBlank())) throw new BusinessException("Cần nhập lý do từ chối");
         String normalizedReason = reason == null || reason.isBlank() ? null : reason.trim();
         if (normalizedReason != null && normalizedReason.length() > 500) throw new BusinessException("Lý do tối đa 500 ký tự");
+
+        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
         jdbc.update("update module_records set status=?,data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.decisionReason',?),'$.decidedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='SUBMITTED'",
                 approve ? "APPROVE" : "REJECT", normalizedReason, OffsetDateTime.now().toString(), registrationId);
         return registration(registrationId);
@@ -142,11 +174,36 @@ public class RaceEventService {
 
     @Transactional
     public RegistrationView withdraw(UUID registrationId, UUID actor) {
+        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
         RegistrationView value = registration(registrationId);
-        if ("WITHDRAWN".equals(value.status())) throw new BusinessException("Đăng ký đã được rút");
+        EventView event = event(value.raceEventId());
+        if (event.completedAt() != null) {
+            throw new BusinessException("Không thể rút đăng ký sau khi giải đua đã hoàn thành");
+        }
+
+        if ("CONFIRMED".equals(value.status())) {
+            throw new BusinessException("Không thể rút đăng ký đã được xác nhận");
+        }
+        if ("WITHDRAWN".equals(value.status())) {
+            throw new BusinessException("Đăng ký đã được rút trước đó");
+        }
+        if ("REJECT".equals(value.status())) {
+            throw new BusinessException("Không thể rút đăng ký đã bị từ chối");
+        }
+        if (!"SUBMITTED".equals(value.status()) && !"APPROVE".equals(value.status())) {
+            throw new BusinessException("Chỉ đăng ký chưa xác nhận (SUBMITTED hoặc APPROVE) mới có thể rút đơn");
+        }
+
         OffsetDateTime now = OffsetDateTime.now();
-        jdbc.update("update module_records set status='WITHDRAWN',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.withdrawnAt',?),'$.withdrawnByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=?",
-                now.toString(), actor.toString(), registrationId);
+        try {
+            jdbc.update("update module_records set status='WITHDRAWN',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.withdrawnAt',?),'$.withdrawnByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=? and status in ('SUBMITTED','APPROVE')",
+                    now.toString(), actor.toString(), registrationId);
+        } catch (DataAccessException ex) {
+            String msg = ex.getMessage() != null ? ex.getMessage() : "";
+            if (msg.contains("53002")) throw new BusinessException("Không thể rút đăng ký đã được xác nhận");
+            if (msg.contains("53003")) throw new BusinessException("Không thể rút đăng ký sau khi giải đua đã hoàn thành");
+            throw ex;
+        }
         return registration(registrationId);
     }
 

@@ -10,31 +10,15 @@ Backend được tổ chức theo modular monolith và package-by-feature. Phiê
 
 ## Khởi chạy local
 
-Mở thư mục `../DATABASE` bằng SSMS, đăng nhập `sa` và chạy lần lượt:
-
-1. `00_create_database.sql`
-2. `01_create_schema.sql`
-3. `02_seed_data.sql`
-4. `03_horse_role_features.sql`
-5. `04_cloudinary_profile_files.sql`
-6. `05_training_evaluations.sql`
-7. `06_training_plans_scheduling_monitoring.sql`
-8. `07_health_medical.sql`
-9. `08_stable_care_inventory.sql`
-10. `09_racing_reporting_rbac_audit.sql`
-11. `10_confirmed_business_rules.sql`
-12. `11_confirmed_automation_and_governance.sql`
-13. `12_compact_schema.sql`
-
-Sau đó chạy backend:
+Tạo `racehorse_local` theo `../DATABASE/README.md` bằng `../DATABASE/setup-local.ps1`. Script chạy baseline `00`–`10` rồi các bản vá `32`–`35`. Không dùng `-RecreateDatabase` khi muốn giữ dữ liệu hiện có. Đặt `JWT_SECRET` như hướng dẫn bên dưới, sau đó chạy backend với profile `local`:
 
 ```powershell
-mvn spring-boot:run
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 ```
 
-Mặc định API chạy tại `http://localhost:8080`. Script `02_seed_data.sql` tạo tài khoản quản lý câu lạc bộ `admin@gmail.com / Admin123` nếu email này chưa tồn tại. Mật khẩu được mã hóa BCrypt trước khi lưu vào database. Hãy thay thông tin đăng nhập mặc định khi triển khai production.
+API chạy tại `http://localhost:8080`. Script `09_seed_reference_data.sql` tạo tài khoản quản lý mẫu `admin@gmail.com / Admin123` nếu email này chưa tồn tại. Hãy thay thông tin đăng nhập mẫu khi triển khai production.
 
-Backend dùng profile `local` để kết nối SQL Server trên máy phát triển. Khi chạy trên host, không bật profile `local`; đặt `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` bằng biến môi trường của host. Không lưu mật khẩu DB trong source hoặc image.
+Backend dùng profile `local` để kết nối SQL Server trên máy phát triển bằng tài khoản thử nghiệm. Khi chạy trên host, không bật profile `local`; đặt `DB_URL`, `DB_USERNAME` và `DB_PASSWORD` bằng biến môi trường của host. Không lưu mật khẩu DB thật trong source hoặc image.
 
 Để bật upload Cloudinary, đặt các biến môi trường sau trước khi chạy backend. Không commit API secret vào repository:
 
@@ -47,13 +31,23 @@ CLOUDINARY_FOLDER=racehorse
 
 Cấu hình nằm tại `src/main/resources/application.properties`. `spring.jpa.hibernate.ddl-auto=none` bảo đảm ứng dụng không tự tạo hoặc thay đổi schema; mọi thay đổi database phải được viết thành script mới trong `../DATABASE` và chạy chủ động bằng SSMS.
 
+`JWT_SECRET` là bắt buộc cho cả profile mặc định và `local`: cung cấp chuỗi Base64 của ít nhất 32 byte ngẫu nhiên qua biến môi trường hoặc secret store trước khi chạy backend. Khóa phát triển cũ đã công khai và bị từ chối. Có thể tạo một khóa mới cho môi trường local trong PowerShell:
+
+```powershell
+$jwtBytes = [byte[]]::new(32)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($jwtBytes)
+$env:JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
+```
+
+Lưu khóa riêng ở nơi an toàn và dùng lại qua các lần khởi động. Đổi khóa sẽ khiến access token hiện có hết hiệu lực; refresh token còn hiệu lực vẫn có thể cấp access token mới. Nếu cần buộc tất cả người dùng đăng nhập lại, phải thu hồi các phiên đăng nhập đang hoạt động. Không commit giá trị thật vào `.env.example` hoặc source code.
+
 ## Triển khai ví demo lên host
 
 Luồng thanh toán hiện tại là mô phỏng: mã hiển thị không thể quét để chuyển tiền thật; nút xác nhận demo cộng tiền vào ví. Chỉ dùng dữ liệu demo, kể cả khi triển khai công khai. Để chạy trên host:
 
 1. Cấp một địa chỉ HTTPS ổn định cho web và API. Nếu cùng origin, reverse proxy chuyển `/api/**` và `/actuator/health` tới backend, phục vụ frontend tĩnh và chuyển các đường dẫn giao diện như `/wallet` về `index.html`; để `VITE_API_URL` trống khi build frontend. Nếu khác origin, đặt `VITE_API_URL` thành URL API **trước khi build** và đặt `CORS_ALLOWED_ORIGINS` bằng origin của frontend.
 2. Thiết lập biến môi trường backend theo `.env.example`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `PAYOS_GATEWAY=fake`. Không cần khóa PayOS hay tunnel cho bản demo. Không đưa mật khẩu vào biến `VITE_*`.
-3. Sau khi duyệt thay đổi DB, áp dụng lần lượt `DATABASE/24_payos_wallet_schema.sql` và `DATABASE/25_horse_specific_service_plans.sql` lên DB đích. Hai script không thêm bảng. Không chạy script lên Azure chỉ vì deploy code.
+3. Với database triển khai ngoài local, đánh giá và áp dụng các migration phù hợp lên đúng database đích; script `setup-local.ps1` và `32`–`35` hiện dùng tên `racehorse_local`, **không tự áp dụng lên Azure**. Không chạy script lên Azure chỉ vì deploy code.
 4. Build JAR Java 21, chạy JAR hoặc `Dockerfile` hiện có với biến môi trường của host; build và phục vụ thư mục `FRONTEND/dist` bằng web server tĩnh. Xác nhận `/actuator/health` trả trạng thái khỏe.
 5. Kiểm tra tạo mã demo, xác nhận nạp ví, mua gói cho từng ngựa và tự gia hạn khi đến hạn. Mỗi ngựa có kỳ hạn và gói riêng; gói được đổi có hiệu lực ở kỳ tiếp theo.
 
@@ -87,6 +81,14 @@ mvn test
 | `GET` | `/api/users/roles` | Quản lý câu lạc bộ xem các role hợp lệ |
 | `PUT` | `/api/users/{id}/roles` | Quản lý câu lạc bộ thay role tài khoản khác |
 | `POST` | `/api/horses` | Tạo hồ sơ ngựa |
+| `GET` | `/api/horse-intake/waiting-room/pending` | Staff/Club Manager xem ngựa đã thanh toán hoặc được bảo lãnh, đang chờ đưa vào phòng chờ |
+| `POST` | `/api/horse-intake/{horseId}/waiting-room` | Staff/Club Manager xác nhận đã đưa ngựa vào phòng chờ; không đổi `paymentStatus` |
+| `GET` | `/api/medical/queue` | Bác sĩ xem ngựa đang ở phòng chờ |
+| `GET` | `/api/medical/queue/overview` | Mọi bác sĩ xem ngựa chờ khám và ca đã được bác sĩ khác tiếp nhận (chỉ xem trạng thái) |
+| `POST` | `/api/medical/queue/{horseId}/receive` | Bác sĩ nhận ngựa từ phòng chờ để khám |
+| `POST` | `/api/medical/queue/{horseId}/complete` | Bác sĩ hoàn tất sau khi lưu hồ sơ khám; ngựa chuyển sang chờ ô chuồng |
+| `GET` | `/api/horse-intake/stall/pending` | Staff/Club Manager xem ngựa đã khám xong, chờ phân ô chuồng, kể cả ngựa bị thương |
+| `POST` | `/api/stables/{stableId}/stalls/{stallId}/assign` | Staff/Club Manager phân ô chuồng cho ngựa đã khám xong |
 | `GET` | `/api/horses/{id}` | Xem chi tiết hồ sơ |
 | `GET` | `/api/horses` | Tìm kiếm, lọc trạng thái và phân trang |
 | `GET` | `/api/horses/mine` | Chủ sở hữu xem danh sách ngựa mình sở hữu |
@@ -112,13 +114,14 @@ mvn test
 | `POST` | `/api/training-plans/{id}/copy` | Sao chép kế hoạch cho ngựa khác |
 | `GET` | `/api/training-plans/{id}` | Xem chi tiết kế hoạch và các giai đoạn |
 | `GET` | `/api/horses/{id}/training-plans` | Danh sách kế hoạch của một ngựa |
-| `POST` | `/api/training-schedules` | Tạo lịch từ giai đoạn của kế hoạch active FR05 |
+| `POST` | `/api/training-schedules` | Tạo lịch từ giai đoạn active; body bắt buộc có `trainingDate` và `slotStart` (06:00–23:00, đúng giờ) |
+| `PUT` | `/api/training-schedules/{id}` | Sửa lịch; body cũng cần `slotStart` |
 | `POST` | `/api/training-schedules/{id}/publish` | Công bố lịch và tạo thông báo cho nhân viên |
 | `GET` | `/api/training-schedules?from=&to=&horseId=` | Lịch huấn luyện dành cho quản lý/HLV trưởng |
 | `GET` | `/api/training-schedules/mine?from=&to=` | Nhân viên xem lịch đã công bố của mình |
 | `POST` | `/api/racetracks` | Quản lý tạo đường đua và số làn |
 | `GET` | `/api/racetracks` | Quản lý/HLV trưởng xem danh sách đường đua |
-| `GET` | `/api/racetracks/{id}/slots?date=` | Xem các slot trống/đã đặt theo ngày và làn |
+| `GET` | `/api/racetracks/{id}/availability?date=YYYY-MM-DD&slotStart=HH:mm` | Xem làn còn trống trong slot 1 giờ đã chọn |
 | `POST` | `/api/trial-run-bookings` | Quản lý/HLV trưởng đặt một slot chạy thử |
 | `GET` | `/api/notifications?unreadOnly=` | Người dùng xem thông báo của chính mình |
 | `PATCH` | `/api/notifications/{id}/read` | Đánh dấu thông báo đã đọc |
@@ -127,13 +130,16 @@ mvn test
 | `GET` | `/api/horses/{id}/training-locks/current` | Xem khóa đang hoạt động |
 | `GET` | `/api/horses/{id}/training-locks` | Xem lịch sử khóa huấn luyện |
 
+Luồng tiếp nhận dùng `intakeStatus` trong `HorseResponse`: `PENDING_WAITING_ROOM` → `WAITING_FOR_VET` → `IN_MEDICAL` → `PENDING_STALL` → `STABLED`. `paymentStatus` vẫn chỉ biểu thị thanh toán; bảo lãnh của Club Manager dùng `serviceOverride`. Khi nhân viên đưa ngựa vào phòng chờ, mọi bác sĩ đang hoạt động được thông báo. Không có bước phân công trước: bác sĩ đầu tiên tiếp nhận sẽ phụ trách lần khám ban đầu; bác sĩ khác xem trạng thái qua `/api/medical/queue/overview` nhưng không thể tiếp nhận lại hoặc ghi hồ sơ khám ban đầu cho ca này. Sau khi hoàn tất, các lần tái khám không bị ràng buộc vào bác sĩ tiếp nhận ban đầu. Ngựa bị thương vẫn được phân ô chuồng để chăm sóc, nhưng chỉ có thể gán HLV và tạo/bắt đầu lịch tập khi ở `STABLED`, sức khỏe `FIT`, có phân ô còn hiệu lực và không còn khóa huấn luyện.
+
 ## Phân quyền API đã triển khai
 
 | Chức năng | CLUB_MANAGER | HEAD_TRAINER | HORSE_OWNER | STABLE_STAFF | VETERINARIAN |
 |---|---:|---:|---:|---:|---:|
 | Quản lý tài khoản và role | Có | Không | Không | Không | Không |
 | Tạo/sửa/lưu trữ hồ sơ ngựa | Có | Có | Không | Không | Không |
-| Gán huấn luyện viên và tỷ lệ sở hữu | Có | Có | Không | Không | Không |
+| HLV tự tiếp nhận ngựa đã khám, đủ điều kiện và có ô chuồng | Không | Có | Không | Không | Không |
+| Quản lý tỷ lệ sở hữu | Có | Có | Không | Không | Không |
 | Tìm kiếm toàn bộ ngựa | Có | Có | Không | Không | Không |
 | Xem hồ sơ/phả hệ/lịch sử đua | Có | Có | Chỉ ngựa đang sở hữu | Không | Không |
 | Thêm/sửa kết quả đua lịch sử | Có | Có | Không | Không | Không |

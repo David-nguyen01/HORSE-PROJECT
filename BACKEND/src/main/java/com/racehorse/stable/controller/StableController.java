@@ -62,14 +62,14 @@ public class StableController {
     }
 
     @PostMapping("/{stableId}/stalls/{stallId}/assign")
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAnyRole('CLUB_MANAGER','STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.AssignmentView assign(@PathVariable UUID stableId, @PathVariable UUID stallId,
                                          @AuthenticationPrincipal Jwt jwt, @Valid @RequestBody AssignmentRequest request) {
         return service.assign(stableId, stallId, request.horseId(), user(jwt));
     }
 
     @PostMapping("/assignments/{assignmentId}/end")
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAnyRole('CLUB_MANAGER','STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.AssignmentView unassign(@PathVariable UUID assignmentId, @AuthenticationPrincipal Jwt jwt) {
         return service.unassign(assignmentId, user(jwt));
     }

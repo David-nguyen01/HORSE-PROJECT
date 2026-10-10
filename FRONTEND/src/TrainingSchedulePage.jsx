@@ -11,6 +11,8 @@ const INTENSITY_LABELS = { LOW: 'Nhẹ', MEDIUM: 'Vừa', HIGH: 'Nặng' }
 const INTENSITY_COLORS = { LOW: '#2f765e', MEDIUM: '#d6a33b', HIGH: '#d16059' }
 const FITNESS_STATUS = { GREEN: 'Thể lực tốt', YELLOW: 'Cần theo dõi', RED: 'Cần chú ý' }
 const todayVN = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
+const HOURLY_SLOTS = Array.from({ length: 18 }, (_, index) => `${String(index + 6).padStart(2, '0')}:00`)
+const slotLabel = schedule => `${String(schedule.operatingWindowStart || '06:00').slice(0, 5)} - ${String(schedule.operatingWindowEnd || '07:00').slice(0, 5)}`
 
 function assigneeLabel(user, assignedBy) {
   if (!user) return 'Chờ nhận'
@@ -150,7 +152,7 @@ export default function TrainingSchedulePage({ isOwner = false, isHeadTrainer = 
             ? pageContent(result.value).map(item => isOwner ? {
               ...item,
               horse: { id: selectedHorses[index].id, code: selectedHorses[index].code, name: selectedHorses[index].name },
-              scheduledStart: `${item.trainingDate}T05:00:00`,
+              scheduledStart: `${item.trainingDate}T${item.operatingWindowStart || '06:00:00'}`,
               publishedAt: 'owner-visible',
               completedAt: item.status === 'COMPLETED' ? 'owner-completed' : null
             } : item)
@@ -377,7 +379,7 @@ export default function TrainingSchedulePage({ isOwner = false, isHeadTrainer = 
                         </span>
                       </span>
                       <span className="schedule-cell-wrap" title={decodeUnicodeEscapes(s.racetrack?.name || '-')} data-label="Sân tập">{decodeUnicodeEscapes(s.racetrack?.name || '-')} · Làn {s.lane?.number ?? '—'}</span>
-                      <span className="is-badge" data-label="Khung giờ">05:00 - 11:00</span>
+                      <span className="is-badge" data-label="Khung giờ">{slotLabel(s)}</span>
                       <span className="is-badge" data-label="Trạng thái">
                         <span className={`fitness-badge ${scheduleStatusColor(status)}`}>
                           {statusLabel}
@@ -848,7 +850,7 @@ function ScheduleDetailModal({ schedule: initial, isOwner, isHeadTrainer, canEdi
             <dt>Kế hoạch</dt><dd>{schedule.phase?.planName || '-'}</dd>
             <dt>Giai đoạn</dt><dd>{schedule.phase?.name || '-'}</dd></>}
             <dt>Ngày tập</dt><dd>{schedule.trainingDate || (schedule.scheduledStart ? new Date(schedule.scheduledStart).toLocaleDateString('vi-VN') : '-')}</dd>
-            <dt>Khung giờ</dt><dd>{schedule.operatingWindowStart || '05:00'} - {schedule.operatingWindowEnd || '11:00'}</dd>
+            <dt>Khung giờ</dt><dd>{slotLabel(schedule)}</dd>
             <dt>Đường đua / làn</dt><dd>{schedule.racetrack?.name || '-'} / {schedule.lane?.number ?? '-'}</dd>
             <dt>Cường độ</dt><dd>{INTENSITY_LABELS[schedule.workloadIntensity] || schedule.workloadIntensity || '-'}</dd>
             <dt>Trạng thái</dt><dd>{status}</dd>
@@ -885,6 +887,7 @@ function EditScheduleModal({ schedule, onClose, onSaved }) {
   const [trackId, setTrackId] = useState(schedule.racetrack?.id || '')
   const [laneId, setLaneId] = useState(schedule.lane?.id || '')
   const [form, setForm] = useState({ taskName: schedule.taskName || '', trainingDate: schedule.trainingDate || '' })
+  const [slotStart, setSlotStart] = useState(String(schedule.operatingWindowStart || '06:00').slice(0, 5))
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -898,11 +901,11 @@ function EditScheduleModal({ schedule, onClose, onSaved }) {
   }, [])
 
   useEffect(() => {
-    if (!trackId || !form.trainingDate) return
+    if (!trackId || !form.trainingDate || !slotStart) return
     let current = true
     setLoading(true)
     setError('')
-    api(`/api/racetracks/${trackId}/availability?date=${form.trainingDate}`)
+    api(`/api/racetracks/${trackId}/availability?date=${form.trainingDate}&slotStart=${slotStart}`)
       .then(value => {
         if (!current) return
         const available = pageContent(value)
@@ -916,7 +919,7 @@ function EditScheduleModal({ schedule, onClose, onSaved }) {
       .catch(err => { if (current) { setLanes([]); setError(err.message) } })
       .finally(() => { if (current) setLoading(false) })
     return () => { current = false }
-  }, [trackId, form.trainingDate, schedule])
+  }, [trackId, form.trainingDate, slotStart, schedule])
 
   const save = async event => {
     event.preventDefault()
@@ -925,7 +928,7 @@ function EditScheduleModal({ schedule, onClose, onSaved }) {
     try {
       await api(`/api/training-schedules/${schedule.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...form, racetrackId: trackId, racetrackLaneId: laneId })
+        body: JSON.stringify({ ...form, slotStart, racetrackId: trackId, racetrackLaneId: laneId })
       })
       onSaved()
     } catch (err) {
@@ -940,9 +943,10 @@ function EditScheduleModal({ schedule, onClose, onSaved }) {
       {error && <div className="notice error full">{error}</div>}
       <label className="field full"><span>Tên bài tập *</span><input required maxLength="300" value={form.taskName} onChange={event => setForm(value => ({ ...value, taskName: event.target.value }))} /></label>
       <label className="field"><span>Ngày tập *</span><input required type="date" min={schedule.trainingDate < todayVN() ? schedule.phase?.startDate : schedule.phase?.startDate > todayVN() ? schedule.phase.startDate : todayVN()} max={schedule.phase?.endDate} value={form.trainingDate} onChange={event => { setForm(value => ({ ...value, trainingDate: event.target.value })); setLaneId('') }} /></label>
+      <label className="field"><span>Slot 1 giờ *</span><select required value={slotStart} onChange={event => { setSlotStart(event.target.value); setLaneId('') }}>{HOURLY_SLOTS.map(slot => <option key={slot} value={slot}>{slot} - {slot === '23:00' ? '00:00' : `${String(Number(slot.slice(0, 2)) + 1).padStart(2, '0')}:00`}</option>)}</select></label>
       <label className="field"><span>Sân tập *</span><select required value={trackId} onChange={event => { setTrackId(event.target.value); setLaneId('') }}><option value="">Chọn sân tập</option>{tracks.map(track => <option key={track.id} value={track.id}>{track.name}</option>)}</select></label>
       <label className="field full"><span>Làn còn trống *</span><select required value={laneId} disabled={loading || !lanes.length} onChange={event => setLaneId(event.target.value)}><option value="">{loading ? 'Đang tải làn...' : 'Chọn làn'}</option>{lanes.map(lane => <option key={lane.laneId} value={lane.laneId}>Làn {lane.laneNumber}</option>)}</select></label>
-      <div className="evaluation-note full">Khung giờ cố định: 05:00 - 11:00. Nhân viên chăm sóc được thông báo theo hồ sơ ngựa.</div>
+      <div className="evaluation-note full">Đường đua mở 06:00 - 00:00; mỗi slot dài 1 giờ. Nhân viên chăm sóc được thông báo theo hồ sơ ngựa.</div>
       <div className="modal-actions full"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button className="button primary" disabled={busy || loading || !laneId}>{busy ? 'Đang lưu...' : 'Lưu thay đổi'}</button></div>
     </form>
   </div></div>
@@ -974,6 +978,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
   const [availabilityError, setAvailabilityError] = useState('')
   const [selectedLane, setSelectedLane] = useState('')
   const [form, setForm] = useState({ taskName: '', trainingDate: '' })
+  const [slotStart, setSlotStart] = useState('06:00')
   const [lockStatus, setLockStatus] = useState({ state: 'idle', reason: '' })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -1006,7 +1011,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
 
   useEffect(() => {
     setSelectedLane('')
-    if (!selectedRacetrack || !form.trainingDate) {
+    if (!selectedRacetrack || !form.trainingDate || !slotStart) {
       setAvailability([])
       setAvailabilityError('')
       return
@@ -1014,12 +1019,12 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
     let current = true
     setAvailabilityLoading(true)
     setAvailabilityError('')
-    api(`/api/racetracks/${selectedRacetrack}/availability?date=${form.trainingDate}`)
+    api(`/api/racetracks/${selectedRacetrack}/availability?date=${form.trainingDate}&slotStart=${slotStart}`)
       .then(value => { if (current) setAvailability(pageContent(value)) })
       .catch(err => { if (current) { setAvailability([]); setAvailabilityError(err.message) } })
       .finally(() => { if (current) setAvailabilityLoading(false) })
     return () => { current = false }
-  }, [selectedRacetrack, form.trainingDate])
+  }, [selectedRacetrack, form.trainingDate, slotStart])
 
   useEffect(() => {
     if (!selectedHorse) {
@@ -1055,7 +1060,8 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
           taskName: form.taskName,
           racetrackId: selectedRacetrack,
           racetrackLaneId: selectedLane,
-          trainingDate: form.trainingDate
+          trainingDate: form.trainingDate,
+          slotStart
         })
       })
       onSaved()
@@ -1113,10 +1119,11 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
             <span>Ngày tập *</span>
             <input required type="date" min={phase?.startDate > todayVN() ? phase.startDate : todayVN()} max={phase?.endDate} value={form.trainingDate} onChange={e => setForm({ ...form, trainingDate: e.target.value })} />
           </label>
+          <label className="field"><span>Slot 1 giờ *</span><select required value={slotStart} onChange={e => setSlotStart(e.target.value)}>{HOURLY_SLOTS.map(slot => <option key={slot} value={slot}>{slot} - {slot === '23:00' ? '00:00' : `${String(Number(slot.slice(0, 2)) + 1).padStart(2, '0')}:00`}</option>)}</select></label>
           <label className="field">
             <span>Làn còn trống *</span>
             <select required value={selectedLane} disabled={!selectedRacetrack || !form.trainingDate || availabilityLoading || !availability.length} onChange={e => setSelectedLane(e.target.value)}>
-              <option value="">{availabilityLoading ? 'Đang tải làn...' : availabilityError ? 'Không tải được làn' : !selectedRacetrack || !form.trainingDate ? 'Chọn đường đua và ngày trước' : availability.length ? 'Chọn làn' : 'Không còn làn trống trong ngày này'}</option>
+              <option value="">{availabilityLoading ? 'Đang tải làn...' : availabilityError ? 'Không tải được làn' : !selectedRacetrack || !form.trainingDate ? 'Chọn đường đua và ngày trước' : availability.length ? 'Chọn làn' : 'Không còn làn trống trong slot này'}</option>
               {availability.map(lane => <option key={lane.laneId} value={lane.laneId}>Làn {lane.laneNumber}</option>)}
             </select>
           </label>
@@ -1130,7 +1137,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
           {phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'locked' && <div className="notice error full"><X size={17} />Ngựa đang bị khóa huấn luyện: {lockStatus.reason}. Không thể tạo buổi cường độ cao.</div>}
           {phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'loading' && <p className="full evaluation-note">Đang kiểm tra khóa huấn luyện…</p>}
           {phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'error' && <div className="notice error full"><X size={17} />Không thể kiểm tra khóa huấn luyện: {lockStatus.reason}. Máy chủ vẫn sẽ áp dụng quy tắc khóa khi lưu.</div>}
-          <p className="full evaluation-note">Khung giờ vận hành buổi tập: 05:00 - 11:00</p>
+          <p className="full evaluation-note">Đường đua mở 06:00 - 00:00; mỗi slot dài 1 giờ.</p>
 
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
@@ -1227,8 +1234,8 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
           {error && <div className="notice error full"><X size={17} />{error}</div>}
           {loading && <div className="notice full">Đang tải bài đánh giá…</div>}
 
-          <label className="field"><span>Khung giờ vận hành</span><input readOnly value="05:00 - 11:00" /></label>
-          <label className="field"><span>Thời lượng vận động thực tế (phút) *</span><input type="number" min="1" required value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} /><small>Thời lượng vận động thực tế của ngựa (không phải toàn bộ khung giờ 6 tiếng của sân).</small></label>
+          <label className="field"><span>Slot buổi tập</span><input readOnly value={slotLabel(schedule)} /></label>
+          <label className="field"><span>Thời lượng vận động thực tế (phút) *</span><input type="number" min="1" required value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} /><small>Thời lượng vận động thực tế của ngựa trong slot 1 giờ.</small></label>
           <label className="field"><span>Quãng đường (m) *</span><input type="number" step="0.01" min="0.01" required value={form.distanceMeters} onChange={e => setForm({...form, distanceMeters: e.target.value})} /></label>
           <label className="field"><span>Thời gian hoàn thành đường chạy (giây) *</span><input type="number" step="0.001" min="0.001" required value={form.trackCompletionSeconds} onChange={e => setForm({...form, trackCompletionSeconds: e.target.value})} /></label>
           <label className="field"><span>Tốc độ TB tính toán (km/h)</span><input readOnly value={average > 0 ? average.toFixed(2) : '-'} /><small>Nhập quãng đường và thời gian hoàn thành để tính tốc độ.</small></label>

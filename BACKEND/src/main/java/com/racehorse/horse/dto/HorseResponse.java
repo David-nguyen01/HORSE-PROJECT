@@ -29,6 +29,7 @@ public record HorseResponse(
         Instant createdAt,
         Instant updatedAt,
         String paymentStatus,
+        String intakeStatus,
         Boolean serviceOverride,
         String overrideReason,
         LocalDate paidUntil

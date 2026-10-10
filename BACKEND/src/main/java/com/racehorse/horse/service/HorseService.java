@@ -77,6 +77,9 @@ public class HorseService {
 
     @Transactional
     public HorseResponse create(CreateHorseRequest request) {
+        if (request.currentTrainerId() != null || request.stableLocation() != null && !request.stableLocation().isBlank()) {
+            throw new BusinessException("Huấn luyện viên và ô chuồng chỉ được phân công sau quy trình tiếp nhận y tế");
+        }
         if (request.initialOwnerId() == null) {
             throw new BusinessException("Mỗi ngựa phải có đúng một chủ sở hữu");
         }
@@ -94,7 +97,6 @@ public class HorseService {
         horse.assignParents(sire, dam);
         horse.assignManualParents(trimToNull(request.sireManualName()), trimToNull(request.sireManualId()),
                 trimToNull(request.damManualName()), trimToNull(request.damManualId()));
-        horse.assignCurrentTrainer(findTrainer(request.currentTrainerId()));
         Horse saved = horseRepository.save(horse);
 
         if (request.initialOwnerId() != null) {
@@ -130,10 +132,20 @@ public class HorseService {
     }
 
     @Transactional(readOnly = true)
-    public HorseResponse getByIdForUser(UUID id, UUID userId, boolean privileged) {
+    public HorseResponse getByIdForUser(UUID id, UUID userId, Role role) {
         Horse horse = findHorse(id);
-        if (!privileged && (horse.getArchivedAt() != null
-                || !ownershipRepository.existsByHorseIdAndOwnerId(id, userId))) {
+        boolean allowed = switch (role) {
+            case CLUB_MANAGER -> true;
+            case HEAD_TRAINER -> horse.getArchivedAt() == null && isServiceVisible(horse)
+                    && "STABLED".equals(horse.getIntakeStatus())
+                    && horse.getCurrentTrainer() != null && userId.equals(horse.getCurrentTrainer().getId());
+            case VETERINARIAN -> horse.getArchivedAt() == null && isServiceVisible(horse)
+                    && Set.of("WAITING_FOR_VET", "IN_MEDICAL", "PENDING_STALL", "STABLED").contains(horse.getIntakeStatus());
+            case STABLE_STAFF -> horse.getArchivedAt() == null && isServiceVisible(horse);
+            case HORSE_OWNER -> horse.getArchivedAt() == null
+                    && ownershipRepository.existsByHorseIdAndOwnerId(id, userId);
+        };
+        if (!allowed) {
             throw new ResourceNotFoundException("Không tìm thấy ngựa được phép truy cập: " + id);
         }
         return toResponse(horse);
@@ -148,7 +160,7 @@ public class HorseService {
     public Page<HorseResponse> search(String query, HorseStatus status, boolean paidOnly, Pageable pageable) {
         String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
         return (paidOnly
-                ? horseRepository.searchPaidOnly(normalizedQuery, status, pageable)
+                ? horseRepository.searchPaidOnly(normalizedQuery, status, serviceToday(), pageable)
                 : horseRepository.search(normalizedQuery, status, pageable))
                 .map(this::toResponse);
     }
@@ -156,14 +168,32 @@ public class HorseService {
     @Transactional(readOnly = true)
     public Page<HorseResponse> searchForTrainer(String query, HorseStatus status, UUID trainerId, Pageable pageable) {
         String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
-        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, pageable).map(this::toResponse);
+        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, serviceToday(), pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<HorseResponse> searchForVeterinarian(String query, HorseStatus status, Pageable pageable) {
+        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+        return horseRepository.searchForVeterinarian(normalizedQuery, status, serviceToday(), pageable)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public List<HorseResponse> getEligibleForMedical() {
-        return horseRepository.findEligibleForMedical().stream()
+        return horseRepository.findEligibleForMedical(serviceToday()).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private LocalDate serviceToday() {
+        return LocalDate.now(clock.withZone(ZoneId.of("Asia/Ho_Chi_Minh")));
+    }
+
+    private boolean isServiceVisible(Horse horse) {
+        if (Boolean.TRUE.equals(horse.getServiceOverride())) return true;
+        if (!"PAID".equals(horse.getPaymentStatus())) return false;
+        return horse.getPaidUntil() == null || !horse.getPaidUntil().isBefore(serviceToday());
     }
 
     @Transactional(readOnly = true)
@@ -174,6 +204,11 @@ public class HorseService {
     @Transactional
     public HorseResponse update(UUID id, UpdateHorseRequest request) {
         Horse horse = findHorse(id);
+        UUID existingTrainerId = horse.getCurrentTrainer() == null ? null : horse.getCurrentTrainer().getId();
+        if (!java.util.Objects.equals(request.currentTrainerId(), existingTrainerId)
+                || !java.util.Objects.equals(request.stableLocation() == null ? "" : request.stableLocation(), horse.getStableLocation())) {
+            throw new BusinessException("Không thể phân chuồng hoặc gán HLV qua API sửa hồ sơ; dùng quy trình tiếp nhận");
+        }
         validateDistinctParents(request.sireId(), request.damId());
         validateManualParents(request.sireId(), request.sireManualName(), request.sireManualId(),
                 request.damId(), request.damManualName(), request.damManualId());
@@ -202,12 +237,11 @@ public class HorseService {
                 request.gender(),
                 request.colorMarkings().trim(),
                 request.breed().trim(),
-                request.stableLocation().trim(),
+                horse.getStableLocation(),
                 request.status());
         horse.assignParents(sire, dam);
         horse.assignManualParents(trimToNull(request.sireManualName()), trimToNull(request.sireManualId()),
                 trimToNull(request.damManualName()), trimToNull(request.damManualId()));
-        horse.assignCurrentTrainer(findTrainer(request.currentTrainerId()));
         notifyResponsible(horse);
         return toResponse(horse);
     }

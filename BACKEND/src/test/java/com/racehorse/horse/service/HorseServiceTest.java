@@ -1,6 +1,7 @@
 package com.racehorse.horse.service;
 
 import com.racehorse.common.exception.BusinessException;
+import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.entity.UserAccount;
@@ -94,7 +95,7 @@ class HorseServiceTest {
                 null,
                 null,
                 null,
-                "Stable B-01",
+                "",
                 HorseStatus.ACTIVE,
                 ownerId
         );
@@ -269,6 +270,55 @@ class HorseServiceTest {
         verify(ownershipRepository, never()).deleteByHorseId(any(UUID.class));
     }
 
+    @Test
+    void unpaidHorseIsHiddenFromVeterinarianAndStableStaffButVisibleToManager() {
+        UUID horseId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Horse horse = horseEntity("H-UNPAID");
+        ReflectionTestUtils.setField(horse, "id", horseId);
+        horse.setPaymentStatus("UNPAID");
+        when(horseRepository.findDetailById(horseId)).thenReturn(Optional.of(horse));
+
+        assertThatThrownBy(() -> horseService.getByIdForUser(horseId, userId, Role.VETERINARIAN))
+                .isInstanceOf(ResourceNotFoundException.class);
+        assertThatThrownBy(() -> horseService.getByIdForUser(horseId, userId, Role.STABLE_STAFF))
+                .isInstanceOf(ResourceNotFoundException.class);
+        when(ownershipRepository.findByHorseIdOrderByOwnerUsernameAsc(horseId)).thenReturn(List.of());
+        assertThat(horseService.getByIdForUser(horseId, userId, Role.CLUB_MANAGER).id()).isEqualTo(horseId);
+    }
+
+    @Test
+    void paidOrSponsoredHorseIsVisibleToCareRolesButExpiredPlanIsNot() {
+        UUID horseId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Horse horse = horseEntity("H-PAID");
+        ReflectionTestUtils.setField(horse, "id", horseId);
+        horse.setPaymentStatus("PAID");
+        horse.setIntakeStatus("WAITING_FOR_VET");
+        horse.setPaidUntil(LocalDate.of(2026, 9, 12));
+        when(horseRepository.findDetailById(horseId)).thenReturn(Optional.of(horse));
+        when(ownershipRepository.findByHorseIdOrderByOwnerUsernameAsc(horseId)).thenReturn(List.of());
+
+        assertThat(horseService.getByIdForUser(horseId, userId, Role.VETERINARIAN).id()).isEqualTo(horseId);
+        horse.setPaidUntil(LocalDate.of(2026, 9, 9));
+        assertThatThrownBy(() -> horseService.getByIdForUser(horseId, userId, Role.STABLE_STAFF))
+                .isInstanceOf(ResourceNotFoundException.class);
+        horse.setServiceOverride(true);
+        assertThat(horseService.getByIdForUser(horseId, userId, Role.STABLE_STAFF).id()).isEqualTo(horseId);
+    }
+
+    @Test
+    void trainerCannotOpenAnotherTrainersHorseByGuessingItsId() {
+        UUID horseId = UUID.randomUUID();
+        Horse horse = horseEntity("H-TRAINER");
+        ReflectionTestUtils.setField(horse, "id", horseId);
+        horse.setPaymentStatus("PAID");
+        when(horseRepository.findDetailById(horseId)).thenReturn(Optional.of(horse));
+
+        assertThatThrownBy(() -> horseService.getByIdForUser(horseId, UUID.randomUUID(), Role.HEAD_TRAINER))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     private CreateHorseRequest request(String code, HorseStatus status) {
         return new CreateHorseRequest(
                 code,
@@ -281,7 +331,7 @@ class HorseServiceTest {
                 null,
                 null,
                 null,
-                "Stable A-01",
+                "",
                 status,
                 UUID.fromString("00000000-0000-0000-0000-000000000001"));
     }

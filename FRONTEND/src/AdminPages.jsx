@@ -371,7 +371,7 @@ function CreateAccount({onClose,onSaved}){
       setError('Mật khẩu cần ít nhất 8 ký tự');
       return;
     }
-    try{
+    if(!form.roles||form.roles.length!==1){setError('Mỗi tài khoản chỉ được có đúng một vai trò');return;} try{
       await api('/api/users',{method:'POST',body:JSON.stringify(form)});
       onSaved();
     }catch(x){
@@ -396,7 +396,7 @@ function CreateAccount({onClose,onSaved}){
 function ManageAccount({user,onClose,onSaved}){
   const [username,setUsername]=useState(user.username);
   const [email,setEmail]=useState(user.email);
-  const [roles,setRoles]=useState(user.roles);
+  const [roles,setRoles]=useState(user.roles&&user.roles.length?[user.roles[0]]:['STABLE_STAFF']);
   const [password,setPassword]=useState('');
   const [error,setError]=useState('');
   const run=async fn=>{setError('');try{await fn();onSaved()}catch(e){setError(e.message)}};
@@ -407,7 +407,7 @@ function ManageAccount({user,onClose,onSaved}){
       <Input label="Email" type="email" value={email} onChange={setEmail}/>
       <button className="button secondary" onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}`,{method:'PUT',body:JSON.stringify({username,email})}))}><Pencil size={16}/>Lưu thông tin</button>
       <RoleChecks chosen={roles} setChosen={setRoles}/>
-      <button className="button secondary" onClick={()=>run(()=>api(`/api/users/${user.id}/roles`,{method:'PUT',body:JSON.stringify({roles})}))}><ShieldCheck size={16}/>Lưu vai trò</button>
+      <button className="button secondary" onClick={()=>run(()=>api(`/api/users/${user.id}/roles`,{method:'PUT',body:JSON.stringify({roles:roles.slice(0,1)})}))}><ShieldCheck size={16}/>Lưu vai trò</button>
       <div style={{display:'grid',gap:'4px'}}>
         <div className="inline-action">
           <input type="password" minLength="8" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mật khẩu mới, tối thiểu 8 ký tự"/>
@@ -421,7 +421,7 @@ function ManageAccount({user,onClose,onSaved}){
   </Dialog>;
 }
 
-function RoleChecks({chosen,setChosen}){const toggle=r=>setChosen(chosen.includes(r)?chosen.filter(x=>x!==r):[...chosen,r]);return <div className="compact-roles">{Object.entries(ROLES).map(([r,l])=><label className={chosen.includes(r)?'chosen':''} key={r}><input type="checkbox" checked={chosen.includes(r)} onChange={()=>toggle(r)}/><span>{l}</span>{chosen.includes(r)&&<Check size={15}/>}</label>)}</div>}
+function RoleChecks({chosen,setChosen}){const selectedRole=chosen&&chosen.length?chosen[0]:'';return <div className="compact-roles">{Object.entries(ROLES).map(([r,l])=><label className={selectedRole===r?'chosen':''} key={r}><input type="radio" name="admin-account-role" checked={selectedRole===r} onChange={()=>setChosen([r])}/><span>{l}</span>{selectedRole===r&&<Check size={15}/>}</label>)}</div>}
 
 export function ArchivedHorses(){const [items,setItems]=useState([]);const [query,setQuery]=useState('');const [error,setError]=useState('');const [loading,setLoading]=useState(true);const load=useCallback(()=>{setLoading(true);api(`/api/admin/horses/archived?size=100&query=${encodeURIComponent(query)}`).then(res=>setItems(Array.isArray(res)?res:[])).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[query]);useEffect(()=>{void load()},[load]);const safeItems=Array.isArray(items)?items:[];const restore=async h=>{if(!confirm(`Khôi phục hồ sơ ${h.name}?`))return;try{await api(`/api/admin/horses/${h.id}/restore`,{method:'PATCH'});await load()}catch(e){setError(e.message)}};return <><Heading eyebrow="QUẢN LÝ NGỰA" title="Hồ sơ đã lưu trữ" text="Kiểm tra và khôi phục hồ sơ ngựa khi cần."/><div className="toolbar card"><label className="search-box"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Tên hoặc mã ngựa…"/></label></div>{error&&<Notice text={error}/>}<section className="card archived-list">{loading ? <div className="simple-empty">Đang tải hồ sơ lưu trữ…</div> : !safeItems.length ? <div className="simple-empty">Không có hồ sơ đã lưu trữ.</div> : safeItems.map(h=><div key={h.id}><div><b>{h.name}</b><small>{h.code} · {h.breed} · Lưu {h.archivedAt ? new Date(h.archivedAt).toLocaleString('vi-VN') : '—'}</small></div><button className="button secondary" onClick={()=>restore(h)}><ArchiveRestore size={16}/>Khôi phục</button></div>)}</section></>}
 

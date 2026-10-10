@@ -123,12 +123,23 @@ class UserManagementServiceTest {
         UserResponse response = service.updateRoles(
                 managerId,
                 targetId,
-                new UpdateUserRolesRequest(Set.of(Role.HEAD_TRAINER, Role.VETERINARIAN)));
+                new UpdateUserRolesRequest(Set.of(Role.HEAD_TRAINER)));
 
         assertThat(response.roles())
-                .containsExactlyInAnyOrder(Role.HEAD_TRAINER, Role.VETERINARIAN);
+                .containsExactly(Role.HEAD_TRAINER);
         verify(userRepository).findById(targetId);
         verify(loginSessionRepository).revokeAllActiveByUserId(targetId, clock.instant());
+    }
+
+    @Test
+    void cannotAssignMultipleRolesToUser() {
+        UUID managerId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UpdateUserRolesRequest request = new UpdateUserRolesRequest(Set.of(Role.HEAD_TRAINER, Role.VETERINARIAN));
+
+        assertThatThrownBy(() -> service.updateRoles(managerId, targetId, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Mỗi tài khoản chỉ được có đúng một vai trò");
     }
 
     @Test

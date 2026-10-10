@@ -145,7 +145,7 @@ IF NOT EXISTS (SELECT 1 FROM dbo.stables WHERE id = @stableAId)
     INSERT INTO dbo.stables (id, name, location, is_active)
     VALUES (@stableAId, N'Chuồng A', N'Khu chuồng trại A (Chăm sóc & Phục hồi)', 1);
 
--- 10 Neutral Racetracks with 4 lanes each (05:00 - 11:00)
+-- 10 Neutral Racetracks with 4 lanes each (06:00 - midnight, hourly slots)
 DECLARE @TrackNames TABLE (name NVARCHAR(200) NOT NULL PRIMARY KEY);
 INSERT INTO @TrackNames (name)
 VALUES
@@ -153,7 +153,7 @@ VALUES
     (N'Sân tập 06'), (N'Sân tập 07'), (N'Sân tập 08'), (N'Sân tập 09'), (N'Sân tập 10');
 
 INSERT INTO dbo.racetracks (id, name, is_active, opens_at, closes_at, closes_next_day, slot_minutes)
-SELECT NEWID(), names.name, 1, '05:00:00', '11:00:00', 0, 360
+SELECT NEWID(), names.name, 1, '06:00:00', '00:00:00', 1, 60
 FROM @TrackNames names
 WHERE NOT EXISTS (SELECT 1 FROM dbo.racetracks WHERE name = names.name);
 

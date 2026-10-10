@@ -7,6 +7,7 @@ import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -104,7 +105,7 @@ public class StableService {
 
         // 3. Chuyển tất cả ngựa bị ảnh hưởng ra khỏi chuồng (vị trí chuồng thành rỗng)
         for (UUID hId : assignedHorseIds) {
-            jdbc.update("update horses set stable_location='', updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
+            jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
         }
 
         // 4. Xóa tất cả các ô chuồng (STALL) của chuồng này
@@ -153,7 +154,7 @@ public class StableService {
                 now.toString(), actor.toString(), stallId.toString());
 
         for (UUID hId : assignedHorseIds) {
-            jdbc.update("update horses set stable_location='', updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
+            jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
         }
 
         // Xóa hẳn ô chuồng khỏi module_records
@@ -173,19 +174,30 @@ public class StableService {
         if (stall.currentAssignment() != null && stall.currentAssignment().horseId().equals(horseId))
             throw new BusinessException("Ngựa đã được phân vào ô chuồng này");
 
-        // 1. Kiểm tra điều kiện dịch vụ (đã thanh toán hoặc được Club Manager bảo lãnh)
+        // Khóa bi quan (pessimistic lock) trên ô chuồng, khu chuồng và ngựa để chống tranh chấp đồng thời
+        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='STABLE_CARE' and record_type='STALL'", UUID.class, stallId);
+        jdbc.queryForObject("select id from stables with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, stableId);
+        jdbc.queryForObject("select id from horses with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, horseId);
+
         Horse horse = horseAccess.requireServiceEligible(horseId);
+        Integer currentAssignment = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and horse_id=?", Integer.class, horseId);
+        boolean movingStall = "STABLED".equals(horse.getIntakeStatus()) && currentAssignment != null && currentAssignment > 0;
+        if (!("PENDING_STALL".equals(horse.getIntakeStatus()) || movingStall)
+                || horse.getDiagnosingVet() == null) {
+            throw new BusinessException("Bác sĩ phải hoàn tất khám trước khi nhân viên phân ô chuồng");
+        }
 
         // 2. Quy tắc sức chứa: Mỗi chuồng chứa tối đa 4 con ngựa
         Integer occupiedInStable = jdbc.queryForObject(
-                "select count(distinct horse_id) from module_records where module_code='STABLE_CARE' "
+                "select count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' "
                 + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?",
                 Integer.class, stableId.toString(), horseId);
         if (occupiedInStable != null && occupiedInStable >= 4) {
             throw new BusinessException("Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa");
         }
 
-        Integer occupied = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
+        Integer occupied = jdbc.queryForObject("select count(*) from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' "
                 + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?",
                 Integer.class, stallId.toString(), horseId);
         if (occupied != null && occupied > 0) throw new BusinessException("Ô chuồng đã có ngựa");
@@ -199,10 +211,24 @@ public class StableService {
         data.put("stallCode", stall.code());
         data.put("assignedFrom", now.toString());
         data.put("assignedUntil", null);
-        jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,event_date,data_json) "
-                        + "values(?,'STABLE_CARE','STALL_ASSIGNMENT','api',?,?,'ACTIVE',cast(? as date),?)",
-                assignmentId, horseId, actor, now, toJson(data));
-        jdbc.update("update horses set stable_location=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+        try {
+            jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,event_date,data_json) "
+                            + "values(?,'STABLE_CARE','STALL_ASSIGNMENT','api',?,?,'ACTIVE',cast(? as date),?)",
+                    assignmentId, horseId, actor, now, toJson(data));
+        } catch (DataAccessException exception) {
+            String message = exception.getMessage() != null ? exception.getMessage() : "";
+            if (message.contains("52001") || message.contains("không thể phân bổ trùng") || message.contains("đã có phân bổ hoạt động")) {
+                throw new BusinessException("Ô chuồng đã có phân bổ hoạt động, không thể phân bổ trùng");
+            }
+            if (message.contains("52002") || message.contains("Ngựa đã có phân bổ ô chuồng đang hoạt động")) {
+                throw new BusinessException("Ngựa đã có phân bổ ô chuồng đang hoạt động");
+            }
+            if (message.contains("52003") || message.contains("đã đạt sức chứa tối đa 4 con ngựa")) {
+                throw new BusinessException("Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa");
+            }
+            throw exception;
+        }
+        jdbc.update("update horses set stable_location=?,intake_status='STABLED',updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 stable.name() + " / " + stall.code(), horseId);
         return new AssignmentView(assignmentId, stableId, stable.name(), stallId, stall.code(), horseId,
                 horse.getName(), horse.getCode(), actor, now, null, true);
@@ -215,7 +241,7 @@ public class StableService {
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update("update module_records set status='ENDED',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=?",
                 now.toString(), actor.toString(), assignmentId);
-        jdbc.update("update horses set stable_location='',updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+        jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 current.horseId());
         return new AssignmentView(current.id(), current.stableId(), current.stableName(), current.stallId(),
                 current.stallCode(), current.horseId(), current.horseName(), current.horseCode(), current.assignedBy(), current.assignedFrom(), now, false);
@@ -266,7 +292,7 @@ public class StableService {
                         + "h.health_status, h.status horse_status, h.health_source_type, "
                         + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
                         + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason "
-                        + "from module_records m join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
+                        + "from module_records m with (UPDLOCK, HOLDLOCK) join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
                         + "left join horses h on h.id=m.horse_id "
                         + "where m.id=? and m.record_type='STALL_ASSIGNMENT'",
                 (rs, row) -> {

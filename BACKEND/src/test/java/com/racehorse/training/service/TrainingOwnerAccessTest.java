@@ -88,6 +88,7 @@ class TrainingOwnerAccessTest {
         when(horse.getCurrentTrainer()).thenReturn(mock(UserAccount.class));
         when(schedule.getPublishedAt()).thenReturn(Instant.parse("2026-10-01T00:00:00Z"));
         when(schedule.getScheduledStart()).thenReturn(Instant.parse("2026-10-03T22:00:00Z"));
+        when(schedule.getScheduledEnd()).thenReturn(Instant.parse("2026-10-03T23:00:00Z"));
         when(schedules.findOwnerVisibleByHorseId(horseId)).thenReturn(List.of(schedule));
         when(bookings.findByTrainingScheduleId(scheduleId)).thenReturn(Optional.empty());
         when(evaluations.findByTrainingScheduleId(scheduleId)).thenReturn(Optional.empty());

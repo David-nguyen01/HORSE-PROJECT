@@ -2,9 +2,11 @@ package com.racehorse.stable.service;
 
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
+import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import tools.jackson.databind.ObjectMapper;
@@ -112,5 +114,137 @@ class StableServiceTest {
         service.deleteDailyRoutine(routineId);
 
         verify(jdbc).update(contains("update module_records set status='INACTIVE'"), eq(routineId));
+    }
+
+    @Test
+    void assignLocksResourcesAndSucceeds() {
+        UUID stableId = UUID.randomUUID();
+        UUID stallId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        StableService.StallView stall = new StableService.StallView(stallId, "S-01", true, null);
+        StableService.StableView stable = new StableService.StableView(stableId, "Barn Alpha", "North Wing", true, List.of(stall));
+
+        when(jdbc.query(contains("from stables where id=?"), any(RowMapper.class), eq(stableId)))
+                .thenReturn(List.of(stable));
+
+        Horse horse = mock(Horse.class);
+        when(horse.getName()).thenReturn("Thunder");
+        when(horse.getCode()).thenReturn("H-01");
+        when(horseAccess.requireServiceEligible(horseId)).thenReturn(horse);
+        when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
+        when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
+
+        when(jdbc.queryForObject(contains("select id from module_records with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stallId)))
+                .thenReturn(stallId);
+        when(jdbc.queryForObject(contains("select id from stables with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stableId)))
+                .thenReturn(stableId);
+        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
+
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+                .thenReturn(1);
+        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+                .thenReturn(0);
+
+        StableService.AssignmentView result = service.assign(stableId, stallId, horseId, actor);
+
+        assertThat(result.stableId()).isEqualTo(stableId);
+        assertThat(result.stallId()).isEqualTo(stallId);
+        assertThat(result.horseId()).isEqualTo(horseId);
+        assertThat(result.horseName()).isEqualTo("Thunder");
+        assertThat(result.active()).isTrue();
+
+        verify(jdbc).queryForObject(contains("select id from module_records with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stallId));
+        verify(jdbc).queryForObject(contains("select id from stables with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stableId));
+        verify(jdbc).queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId));
+        verify(jdbc).update(contains("insert into module_records"), any(), eq(horseId), eq(actor), any(), anyString());
+        verify(jdbc).update(contains("update horses set stable_location=?"), eq("Barn Alpha / S-01"), eq(horseId));
+    }
+
+    @Test
+    void assignRejectsWhenStallAlreadyOccupied() {
+        UUID stableId = UUID.randomUUID();
+        UUID stallId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        StableService.StallView stall = new StableService.StallView(stallId, "S-01", true, null);
+        StableService.StableView stable = new StableService.StableView(stableId, "Barn Alpha", "North Wing", true, List.of(stall));
+
+        when(jdbc.query(contains("from stables where id=?"), any(RowMapper.class), eq(stableId)))
+                .thenReturn(List.of(stable));
+
+        Horse horse = mock(Horse.class);
+        when(horseAccess.requireServiceEligible(horseId)).thenReturn(horse);
+        when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
+        when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
+
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+                .thenReturn(1);
+        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+                .thenReturn(1);
+
+        assertThatThrownBy(() -> service.assign(stableId, stallId, horseId, actor))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ô chuồng đã có ngựa");
+    }
+
+    @Test
+    void assignRejectsWhenStableExceedsCapacity() {
+        UUID stableId = UUID.randomUUID();
+        UUID stallId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        StableService.StallView stall = new StableService.StallView(stallId, "S-01", true, null);
+        StableService.StableView stable = new StableService.StableView(stableId, "Barn Alpha", "North Wing", true, List.of(stall));
+
+        when(jdbc.query(contains("from stables where id=?"), any(RowMapper.class), eq(stableId)))
+                .thenReturn(List.of(stable));
+
+        Horse horse = mock(Horse.class);
+        when(horseAccess.requireServiceEligible(horseId)).thenReturn(horse);
+        when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
+        when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
+
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+                .thenReturn(4);
+
+        assertThatThrownBy(() -> service.assign(stableId, stallId, horseId, actor))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa");
+    }
+
+    @Test
+    void assignTranslatesDatabaseTriggerConstraintViolation() {
+        UUID stableId = UUID.randomUUID();
+        UUID stallId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        StableService.StallView stall = new StableService.StallView(stallId, "S-01", true, null);
+        StableService.StableView stable = new StableService.StableView(stableId, "Barn Alpha", "North Wing", true, List.of(stall));
+
+        when(jdbc.query(contains("from stables where id=?"), any(RowMapper.class), eq(stableId)))
+                .thenReturn(List.of(stable));
+
+        Horse horse = mock(Horse.class);
+        when(horseAccess.requireServiceEligible(horseId)).thenReturn(horse);
+        when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
+        when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
+
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+                .thenReturn(1);
+        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+                .thenReturn(0);
+
+        when(jdbc.update(contains("insert into module_records"), any(), any(), any(), any(), any()))
+                .thenThrow(new DataIntegrityViolationException("52001: Ô chuồng đã có phân bổ hoạt động, không thể phân bổ trùng."));
+
+        assertThatThrownBy(() -> service.assign(stableId, stallId, horseId, actor))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ô chuồng đã có phân bổ hoạt động, không thể phân bổ trùng");
     }
 }

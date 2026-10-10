@@ -55,6 +55,7 @@ public class HorseMapper {
                 horse.getCreatedAt(),
                 horse.getUpdatedAt(),
                 horse.getPaymentStatus(),
+                horse.getIntakeStatus(),
                 horse.getServiceOverride(),
                 horse.getOverrideReason(),
                 horse.getPaidUntil());

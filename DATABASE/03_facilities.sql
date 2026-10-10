@@ -34,11 +34,11 @@ BEGIN
         name NVARCHAR(200) NOT NULL CONSTRAINT uq_racetracks_name UNIQUE,
         location NVARCHAR(300) NULL,
         is_active BIT NOT NULL CONSTRAINT df_racetracks_is_active DEFAULT 1,
-        opens_at TIME NOT NULL CONSTRAINT df_racetracks_opens_at DEFAULT '05:00:00',
-        closes_at TIME NOT NULL CONSTRAINT df_racetracks_closes_at DEFAULT '11:00:00',
-        closes_next_day BIT NOT NULL CONSTRAINT df_racetracks_closes_next_day DEFAULT 0,
-        slot_minutes INT NOT NULL CONSTRAINT df_racetracks_slot_minutes DEFAULT 360,
-        CONSTRAINT ck_racetracks_operating_hours CHECK (opens_at = '05:00:00' AND closes_at = '11:00:00' AND closes_next_day = 0)
+        opens_at TIME NOT NULL CONSTRAINT df_racetracks_opens_at DEFAULT '06:00:00',
+        closes_at TIME NOT NULL CONSTRAINT df_racetracks_closes_at DEFAULT '00:00:00',
+        closes_next_day BIT NOT NULL CONSTRAINT df_racetracks_closes_next_day DEFAULT 1,
+        slot_minutes INT NOT NULL CONSTRAINT df_racetracks_slot_minutes DEFAULT 60,
+        CONSTRAINT ck_racetracks_operating_hours CHECK (opens_at = '06:00:00' AND closes_at = '00:00:00' AND closes_next_day = 1 AND slot_minutes = 60)
     );
 END;
 GO

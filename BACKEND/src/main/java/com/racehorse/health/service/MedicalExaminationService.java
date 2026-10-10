@@ -67,6 +67,7 @@ public class MedicalExaminationService {
             UUID veterinarianId,
             CreateMedicalExaminationRequest req) {
         Horse horse = horseAccessService.requireActive(horseId);
+        requireInitialExamAccess(horseId, veterinarianId, horse.getIntakeStatus());
 
         LocalDate today = LocalDate.now();
         if (req.examinationDate().isAfter(today)) {
@@ -208,7 +209,8 @@ public class MedicalExaminationService {
         }
 
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
-        horseAccessService.requireActive(horseId);
+        Horse horse = horseAccessService.requireActive(horseId);
+        requireInitialExamAccess(horseId, authorId, horse.getIntakeStatus());
 
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
 
@@ -492,6 +494,22 @@ public class MedicalExaminationService {
                     where id = ?
                     """,
                     actorId, horseId);
+        }
+    }
+
+    private void requireInitialExamAccess(UUID horseId, UUID veterinarianId, String intakeStatus) {
+        if ("PENDING_WAITING_ROOM".equals(intakeStatus) || "WAITING_FOR_VET".equals(intakeStatus)) {
+            throw new BusinessException("Ngựa phải được nhân viên đưa vào phòng chờ và bác sĩ tiếp nhận trước khi ghi khám ban đầu");
+        }
+        if (!"IN_MEDICAL".equals(intakeStatus)) return;
+
+        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+        Integer assignedToThisVet = jdbc.queryForObject(
+                "select count(*) from module_records where module_code='MEDICAL' "
+                        + "and record_type='MEDICAL_ASSIGNMENT' and horse_id=? and user_id=? and status='ACTIVE'",
+                Integer.class, horseId, veterinarianId);
+        if (assignedToThisVet == null || assignedToThisVet == 0) {
+            throw new BusinessException("Ca khám ban đầu đã được bác sĩ khác tiếp nhận; bạn chỉ có thể xem trạng thái");
         }
     }
 
