@@ -74,7 +74,9 @@ public class UserController {
             @Valid @RequestBody UpdateUserRolesRequest request) {
         UserResponse before=userManagementService.getById(id);
         UserResponse response=userManagementService.updateRoles(UUID.fromString(jwt.getSubject()), id, request);
-        auditService.record(UUID.fromString(jwt.getSubject()),"ACCESS","ROLE_CHANGE","USER",id,"Thay đổi vai trò tài khoản",toJson(before.roles()),toJson(response.roles()),null,null);
+        if (!before.roles().equals(response.roles())) {
+            auditService.record(UUID.fromString(jwt.getSubject()),"ACCESS","ROLE_CHANGE","USER",id,"Thay đổi vai trò tài khoản",toJson(before.roles()),toJson(response.roles()),null,null);
+        }
         return response;
     }
     private String toJson(Object value){try{return json.writeValueAsString(value);}catch(Exception e){throw new IllegalStateException("Không thể ghi dữ liệu audit",e);}}

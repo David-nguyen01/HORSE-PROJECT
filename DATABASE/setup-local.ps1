@@ -68,7 +68,8 @@ $baselineScripts = @(
     "32_stall_assignment_concurrency_lock.sql",
     "33_race_registration_lifecycle_integrity.sql",
     "34_hourly_racetrack_slots.sql",
-    "35_horse_intake_workflow.sql"
+    "35_horse_intake_workflow.sql",
+    "36_align_race_events_schema.sql"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan

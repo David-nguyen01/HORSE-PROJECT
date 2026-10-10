@@ -35,9 +35,26 @@ if ($Gateway -eq 'real') {
         $env:PAYOS_CANCEL_URL = 'http://localhost:5173/wallet'
     }
 }
-$env:JAVA_HOME = (Resolve-Path (Join-Path $PSScriptRoot '..\.tools\jdk-21.0.12.1+1')).Path
-$env:Path = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:Path
-$maven = (Resolve-Path (Join-Path $PSScriptRoot '..\.tools\apache-maven-3.9.16\bin\mvn.cmd')).Path
+$jwtSecret = [Environment]::GetEnvironmentVariable('JWT_SECRET', 'User')
+if ([string]::IsNullOrWhiteSpace($jwtSecret)) {
+    $jwtSecret = [Environment]::GetEnvironmentVariable('JWT_SECRET', 'Process')
+}
+if (-not [string]::IsNullOrWhiteSpace($jwtSecret)) {
+    $env:JWT_SECRET = $jwtSecret
+}
+
+$toolsJdk = Join-Path $PSScriptRoot '..\.tools\jdk-21.0.12.1+1'
+if (Test-Path -LiteralPath $toolsJdk) {
+    $env:JAVA_HOME = (Resolve-Path $toolsJdk).Path
+    $env:Path = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:Path
+}
+$toolsMvn = Join-Path $PSScriptRoot '..\.tools\apache-maven-3.9.16\bin\mvn.cmd'
+if (Test-Path -LiteralPath $toolsMvn) {
+    $maven = (Resolve-Path $toolsMvn).Path
+} else {
+    $mavenCmd = Get-Command mvn -ErrorAction SilentlyContinue
+    $maven = if ($mavenCmd) { $mavenCmd.Source } else { 'mvn' }
+}
 
 Push-Location $PSScriptRoot
 try {

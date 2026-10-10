@@ -21,7 +21,7 @@ public class TelemetryController {
     private final TelemetryService service;
     public TelemetryController(TelemetryService service){this.service=service;}
     @PostMapping("/metric-thresholds") @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') or hasRole('CLUB_MANAGER')")
     Map<String,UUID> threshold(@PathVariable UUID horseId,@AuthenticationPrincipal Jwt jwt,Authentication auth,@Valid @RequestBody CreateMetricThresholdRequest request){
         return Map.of("id",service.configureThreshold(horseId,user(jwt),manager(auth),trainer(auth),request));
     }
@@ -32,18 +32,18 @@ public class TelemetryController {
         return service.thresholds(horseId,user(jwt),manager(auth),trainer(auth),owner(auth),vet(auth),includeExpired);
     }
     @PutMapping("/metric-thresholds/{thresholdId}")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') or hasRole('CLUB_MANAGER')")
     TelemetryService.ThresholdView updateThreshold(@PathVariable UUID horseId,@PathVariable UUID thresholdId,
             @AuthenticationPrincipal Jwt jwt,Authentication auth,@Valid @RequestBody CreateMetricThresholdRequest request){
         return service.updateThreshold(horseId,thresholdId,user(jwt),manager(auth),trainer(auth),request);
     }
     @DeleteMapping("/metric-thresholds/{thresholdId}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') or hasRole('CLUB_MANAGER')")
     void endThreshold(@PathVariable UUID horseId,@PathVariable UUID thresholdId,@AuthenticationPrincipal Jwt jwt,Authentication auth){
         service.endThreshold(horseId,thresholdId,user(jwt),manager(auth),trainer(auth));
     }
     @PostMapping("/telemetry") @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') or hasRole('CLUB_MANAGER')")
     TelemetryResponse telemetry(@PathVariable UUID horseId,@AuthenticationPrincipal Jwt jwt,Authentication auth,@Valid @RequestBody CreateTelemetryRequest request){
         return service.enter(horseId,user(jwt),manager(auth),trainer(auth),request);
     }
@@ -66,7 +66,7 @@ public class TelemetryController {
         return service.alerts(horseId,user(jwt),manager(auth),trainer(auth),owner(auth),vet(auth),metric,acknowledged,from,to,page,size);
     }
     @PostMapping("/alerts/{alertId}/acknowledge")
-    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_TRAINING_EDIT') or hasRole('CLUB_MANAGER')")
     TelemetryService.AlertView acknowledge(@PathVariable UUID horseId,@PathVariable UUID alertId,@AuthenticationPrincipal Jwt jwt,Authentication auth){
         return service.acknowledge(horseId,alertId,user(jwt),manager(auth),trainer(auth));
     }

@@ -37,6 +37,8 @@ class UserManagementServiceTest {
     private UserAccountRepository userRepository;
     @Mock
     private LoginSessionRepository loginSessionRepository;
+    @Mock
+    private AccountActivityGuard activityGuard;
 
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T06:00:00Z"), ZoneOffset.UTC);
 
@@ -48,7 +50,8 @@ class UserManagementServiceTest {
                 userRepository,
                 new BCryptPasswordEncoder(4),
                 loginSessionRepository,
-                clock);
+                clock,
+                activityGuard);
     }
 
     @Test
@@ -128,7 +131,42 @@ class UserManagementServiceTest {
         assertThat(response.roles())
                 .containsExactly(Role.HEAD_TRAINER);
         verify(userRepository).findById(targetId);
+        verify(activityGuard).requireEligibleForRoleChange(targetId);
         verify(loginSessionRepository).revokeAllActiveByUserId(targetId, clock.instant());
+    }
+
+    @Test
+    void unchangedRoleDoesNotRevokeSessionsOrCheckActivity() {
+        UUID managerId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount target = new UserAccount(
+                "staff.one", "staff@example.com", "encoded-password", Set.of(Role.STABLE_STAFF));
+        when(userRepository.findById(targetId)).thenReturn(Optional.of(target));
+
+        UserResponse response = service.updateRoles(managerId, targetId,
+                new UpdateUserRolesRequest(Set.of(Role.STABLE_STAFF)));
+
+        assertThat(response.roles()).containsExactly(Role.STABLE_STAFF);
+        verify(loginSessionRepository, never()).revokeAllActiveByUserId(any(UUID.class), any(Instant.class));
+        org.mockito.Mockito.verifyNoInteractions(activityGuard);
+    }
+
+    @Test
+    void roleChangeStopsWhenAccountHasBusinessActivity() {
+        UUID managerId = UUID.randomUUID();
+        UUID targetId = UUID.randomUUID();
+        UserAccount target = new UserAccount(
+                "staff.one", "staff@example.com", "encoded-password", Set.of(Role.STABLE_STAFF));
+        when(userRepository.findById(targetId)).thenReturn(Optional.of(target));
+        org.mockito.Mockito.doThrow(new BusinessException("Đã có nghiệp vụ"))
+                .when(activityGuard).requireEligibleForRoleChange(targetId);
+
+        assertThatThrownBy(() -> service.updateRoles(managerId, targetId,
+                new UpdateUserRolesRequest(Set.of(Role.VETERINARIAN))))
+                .isInstanceOf(BusinessException.class);
+
+        assertThat(target.getRoles()).containsExactly(Role.STABLE_STAFF);
+        verify(loginSessionRepository, never()).revokeAllActiveByUserId(any(UUID.class), any(Instant.class));
     }
 
     @Test

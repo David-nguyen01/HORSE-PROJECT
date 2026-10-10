@@ -6,7 +6,7 @@ import { api, inventoryApi, stableCareApi } from './api'
 const initials = (name = '') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'RC'
 
 const ROLES={CLUB_MANAGER:'Quản lý câu lạc bộ',HEAD_TRAINER:'Huấn luyện viên trưởng',VETERINARIAN:'Bác sĩ thú y',STABLE_STAFF:'Nhân viên chuồng',HORSE_OWNER:'Chủ sở hữu ngựa'}
-const MODULES={PROFILE:'Hồ sơ ngựa',TRAINING:'Huấn luyện',MEDICAL:'Y tế',STABLE_CARE:'Chăm sóc chuồng',RACING:'Giải đua',REPORTING:'Báo cáo'}
+const MODULES={PROFILE:'Hồ sơ ngựa',TRAINING:'Huấn luyện',MEDICAL:'Y tế',STABLE_CARE:'Chăm sóc chuồng',RACING:'Giải đua',REPORTING:'Báo cáo',INVENTORY:'Kho vật tư',SYSTEM:'Hệ thống'}
 const money=(value)=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(value||0)
 const monthNow=()=>new Date().toISOString().slice(0,7)
 const priorMonth=(month)=>{
@@ -255,7 +255,7 @@ export function PermissionsPage(){
       setBusy('');
     }
   }
-  return <><Heading eyebrow="PHÂN QUYỀN RBAC" title="Ma trận quyền theo vai trò" text="Bật hoặc tắt các quyền mà từng phân hệ thực sự hỗ trợ."/>{error&&<Notice text={error}/>} {loading?<section className="card simple-empty">Đang tải ma trận quyền…</section>:modules.length?<div className="permission-grid">{roles.map(role=><section className="card permission-card" key={role}><SectionHead icon={SlidersHorizontal} title={ROLES[role]}/><div className="permission-head"><span>Phân hệ</span><span>Xem</span><span>Sửa</span><span>Duyệt</span></div>{modules.map(module=><div className="permission-row" key={module}><b>{MODULES[module]||module}</b>{['VIEW','EDIT','APPROVE'].map(action=>{const item=safeItems.find(x=>x.role===role&&x.module===module&&x.action===action);const key=`${role}-${module}-${action}`;return item?<button aria-label={`${ROLES[role]} ${MODULES[module]||module} ${action}`} disabled={busy===key} className={item.granted?'granted':''} key={action} onClick={()=>toggle(item)}>{item.granted?<Check size={15}/>:<X size={15}/>}</button>:<span className="unsupported-permission" key={action}>—</span>})}</div>)}</section>)}</div>:<section className="card simple-empty">Chưa có dữ liệu phân quyền.</section>}</>
+  return <><Heading eyebrow="PHÂN QUYỀN RBAC" title="Ma trận quyền theo vai trò" text="Bật hoặc tắt các quyền mà từng phân hệ thực sự hỗ trợ."/>{error&&<Notice text={error}/>} {loading?<section className="card simple-empty">Đang tải ma trận quyền…</section>:modules.length?<div className="permission-grid">{roles.map(role=><section className="card permission-card" key={role}><SectionHead icon={SlidersHorizontal} title={ROLES[role]}/><div className="permission-head"><span>Phân hệ</span><span>Xem</span><span>Sửa</span><span>Duyệt</span><span>Tiếp nhận</span></div>{modules.map(module=><div className="permission-row" key={module}><b>{MODULES[module]||module}</b>{['VIEW','EDIT','APPROVE','CLAIM'].map(action=>{const item=safeItems.find(x=>x.role===role&&x.module===module&&x.action===action);const key=`${role}-${module}-${action}`;return item?<button aria-label={`${ROLES[role]} ${MODULES[module]||module} ${action}`} disabled={busy===key} className={item.granted?'granted':''} key={action} onClick={()=>toggle(item)}>{item.granted?<Check size={15}/>:<X size={15}/>}</button>:<span className="unsupported-permission" key={action}>—</span>})}</div>)}</section>)}</div>:<section className="card simple-empty">Chưa có dữ liệu phân quyền.</section>}</>
 }
 function checkPasswordStrength(pw){
   if(!pw)return{score:0,label:'',color:'',width:'0%'};
@@ -407,7 +407,8 @@ function ManageAccount({user,onClose,onSaved}){
       <Input label="Email" type="email" value={email} onChange={setEmail}/>
       <button className="button secondary" onClick={()=>run(()=>api(`/api/admin/accounts/${user.id}`,{method:'PUT',body:JSON.stringify({username,email})}))}><Pencil size={16}/>Lưu thông tin</button>
       <RoleChecks chosen={roles} setChosen={setRoles}/>
-      <button className="button secondary" onClick={()=>run(()=>api(`/api/users/${user.id}/roles`,{method:'PUT',body:JSON.stringify({roles:roles.slice(0,1)})}))}><ShieldCheck size={16}/>Lưu vai trò</button>
+      <small>Chỉ đổi vai trò khi tài khoản chưa tham gia nghiệp vụ; cần bàn giao nhiệm vụ đang mở trước khi khóa.</small>
+      <button className="button secondary" disabled={roles[0]===user.roles?.[0]} onClick={()=>run(()=>api(`/api/users/${user.id}/roles`,{method:'PUT',body:JSON.stringify({roles:roles.slice(0,1)})}))}><ShieldCheck size={16}/>Lưu vai trò</button>
       <div style={{display:'grid',gap:'4px'}}>
         <div className="inline-action">
           <input type="password" minLength="8" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Mật khẩu mới, tối thiểu 8 ký tự"/>

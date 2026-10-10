@@ -24,7 +24,7 @@ public class FinanceController {
     public FinanceController(FinanceService service) { this.service = service; }
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_REPORTING_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_REPORTING_EDIT') or hasRole('CLUB_MANAGER')")
     FinanceService.TransactionView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody TransactionRequest request) {
         return service.create(user(jwt), request.horseId(), request.stableId(), request.transactionDate(),
                 request.transactionType(), request.category(), request.amount(), request.description(),

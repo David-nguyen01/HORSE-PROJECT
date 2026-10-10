@@ -23,7 +23,7 @@ Tài liệu này là đặc tả chuẩn quản trị cơ sở dữ liệu cho d
 
 ## 2. DATABASE STRUCTURE (MODULAR BASELINE)
 
-Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`35`) được `setup-local.ps1` áp dụng sau baseline:
+Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`36`) được `setup-local.ps1` áp dụng sau baseline:
 
 ```text
 DATABASE/
@@ -42,6 +42,7 @@ DATABASE/
 ├── 33_race_registration_lifecycle_integrity.sql # Ràng buộc trạng thái đăng ký đua
 ├── 34_hourly_racetrack_slots.sql   # Nâng cấp DB đã tồn tại sang slot 1 giờ
 ├── 35_horse_intake_workflow.sql     # Tách trạng thái tiếp nhận khỏi trạng thái thanh toán, giữ phân chuồng cũ
+├── 36_align_race_events_schema.sql  # Đồng bộ schema race_events (race_name, racecourse, race_class) với backend
 ├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
 ├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
 ├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên

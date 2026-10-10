@@ -17,6 +17,8 @@ import java.util.*;
 public class FinanceService {
     private static final Set<String> TYPES = Set.of("EXPENSE", "REVENUE");
     private static final Set<String> CATEGORIES = Set.of("FEED_COST", "MEDICAL_COST", "OPERATING_COST", "PRIZE_REVENUE");
+    private static final Set<String> EXPENSE_CATEGORIES = Set.of("FEED_COST", "MEDICAL_COST", "OPERATING_COST");
+    private static final Set<String> REVENUE_CATEGORIES = Set.of("PRIZE_REVENUE");
     private final JdbcTemplate jdbc;
     private final AuditService audit;
 
@@ -33,6 +35,10 @@ public class FinanceService {
         String normalizedCategory = upper(category);
         if (!TYPES.contains(normalizedType)) throw new BusinessException("transactionType chỉ nhận EXPENSE hoặc REVENUE");
         if (!CATEGORIES.contains(normalizedCategory)) throw new BusinessException("category không hợp lệ");
+        if ("EXPENSE".equals(normalizedType) && !EXPENSE_CATEGORIES.contains(normalizedCategory))
+            throw new BusinessException("Danh mục " + normalizedCategory + " không phù hợp với khoản chi (EXPENSE)");
+        if ("REVENUE".equals(normalizedType) && !REVENUE_CATEGORIES.contains(normalizedCategory))
+            throw new BusinessException("Danh mục " + normalizedCategory + " không phù hợp với khoản thu (REVENUE)");
         if (amount == null || amount.signum() < 0) throw new BusinessException("Số tiền phải lớn hơn hoặc bằng 0");
         if (horseId == null && stableId == null) throw new BusinessException("Giao dịch phải thuộc một ngựa hoặc một chuồng");
         if (Set.of("MEDICAL_COST", "PRIZE_REVENUE").contains(normalizedCategory) && horseId == null)

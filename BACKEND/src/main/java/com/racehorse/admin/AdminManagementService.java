@@ -3,6 +3,7 @@ package com.racehorse.admin;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.auth.entity.Role;
+import com.racehorse.auth.service.AccountActivityGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import com.racehorse.audit.service.AuditService;
@@ -17,7 +18,9 @@ public class AdminManagementService {
     private final PasswordEncoder encoder;
     private final AuditService audit;
     private final ObjectMapper json;
-    public AdminManagementService(JdbcTemplate jdbc, PasswordEncoder encoder,AuditService audit,ObjectMapper json) {this.jdbc=jdbc;this.encoder=encoder;this.audit=audit;this.json=json;}
+    private final AccountActivityGuard activityGuard;
+    public AdminManagementService(JdbcTemplate jdbc, PasswordEncoder encoder,AuditService audit,ObjectMapper json,
+                                  AccountActivityGuard activityGuard) {this.jdbc=jdbc;this.encoder=encoder;this.audit=audit;this.json=json;this.activityGuard=activityGuard;}
 
     @Transactional(readOnly=true)
     public List<Map<String,Object>> accounts(String query, Role role, Boolean enabled, int page, int size) {
@@ -54,6 +57,7 @@ public class AdminManagementService {
         // Serialize manager lifecycle changes so two managers cannot disable each other concurrently.
         List<UUID> managers=jdbc.query("select u.id from users u with (updlock,holdlock) where u.enabled=1 and exists(select 1 from user_roles r where r.user_id=u.id and r.role='CLUB_MANAGER')",(rs,n)->rs.getObject(1,UUID.class));
         if(!enabled&&managers.contains(id)&&managers.size()<=1)throw new BusinessException("Phải giữ ít nhất một Club Manager hoạt động");
+        if(!enabled)activityGuard.requireNoActiveAssignments(id);
         jdbc.update("update users set enabled=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",enabled,id);
         if(!enabled)revokeSessions(id);
         writeAudit(actor,"STATUS_CHANGE",id,enabled?"Mở khóa tài khoản":"Khóa tài khoản",

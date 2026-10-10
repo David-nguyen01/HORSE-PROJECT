@@ -28,15 +28,18 @@ public class UserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final LoginSessionRepository loginSessionRepository;
     private final Clock clock;
+    private final AccountActivityGuard activityGuard;
     public UserManagementService(
             UserAccountRepository userRepository,
             PasswordEncoder passwordEncoder,
             LoginSessionRepository loginSessionRepository,
-            Clock clock) {
+            Clock clock,
+            AccountActivityGuard activityGuard) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.loginSessionRepository = loginSessionRepository;
         this.clock = clock;
+        this.activityGuard = activityGuard;
     }
 
     @Transactional
@@ -74,12 +77,16 @@ public class UserManagementService {
         UserAccount target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Không tìm thấy tài khoản: " + targetUserId));
+        if (target.getRoles().equals(request.roles())) {
+            return toResponse(target);
+        }
         boolean removesManager = target.isEnabled()
                 && target.getRoles().contains(Role.CLUB_MANAGER)
                 && !request.roles().contains(Role.CLUB_MANAGER);
         if (removesManager && userRepository.findActiveClubManagersForUpdate().size() <= 1) {
             throw new BusinessException("Phải giữ ít nhất một Club Manager hoạt động");
         }
+        activityGuard.requireEligibleForRoleChange(targetUserId);
         target.replaceRoles(request.roles());
         loginSessionRepository.revokeAllActiveByUserId(targetUserId, clock.instant());
         return toResponse(target);

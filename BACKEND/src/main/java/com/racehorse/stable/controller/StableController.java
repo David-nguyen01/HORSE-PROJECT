@@ -31,32 +31,32 @@ public class StableController {
     StableService.StableView get(@PathVariable UUID stableId) { return service.get(stableId); }
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
     StableService.StableView create(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody StableRequest request) {
         return service.create(user(jwt), request.name(), request.location(), request.stallCodes());
     }
 
     @PutMapping("/{stableId}")
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
     StableService.StableView update(@PathVariable UUID stableId, @Valid @RequestBody UpdateStableRequest request) {
         return service.update(stableId, request.name(), request.location(), request.active());
     }
 
     @DeleteMapping("/{stableId}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
     void deleteStable(@PathVariable UUID stableId, @AuthenticationPrincipal Jwt jwt) {
         service.delete(stableId, user(jwt));
     }
 
     @PostMapping("/{stableId}/stalls") @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
     StableService.StableView addStall(@PathVariable UUID stableId, @AuthenticationPrincipal Jwt jwt,
                                       @Valid @RequestBody StallRequest request) {
         return service.addStall(stableId, user(jwt), request.code());
     }
 
     @DeleteMapping("/{stableId}/stalls/{stallId}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
     void deleteStall(@PathVariable UUID stableId, @PathVariable UUID stallId, @AuthenticationPrincipal Jwt jwt) {
         service.deleteStall(stableId, stallId, user(jwt));
     }

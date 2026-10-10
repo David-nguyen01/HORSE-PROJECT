@@ -500,7 +500,7 @@ Module `training` chứa FR03–FR07; telemetry FR06 do Head Trainer nhập th�
 
 `CLUB_MANAGER` là admin nghiệp vụ: quản lý tài khoản, gán role và quản lý dữ liệu câu lạc bộ. API chỉnh sửa hồ sơ ngựa dành cho `CLUB_MANAGER` và `HEAD_TRAINER`. `HORSE_OWNER` chỉ xem được ngựa có liên kết sở hữu thực tế trong database.
 
-Khi đổi role, `CLUB_MANAGER` gửi toàn bộ danh sách role thay thế tới `PUT /api/users/{id}/roles`. Danh sách không được rỗng. Quản lý câu lạc bộ không thể dùng endpoint này để tự thay đổi role của chính mình.
+Khi đổi role, `CLUB_MANAGER` gửi toàn bộ danh sách role thay thế tới `PUT /api/users/{id}/roles`. Danh sách phải có đúng một role. Chỉ tài khoản chưa có dữ liệu nghiệp vụ hoặc phân công mới được đổi role; phiên đăng nhập và thông báo không tính là nghiệp vụ. Quản lý câu lạc bộ không thể tự đổi role của chính mình. Gửi lại role hiện tại không thu hồi phiên và không ghi audit thay đổi giả.
 
 ## API nghiệp vụ mới đã chốt
 
@@ -541,7 +541,7 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 
 ### API quản trị nghiệp vụ bổ sung
 
-- `/api/admin/accounts` — lọc tài khoản theo từ khóa, role và trạng thái; sửa thông tin, khóa/mở khóa và đặt lại mật khẩu. Khóa, đặt lại mật khẩu hoặc đổi role sẽ thu hồi các phiên hiện tại.
+- `/api/admin/accounts` — lọc tài khoản theo từ khóa, role và trạng thái; sửa thông tin, khóa/mở khóa và đặt lại mật khẩu. Khi khóa, tài khoản không được còn sở hữu ngựa đang hoạt động, đang phụ trách ngựa, giữ ca khám hoặc có việc chăm sóc chưa hoàn thành. Khóa, đặt lại mật khẩu hoặc đổi role thực sự sẽ thu hồi các phiên hiện tại.
 - `/api/admin/horses/archived` và `/api/admin/horses/{id}/restore` — xem và khôi phục hồ sơ ngựa đã lưu trữ.
 - `/api/admin/dashboard?month=YYYY-MM&compareTo=YYYY-MM` — dashboard tháng gồm số buổi tập, số ngựa được tập, trạng thái xanh/vàng/đỏ, doanh thu, chi phí và chênh lệch VND.
 - `/api/admin/audit-logs` và `/api/admin/audit-logs/{id}` — tra cứu danh sách và chi tiết nhật ký; thao tác quản trị tài khoản lưu dữ liệu trước/sau thay đổi.

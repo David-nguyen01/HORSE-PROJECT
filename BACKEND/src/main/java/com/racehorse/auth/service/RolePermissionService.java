@@ -18,12 +18,14 @@ import java.util.UUID;
 @Service
 public class RolePermissionService {
     private static final Map<String, Set<String>> SUPPORTED_ACTIONS = Map.of(
-            "PROFILE", Set.of("VIEW", "EDIT", "APPROVE"),
-            "TRAINING", Set.of("VIEW", "EDIT"),
-            "MEDICAL", Set.of("VIEW", "EDIT"),
-            "STABLE_CARE", Set.of("VIEW", "EDIT"),
-            "RACING", Set.of("VIEW", "EDIT", "APPROVE"),
-            "REPORTING", Set.of("VIEW", "EDIT"));
+            "PROFILE", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "TRAINING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "MEDICAL", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "STABLE_CARE", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "RACING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "REPORTING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "INVENTORY", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
+            "SYSTEM", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"));
     private final JdbcTemplate jdbc;
 
     public RolePermissionService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
@@ -33,14 +35,12 @@ public class RolePermissionService {
         return jdbc.query("""
                 with roles(code) as (
                     select code from (values ('CLUB_MANAGER'),('HEAD_TRAINER'),('VETERINARIAN'),('STABLE_STAFF'),('HORSE_OWNER')) r(code)
+                ), modules(module_code) as (
+                    select m from (values ('PROFILE'),('TRAINING'),('MEDICAL'),('STABLE_CARE'),('RACING'),('REPORTING'),('INVENTORY'),('SYSTEM')) m(m)
+                ), actions(action_code) as (
+                    select a from (values ('VIEW'),('EDIT'),('APPROVE'),('CLAIM')) a(a)
                 ), permissions(module_code,action_code) as (
-                    select * from (values
-                        ('PROFILE','VIEW'),('PROFILE','EDIT'),('PROFILE','APPROVE'),
-                        ('TRAINING','VIEW'),('TRAINING','EDIT'),
-                        ('MEDICAL','VIEW'),('MEDICAL','EDIT'),
-                        ('STABLE_CARE','VIEW'),('STABLE_CARE','EDIT'),
-                        ('RACING','VIEW'),('RACING','EDIT'),('RACING','APPROVE'),
-                        ('REPORTING','VIEW'),('REPORTING','EDIT')) p(module_code,action_code)
+                    select module_code, action_code from modules cross join actions
                 )
                 select r.code,p.module_code,p.action_code,coalesce(rp.granted,0)
                 from roles r cross join permissions p

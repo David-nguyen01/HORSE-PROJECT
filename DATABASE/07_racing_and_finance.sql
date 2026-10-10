@@ -18,10 +18,13 @@ IF OBJECT_ID(N'dbo.race_events', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.race_events (
         id UNIQUEIDENTIFIER NOT NULL CONSTRAINT pk_race_events PRIMARY KEY,
-        name NVARCHAR(200) NOT NULL,
-        location NVARCHAR(300) NOT NULL,
+        race_name NVARCHAR(200) NULL,
+        racecourse NVARCHAR(300) NULL,
+        race_class NVARCHAR(100) NULL,
+        name NVARCHAR(200) NULL,
+        location NVARCHAR(300) NULL,
         race_date DATE NOT NULL,
-        race_time TIME NOT NULL,
+        race_time TIME NULL,
         distance_meters INT NOT NULL,
         minimum_age_years INT NULL,
         maximum_age_years INT NULL,

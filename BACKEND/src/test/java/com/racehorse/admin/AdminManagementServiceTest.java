@@ -2,6 +2,7 @@ package com.racehorse.admin;
 
 import com.racehorse.audit.service.AuditService;
 import com.racehorse.common.exception.BusinessException;
+import com.racehorse.auth.service.AccountActivityGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,11 +27,12 @@ class AdminManagementServiceTest {
     @Mock JdbcTemplate jdbc;
     @Mock PasswordEncoder encoder;
     @Mock AuditService audit;
+    @Mock AccountActivityGuard activityGuard;
     private AdminManagementService service;
 
     @BeforeEach
     void setUp() {
-        service = new AdminManagementService(jdbc, encoder, audit, new ObjectMapper());
+        service = new AdminManagementService(jdbc, encoder, audit, new ObjectMapper(), activityGuard);
     }
 
     @Test
@@ -55,6 +57,23 @@ class AdminManagementServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Không thể tự khóa");
 
+        verifyNoInteractions(audit);
+    }
+
+    @Test
+    void accountWithActiveAssignmentCannotBeDisabled() {
+        UUID actor = UUID.randomUUID();
+        UUID target = UUID.randomUUID();
+        accountSnapshot(target, true);
+        org.mockito.Mockito.doThrow(new BusinessException("Còn ca khám"))
+                .when(activityGuard).requireNoActiveAssignments(target);
+
+        assertThatThrownBy(() -> service.setEnabled(actor, target, false))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Còn ca khám");
+
+        verify(jdbc, never()).update(org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.<Object[]>any());
         verifyNoInteractions(audit);
     }
 

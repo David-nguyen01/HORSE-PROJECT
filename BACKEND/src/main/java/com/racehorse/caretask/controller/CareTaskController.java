@@ -68,7 +68,7 @@ public class CareTaskController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')")
     public CareTaskResponse createTask(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateCareTaskRequest request) {
@@ -76,7 +76,7 @@ public class CareTaskController {
     }
 
     @PostMapping(value = "/{id}/complete", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('STABLE_STAFF','HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasAnyRole('STABLE_STAFF','HEAD_TRAINER','CLUB_MANAGER')")
     public CareTaskResponse completeTaskMultipart(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -86,7 +86,7 @@ public class CareTaskController {
     }
 
     @PostMapping(value = "/{id}/complete", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.ALL_VALUE})
-    @PreAuthorize("hasAnyRole('STABLE_STAFF','HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasAnyRole('STABLE_STAFF','HEAD_TRAINER','CLUB_MANAGER')")
     public CareTaskResponse completeTaskJson(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -95,7 +95,7 @@ public class CareTaskController {
     }
 
     @PostMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_EDIT') or hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')")
     public CareTaskResponse cancelTask(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {

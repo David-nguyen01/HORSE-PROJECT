@@ -38,21 +38,21 @@ public class RaceEventController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') or hasRole('CLUB_MANAGER')")
     RaceEventService.EventView update(@PathVariable UUID id, @Valid @RequestBody EventRequest request) {
         return service.update(id, request.command(request.active() == null || request.active()));
     }
 
     @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') or hasRole('CLUB_MANAGER')")
     void deactivate(@PathVariable UUID id) { service.deactivate(id); }
 
     @PostMapping("/{id}/complete")
-    @PreAuthorize("hasRole('CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') or hasRole('CLUB_MANAGER')")
     RaceEventService.EventView complete(@PathVariable UUID id) { return service.complete(id); }
 
     @PostMapping("/{eventId}/registrations") @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') or hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')")
     RaceEventService.RegistrationView register(@PathVariable UUID eventId, @AuthenticationPrincipal Jwt jwt,
                                                 @Valid @RequestBody RegistrationRequest request) {
         return service.register(eventId, request.horseId(), user(jwt), request.registeredWeightKg());
@@ -75,11 +75,11 @@ public class RaceEventController {
     }
 
     @PostMapping("/registrations/{id}/confirm")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_APPROVE')")
+    @PreAuthorize("hasAuthority('PERM_RACING_APPROVE') or hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')")
     RaceEventService.RegistrationView confirm(@PathVariable UUID id) { return service.confirm(id); }
 
     @PostMapping("/registrations/{id}/withdraw")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
+    @PreAuthorize("hasAuthority('PERM_RACING_EDIT') or hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')")
     RaceEventService.RegistrationView withdraw(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
         return service.withdraw(id, user(jwt));
     }
