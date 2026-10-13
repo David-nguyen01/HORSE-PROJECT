@@ -127,6 +127,416 @@ public class NutritionPlanService {
         );
     }
 
+<<<<<<< Updated upstream
+=======
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listStandardPlans() {
+        return jdbc.query(
+                "select id, data_json, created_at from module_records " +
+                        "where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' and status='ACTIVE' " +
+                        "order by JSON_VALUE(data_json,'$.planName') asc",
+                (rs, rowNum) -> {
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("id", rs.getObject("id"));
+                    JsonNode node = read(rs.getString("data_json"));
+                    map.put("planCode", node.path("planCode").asText(""));
+                    map.put("planName", node.path("planName").asText(""));
+                    map.put("description", node.path("description").asText(""));
+                    map.put("targetGroup", node.path("targetGroup").asText(""));
+
+                    List<MealItem> meals = new ArrayList<>();
+                    JsonNode mealsNode = node.path("meals");
+                    if (mealsNode.isArray()) {
+                        for (JsonNode m : mealsNode) {
+                            meals.add(new MealItem(
+                                    m.path("mealName").asText(""),
+                                    LocalTime.parse(m.path("feedingTime").asText("07:00")),
+                                    new BigDecimal(m.path("concentrateKg").asText("0")),
+                                    m.path("concentrateType").isNull() ? null : m.path("concentrateType").asText(null),
+                                    new BigDecimal(m.path("forageKg").asText("0")),
+                                    m.path("forageType").isNull() ? null : m.path("forageType").asText(null),
+                                    m.path("supplements").isNull() ? null : m.path("supplements").asText(null)
+                            ));
+                        }
+                    }
+                    map.put("meals", meals);
+                    return map;
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public List<FeedingTemplateOptionView> getTemplateOptionsForHorse(UUID horseId) {
+        horseAccess.requireActive(horseId);
+
+        List<Map<String, Object>> horseRows = jdbc.queryForList(
+                "select code, name, health_status, status as horse_status, intake_status, " +
+                        "(select count(*) from training_locks tl where tl.horse_id=horses.id and tl.released_at is null) as active_locks " +
+                        "from horses where id=?", horseId);
+        if (horseRows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy ngựa: " + horseId);
+        }
+        Map<String, Object> h = horseRows.getFirst();
+        String healthStatus = (String) h.get("health_status");
+        String horseStatus = (String) h.get("horse_status");
+        String intakeStatus = (String) h.get("intake_status");
+        int lockCount = ((Number) h.get("active_locks")).intValue();
+
+        boolean isInjured = "INJURED".equalsIgnoreCase(healthStatus)
+                || "INJURED".equalsIgnoreCase(horseStatus)
+                || "QUARANTINED".equalsIgnoreCase(healthStatus);
+        boolean hasLock = lockCount > 0;
+        boolean isWaitingForVet = "WAITING_FOR_VET".equalsIgnoreCase(intakeStatus)
+                || "PENDING_WAITING_ROOM".equalsIgnoreCase(intakeStatus);
+
+        List<Map<String, Object>> standardPlans = listStandardPlans();
+        List<FeedingTemplateOptionView> options = new ArrayList<>();
+
+        for (Map<String, Object> plan : standardPlans) {
+            String planCode = (String) plan.get("planCode");
+            String planName = (String) plan.get("planName");
+            String description = (String) plan.get("description");
+            String targetGroup = (String) plan.get("targetGroup");
+            @SuppressWarnings("unchecked")
+            List<MealItem> meals = (List<MealItem>) plan.get("meals");
+
+            String suitability;
+            String suitabilityReason;
+            boolean canApply;
+            boolean requiresConfirmation;
+
+            if ("STD_TRAINING".equalsIgnoreCase(planCode)) {
+                if (isInjured || hasLock) {
+                    suitability = "INELIGIBLE";
+                    canApply = false;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Không đủ điều kiện: Ngựa đang có hạn chế y tế hoặc lệnh khóa huấn luyện. Nghiêm cấm áp dụng khẩu phần năng lượng cao.";
+                } else if (isWaitingForVet) {
+                    suitability = "INELIGIBLE";
+                    canApply = false;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Chưa đủ điều kiện: Ngựa đang chờ khám thú y, chưa được kết luận đủ thể lực cho chế độ huấn luyện.";
+                } else {
+                    suitability = "RECOMMENDED";
+                    canApply = true;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Khuyến nghị: Phù hợp cho ngựa thi đấu và luyện tập thể lực thường xuyên.";
+                }
+            } else if ("STD_RECOVERY".equalsIgnoreCase(planCode)) {
+                if (isInjured || hasLock) {
+                    suitability = "RECOMMENDED";
+                    canApply = true;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Khuyến nghị hàng đầu: Tối ưu cho ngựa đang nghỉ ngơi, phục hồi thể lực hoặc theo dõi y tế sau chấn thương.";
+                } else if (isWaitingForVet) {
+                    suitability = "CONFIRMATION_REQUIRED";
+                    canApply = true;
+                    requiresConfirmation = true;
+                    suitabilityReason = "Cần xác nhận: Ngựa đang chờ khám thú y, có thể áp dụng tạm thời nếu cần chế độ giảm tải.";
+                } else {
+                    suitability = "ELIGIBLE";
+                    canApply = true;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Có thể áp dụng: Dành cho giai đoạn giảm tải tập luyện hoặc hồi sức.";
+                }
+            } else { // STD_STANDARD
+                if (isInjured || hasLock) {
+                    suitability = "CONFIRMATION_REQUIRED";
+                    canApply = true;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Cần lưu ý: Ngựa đang có hạn chế y tế; khuyến nghị ưu tiên dùng khẩu phần phục hồi STD_RECOVERY.";
+                } else if (isWaitingForVet) {
+                    suitability = "CONFIRMATION_REQUIRED";
+                    canApply = true;
+                    requiresConfirmation = true;
+                    suitabilityReason = "Cần xác nhận: Khẩu phần cơ bản an toàn trong thời gian chờ Bác sĩ thú y hoàn tất khám lâm sàng.";
+                } else {
+                    suitability = "RECOMMENDED";
+                    canApply = true;
+                    requiresConfirmation = false;
+                    suitabilityReason = "Khuyến nghị tiêu chuẩn: Cân bằng dưỡng chất, phù hợp cho ngựa thể trạng bình thường trong chăm sóc hàng ngày.";
+                }
+            }
+
+            options.add(new FeedingTemplateOptionView(
+                    planCode, planName, description, targetGroup,
+                    suitability, suitabilityReason, canApply, requiresConfirmation, meals
+            ));
+        }
+
+        return options;
+    }
+
+    @Transactional
+    public NutritionPlanResponse applyStandardTemplate(UUID horseId, UUID actor, ApplyFeedingTemplateRequest request) {
+        horseAccess.requireActive(horseId);
+        if (request.templateCode() == null || request.templateCode().isBlank()) {
+            throw new BusinessException("Mã khẩu phần mẫu không được để trống");
+        }
+        String tCode = request.templateCode().trim();
+
+        List<Map<String, Object>> templateRows = jdbc.query(
+                "select data_json from module_records where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' " +
+                        "and status='ACTIVE' and JSON_VALUE(data_json,'$.planCode')=?",
+                (rs, rowNum) -> {
+                    JsonNode n = read(rs.getString("data_json"));
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("planCode", n.path("planCode").asText(""));
+                    map.put("planName", n.path("planName").asText(""));
+                    map.put("description", n.path("description").asText(""));
+                    map.put("targetGroup", n.path("targetGroup").asText(""));
+                    List<MealItem> meals = new ArrayList<>();
+                    JsonNode mealsNode = n.path("meals");
+                    if (mealsNode.isArray()) {
+                        for (JsonNode m : mealsNode) {
+                            meals.add(new MealItem(
+                                    m.path("mealName").asText(""),
+                                    LocalTime.parse(m.path("feedingTime").asText("07:00")),
+                                    new BigDecimal(m.path("concentrateKg").asText("0")),
+                                    m.path("concentrateType").isNull() ? null : m.path("concentrateType").asText(null),
+                                    new BigDecimal(m.path("forageKg").asText("0")),
+                                    m.path("forageType").isNull() ? null : m.path("forageType").asText(null),
+                                    m.path("supplements").isNull() ? null : m.path("supplements").asText(null)
+                            ));
+                        }
+                    }
+                    map.put("meals", meals);
+                    return map;
+                }, tCode);
+
+        if (templateRows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + tCode);
+        }
+        Map<String, Object> template = templateRows.getFirst();
+        String planName = (String) template.get("planName");
+        @SuppressWarnings("unchecked")
+        List<MealItem> templateMeals = (List<MealItem>) template.get("meals");
+
+        // Clinical guardrail checks
+        List<Map<String, Object>> horseRows = jdbc.queryForList(
+                "select code, name, health_status, status as horse_status, intake_status, " +
+                        "(select count(*) from training_locks tl where tl.horse_id=horses.id and tl.released_at is null) as active_locks " +
+                        "from horses where id=?", horseId);
+        if (!horseRows.isEmpty()) {
+            Map<String, Object> h = horseRows.getFirst();
+            String healthStatus = (String) h.get("health_status");
+            String horseStatus = (String) h.get("horse_status");
+            String intakeStatus = (String) h.get("intake_status");
+            int lockCount = ((Number) h.get("active_locks")).intValue();
+
+            boolean isInjured = "INJURED".equalsIgnoreCase(healthStatus)
+                    || "INJURED".equalsIgnoreCase(horseStatus)
+                    || "QUARANTINED".equalsIgnoreCase(healthStatus);
+            boolean hasLock = lockCount > 0;
+            boolean isWaitingForVet = "WAITING_FOR_VET".equalsIgnoreCase(intakeStatus)
+                    || "PENDING_WAITING_ROOM".equalsIgnoreCase(intakeStatus);
+
+            if ((isInjured || hasLock) && "STD_TRAINING".equalsIgnoreCase(tCode)) {
+                throw new BusinessException("Xung đột y tế: Ngựa đang có hạn chế y tế hoặc khóa huấn luyện, hệ thống từ chối áp dụng khẩu phần huấn luyện (STD_TRAINING). Vui lòng chọn khẩu phần dưỡng thương (STD_RECOVERY).");
+            }
+            if (isWaitingForVet && "STD_TRAINING".equalsIgnoreCase(tCode)) {
+                throw new BusinessException("Ngựa đang chờ khám thú y, chưa đủ điều kiện áp dụng khẩu phần huấn luyện (STD_TRAINING).");
+            }
+        }
+
+        LocalDate effectiveDate = request.effectiveDate() != null ? request.effectiveDate() : LocalDate.now();
+        String noteText = (request.notes() != null && !request.notes().isBlank())
+                ? request.notes().trim()
+                : ("Áp dụng từ mẫu duyệt sẵn: " + planName);
+
+        CreateNutritionPlanRequest createReq = new CreateNutritionPlanRequest(
+                effectiveDate,
+                noteText,
+                templateMeals
+        );
+
+        return createPlan(horseId, actor, createReq);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getStableWorkload(LocalDate date) {
+        LocalDate targetDate = date == null ? LocalDate.now() : date;
+
+        // 1. Get all active stables
+        List<Map<String, Object>> stableRows = jdbc.queryForList(
+                "select id, name, location, is_active from stables where is_active=1 order by name asc");
+
+        List<Map<String, Object>> stallsList = new ArrayList<>();
+        int occupiedCount = 0;
+        int emptyCount = 0;
+
+        for (Map<String, Object> stable : stableRows) {
+            Object sIdRaw = stable.get("id");
+            if (sIdRaw == null) continue;
+            UUID stableId = sIdRaw instanceof UUID u ? u : UUID.fromString(sIdRaw.toString());
+            String stableName = (String) stable.get("name");
+
+            // Query stalls for this stable
+            List<Map<String, Object>> stallRows = jdbc.query(
+                    "select id, data_json from module_records where module_code='STABLE_CARE' and record_type='STALL' "
+                            + "and JSON_VALUE(data_json,'$.stableId')=? order by JSON_VALUE(data_json,'$.stallCode') asc",
+                    (rs, rowNum) -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("stallId", rs.getObject("id", UUID.class));
+                        JsonNode n = read(rs.getString("data_json"));
+                        m.put("stallCode", n.path("stallCode").asText(""));
+                        m.put("isActive", n.path("isActive").asBoolean(true));
+                        return m;
+                    }, stableId.toString());
+
+            for (Map<String, Object> stall : stallRows) {
+                UUID stallId = (UUID) stall.get("stallId");
+                String stallCode = (String) stall.get("stallCode");
+                String locationDisplay = stableName + " / " + stallCode;
+
+                // Check active assignment for this stall
+                List<Map<String, Object>> assignmentRows = jdbc.query(
+                        "select top 1 m.id, m.horse_id, h.code as horse_code, h.name as horse_name "
+                                + "from module_records m join horses h on h.id=m.horse_id "
+                                + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
+                                + "and JSON_VALUE(m.data_json,'$.stallId')=? and JSON_VALUE(m.data_json,'$.assignedUntil') is null",
+                        (rs, rowNum) -> {
+                            Map<String, Object> a = new LinkedHashMap<>();
+                            a.put("assignmentId", rs.getObject("id", UUID.class));
+                            a.put("horseId", rs.getObject("horse_id", UUID.class));
+                            a.put("horseCode", rs.getString("horse_code"));
+                            a.put("horseName", rs.getString("horse_name"));
+                            return a;
+                        }, stallId.toString());
+
+                Map<String, Object> stallItem = new LinkedHashMap<>();
+                stallItem.put("stableId", stableId);
+                stallItem.put("stableName", stableName);
+                stallItem.put("stallId", stallId);
+                stallItem.put("stallCode", stallCode);
+                stallItem.put("stallLocationDisplay", locationDisplay);
+
+                if (!assignmentRows.isEmpty()) {
+                    Map<String, Object> a = assignmentRows.getFirst();
+                    UUID horseId = (UUID) a.get("horseId");
+                    String horseCode = (String) a.get("horseCode");
+                    String horseName = (String) a.get("horseName");
+                    String horseDisplay = horseCode + " — " + horseName;
+
+                    stallItem.put("hasHorse", true);
+                    stallItem.put("operationalStatus", "OCCUPIED");
+                    stallItem.put("horseId", horseId);
+                    stallItem.put("horseCode", horseCode);
+                    stallItem.put("horseName", horseName);
+                    stallItem.put("horseDisplay", horseDisplay);
+
+                    try {
+                        NutritionPlanResponse plan = getEffectivePlan(horseId, targetDate);
+                        stallItem.put("hasPlan", true);
+                        stallItem.put("planId", plan.id());
+                        stallItem.put("planName", plan.notes() != null && !plan.notes().isBlank() ? plan.notes() : "Khẩu phần Huấn luyện Tiêu chuẩn");
+                        stallItem.put("version", plan.version());
+                        stallItem.put("versionDisplay", "v" + plan.version() + " · Áp dụng");
+                        stallItem.put("effectiveDate", plan.effectiveDate());
+                        stallItem.put("planStatus", plan.status());
+                        stallItem.put("statusLabel", "Áp dụng");
+                        stallItem.put("notes", plan.notes());
+
+                        double totalConcentrate = 0.0;
+                        double totalForage = 0.0;
+                        if (plan.meals() != null) {
+                            for (MealItem m : plan.meals()) {
+                                if (m.concentrateKg() != null) totalConcentrate += m.concentrateKg().doubleValue();
+                                if (m.forageKg() != null) totalForage += m.forageKg().doubleValue();
+                            }
+                        }
+                        int mealCount = plan.meals() == null ? 0 : plan.meals().size();
+                        stallItem.put("totalMeals", mealCount);
+                        stallItem.put("mealsDisplay", mealCount + " bữa/ngày");
+                        stallItem.put("totalConcentrateKg", totalConcentrate);
+                        stallItem.put("totalForageKg", totalForage);
+                        stallItem.put("feedingSummary", String.format(Locale.US, "%.1fkg cỏ · %.1fkg thức ăn tinh",
+                                totalForage, totalConcentrate));
+                        stallItem.put("meals", plan.meals());
+                        stallItem.put("hasChecklist", true);
+                        occupiedCount++;
+                    } catch (ResourceNotFoundException ex) {
+                        stallItem.put("hasPlan", false);
+                        stallItem.put("planId", null);
+                        stallItem.put("planName", "Chưa gán khẩu phần");
+                        stallItem.put("version", null);
+                        stallItem.put("versionDisplay", "—");
+                        stallItem.put("effectiveDate", null);
+                        stallItem.put("planStatus", "UNASSIGNED");
+                        stallItem.put("statusLabel", "Chưa gán khẩu phần");
+                        stallItem.put("notes", "Chưa gán khẩu phần");
+                        stallItem.put("totalMeals", 0);
+                        stallItem.put("mealsDisplay", "0 bữa/ngày");
+                        stallItem.put("totalConcentrateKg", 0.0);
+                        stallItem.put("totalForageKg", 0.0);
+                        stallItem.put("feedingSummary", "Chưa có khẩu phần");
+                        stallItem.put("meals", List.of());
+                        stallItem.put("hasChecklist", false);
+                        occupiedCount++;
+                    }
+                } else {
+                    // Empty stall (Chưa có ngựa)
+                    stallItem.put("hasHorse", false);
+                    stallItem.put("operationalStatus", "EMPTY");
+                    stallItem.put("horseId", null);
+                    stallItem.put("horseCode", null);
+                    stallItem.put("horseName", "Chưa có ngựa");
+                    stallItem.put("horseDisplay", "Chưa có ngựa");
+                    stallItem.put("hasPlan", false);
+                    stallItem.put("planId", null);
+                    stallItem.put("planName", "Không có khẩu phần");
+                    stallItem.put("version", null);
+                    stallItem.put("versionDisplay", "—");
+                    stallItem.put("effectiveDate", null);
+                    stallItem.put("planStatus", "EMPTY");
+                    stallItem.put("statusLabel", "Chưa có ngựa");
+                    stallItem.put("notes", "Chưa có ngựa");
+                    stallItem.put("totalMeals", 0);
+                    stallItem.put("mealsDisplay", "—");
+                    stallItem.put("totalConcentrateKg", 0.0);
+                    stallItem.put("totalForageKg", 0.0);
+                    stallItem.put("feedingSummary", "Không có khẩu phần");
+                    stallItem.put("meals", List.of());
+                    stallItem.put("hasChecklist", false);
+                    emptyCount++;
+                }
+
+                stallsList.add(stallItem);
+            }
+        }
+
+        // Summary metadata
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalStalls", stallsList.size());
+        summary.put("occupiedStalls", occupiedCount);
+        summary.put("emptyStalls", emptyCount);
+        summary.put("standardPlansCount", listStandardPlans().size());
+        summary.put("specialInstructionsCount", 0);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("targetDate", targetDate);
+        result.put("summary", summary);
+        result.put("stalls", stallsList);
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> listHorsesActivePlans(LocalDate date) {
+        Map<String, Object> workload = getStableWorkload(date);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> stalls = (List<Map<String, Object>>) workload.get("stalls");
+        List<Map<String, Object>> activeHorses = new ArrayList<>();
+        for (Map<String, Object> s : stalls) {
+            if (Boolean.TRUE.equals(s.get("hasHorse"))) {
+                Map<String, Object> item = new LinkedHashMap<>(s);
+                item.put("stableLocation", s.get("stallLocationDisplay"));
+                item.put("status", s.get("planStatus"));
+                activeHorses.add(item);
+            }
+        }
+        return activeHorses;
+    }
+
+>>>>>>> Stashed changes
     private void validatePlan(CreateNutritionPlanRequest request) {
         if (request.effectiveDate() == null) throw new BusinessException("Ngày áp dụng không được để trống");
         if (request.meals() == null || request.meals().isEmpty()) {

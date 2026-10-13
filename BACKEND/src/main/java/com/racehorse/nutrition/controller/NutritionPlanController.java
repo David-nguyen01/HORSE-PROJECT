@@ -1,8 +1,6 @@
 package com.racehorse.nutrition.controller;
 
-import com.racehorse.nutrition.dto.CreateNutritionPlanRequest;
-import com.racehorse.nutrition.dto.DailyFeedingChecklistResponse;
-import com.racehorse.nutrition.dto.NutritionPlanResponse;
+import com.racehorse.nutrition.dto.*;
 import com.racehorse.nutrition.service.NutritionPlanService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -44,6 +42,25 @@ public class NutritionPlanController {
             @PathVariable UUID horseId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return service.getDailyChecklist(horseId, date);
+    }
+
+    @GetMapping("/template-options")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    public List<FeedingTemplateOptionView> getTemplateOptions(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        ownerGuard.requireHorse(horseId, jwt, authentication);
+        return service.getTemplateOptionsForHorse(horseId);
+    }
+
+    @PostMapping("/apply-template")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('STABLE_STAFF','VETERINARIAN','HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    public NutritionPlanResponse applyStandardTemplate(
+            @PathVariable UUID horseId,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ApplyFeedingTemplateRequest request) {
+        return service.applyStandardTemplate(horseId, UUID.fromString(jwt.getSubject()), request);
     }
 
     @PostMapping
