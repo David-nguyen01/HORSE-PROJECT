@@ -222,14 +222,11 @@ IF NOT EXISTS (SELECT 1 FROM dbo.module_records WHERE id = 'C1010000-0000-0000-0
     VALUES ('C1010000-0000-0000-0000-000000000002', 'STABLE_CARE', 'STANDARD_FEEDING_PLAN', 'api', NULL, @adminUserId, 'ACTIVE', '2026-10-01',
             N'{"planCode":"STD_RECOVERY","planName":"Khẩu phần Nghỉ ngơi & Phục hồi","description":"Dành cho ngựa sau thi đấu hoặc đang trong giai đoạn nghỉ dưỡng phục hồi thể lực, giảm tinh bột và tăng xơ tiêu hóa.","targetGroup":"Ngựa nghỉ dưỡng / phục hồi","meals":[{"mealName":"Bữa sáng (07:00)","feedingTime":"07:00:00","concentrateKg":0.5,"concentrateType":"Yến mạch nguyên hạt cán dập (Oats)","forageKg":3.5,"forageType":"Cỏ khô Alfalfa (Mỹ vụ mới)","supplements":"Men vi sinh tiêu hóa: 30g"},{"mealName":"Bữa trưa (12:00)","feedingTime":"12:00:00","concentrateKg":0.5,"concentrateType":"Cám viên dinh dưỡng cao năng lượng","forageKg":3.0,"forageType":"Cỏ khô Alfalfa (Mỹ vụ mới)","supplements":null},{"mealName":"Bữa chiều (17:00)","feedingTime":"17:00:00","concentrateKg":0.5,"concentrateType":"Yến mạch nguyên hạt cán dập (Oats)","forageKg":4.0,"forageType":"Cỏ khô Alfalfa (Mỹ vụ mới)","supplements":"Chế phẩm điện giải bù nước: 25g"}]}');
 
-<<<<<<< Updated upstream
-=======
 IF NOT EXISTS (SELECT 1 FROM dbo.module_records WHERE id = 'C1010000-0000-0000-0000-000000000010' OR (module_code = 'STABLE_CARE' AND record_type = 'STANDARD_FEEDING_PLAN' AND JSON_VALUE(data_json, '$.planCode') = 'STD_STANDARD'))
     INSERT INTO dbo.module_records (id, module_code, record_type, source_table, horse_id, user_id, status, event_date, data_json)
     VALUES ('C1010000-0000-0000-0000-000000000010', 'STABLE_CARE', 'STANDARD_FEEDING_PLAN', 'api', NULL, @adminUserId, 'ACTIVE', '2026-10-01',
             N'{"planCode":"STD_STANDARD","planName":"Khẩu phần Tiêu chuẩn Thường nhật","description":"Dành cho ngựa có trạng thái bình thường, đáp ứng nhu cầu chăm sóc và duy trì thể lực thường nhật.","targetGroup":"Ngựa thể trạng bình thường / chăm sóc thường nhật","meals":[{"mealName":"Bữa sáng (07:00)","feedingTime":"07:00:00","concentrateKg":1.0,"concentrateType":"Yến mạch nguyên hạt cán dập (Oats)","forageKg":3.0,"forageType":"Cỏ khô Alfalfa (Mỹ vụ mới)","supplements":"Khoáng vi lượng & muối khoáng: 20g"},{"mealName":"Bữa trưa (11:30)","feedingTime":"11:30:00","concentrateKg":0.8,"concentrateType":"Cám viên dinh dưỡng cao năng lượng","forageKg":2.5,"forageType":"Cỏ khô Alfalfa (Mỹ vụ mới)","supplements":null},{"mealName":"Bữa chiều (17:00)","feedingTime":"17:00:00","concentrateKg":1.0,"concentrateType":"Yến mạch nguyên hạt cán dập (Oats)","forageKg":3.5,"forageType":"Cỏ khô Alfalfa (Mỹ vụ mới)","supplements":"Chế phẩm điện giải bù nước: 20g"}]}');
 
->>>>>>> Stashed changes
 -- Baseline Sample Inventory Items
 IF NOT EXISTS (SELECT 1 FROM dbo.module_records WHERE id = 'A1010000-0000-0000-0000-000000000001')
     INSERT INTO dbo.module_records (id, module_code, record_type, horse_id, user_id, status, data_json)

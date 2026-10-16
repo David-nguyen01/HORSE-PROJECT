@@ -1,15 +1,5 @@
-<<<<<<< Updated upstream
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-=======
-<<<<<<< Updated upstream
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-=======
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -234,38 +224,18 @@ export default function StableCarePage() {
         </div>
       )}
 
-<<<<<<< Updated upstream
-      {isVet ? (
-        <NutritionView canEditPlan={true} />
-=======
-<<<<<<< Updated upstream
-      {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
-      {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
-      {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
-      {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
-      {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
-=======
       {isVet ? (
         <NutritionView canEditPlan={true} canApplyTemplate={true} isStaff={false} />
->>>>>>> Stashed changes
       ) : (
         <>
           {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canEdit={canEditRoutine} />}
           {activeTab === 'training' && <TrainingPreparationView isStaff={isStaff} />}
           {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
-<<<<<<< Updated upstream
-          {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
-=======
           {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} canApplyTemplate={isStaff || isVet || isManager || isTrainer} isStaff={isStaff} />}
->>>>>>> Stashed changes
           {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canUpdateStatus={isManager || isStaff} />}
           {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
         </>
       )}
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
     </>
   )
 }
@@ -450,15 +420,7 @@ function StablesView({ canEditRoutine, isStaff }) {
         <div className="stat card blue">
           <div>
             <strong>{allStalls.length}</strong>
-<<<<<<< Updated upstream
-            <span>Tổng số ô (Chuồng {activeStable?.name?.toUpperCase() || '—'})</span>
-=======
-<<<<<<< Updated upstream
-            <span>Tổng số ô chuồng ({activeStable?.name || '—'})</span>
-=======
             <span>Tổng số ô ({activeStable?.name?.toUpperCase() || '—'})</span>
->>>>>>> Stashed changes
->>>>>>> Stashed changes
           </div>
         </div>
         <div className="stat card gold">
@@ -693,15 +655,6 @@ function StablesView({ canEditRoutine, isStaff }) {
               </div>
 
               {!routines.length ? (
-<<<<<<< Updated upstream
-                <div className="empty" style={{ minHeight: '100px', padding: '16px' }}>
-=======
-<<<<<<< Updated upstream
-                <div className="empty" style={{ minHeight: '130px' }}>
->>>>>>> Stashed changes
-                  <span>Chưa có lịch sinh hoạt nào được thiết lập cho ngựa này.</span>
-                </div>
-=======
                 selectedHorse.healthStatus === 'INJURED' || selectedHorse.trainingLocked ? (
                   <div className="notice" style={{ backgroundColor: '#fff7e6', borderColor: '#ffd591', color: '#d46b08', padding: '16px', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -719,7 +672,6 @@ function StablesView({ canEditRoutine, isStaff }) {
                     <span>Chưa có lịch sinh hoạt nào được thiết lập cho ngựa này.</span>
                   </div>
                 )
->>>>>>> Stashed changes
               ) : (
                 <div className="routine-list">
                   {routines.map((r) => (
@@ -1778,7 +1730,6 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
 // =========================================================================
 // 1b. TRAINING PREPARATION / READINESS (STABLE STAFF)
 // =========================================================================
-<<<<<<< Updated upstream
 function TrainingPreparationView({ isStaff }) {
   const [searchParams] = useSearchParams()
   const highlightScheduleId = searchParams.get('scheduleId')
@@ -1786,24 +1737,6 @@ function TrainingPreparationView({ isStaff }) {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(false)
-=======
-<<<<<<< Updated upstream
-function NutritionView({ canEditPlan }) {
-  const [horses, setHorses] = useState([])
-  const [selectedHorseId, setSelectedHorseId] = useState('')
-=======
-function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff }) {
-  const [subTab, setSubTab] = useState('stables') // 'stables' or 'standard'
->>>>>>> Stashed changes
-  const [targetDate, setTargetDate] = useState(today())
-  const [checklist, setChecklist] = useState(null)
-  const [activePlan, setActivePlan] = useState(null)
-  const [history, setHistory] = useState([])
-  const [showHistory, setShowHistory] = useState(false)
-  const [showCreatePlan, setShowCreatePlan] = useState(false)
-  const [applyModalStall, setApplyModalStall] = useState(null)
-  const [loading, setLoading] = useState(true)
->>>>>>> Stashed changes
   const [error, setError] = useState('')
   const [actionSuccess, setActionSuccess] = useState('')
   const [actionLoadingId, setActionLoadingId] = useState(null)
@@ -2048,7 +1981,7 @@ function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff }) {
 // =========================================================================
 // 2. FR14: NUTRITION PLAN & DAILY FEEDING CHECKLIST
 // =========================================================================
-function NutritionView({ canEditPlan }) {
+function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff }) {
   const [subTab, setSubTab] = useState('stables') // 'stables' or 'standard'
   const [targetDate, setTargetDate] = useState(today())
   const [workload, setWorkload] = useState(null)
@@ -2061,6 +1994,7 @@ function NutritionView({ canEditPlan }) {
   const [viewMode, setViewMode] = useState('grid') // 'grid' (thẻ ô chuồng) or 'table' (bảng)
   const [confirmedMeals, setConfirmedMeals] = useState({})
   const [showCreatePlan, setShowCreatePlan] = useState(false)
+  const [applyModalStall, setApplyModalStall] = useState(null)
   const [loading, setLoading] = useState(true)
   const [checklistLoading, setChecklistLoading] = useState(false)
   const [error, setError] = useState('')
@@ -2108,12 +2042,6 @@ function NutritionView({ canEditPlan }) {
       setHistory([])
       return
     }
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-    setShowHistory(!showHistory)
-=======
->>>>>>> Stashed changes
     setChecklistLoading(true)
     try {
       const [chk, hist] = await Promise.all([
@@ -2134,10 +2062,6 @@ function NutritionView({ canEditPlan }) {
     loadHorseDetails()
   }, [loadHorseDetails])
 
-<<<<<<< Updated upstream
-  const toggleHistory = () => {
-    setShowHistory((prev) => !prev)
-=======
   const checklistSectionRef = useRef(null)
 
   const handleSelectStallForChecklist = useCallback((stallId) => {
@@ -2149,8 +2073,6 @@ function NutritionView({ canEditPlan }) {
 
   const toggleHistory = () => {
     setShowHistory((prev) => !prev)
->>>>>>> Stashed changes
->>>>>>> Stashed changes
   }
 
   const toggleMealConfirmed = (mealKey) => {
@@ -2261,24 +2183,6 @@ function NutritionView({ canEditPlan }) {
               style={{ width: '150px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
             />
           </div>
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-          <div className="data-table">
-            <div className="table-header" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }}>
-              <span>Phiên bản</span>
-              <span>Ngày áp dụng</span>
-              <span>Ghi chú / Khẩu phần</span>
-              <span>Trạng thái</span>
-            </div>
-            {history.map((ver) => (
-              <div className="table-row" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }} key={ver.id}>
-                <b>v{ver.version}</b>
-                <span>{ver.effectiveDate}</span>
-                <div>
-                  <b>{ver.notes || 'Khẩu phần ăn tiêu chuẩn'}</b>
-                  <small className="muted">{ver.meals?.length || 0} bữa/ngày</small>
-=======
 
           {canApplyTemplate && (
             <button
@@ -2290,7 +2194,6 @@ function NutritionView({ canEditPlan }) {
               <Utensils size={15} /> Áp dụng khẩu phần mẫu
             </button>
           )}
->>>>>>> Stashed changes
 
           {canEditPlan && (
             <button
@@ -2446,16 +2349,6 @@ function NutritionView({ canEditPlan }) {
                                 <button
                                   className={`button ${isSelected ? 'primary' : 'secondary'}`}
                                   style={{ width: '100%', minHeight: '32px', fontSize: '12px', justifyContent: 'center' }}
-<<<<<<< Updated upstream
-                                  onClick={() => setSelectedStallId(s.stallId)}
-                                >
-                                  {isSelected ? '✓ Đang xem checklist' : 'Xem checklist'}
-                                </button>
-                              ) : (
-                                <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px', padding: '6px 0' }}>
-                                  Không có feeding checklist
-                                </div>
-=======
                                   onClick={() => handleSelectStallForChecklist(s.stallId)}
                                 >
                                   {isSelected ? '✓ Đang xem checklist' : 'Xem checklist'}
@@ -2488,7 +2381,6 @@ function NutritionView({ canEditPlan }) {
                                 >
                                   {isSelected ? '✓ Ô đang chọn' : 'Ô chuồng trống'}
                                 </button>
->>>>>>> Stashed changes
                               )}
                             </div>
                           </div>
@@ -2516,20 +2408,10 @@ function NutritionView({ canEditPlan }) {
                       className="table-row"
                       style={{
                         gridTemplateColumns: '170px 180px 1fr 140px 110px 130px',
-                        background: isSelected ? 'rgba(38, 117, 75, 0.08)' : !s.hasHorse ? '#fafafa' : undefined,
-<<<<<<< Updated upstream
-                        cursor: s.hasHorse ? 'pointer' : 'default',
-                        opacity: !s.hasHorse ? 0.75 : 1,
-                      }}
-                      onClick={() => {
-                        if (s.hasHorse) setSelectedStallId(s.stallId)
-                      }}
-=======
                         cursor: 'pointer',
                         opacity: !s.hasHorse ? 0.75 : 1,
                       }}
                       onClick={() => handleSelectStallForChecklist(s.stallId)}
->>>>>>> Stashed changes
                     >
                       <div>
                         <b style={{ color: '#123f32' }}>{s.stallLocationDisplay}</b>
@@ -2563,19 +2445,11 @@ function NutritionView({ canEditPlan }) {
                             style={{ minHeight: '30px', fontSize: '11px', padding: '0 10px' }}
                             onClick={(e) => {
                               e.stopPropagation()
-<<<<<<< Updated upstream
-                              setSelectedStallId(s.stallId)
-=======
                               handleSelectStallForChecklist(s.stallId)
->>>>>>> Stashed changes
                             }}
                           >
                             {isSelected ? '✓ Đang chọn' : 'Xem checklist'}
                           </button>
-<<<<<<< Updated upstream
-                        ) : (
-                          <span className="muted" style={{ fontSize: '11px' }}>—</span>
-=======
                         ) : s.hasHorse ? (
                           <div style={{ display: 'flex', gap: '4px' }}>
                             <button
@@ -2613,7 +2487,6 @@ function NutritionView({ canEditPlan }) {
                           >
                             {isSelected ? '✓ Đang chọn' : 'Xem ô'}
                           </button>
->>>>>>> Stashed changes
                         )}
                       </div>
                     </div>
@@ -2624,13 +2497,8 @@ function NutritionView({ canEditPlan }) {
           </section>
 
           {/* CHECKLIST & FEEDING DETAILS FOR SELECTED ACTIVE STALL */}
-<<<<<<< Updated upstream
-          {selectedStall && selectedStall.hasHorse && selectedStall.hasChecklist && (
-            <section className="card" style={{ padding: '24px', marginBottom: '20px' }}>
-=======
           {selectedStall && (
             <section ref={checklistSectionRef} className="card" style={{ padding: '24px', marginBottom: '20px' }}>
->>>>>>> Stashed changes
               <div className="card-head" style={{ padding: '0 0 16px', borderBottom: '1px solid #eee', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2640,25 +2508,16 @@ function NutritionView({ canEditPlan }) {
                     )}
                   </div>
                   <p className="muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
-<<<<<<< Updated upstream
-                    Ngày: <b>{formatVNDate(targetDate)}</b> · Ô chuồng: <b>{selectedStall.stallLocationDisplay}</b> · Ngựa: <b>{selectedStall.horseDisplay}</b> · Định mức: <b>{selectedStall.feedingSummary}</b>
-=======
                     Ngày: <b>{formatVNDate(targetDate)}</b> · Ô chuồng: <b>{selectedStall.stallLocationDisplay}</b>
                     {selectedStall.hasHorse ? (
                       <> · Ngựa: <b>{selectedStall.horseDisplay}</b> · Định mức: <b>{selectedStall.feedingSummary}</b></>
                     ) : (
                       <> · <i style={{ color: '#8c959f' }}>Ô chuồng trống</i></>
                     )}
->>>>>>> Stashed changes
                   </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-<<<<<<< Updated upstream
-                  <button className="button secondary" onClick={toggleHistory}>
-                    <RotateCcw size={14} /> {showHistory ? 'Ẩn lịch sử' : `Lịch sử phiên bản (${history.length})`}
-                  </button>
-=======
                   {selectedStall.hasHorse && canApplyTemplate && (
                     <button
                       className="button secondary"
@@ -2674,121 +2533,11 @@ function NutritionView({ canEditPlan }) {
                       <RotateCcw size={14} /> {showHistory ? 'Ẩn lịch sử' : `Lịch sử phiên bản (${history.length})`}
                     </button>
                   )}
->>>>>>> Stashed changes
                   <Link to="/stable-care/tasks" className="button secondary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Clock size={14} /> Xem nhiệm vụ trong ngày
                   </Link>
                 </div>
               </div>
-
-<<<<<<< Updated upstream
-              {/* VERSION HISTORY ACCORDION */}
-              {showHistory && (
-                <div style={{ background: '#fcfcfc', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
-                  <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#123f32' }}>Lịch sử các phiên bản khẩu phần của ngựa này</h4>
-                  {history.length === 0 ? (
-                    <div className="empty" style={{ padding: '12px', fontSize: '12px' }}>Chưa có bản ghi lịch sử</div>
-                  ) : (
-                    <div className="data-table">
-                      <div className="table-header" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }}>
-                        <span>Phiên bản</span>
-                        <span>Ngày áp dụng</span>
-                        <span>Ghi chú / Khẩu phần</span>
-                        <span>Trạng thái</span>
-                      </div>
-                      {history.map((ver) => (
-                        <div className="table-row" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }} key={ver.id}>
-                          <b>v{ver.version}</b>
-                          <span>{formatVNDate(ver.effectiveDate)}</span>
-                          <div>
-                            <b>{ver.notes || 'Khẩu phần ăn tiêu chuẩn'}</b>
-                            <small className="muted" style={{ display: 'block' }}>{ver.meals?.length || 0} bữa/ngày</small>
-                          </div>
-                          <span className={`status ${ver.status === 'ACTIVE' ? 'active' : 'retired'}`}>
-                            <i /> {ver.status === 'ACTIVE' ? 'ĐANG ÁP DỤNG' : 'HẾT HIỆU LỰC'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SPECIAL INSTRUCTIONS (EMPTY STATE) */}
-              <div style={{ background: '#fafbfc', border: '1px dashed #d0d7de', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ background: '#fff', borderRadius: '50%', padding: '8px', border: '1px solid #e1e4e8', display: 'flex' }}>
-                  <ShieldAlert size={20} style={{ color: '#6e7781' }} />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <b style={{ fontSize: '13px', color: '#24292f' }}>Chỉ định đặc biệt:</b>
-                    <span className="badge-tag pending" style={{ background: '#f3f4f6', color: '#57606a', border: 'none' }}>0 chỉ định</span>
-                  </div>
-                  <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#57606a' }}>
-                    Chưa có chỉ định đặc biệt từ Bác sĩ thú y hoặc Huấn luyện viên trưởng cho ô chuồng này. Mọi bữa ăn tuân theo khẩu phần cơ sở đã được phê duyệt.
-                  </p>
-                </div>
-              </div>
-
-              {/* MEALS CHECKLIST */}
-              {checklistLoading ? (
-                <div className="empty" style={{ minHeight: '120px', padding: '20px' }}>Đang tải thực đơn bữa ăn…</div>
-              ) : !checklist?.meals?.length ? (
-                <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
-                  <Utensils size={26} style={{ color: 'var(--muted)', opacity: 0.7 }} />
-                  <b style={{ marginTop: '6px', fontSize: '13px' }}>Chưa có kế hoạch dinh dưỡng</b>
-                  <span style={{ fontSize: '12px' }}>Ngựa này chưa được Bác sĩ thú y hoặc Huấn luyện viên trưởng thiết lập khẩu phần ăn.</span>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gap: '14px' }}>
-                  {checklist.meals.map((meal, idx) => {
-                    const mealKey = `${targetDate}-${selectedStall.horseId}-${idx}`
-                    const isDone = !!confirmedMeals[mealKey]
-                    return (
-                      <div key={idx} className="checklist-card" style={{ borderColor: isDone ? '#bbf7d0' : undefined, background: isDone ? '#f0fdf4' : undefined }}>
-                        <span className="brand-mark" style={{ width: '40px', height: '40px', background: isDone ? '#dcfce7' : undefined, color: isDone ? '#166534' : undefined }}>
-                          {isDone ? <Check size={20} /> : <Clock size={18} />}
-                        </span>
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <b style={{ fontSize: '15px', color: isDone ? '#166534' : '#123f32' }}>{meal.mealName}</b>
-                            <span className="badge-tag pending">{meal.feedingTime}</span>
-                            {isDone && <span className="badge-tag completed">Đã hoàn thành</span>}
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '10px' }}>
-                            <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
-                              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN TINH</span>
-                              <b>{meal.concentrateKg} kg</b> {meal.concentrateType && `· ${meal.concentrateType}`}
-                            </div>
-                            <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
-                              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN THÔ XANH</span>
-                              <b>{meal.forageKg} kg</b> {meal.forageType && `· ${meal.forageType}`}
-                            </div>
-                            <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
-                              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>CHẤT BỔ SUNG / THUỐC</span>
-                              <b>{meal.supplements || 'Không có'}</b>
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          className={`button ${isDone ? 'secondary' : 'primary'}`}
-                          style={{
-                            minHeight: '36px',
-                            fontSize: '11px',
-                            alignSelf: 'center',
-                            background: isDone ? '#dcfce7' : undefined,
-                            color: isDone ? '#166534' : undefined,
-                            borderColor: isDone ? '#86efac' : undefined,
-                          }}
-                          onClick={() => toggleMealConfirmed(mealKey)}
-                        >
-                          {isDone ? '✓ Đã cho ăn' : 'Xác nhận cho ăn'}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-=======
               {!selectedStall.hasHorse ? (
                 <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
                   <Home size={26} style={{ color: 'var(--muted)', opacity: 0.7 }} />
@@ -2924,7 +2673,6 @@ function NutritionView({ canEditPlan }) {
                     </div>
                   )}
                 </>
->>>>>>> Stashed changes
               )}
             </section>
           )}
@@ -2983,10 +2731,6 @@ function NutritionView({ canEditPlan }) {
                 <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px dashed #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <small className="muted" style={{ fontSize: '11px' }}>Dữ liệu chuẩn cơ sở (Chỉ đọc)</small>
                   <span className="status active" style={{ fontSize: '11px' }}><i></i> ĐANG HIỆU LỰC</span>
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
                 </div>
               </div>
             ))}

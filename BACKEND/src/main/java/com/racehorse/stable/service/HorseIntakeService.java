@@ -48,14 +48,6 @@ public class HorseIntakeService {
     }
 
     private List<IntakeHorse> list(String status) {
-<<<<<<< Updated upstream
-        return jdbc.query("select id,code,name,payment_status,intake_status from horses "
-                        + "where archived_at is null and intake_status=? "
-                        + "and (service_override=1 or (payment_status='PAID' and (paid_until is null or paid_until>=?))) "
-                        + "order by updated_at,id",
-                (rs, row) -> new IntakeHorse(rs.getObject("id", UUID.class), rs.getString("code"),
-                        rs.getString("name"), rs.getString("payment_status"), rs.getString("intake_status")),
-=======
         return jdbc.query("""
                 select h.id, h.code, h.name, h.payment_status, h.intake_status,
                        h.diagnosing_vet_user_id, u.username as diagnosing_vet_name,
@@ -75,7 +67,6 @@ public class HorseIntakeService {
                         rs.getObject("diagnosing_vet_user_id", UUID.class),
                         rs.getString("diagnosing_vet_name"),
                         rs.getString("health_status")),
->>>>>>> Stashed changes
                 status, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")));
     }
 
@@ -103,11 +94,6 @@ public class HorseIntakeService {
         }
         return new IntakeHorse(horseId, horse.getCode(), horse.getName(), horse.getPaymentStatus(), "WAITING_FOR_VET");
     }
-
-<<<<<<< Updated upstream
-    public record IntakeHorse(UUID horseId, String code, String name, String paymentStatus, String intakeStatus) {}
-}
-=======
     public record IntakeHorse(
             UUID horseId,
             String code,
@@ -123,5 +109,3 @@ public class HorseIntakeService {
         }
     }
 }
-
->>>>>>> Stashed changes

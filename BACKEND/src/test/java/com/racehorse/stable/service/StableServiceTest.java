@@ -150,11 +150,6 @@ class StableServiceTest {
 
         verify(jdbc).update(contains("update module_records set status='INACTIVE'"), eq(routineId));
     }
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
 
     @Test
     void assignLocksResourcesAndSucceeds() {
@@ -287,8 +282,6 @@ class StableServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Ô chuồng đã có phân bổ hoạt động, không thể phân bổ trùng");
     }
-<<<<<<< Updated upstream
-=======
 
     @Test
     void createDefaultDailyRoutineIfAbsentCreatesHealthyRoutineWhenFit() {
@@ -535,6 +528,4 @@ class StableServiceTest {
         // Verifies horse location updated
         verify(jdbc).update(contains("update horses set stable_location=?"), eq("Barn Beta / B-02"), eq(horseId));
     }
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 }

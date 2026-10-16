@@ -270,11 +270,6 @@ class HorseServiceTest {
         verify(ownershipRepository, never()).deleteByHorseId(any(UUID.class));
     }
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
     @Test
     void unpaidHorseIsHiddenFromVeterinarianAndStableStaffButVisibleToManager() {
         UUID horseId = UUID.randomUUID();
@@ -324,8 +319,6 @@ class HorseServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
-<<<<<<< Updated upstream
-=======
     @Test
     void createRejectsMissingInitialOwner() {
         CreateHorseRequest request = new CreateHorseRequest(
@@ -397,8 +390,6 @@ class HorseServiceTest {
         verify(ownershipRepository).saveAll(any());
     }
 
->>>>>>> Stashed changes
->>>>>>> Stashed changes
     private CreateHorseRequest request(String code, HorseStatus status) {
         return new CreateHorseRequest(
                 code,

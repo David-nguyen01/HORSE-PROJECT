@@ -42,56 +42,16 @@ class TrainingSessionAccessTest {
         SecurityContextHolder.clearContext();
     }
 
-<<<<<<< Updated upstream
-    private static final String TRAINER_WRITE = "hasRole('HEAD_TRAINER') and hasAuthority('PERM_TRAINING_EDIT')";
-    private static final String SCHEDULE_UPDATE = "hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')";
-
-    @Test
-    @org.junit.jupiter.api.Disabled("Recovered from stash b647ee4: legacy update/cancel/delete/complete contracts deferred; v3 lifecycle will use its own endpoints.")
-    void restrictsAllSessionMutationEndpointsToHeadTrainers() {
-=======
     private static final String TRAINER_ONLY_WRITE = "hasAuthority('PERM_TRAINING_EDIT') and hasRole('HEAD_TRAINER')";
     private static final String SCHEDULE_UPDATE = "hasAuthority('PERM_TRAINING_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')";
     private static final String PREPARATION_READY = "hasAuthority('PERM_TRAINING_VIEW') and hasAnyRole('CLUB_MANAGER','STABLE_STAFF')";
 
     @Test
     void headTrainerCanPerformAllExecutionMutationsAndEvaluation() {
->>>>>>> Stashed changes
         UUID scheduleId = UUID.randomUUID();
         Jwt jwt = jwt();
         authenticate("HEAD_TRAINER", "PERM_TRAINING_EDIT");
 
-<<<<<<< Updated upstream
-        assertThatCode(() -> invokeDeferred("update", scheduleId, jwt, null, authentication())).doesNotThrowAnyException();
-        assertThatCode(() -> invokeDeferred("delete", scheduleId, jwt)).doesNotThrowAnyException();
-        assertThatCode(() -> invokeDeferred("cancel", scheduleId, jwt)).doesNotThrowAnyException();
-        assertThatCode(() -> invokeDeferred("complete", scheduleId, jwt)).doesNotThrowAnyException();
-        assertThatCode(() -> evaluationController.create(jwt, null, null)).doesNotThrowAnyException();
-
-        assertPolicy(TrainingScheduleController.class, "update", SCHEDULE_UPDATE);
-        assertPolicy(TrainingScheduleController.class, "delete", TRAINER_WRITE);
-        assertPolicy(TrainingScheduleController.class, "cancel", TRAINER_WRITE);
-        assertPolicy(TrainingScheduleController.class, "complete", TRAINER_WRITE);
-        assertPolicy(TrainingEvaluationController.class, "create", TRAINER_WRITE);
-    }
-
-    @Test
-    @org.junit.jupiter.api.Disabled("Recovered from stash b647ee4: legacy update/cancel/delete/complete contracts deferred; v3 lifecycle will use its own endpoints.")
-    void allowsClubManagerToUpdateSchedulesButNotOtherMutations() {
-        UUID scheduleId = UUID.randomUUID();
-        Jwt jwt = jwt();
-        authenticate("CLUB_MANAGER", "PERM_TRAINING_EDIT");
-        assertThatCode(() -> invokeDeferred("update", scheduleId, jwt, null, authentication())).doesNotThrowAnyException();
-        assertDenied(() -> invokeDeferred("delete", scheduleId, jwt));
-        assertDenied(() -> invokeDeferred("cancel", scheduleId, jwt));
-        assertDenied(() -> invokeDeferred("complete", scheduleId, jwt));
-        assertDenied(() -> evaluationController.create(jwt, null, null));
-    }
-
-    @Test
-    @org.junit.jupiter.api.Disabled("Recovered from stash b647ee4: legacy update/cancel/delete/complete contracts deferred; v3 lifecycle will use its own endpoints.")
-    void deniesSessionMutationsToEveryNonTrainerRole() {
-=======
         assertThatCode(() -> scheduleController.update(scheduleId, jwt, null, authentication())).doesNotThrowAnyException();
         assertThatCode(() -> scheduleController.cancel(scheduleId, jwt, authentication())).doesNotThrowAnyException();
         assertThatCode(() -> scheduleController.start(scheduleId, jwt)).doesNotThrowAnyException();
@@ -121,30 +81,10 @@ class TrainingSessionAccessTest {
 
     @Test
     void deniesSessionMutationsToEveryNonTrainerNonManagerRole() {
->>>>>>> Stashed changes
         UUID scheduleId = UUID.randomUUID();
         Jwt jwt = jwt();
         for (String role : List.of("STABLE_STAFF", "VETERINARIAN", "HORSE_OWNER")) {
             authenticate(role, "PERM_TRAINING_EDIT");
-<<<<<<< Updated upstream
-            assertDenied(() -> invokeDeferred("update", scheduleId, jwt, null, authentication()));
-            assertDenied(() -> invokeDeferred("delete", scheduleId, jwt));
-            assertDenied(() -> invokeDeferred("cancel", scheduleId, jwt));
-            assertDenied(() -> invokeDeferred("complete", scheduleId, jwt));
-            assertDenied(() -> evaluationController.create(jwt, null, null));
-        }
-    }
-
-    private void invokeDeferred(String name, Object... args) throws Throwable {
-        Method method = java.util.Arrays.stream(TrainingScheduleController.class.getDeclaredMethods())
-                .filter(candidate -> candidate.getName().equals(name) && candidate.getParameterCount() == args.length)
-                .findFirst().orElseThrow(() -> new NoSuchMethodException(name));
-        method.setAccessible(true);
-        try { method.invoke(scheduleController, args); }
-        catch (java.lang.reflect.InvocationTargetException failure) { throw failure.getCause(); }
-    }
-
-=======
             assertDenied(() -> scheduleController.update(scheduleId, jwt, null, authentication()));
             assertDenied(() -> scheduleController.cancel(scheduleId, jwt, authentication()));
             assertDenied(() -> scheduleController.start(scheduleId, jwt));
@@ -152,8 +92,6 @@ class TrainingSessionAccessTest {
             assertDenied(() -> evaluationController.create(jwt, null, authentication()));
         }
     }
-
->>>>>>> Stashed changes
     // Deferred mutation workflows are documented in BACKEND/TRAINING_TEST_SCOPE.md.
     @Test
     void managersAndTrainersCanCreatePublishButOnlyTrainersCanEvaluate() {

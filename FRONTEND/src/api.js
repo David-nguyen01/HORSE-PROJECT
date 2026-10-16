@@ -99,16 +99,6 @@ export const stableCareApi = {
   getActiveNutritionPlan: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan${date ? `?date=${date}` : ''}`),
   getNutritionHistory: (horseId) => api(`/api/horses/${horseId}/nutrition-plan/history`),
   getDailyFeedingChecklist: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan/daily-checklist${date ? `?date=${date}` : ''}`),
-<<<<<<< Updated upstream
-  getStandardPlans: () => api('/api/nutrition/standard-plans'),
-  getHorsesActivePlans: (date) => api(`/api/nutrition/horses-active${date ? `?date=${date}` : ''}`),
-  getStablesWorkload: (date) => api(`/api/nutrition/stables-workload${date ? `?date=${date}` : ''}`),
-  createNutritionPlan: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'POST', body: JSON.stringify(payload) }),
-  deleteNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'DELETE' }),
-=======
-<<<<<<< Updated upstream
-  createNutritionPlan: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'POST', body: JSON.stringify(payload) }),
-=======
   getStandardPlans: () => api('/api/nutrition/standard-plans'),
   getFeedingTemplateOptions: (horseId) => api(`/api/horses/${horseId}/nutrition-plan/template-options`),
   applyFeedingTemplate: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan/apply-template`, { method: 'POST', body: JSON.stringify(payload) }),
@@ -118,8 +108,6 @@ export const stableCareApi = {
   deleteNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'DELETE' }),
   getRoutineBackfillPreview: () => api('/api/stables/routines/backfill-preview'),
   executeRoutineBackfill: () => api('/api/stables/routines/backfill-execute', { method: 'POST' }),
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 
   // FR15 Care Tasks
   getCareTasks: (params = {}) => {

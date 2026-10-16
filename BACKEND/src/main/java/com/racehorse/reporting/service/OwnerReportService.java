@@ -27,14 +27,6 @@ public class OwnerReportService {
     private final FinanceService finance;
     private final AuditService audit;
 
-<<<<<<< Updated upstream
-    public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance, AuditService audit) {
-        this.jdbc = jdbc; this.json = json; this.finance = finance; this.audit = audit;
-=======
-<<<<<<< Updated upstream
-    public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance) {
-        this.jdbc = jdbc; this.json = json; this.finance = finance;
-=======
     public record TransactionItem(
             UUID id,
             UUID horseId,
@@ -47,7 +39,6 @@ public class OwnerReportService {
 
     public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance, AuditService audit) {
         this.jdbc = jdbc; this.json = json; this.finance = finance; this.audit = audit;
->>>>>>> Stashed changes
     }
 
     public static List<UUID> normalizeIds(Collection<UUID> ids) {
@@ -159,7 +150,6 @@ public class OwnerReportService {
                 rs.getString("category"),
                 rs.getBigDecimal("amount"),
                 rs.getString("description")), args.toArray());
->>>>>>> Stashed changes
     }
 
     @Transactional

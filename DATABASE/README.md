@@ -23,90 +23,7 @@ Tài liệu này là đặc tả chuẩn quản trị cơ sở dữ liệu cho d
 
 ## 2. DATABASE STRUCTURE (MODULAR BASELINE)
 
-<<<<<<< Updated upstream
-Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`36`) được `setup-local.ps1` áp dụng sau baseline:
-=======
-<<<<<<< Updated upstream
-1. `00_create_database.sql` — tạo database `racehorse` nếu chưa tồn tại.
-2. `01_create_schema.sql` — tạo bảng, khóa ngoại, ràng buộc và index.
-3. `02_seed_data.sql` — tạo tài khoản quản lý câu lạc bộ mặc định.
-4. `03_horse_role_features.sql` — bổ sung quyền sở hữu, huấn luyện viên hiện tại, lưu trữ hồ sơ và lịch sử đua.
-5. `04_cloudinary_profile_files.sql` — lưu metadata file chính và đề xuất thay file trên Cloudinary.
-6. `05_training_evaluations.sql` — lưu chỉ số buổi tập FR07 và tạo index truy vấn dashboard FR03.
-7. `06_training_plans_scheduling_monitoring.sql` — kế hoạch/giai đoạn, lịch và lượt chạy thử, notification, telemetry, ngưỡng và cảnh báo cho FR04–FR06.
-8. `07_health_medical.sql` — file dùng chung, trạng thái sức khỏe, khám bệnh/phụ lục, chấn thương 3D, khóa huấn luyện và chăm sóc phòng ngừa cho FR08–FR12.
-9. `08_stable_care_inventory.sql` — chuồng/ô chuồng, sinh hoạt, dinh dưỡng có phiên bản, nhiệm vụ, sự cố, danh mục và tồn kho cho FR13–FR17/FR20.
-10. `09_racing_reporting_rbac_audit.sql` — cuộc đua/đăng ký, sổ giao dịch, ma trận quyền cho 5 role cố định và audit append-only cho FR18–FR23.
-11. `10_confirmed_business_rules.sql` — cấu hình đường đua 06:00–24:00, slot 60 phút và lịch sử cân nặng nhập thủ công.
-12. `11_confirmed_automation_and_governance.sql` — telemetry nhập tay, chống gửi thông báo trùng, quyết định duyệt vật tư, VND, báo cáo ngày và dữ liệu ma trận quyền mặc định.
-13. `12_compact_schema.sql` — gộp schema từ 62 bảng thiết kế chi tiết xuống 30 bảng vận hành mà không thay đổi 5 role hay API hiện có.
-
-Các script đều có kiểm tra dữ liệu hoặc đối tượng đã tồn tại, vì vậy có thể chạy lại mà không tạo trùng.
-
-## Nguyên tắc thiết kế
-
-- Dashboard FR03 đọc trực tiếp `training_evaluations`; database không tự tính chỉ số người dùng đã nhập.
-- FR04 chặn giai đoạn trùng thời gian trong cùng một kế hoạch bằng trigger.
-- FR05 chặn lịch trùng của cùng nhân viên và chặn đặt trùng làn chạy bằng trigger.
-- FR08 lưu trạng thái hiện tại và tự ghi lịch sử trạng thái; FR09 không cho xóa hồ sơ khám, chỉ thêm phụ lục.
-- FR11 chỉ cho tồn tại một khóa huấn luyện đang hoạt động trên mỗi ngựa.
-- FR14 lưu từng phiên bản khẩu phần; lịch sử cũ không bị ghi đè.
-- FR19/FR22 dùng chung `financial_transactions`; danh sách ngựa và giao dịch đóng băng trong báo cáo được lưu bằng JSON ngay trên `owner_reports`.
-- FR23 dùng trigger chặn mọi thao tác sửa/xóa trên `audit_logs`. Thời gian lưu giữ nằm trong `audit_settings` và phải được quản lý câu lạc bộ cấu hình, vì tài liệu chưa nêu số ngày mặc định.
-- FR21 giữ đúng 5 role trong ràng buộc `user_roles`; ứng dụng không cung cấp API tạo thêm role. Quản lý câu lạc bộ được thay role của tài khoản khác.
-- FR06 chỉ nhận chỉ số do Head Trainer nhập thủ công; không tích hợp thiết bị realtime ở giai đoạn này.
-- FR12 và báo cáo chủ sở hữu dùng job backend chạy lúc 06:00 theo múi giờ câu lạc bộ. `deduplication_key` ngăn job gửi cùng một thông báo nhiều lần.
-- `replenishment_requests.decision_status` có bốn trạng thái rõ ràng: `PENDING`, `APPROVED`, `REJECTED`, `FULFILLED`.
-- Tất cả giao dịch hiện dùng `VND`; quy tắc phân bổ chi phí giữa nhiều chủ sở hữu chưa được áp dụng.
-
-Những quyết định chưa có trong tài liệu như vòng đời kế hoạch đầy đủ, phân bổ chi phí đồng sở hữu và số ngày giữ audit không được tự đặt trong schema.
-
-## Schema compact 30 bảng
-
-Các phần được gộp có chủ đích:
-
-- `role_definitions`, `module_permissions`, `role_permission_assignments` → `role_permissions`.
-- `preventive_care_completions` → các cột hoàn thành trên `preventive_care_schedules`.
-- `owner_report_horses`, `owner_report_transactions` → hai cột JSON trên `owner_reports`.
-- Trạng thái sức khỏe hiện tại (quan hệ 1-1) → các cột `health_*` trên `horses`; lịch sử chi tiết chưa có API được lưu trữ trong `module_records`.
-- Các bảng chi tiết y tế chưa có API, dinh dưỡng, nhiệm vụ, sự cố và kho → `module_records`, phân biệt bằng `module_code` và `record_type`.
-- `stables` vẫn là bảng quan hệ riêng để giữ khóa ngoại từ `financial_transactions.stable_id`; không lưu tham chiếu chuồng dưới dạng JSON.
-- Dữ liệu cũ của các bảng được gộp được đóng gói thành JSON trong `module_records` trước khi bảng cũ bị xóa.
-
-Các bảng nghiệp vụ đang được backend truy cập thường xuyên như `horses`, `training_plans`, `training_schedules`, `training_evaluations`, telemetry, cảnh báo, khóa huấn luyện và tài chính vẫn được giữ quan hệ riêng để không ảnh hưởng hiệu năng hoặc logic role.
-
-Tài khoản mặc định sau khi seed:
->>>>>>> Stashed changes
-
-```text
-DATABASE/
-├── 00_create_database.sql          # Khởi tạo DB racehorse_local, collation & login racehorse_local_app
-├── 01_core_auth.sql                # Người dùng (users, wallet, plan), user_roles, login_sessions, role_permissions
-├── 02_horses_and_profiles.sql      # Hồ sơ ngựa, phả hệ thủ công, cân nặng, gói dịch vụ, quyền sở hữu, file đính kèm
-├── 03_facilities.sql               # Chuồng trại, sân tập 06:00-00:00, 4 làn chạy/sân
-├── 04_training_management.sql      # Kế hoạch/giai đoạn tập, khóa an toàn (training_locks), lịch tập (schedules), đặt làn & đánh giá
-├── 05_health_and_care.sql          # Định nghĩa quy trình chăm sóc (definitions), việc chăm sóc (care_tasks), lịch phòng ngừa
-├── 06_telemetry_and_alerts.sql     # Ngưỡng sinh trắc, phiên đo dữ liệu (telemetry_sessions), chỉ số (readings), cảnh báo
-├── 07_racing_and_finance.sql       # Sự kiện đua (race_events), kết quả, giao dịch tài chính (transactions), báo cáo chủ ngựa, thông báo & audit
-├── 08_compact_records.sql          # Kho lưu trữ bán cấu trúc đa năng (module_records) & đơn nạp tiền ví PayOS
-├── 09_seed_reference_data.sql      # Dữ liệu danh mục: 5 tài khoản role chuẩn, ma trận 54 quyền RBAC, 2 chuồng, 10 sân tập (40 làn), 5 quy trình
-├── 10_seed_demo_data.sql           # Dữ liệu nghiệp vụ mẫu: 3 ngựa (H01, H02, H03), ô chuồng, khẩu phần, care tasks hôm nay, telemetry, tài chính
-├── 32_stall_assignment_concurrency_lock.sql # Chống phân ô trùng khi đồng thời
-├── 33_race_registration_lifecycle_integrity.sql # Ràng buộc trạng thái đăng ký đua
-├── 34_hourly_racetrack_slots.sql   # Nâng cấp DB đã tồn tại sang slot 1 giờ
-├── 35_horse_intake_workflow.sql     # Tách trạng thái tiếp nhận khỏi trạng thái thanh toán, giữ phân chuồng cũ
-├── 36_align_race_events_schema.sql  # Đồng bộ schema race_events (race_name, racecourse, race_class) với backend
-├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
-├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
-├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên
-└── README.md                       # Tài liệu quản trị và hướng dẫn này
-```
-
-<<<<<<< Updated upstream
-=======
-Mật khẩu trong database được lưu dưới dạng BCrypt, không lưu chuỗi `Admin123` trực tiếp.
-=======
-Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`38`) được `setup-local.ps1` áp dụng sau baseline:
+Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`40`) được `setup-local.ps1` áp dụng sau baseline:
 
 ```text
 DATABASE/
@@ -128,13 +45,15 @@ DATABASE/
 ├── 36_align_race_events_schema.sql  # Đồng bộ schema race_events (race_name, racecourse, race_class) với backend
 ├── 37_owner_report_duplicate_protection.sql # Ràng buộc chống trùng lặp nội dung báo cáo chủ ngựa (BUG-03 / FR19)
 ├── 38_seed_horse_daily_routines.sql # Khởi tạo lịch sinh hoạt hàng ngày chuẩn (FR13) cho ngựa mẫu (khỏe & dưỡng thương)
+├── 39_seed_standard_feeding_plan_and_routine_templates.sql # Khẩu phần dinh dưỡng tiêu chuẩn & mẫu lịch sinh hoạt
+├── 40_backfill_stabled_horses_daily_routines.sql # Điền bổ sung lịch sinh hoạt cho ngựa đã vào chuồng
 ├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
 ├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
 ├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên
 └── README.md                       # Tài liệu quản trị và hướng dẫn này
 ```
 
->>>>>>> Stashed changes
+
 ### Chi tiết các script baseline
 
 1. **`00_create_database.sql`**
@@ -179,11 +98,9 @@ DATABASE/
     - Seed 5 tài khoản kiểm thử cho 5 role, ma trận 54 quyền RBAC, Chuồng A, Chuồng B, 10 sân tập (40 làn), 5 quy trình chăm sóc và kho vật tư cơ sở.
 11. **`10_seed_demo_data.sql`**
     - Seed 3 ngựa đua (H01 - Thắng, H02 - Ex, H03 - Demo) với thông tin phả hệ, cân nặng chuẩn thú y, quyền sở hữu, ô chuồng, khẩu phần ăn, nhiệm vụ chăm sóc hôm nay cho nhân viên, phiên đo nhịp tim nghỉ ngơi chuẩn phục vụ kiểm tra điều kiện xuất phát (`race-readiness`), kế hoạch huấn luyện và giao dịch tài chính mẫu.
-<<<<<<< Updated upstream
-=======
 12. **`37_owner_report_duplicate_protection.sql`**
     - Bổ sung cột `content_hash VARCHAR(64) NOT NULL` và Unique Nonclustered Index `ux_owner_reports_period_content` trên `(owner_user_id, period_start, period_end, content_hash)` nhằm ngăn chặn triệt để trùng lặp nội dung báo cáo chủ ngựa khi gọi tuần tự hoặc đồng thời (BUG-03 / FR19).
->>>>>>> Stashed changes
+
 
 ---
 
@@ -201,11 +118,8 @@ powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -UseWindowsAut
 powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -SqlServer "localhost,1433" -SqlUsername "sa" -SqlPassword "<mật khẩu SQL Server của bạn>"
 ```
 
-<<<<<<< Updated upstream
-Chỉ dùng `-RecreateDatabase` khi chủ động muốn **xóa toàn bộ dữ liệu cũ**. Các bản vá `32`–`35` hướng tới `racehorse_local`; không chạy chúng trực tiếp trên Azure. Dữ liệu lịch 05:00–11:00 cũ được giữ nguyên khi nâng cấp; lịch tương lai cần được kiểm tra và chuyển thủ công sang slot mới nếu còn dùng.
-=======
-Chỉ dùng `-RecreateDatabase` khi chủ động muốn **xóa toàn bộ dữ liệu cũ**. Các bản vá `32`–`37` hướng tới `racehorse_local`; không chạy chúng trực tiếp trên Azure. Dữ liệu lịch 05:00–11:00 cũ được giữ nguyên khi nâng cấp; lịch tương lai cần được kiểm tra và chuyển thủ công sang slot mới nếu còn dùng.
->>>>>>> Stashed changes
+Chỉ dùng `-RecreateDatabase` khi chủ động muốn **xóa toàn bộ dữ liệu cũ**. Các bản vá `32`–`40` hướng tới `racehorse_local`; không chạy chúng trực tiếp trên Azure. Dữ liệu lịch 05:00–11:00 cũ được giữ nguyên khi nâng cấp; lịch tương lai cần được kiểm tra và chuyển thủ công sang slot mới nếu còn dùng.
+
 
 ### Bước 2: Kiểm tra cấu hình Backend (`application-local.properties`)
 
@@ -259,7 +173,4 @@ Khi cần chia sẻ dữ liệu thử nghiệm giữa các thành viên mà khô
    powershell -ExecutionPolicy Bypass -File DATABASE/apply-sync.ps1 -UseWindowsAuth
    ```
    Script sẽ tự động quét và thực thi các file SQL mới trong `DATABASE/sync/` theo thứ tự tên file.
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
+

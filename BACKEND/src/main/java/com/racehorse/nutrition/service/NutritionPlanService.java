@@ -152,12 +152,6 @@ public class NutritionPlanService {
                 horseId, code, name, stableLocation, targetDate, plan.version(), sortedMeals
         );
     }
-
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listStandardPlans() {
         return jdbc.query(
@@ -194,8 +188,6 @@ public class NutritionPlanService {
     }
 
     @Transactional(readOnly = true)
-<<<<<<< Updated upstream
-=======
     public List<FeedingTemplateOptionView> getTemplateOptionsForHorse(UUID horseId) {
         horseAccess.requireActive(horseId);
 
@@ -384,7 +376,6 @@ public class NutritionPlanService {
     }
 
     @Transactional(readOnly = true)
->>>>>>> Stashed changes
     public Map<String, Object> getStableWorkload(LocalDate date) {
         LocalDate targetDate = date == null ? LocalDate.now() : date;
 
@@ -567,11 +558,6 @@ public class NutritionPlanService {
         }
         return activeHorses;
     }
-
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
     private void validatePlan(CreateNutritionPlanRequest request) {
         if (request.effectiveDate() == null) throw new BusinessException("Ngày áp dụng không được để trống");
         if (request.meals() == null || request.meals().isEmpty()) {

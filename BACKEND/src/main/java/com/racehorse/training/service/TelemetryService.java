@@ -24,22 +24,10 @@ public class TelemetryService {
     public UUID configureThreshold(UUID horseId,UUID actor,boolean manager,boolean trainer,CreateMetricThresholdRequest r){
         requireAccess(horseId,actor,manager,trainer,false,false);
         String metric=upper(r.metricType());
-<<<<<<< Updated upstream
-        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new InvalidInputException("metricType chỉ nhận HEART_RATE hoặc SPEED");
-        if(r.minimumValue()==null&&r.maximumValue()==null) throw new InvalidInputException("Phải nhập ít nhất một ngưỡng");
-        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new InvalidInputException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
-=======
-<<<<<<< Updated upstream
-        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new BusinessException("metricType chỉ nhận HEART_RATE hoặc SPEED");
-        if(r.minimumValue()==null&&r.maximumValue()==null) throw new BusinessException("Phải nhập ít nhất một ngưỡng");
-        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new BusinessException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
-=======
         if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new InvalidInputException("metricType chỉ nhận HEART_RATE hoặc SPEED");
         if(r.minimumValue()==null&&r.maximumValue()==null) throw new InvalidInputException("Phải nhập ít nhất một ngưỡng");
         if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new InvalidInputException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
         if(r.effectiveFrom()!=null&&r.effectiveTo()!=null&&!r.effectiveFrom().isBefore(r.effectiveTo())) throw new InvalidInputException("effectiveTo phải sau effectiveFrom");
->>>>>>> Stashed changes
->>>>>>> Stashed changes
         UUID id=UUID.randomUUID();
         jdbc.update("insert into horse_metric_thresholds(id,horse_id,metric_type,minimum_value,maximum_value,unit,configured_by_user_id,effective_from,effective_to) values(?,?,?,?,?,?,?,?,?)",
                 id,horseId,metric,r.minimumValue(),r.maximumValue(),r.unit(),actor,r.effectiveFrom(),r.effectiveTo());
@@ -67,22 +55,10 @@ public class TelemetryService {
         Integer count=jdbc.queryForObject("select count(*) from horse_metric_thresholds where id=? and horse_id=?",Integer.class,thresholdId,horseId);
         if(count==null||count==0) throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy ngưỡng: "+thresholdId);
         String metric=upper(r.metricType());
-<<<<<<< Updated upstream
-        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new InvalidInputException("metricType chỉ nhận HEART_RATE hoặc SPEED");
-        if(r.minimumValue()==null&&r.maximumValue()==null) throw new InvalidInputException("Phải nhập ít nhất một ngưỡng");
-        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new InvalidInputException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
-=======
-<<<<<<< Updated upstream
-        if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new BusinessException("metricType chỉ nhận HEART_RATE hoặc SPEED");
-        if(r.minimumValue()==null&&r.maximumValue()==null) throw new BusinessException("Phải nhập ít nhất một ngưỡng");
-        if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new BusinessException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
-=======
         if(!List.of("HEART_RATE","SPEED").contains(metric)) throw new InvalidInputException("metricType chỉ nhận HEART_RATE hoặc SPEED");
         if(r.minimumValue()==null&&r.maximumValue()==null) throw new InvalidInputException("Phải nhập ít nhất một ngưỡng");
         if(r.minimumValue()!=null&&r.maximumValue()!=null&&r.minimumValue().compareTo(r.maximumValue())>=0) throw new InvalidInputException("Ngưỡng tối thiểu phải nhỏ hơn tối đa");
         if(r.effectiveFrom()!=null&&r.effectiveTo()!=null&&!r.effectiveFrom().isBefore(r.effectiveTo())) throw new InvalidInputException("effectiveTo phải sau effectiveFrom");
->>>>>>> Stashed changes
->>>>>>> Stashed changes
         jdbc.update("update horse_metric_thresholds set metric_type=?,minimum_value=?,maximum_value=?,unit=?,configured_by_user_id=?,effective_from=?,effective_to=? where id=?",
                 metric,r.minimumValue(),r.maximumValue(),r.unit(),actor,r.effectiveFrom(),r.effectiveTo(),thresholdId);
         return thresholds(horseId,actor,manager,trainer,false,false,true).stream()
@@ -170,13 +146,6 @@ public class TelemetryService {
             Integer exists=jdbc.queryForObject("select count(*) from alert_events where id=? and horse_id=?",Integer.class,alertId,horseId);
             if(exists==null||exists==0)throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy cảnh báo: "+alertId);
         }
-<<<<<<< Updated upstream
-        return alerts(horseId,actor,manager,trainer,false,false,null,null,null,null,0,200).stream()
-                .filter(v->v.id().equals(alertId)).findFirst().orElseThrow();
-=======
-<<<<<<< Updated upstream
-        return alerts(horseId,actor,true,null,null,null,null,0,200).stream().filter(v->v.id().equals(alertId)).findFirst().orElseThrow();
-=======
         List<AlertView> rows = jdbc.query(
                 "select id,telemetry_session_id,telemetry_reading_id,threshold_id,metric_type,observed_value,threshold_value,threshold_direction,occurred_at,acknowledged_by_user_id,acknowledged_at from alert_events where id=? and horse_id=?",
                 (rs, row) -> new AlertView(rs.getObject("id", UUID.class), horseId,
@@ -187,7 +156,6 @@ public class TelemetryService {
                         rs.getObject("acknowledged_at", OffsetDateTime.class)), alertId, horseId);
         if (rows.isEmpty()) throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy cảnh báo: " + alertId);
         return rows.getFirst();
->>>>>>> Stashed changes
     }
 
     @Transactional(readOnly = true)
@@ -203,10 +171,6 @@ public class TelemetryService {
                                   OffsetDateTime to, int page, int size) {
         requireAccess(horseId,requester,manager,trainer,owner,vet);
         return alertsAfterAccess(horseId, metric, acknowledged, from, to, page, size);
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
     }
 
     private long insertReading(UUID session,CreateTelemetryRequest.Reading r){

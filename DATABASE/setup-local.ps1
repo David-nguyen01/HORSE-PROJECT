@@ -47,12 +47,6 @@ function Run-SqlCmd {
     }
 }
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-Write-Host "Database racehorse is ready." -ForegroundColor Green
-=======
->>>>>>> Stashed changes
 if ($RecreateDatabase) {
     Write-Host "Dropping existing database racehorse_local if present..." -ForegroundColor Yellow
     $dropSql = "IF DB_ID(N'racehorse_local') IS NOT NULL BEGIN ALTER DATABASE [racehorse_local] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [racehorse_local]; END;"
@@ -75,15 +69,11 @@ $baselineScripts = @(
     "33_race_registration_lifecycle_integrity.sql",
     "34_hourly_racetrack_slots.sql",
     "35_horse_intake_workflow.sql",
-<<<<<<< Updated upstream
-    "36_align_race_events_schema.sql"
-=======
     "36_align_race_events_schema.sql",
     "37_owner_report_duplicate_protection.sql",
     "38_seed_horse_daily_routines.sql",
     "39_seed_standard_feeding_plan_and_routine_templates.sql",
     "40_backfill_stabled_horses_daily_routines.sql"
->>>>>>> Stashed changes
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -124,7 +114,4 @@ if ($IncludeSync) {
 }
 
 Write-Host "Database racehorse_local is ready." -ForegroundColor Green
-<<<<<<< Updated upstream
-=======
->>>>>>> Stashed changes
->>>>>>> Stashed changes
+

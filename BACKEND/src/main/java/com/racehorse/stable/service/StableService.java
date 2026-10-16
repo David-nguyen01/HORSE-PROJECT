@@ -201,16 +201,7 @@ public class StableService {
                 + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?",
                 Integer.class, stallId.toString(), horseId);
         if (occupied != null && occupied > 0) throw new BusinessException("Ô chuồng đã có ngựa");
-<<<<<<< Updated upstream
-
-=======
-<<<<<<< Updated upstream
-=======
-
         validateHealthCompatibility(stableId, horseId, horse.getHealthStatus());
-
->>>>>>> Stashed changes
->>>>>>> Stashed changes
         OffsetDateTime now = OffsetDateTime.now();
         endCurrentHorseAssignment(horseId, now);
         UUID assignmentId = UUID.randomUUID();
@@ -239,14 +230,7 @@ public class StableService {
         }
         jdbc.update("update horses set stable_location=?,intake_status='STABLED',updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 stable.name() + " / " + stall.code(), horseId);
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-        HorseSummary horse = getHorseSummary(horseId);
-=======
         createDefaultDailyRoutineIfAbsent(horseId, horse, actor);
->>>>>>> Stashed changes
->>>>>>> Stashed changes
         return new AssignmentView(assignmentId, stableId, stable.name(), stallId, stall.code(), horseId,
                 horse.getName(), horse.getCode(), actor, now, null, true);
     }
@@ -582,16 +566,8 @@ public class StableService {
     public DailyRoutineView addDailyRoutine(UUID horseId, UUID actor, DailyRoutineRequest request) {
         Horse horse = horseAccess.requireActive(horseId);
         validateRoutine(request);
-<<<<<<< Updated upstream
-        UUID routineId = UUID.randomUUID();
-=======
-<<<<<<< Updated upstream
-        UUID id = UUID.randomUUID();
-=======
         validateRoutineAllowedForHorse(horseId, horse, request);
         UUID routineId = UUID.randomUUID();
->>>>>>> Stashed changes
->>>>>>> Stashed changes
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("activityType", request.activityType().trim().toUpperCase(Locale.ROOT));
         data.put("startTime", request.startTime().toString());
@@ -608,21 +584,10 @@ public class StableService {
 
     @Transactional
     public DailyRoutineView updateDailyRoutine(UUID routineId, UUID actor, DailyRoutineRequest request) {
-<<<<<<< Updated upstream
         validateRoutine(request);
         DailyRoutineView existing = getDailyRoutine(routineId);
-        horseAccess.requireActive(existing.horseId());
-
-=======
-        DailyRoutineView existing = getDailyRoutine(routineId);
-<<<<<<< Updated upstream
-        validateRoutine(request);
-=======
         Horse horse = horseAccess.requireActive(existing.horseId());
         validateRoutineAllowedForHorse(existing.horseId(), horse, request);
-
->>>>>>> Stashed changes
->>>>>>> Stashed changes
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("activityType", request.activityType().trim().toUpperCase(Locale.ROOT));
         data.put("startTime", request.startTime().toString());
@@ -668,107 +633,6 @@ public class StableService {
         if (!r.startTime().isBefore(r.endTime())) throw new BusinessException("Giờ bắt đầu phải trước giờ kết thúc");
     }
 
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-    private StableView buildStable(UUID id, String name, String location, boolean active) {
-        List<StallView> stalls = jdbc.query("select id,status,data_json from module_records where module_code='STABLE_CARE' "
-                        + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=? order by JSON_VALUE(data_json,'$.stallCode')",
-                (rs, row) -> {
-                    UUID stallId = rs.getObject("id", UUID.class);
-                    JsonNode node = read(rs.getString("data_json"));
-                    AssignmentView assignment = activeAssignmentForStall(stallId, id, name);
-                    return new StallView(stallId, node.path("stallCode").asText(), "ACTIVE".equals(rs.getString("status")), assignment);
-                }, id.toString());
-        return new StableView(id, name, location, active, stalls);
-    }
-
-    private AssignmentView activeAssignmentForStall(UUID stallId, UUID stableId, String stableName) {
-        List<AssignmentView> rows = jdbc.query("select top 1 m.id,m.horse_id,m.user_id,m.data_json,h.code horse_code,h.name horse_name,h.health_status "
-                        + "from module_records m left join horses h on h.id=m.horse_id "
-                        + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
-                        + "and JSON_VALUE(m.data_json,'$.stallId')=? order by m.created_at desc",
-                (rs, row) -> assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
-                        rs.getString("horse_code"), rs.getString("horse_name"), rs.getString("health_status"),
-                        rs.getObject("user_id", UUID.class), rs.getString("data_json"), stableId, stableName, true),
-                stallId.toString());
-        return rows.isEmpty() ? null : rows.getFirst();
-    }
-
-    private AssignmentView requireAssignment(UUID id) {
-        List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name,h.code horse_code,h.name horse_name,h.health_status "
-                        + "from module_records m join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
-                        + "left join horses h on h.id=m.horse_id "
-                        + "where m.id=? and m.record_type='STALL_ASSIGNMENT'",
-                (rs, row) -> assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
-                        rs.getString("horse_code"), rs.getString("horse_name"), rs.getString("health_status"),
-                        rs.getObject("user_id", UUID.class), rs.getString("data_json"),
-                        UUID.fromString(read(rs.getString("data_json")).path("stableId").asText()),
-                        rs.getString("stable_name"), "ACTIVE".equals(rs.getString("status"))), id);
-        if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy phân bổ chuồng: " + id);
-        return rows.getFirst();
-    }
-
-    private AssignmentView assignment(UUID id, UUID horseId, String horseCode, String horseName, String healthStatus,
-                                      UUID actor, String jsonValue, UUID stableId, String stableName, boolean active) {
-        JsonNode node = read(jsonValue);
-        String until = node.path("assignedUntil").isNull() ? null : node.path("assignedUntil").asText(null);
-        return new AssignmentView(id, stableId, stableName, UUID.fromString(node.path("stallId").asText()),
-                node.path("stallCode").asText(), horseId, horseCode, horseName, healthStatus, actor,
-                OffsetDateTime.parse(node.path("assignedFrom").asText()),
-                until == null || until.isBlank() ? null : OffsetDateTime.parse(until), active);
-    }
-
-    private HorseSummary getHorseSummary(UUID horseId) {
-        List<HorseSummary> rows = jdbc.query("select code, name, health_status from horses where id=?",
-                (rs, row) -> new HorseSummary(rs.getString("code"), rs.getString("name"), rs.getString("health_status")),
-                horseId);
-        return rows.isEmpty() ? new HorseSummary(null, null, null) : rows.getFirst();
-    }
-
-    private void addStallInternal(UUID stableId, UUID actor, String code) {
-        Integer exists = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
-                + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=? and upper(JSON_VALUE(data_json,'$.stallCode'))=upper(?)",
-                Integer.class, stableId.toString(), code);
-        if (exists != null && exists > 0) throw new BusinessException("Mã ô chuồng đã tồn tại trong chuồng này: " + code);
-        UUID id = UUID.randomUUID();
-        jdbc.update("insert into module_records(id,module_code,record_type,source_table,user_id,status,data_json) "
-                        + "values(?,'STABLE_CARE','STALL','api',?,'ACTIVE',?)",
-                id, actor, toJson(Map.of("stableId", stableId.toString(), "stallCode", code, "isActive", true)));
-    }
-
-    private StableView requireActiveStable(UUID stableId) {
-        StableView stable = get(stableId);
-        if (!stable.active()) throw new BusinessException("Chuồng đang ngừng hoạt động");
-        return stable;
-    }
-
-    private StallView requireStall(UUID stableId, UUID stallId) {
-        return get(stableId).stalls().stream().filter(value -> value.id().equals(stallId)).findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ô chuồng: " + stallId));
-    }
-
-    private void endCurrentHorseAssignment(UUID horseId, OffsetDateTime at) {
-        jdbc.update("update module_records set status='ENDED',data_json=JSON_MODIFY(data_json,'$.assignedUntil',?),updated_at=SYSDATETIMEOFFSET() "
-                        + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and horse_id=?",
-                at.toString(), horseId);
-    }
-
-    private JsonNode read(String value) {
-        try { return json.readTree(value); }
-        catch (JacksonException exception) { throw new IllegalStateException("Dữ liệu JSON chuồng không hợp lệ", exception); }
-    }
-
-    private String toJson(Object value) {
-        try { return json.writeValueAsString(value); }
-        catch (JacksonException exception) { throw new IllegalStateException("Không thể tạo dữ liệu JSON chuồng", exception); }
-    }
-
-    private String normalizeCode(String value) { return required(value, "Mã ô chuồng không được để trống").toUpperCase(Locale.ROOT); }
-    private String required(String value, String message) { if (value == null || value.isBlank()) throw new BusinessException(message); return value.trim(); }
-    private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
-
-=======
     private void validateRoutineAllowedForHorse(UUID horseId, Horse horse, DailyRoutineRequest r) {
         String act = r.activityType().trim().toUpperCase(Locale.ROOT);
         if ("TURNOUT".equals(act)) {
@@ -941,9 +805,6 @@ public class StableService {
         }
         return previewRoutineBackfill();
     }
-
->>>>>>> Stashed changes
->>>>>>> Stashed changes
     public record StableView(UUID id, String name, String location, boolean active, List<StallView> stalls) {}
     public record StallView(UUID id, String code, boolean active, AssignmentView currentAssignment) {}
     public record AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
@@ -959,16 +820,9 @@ public class StableService {
     }
     public record DailyRoutineView(UUID id, UUID horseId, String activityType, LocalTime startTime, LocalTime endTime, String notes, boolean active) {}
     public record DailyRoutineRequest(String activityType, LocalTime startTime, LocalTime endTime, String notes) {}
-<<<<<<< Updated upstream
-=======
-<<<<<<< Updated upstream
-    private record HorseSummary(String code, String name, String healthStatus) {}
-=======
     public record RoutineBackfillPreview(int totalStabledHorses, int alreadyConfiguredCount, int eligibleHealthyCount,
                                          int eligibleRestrictedCount, int excludedCount, List<RoutineBackfillItem> details) {}
     public record RoutineBackfillItem(UUID horseId, String horseCode, String horseName, String stableLocation,
                                       String healthStatus, boolean hasActiveLock, int existingRoutineCount,
                                       String statusAction, String targetTemplate) {}
->>>>>>> Stashed changes
->>>>>>> Stashed changes
 }
