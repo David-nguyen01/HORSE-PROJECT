@@ -1,7 +1,18 @@
+<<<<<<< Updated upstream
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+=======
+<<<<<<< Updated upstream
+import { useCallback, useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+=======
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
 import {
   AlertTriangle,
+  ArrowRightLeft,
   Boxes,
   Calendar,
   Check,
@@ -16,8 +27,10 @@ import {
   RotateCcw,
   Search,
   ShieldAlert,
+  ShieldCheck,
   Trash2,
   Upload,
+  UserCheck,
   Utensils,
   X,
 } from 'lucide-react'
@@ -31,6 +44,17 @@ const TASK_TYPE_LABELS = {
   GROOMING: 'Chải lông chăm sóc',
   WALKING: 'Dắt đi dạo nhẹ',
   OTHER: 'Nhiệm vụ khác',
+}
+
+const ROUTINE_ACTIVITY_LABELS = {
+  TURNOUT: 'Thả bãi cỏ dạo chơi (Turnout)',
+  GROOMING: 'Chải lông & Vệ sinh (Grooming)',
+  REST: 'Thời gian nghỉ ngơi (Rest)',
+  FEEDING: 'Giờ ăn khẩu phần (Feeding)',
+  WALKING: 'Dắt đi dạo nhẹ (Walking)',
+  ICE_BOOTS: 'Ngâm / Chườm đá chân (Ice boots)',
+  STALL_REST: 'Tĩnh dưỡng tại chuồng (Stall rest)',
+  OTHER: 'Hoạt động khác',
 }
 
 const INCIDENT_TYPE_LABELS = {
@@ -210,18 +234,38 @@ export default function StableCarePage() {
         </div>
       )}
 
+<<<<<<< Updated upstream
       {isVet ? (
         <NutritionView canEditPlan={true} />
+=======
+<<<<<<< Updated upstream
+      {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} canEdit={canEditRoutine} />}
+      {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
+      {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
+      {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} canUpdateStatus={canEditRoutine || isStaff} />}
+      {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
+=======
+      {isVet ? (
+        <NutritionView canEditPlan={true} canApplyTemplate={true} isStaff={false} />
+>>>>>>> Stashed changes
       ) : (
         <>
           {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canEdit={canEditRoutine} />}
           {activeTab === 'training' && <TrainingPreparationView isStaff={isStaff} />}
           {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
+<<<<<<< Updated upstream
           {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} />}
+=======
+          {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} canApplyTemplate={isStaff || isVet || isManager || isTrainer} isStaff={isStaff} />}
+>>>>>>> Stashed changes
           {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canUpdateStatus={isManager || isStaff} />}
           {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
         </>
       )}
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
     </>
   )
 }
@@ -239,6 +283,33 @@ function StablesView({ canEditRoutine, isStaff }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showAddRoutine, setShowAddRoutine] = useState(false)
+  const [showBackfillModal, setShowBackfillModal] = useState(false)
+
+  // Intake & Transfer states
+  const [pendingWaitingCount, setPendingWaitingCount] = useState(0)
+  const [pendingStallCount, setPendingStallCount] = useState(0)
+  const [showIntakeModal, setShowIntakeModal] = useState(false)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferSourceHorse, setTransferSourceHorse] = useState(null)
+  const [showAssignSingleModal, setShowAssignSingleModal] = useState(false)
+  const [targetAssignStall, setTargetAssignStall] = useState(null)
+
+  const loadPendingCounts = useCallback(async () => {
+    try {
+      const [waiting, cleared] = await Promise.all([
+        stableCareApi.getPendingWaitingRoom().catch(() => []),
+        stableCareApi.getPendingStall().catch(() => []),
+      ])
+      setPendingWaitingCount((waiting || []).length)
+      setPendingStallCount((cleared || []).length)
+    } catch {
+      // ignore error
+    }
+  }, [])
+
+  useEffect(() => {
+    loadPendingCounts()
+  }, [loadPendingCounts])
 
   const loadStables = useCallback(async () => {
     setLoading(true)
@@ -281,6 +352,7 @@ function StablesView({ canEditRoutine, isStaff }) {
         id: stall.currentAssignment.horseId,
         code: stall.currentAssignment.horseCode,
         name: stall.currentAssignment.horseName,
+        stallId: stall.id,
         stallCode: stall.code,
         healthStatus: stall.currentAssignment.horseHealthStatus,
         assignedFrom: stall.currentAssignment.assignedFrom,
@@ -319,13 +391,56 @@ function StablesView({ canEditRoutine, isStaff }) {
     }
   }
 
+  const handleTransferDone = (newStableId) => {
+    setShowTransferModal(false)
+    setTransferSourceHorse(null)
+    loadStables()
+    loadPendingCounts()
+    if (newStableId) setSelectedStableId(newStableId)
+  }
+
+  const handleAssignDone = (newStableId) => {
+    setShowIntakeModal(false)
+    setShowAssignSingleModal(false)
+    setTargetAssignStall(null)
+    loadStables()
+    loadPendingCounts()
+    if (newStableId) setSelectedStableId(newStableId)
+  }
+
   const allStalls = activeStable?.stalls || []
   const occupiedCount = allStalls.filter((s) => s.currentAssignment).length
   const vacantCount = allStalls.length - occupiedCount
 
   return (
     <div>
-      <div className="stats-grid">
+      {/* Action Header for Intake & Stables Management */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: '18px', color: '#15352c', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Home size={20} style={{ color: '#27704e' }} /> Quản lý Ô chuồng & Tiếp nhận
+          </h3>
+          <p style={{ margin: '3px 0 0', fontSize: '12px', color: 'var(--muted)' }}>
+            Theo dõi sức chứa các khu chuồng (tối đa 4 ô/ngựa), tiếp nhận ngựa mới từ phòng khám và chuyển chuồng an toàn.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            className="button primary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minHeight: '36px' }}
+            onClick={() => setShowIntakeModal(true)}
+          >
+            <Plus size={16} /> Tiếp nhận & Xếp chuồng
+            {(pendingWaitingCount > 0 || pendingStallCount > 0) && (
+              <span style={{ background: '#fff', color: '#1b4d3e', borderRadius: '10px', padding: '1px 7px', fontSize: '11px', fontWeight: 700 }}>
+                {pendingWaitingCount + pendingStallCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
         <div className="stat card green">
           <div>
             <strong>{stables.length}</strong>
@@ -335,7 +450,15 @@ function StablesView({ canEditRoutine, isStaff }) {
         <div className="stat card blue">
           <div>
             <strong>{allStalls.length}</strong>
+<<<<<<< Updated upstream
             <span>Tổng số ô (Chuồng {activeStable?.name?.toUpperCase() || '—'})</span>
+=======
+<<<<<<< Updated upstream
+            <span>Tổng số ô chuồng ({activeStable?.name || '—'})</span>
+=======
+            <span>Tổng số ô ({activeStable?.name?.toUpperCase() || '—'})</span>
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
           </div>
         </div>
         <div className="stat card gold">
@@ -348,6 +471,17 @@ function StablesView({ canEditRoutine, isStaff }) {
           <div>
             <strong>{vacantCount}</strong>
             <span>Ô chuồng trống</span>
+          </div>
+        </div>
+        <div
+          className="stat card purple"
+          style={{ cursor: 'pointer' }}
+          onClick={() => setShowIntakeModal(true)}
+          title="Bấm để xem danh sách tiếp nhận & phân ô"
+        >
+          <div>
+            <strong>{pendingWaitingCount + pendingStallCount}</strong>
+            <span>Chờ tiếp nhận ({pendingWaitingCount} phòng khám · {pendingStallCount} chờ xếp)</span>
           </div>
         </div>
       </div>
@@ -432,10 +566,47 @@ function StablesView({ canEditRoutine, isStaff }) {
                       <div>
                         <div className="stall-horse-name">{assigned.horseName}</div>
                         <div className="stall-horse-code">{assigned.horseCode}</div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
+                          <span className="muted" style={{ fontSize: '10px' }}>Ô: <b>{stall.code}</b></span>
+                          <button
+                            type="button"
+                            className="button secondary"
+                            style={{ fontSize: '10px', padding: '2px 8px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            title="Chuyển ngựa sang ô chuồng khác"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setTransferSourceHorse({
+                                id: assigned.horseId,
+                                code: assigned.horseCode,
+                                name: assigned.horseName,
+                                stallId: stall.id,
+                                stallCode: stall.code,
+                                healthStatus: assigned.horseHealthStatus,
+                              })
+                              setShowTransferModal(true)
+                            }}
+                          >
+                            <ArrowRightLeft size={11} /> Chuyển ô
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="muted" style={{ fontSize: '11px', marginTop: '6px' }}>
-                        Chưa phân bổ ngựa
+                      <div style={{ marginTop: '8px' }}>
+                        <div className="muted" style={{ fontSize: '11px', marginBottom: '8px' }}>
+                          Chưa phân bổ ngựa
+                        </div>
+                        <button
+                          type="button"
+                          className="button secondary"
+                          style={{ fontSize: '11px', width: '100%', padding: '4px 8px', minHeight: '26px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTargetAssignStall({ stall, stable: activeStable })
+                            setShowAssignSingleModal(true)
+                          }}
+                        >
+                          <Plus size={12} /> Xếp ngựa
+                        </button>
                       </div>
                     )}
                   </div>
@@ -447,13 +618,25 @@ function StablesView({ canEditRoutine, isStaff }) {
 
         {/* Right: Daily routine for selected horse */}
         <section className="card" style={{ padding: '20px' }}>
-          <div className="card-head" style={{ padding: '0 0 14px' }}>
+          <div className="card-head" style={{ padding: '0 0 14px', flexWrap: 'wrap', gap: '8px' }}>
             <h3>Lịch sinh hoạt hằng ngày</h3>
-            {canEditRoutine && selectedHorse && (
-              <button className="button primary" style={{ minHeight: '34px', fontSize: '11px' }} onClick={() => setShowAddRoutine(true)}>
-                <Plus size={14} /> Thêm hoạt động
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {canEditRoutine && (
+                <button
+                  className="button secondary"
+                  style={{ minHeight: '34px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  title="Kiểm tra và khởi tạo lịch sinh hoạt mặc định theo thể trạng cho các ngựa trong chuồng"
+                  onClick={() => setShowBackfillModal(true)}
+                >
+                  <RotateCcw size={13} /> Khởi tạo lịch mặc định
+                </button>
+              )}
+              {canEditRoutine && selectedHorse && (
+                <button className="button primary" style={{ minHeight: '34px', fontSize: '11px' }} onClick={() => setShowAddRoutine(true)}>
+                  <Plus size={14} /> Thêm hoạt động
+                </button>
+              )}
+            </div>
           </div>
 
           {!selectedHorse ? (
@@ -487,12 +670,56 @@ function StablesView({ canEditRoutine, isStaff }) {
                     Nhân viên chuồng: Xem lịch trình sinh hoạt theo giờ để thực hiện chăm sóc.
                   </div>
                 )}
+                <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="button secondary"
+                    style={{ fontSize: '11px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                    onClick={() => {
+                      setTransferSourceHorse({
+                        id: selectedHorse.id,
+                        code: selectedHorse.code,
+                        name: selectedHorse.name,
+                        stallId: selectedHorse.stallId,
+                        stallCode: selectedHorse.stallCode,
+                        healthStatus: selectedHorse.healthStatus,
+                      })
+                      setShowTransferModal(true)
+                    }}
+                  >
+                    <ArrowRightLeft size={13} /> Chuyển ô chuồng khác
+                  </button>
+                </div>
               </div>
 
               {!routines.length ? (
+<<<<<<< Updated upstream
                 <div className="empty" style={{ minHeight: '100px', padding: '16px' }}>
+=======
+<<<<<<< Updated upstream
+                <div className="empty" style={{ minHeight: '130px' }}>
+>>>>>>> Stashed changes
                   <span>Chưa có lịch sinh hoạt nào được thiết lập cho ngựa này.</span>
                 </div>
+=======
+                selectedHorse.healthStatus === 'INJURED' || selectedHorse.trainingLocked ? (
+                  <div className="notice" style={{ backgroundColor: '#fff7e6', borderColor: '#ffd591', color: '#d46b08', padding: '16px', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                      <ShieldAlert size={20} style={{ color: '#fa8c16', flexShrink: 0, marginTop: '2px' }} />
+                      <div>
+                        <b style={{ fontSize: '13px', display: 'block', marginBottom: '4px' }}>Chế độ tĩnh tại chuồng (Stall Rest / Theo dõi y tế)</b>
+                        <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#873800' }}>
+                          Ngựa hiện đang bị hạn chế vận động theo chỉ định y tế hoặc có lệnh khóa huấn luyện. Chưa có lịch sinh hoạt ngoài chuồng được phân công. Vui lòng duy trì chăm sóc tại ô chuồng và tuân thủ y lệnh của bác sĩ thú y.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="empty" style={{ minHeight: '100px', padding: '16px' }}>
+                    <span>Chưa có lịch sinh hoạt nào được thiết lập cho ngựa này.</span>
+                  </div>
+                )
+>>>>>>> Stashed changes
               ) : (
                 <div className="routine-list">
                   {routines.map((r) => (
@@ -501,7 +728,7 @@ function StablesView({ canEditRoutine, isStaff }) {
                         <Clock size={13} /> {r.startTime} - {r.endTime}
                       </span>
                       <div>
-                        <b style={{ fontSize: '12px', color: '#173129' }}>{r.activityType}</b>
+                        <b style={{ fontSize: '12px', color: '#173129' }}>{ROUTINE_ACTIVITY_LABELS[r.activityType] || r.activityType}</b>
                         {r.notes && <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{r.notes}</div>}
                       </div>
                       {canEditRoutine && (
@@ -528,12 +755,804 @@ function StablesView({ canEditRoutine, isStaff }) {
           }}
         />
       )}
+
+      {showBackfillModal && (
+        <RoutineBackfillModal
+          onClose={() => setShowBackfillModal(false)}
+          onExecuted={() => {
+            setShowBackfillModal(false)
+            if (selectedHorse) loadRoutines(selectedHorse.id)
+            loadStables()
+          }}
+        />
+      )}
+
+      {showIntakeModal && (
+        <HorseIntakeModal
+          stables={stables}
+          onClose={() => setShowIntakeModal(false)}
+          onAssigned={handleAssignDone}
+        />
+      )}
+
+      {showTransferModal && transferSourceHorse && (
+        <TransferStallModal
+          horse={transferSourceHorse}
+          currentStable={activeStable}
+          stables={stables}
+          onClose={() => {
+            setShowTransferModal(false)
+            setTransferSourceHorse(null)
+          }}
+          onTransferred={handleTransferDone}
+        />
+      )}
+
+      {showAssignSingleModal && targetAssignStall && (
+        <AssignSingleStallModal
+          stall={targetAssignStall.stall}
+          stable={targetAssignStall.stable}
+          onClose={() => {
+            setShowAssignSingleModal(false)
+            setTargetAssignStall(null)
+          }}
+          onAssigned={() => handleAssignDone(targetAssignStall.stable.id)}
+        />
+      )}
+    </div>
+  )
+}
+
+function HorseIntakeModal({ stables, onClose, onAssigned }) {
+  const [tab, setTab] = useState('WAITING')
+  const [waitingList, setWaitingList] = useState([])
+  const [pendingStallList, setPendingStallList] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
+  const [admittingId, setAdmittingId] = useState(null)
+
+  const [allocatingHorse, setAllocatingHorse] = useState(null)
+  const [targetStableId, setTargetStableId] = useState('')
+  const [targetStallId, setTargetStallId] = useState('')
+  const [assignBusy, setAssignBusy] = useState(false)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const [waiting, cleared] = await Promise.all([
+        stableCareApi.getPendingWaitingRoom().catch(() => []),
+        stableCareApi.getPendingStall().catch(() => []),
+      ])
+      setWaitingList(waiting || [])
+      setPendingStallList(cleared || [])
+      if ((waiting || []).length === 0 && (cleared || []).length > 0) {
+        setTab('PENDING_STALL')
+      }
+    } catch (err) {
+      setError(err.message || 'Lỗi khi tải danh sách tiếp nhận')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  const handleStartAllocating = (horse) => {
+    setAllocatingHorse(horse)
+    setError('')
+    setSuccessMsg('')
+    const defaultStable = stables?.find((s) => s.active) || stables?.[0]
+    if (defaultStable) {
+      setTargetStableId(defaultStable.id)
+      const vacantStalls = (defaultStable.stalls || []).filter((st) => st.active && !st.currentAssignment)
+      setTargetStallId(vacantStalls[0]?.id || '')
+    }
+  }
+
+  const currentTargetStable = useMemo(() => {
+    return (stables || []).find((s) => s.id === targetStableId) || null
+  }, [stables, targetStableId])
+
+  const targetStableOccupancy = useMemo(() => {
+    return (currentTargetStable?.stalls || []).filter((st) => st.currentAssignment).length
+  }, [currentTargetStable])
+
+  const availableVacantStalls = useMemo(() => {
+    if (!currentTargetStable) return []
+    return (currentTargetStable.stalls || []).filter((st) => st.active && !st.currentAssignment)
+  }, [currentTargetStable])
+
+  useEffect(() => {
+    if (availableVacantStalls.length > 0 && (!targetStallId || !availableVacantStalls.some((s) => s.id === targetStallId))) {
+      setTargetStallId(availableVacantStalls[0].id)
+    } else if (availableVacantStalls.length === 0) {
+      setTargetStallId('')
+    }
+  }, [availableVacantStalls, targetStallId])
+
+  const compatibilityAlert = useMemo(() => {
+    if (!allocatingHorse || !currentTargetStable) return null
+    const horseHealth = (allocatingHorse.healthStatus || 'FIT').toUpperCase()
+    const hasQuarantined = (currentTargetStable.stalls || []).some(
+      (st) => st.currentAssignment && (st.currentAssignment.horseHealthStatus || '').toUpperCase() === 'QUARANTINED'
+    )
+    const hasNonQuarantined = (currentTargetStable.stalls || []).some(
+      (st) => st.currentAssignment && (st.currentAssignment.horseHealthStatus || '').toUpperCase() !== 'QUARANTINED'
+    )
+
+    if (horseHealth === 'QUARANTINED' && hasNonQuarantined) {
+      return {
+        level: 'error',
+        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly (QUARANTINED). Không thể xếp chung khu chuồng với các ngựa khỏe mạnh khác.',
+      }
+    }
+    if (horseHealth !== 'QUARANTINED' && hasQuarantined) {
+      return {
+        level: 'error',
+        text: 'Cảnh báo y tế: Khu chuồng này đang có ngựa cách ly (QUARANTINED). Không thể xếp ngựa khỏe mạnh vào khu vực này.',
+      }
+    }
+    return null
+  }, [allocatingHorse, currentTargetStable])
+
+  const handleAdmitToWaiting = async (horse) => {
+    setAdmittingId(horse.horseId)
+    setError('')
+    setSuccessMsg('')
+    try {
+      await stableCareApi.admitToWaitingRoom(horse.horseId)
+      setSuccessMsg(`Đã đưa ngựa ${horse.name} (${horse.code}) vào phòng chờ. Bác sĩ thú y đã nhận thông báo khám sàng lọc!`)
+      await loadData()
+    } catch (err) {
+      setError(err.message || 'Lỗi khi đưa ngựa vào phòng chờ')
+    } finally {
+      setAdmittingId(null)
+    }
+  }
+
+  const handleConfirmAssignment = async (e) => {
+    e.preventDefault()
+    if (!allocatingHorse || !targetStableId || !targetStallId) {
+      setError('Vui lòng chọn khu chuồng và ô chuồng trống')
+      return
+    }
+    if (targetStableOccupancy >= 4) {
+      setError('Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa')
+      return
+    }
+    if (compatibilityAlert?.level === 'error') {
+      setError(compatibilityAlert.text)
+      return
+    }
+
+    setAssignBusy(true)
+    setError('')
+    setSuccessMsg('')
+    try {
+      await stableCareApi.assignStall(targetStableId, targetStallId, allocatingHorse.horseId)
+      setSuccessMsg(`Phân bổ chuồng thành công cho ngựa ${allocatingHorse.name}!`)
+      setAllocatingHorse(null)
+      await loadData()
+      onAssigned(targetStableId)
+    } catch (err) {
+      setError(err.message || 'Lỗi khi phân bổ ô chuồng')
+    } finally {
+      setAssignBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 'min(920px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <div>
+            <p className="eyebrow">QUY TRÌNH TIẾP NHẬN & PHÂN BỔ CHUỒNG</p>
+            <h2>Tiếp nhận ngựa mới & Xếp ô chuồng</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X /></button>
+        </div>
+
+        <div style={{ padding: '0 24px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {error && <div className="notice error"><X size={16} />{error}</div>}
+          {successMsg && <div className="notice success"><CheckCircle size={16} />{successMsg}</div>}
+
+          {/* Sub tabs */}
+          <div className="sub-tabs" style={{ margin: 0 }}>
+            <button
+              className={`sub-tab-btn ${tab === 'WAITING' ? 'active' : ''}`}
+              onClick={() => {
+                setTab('WAITING')
+                setAllocatingHorse(null)
+                setError('')
+              }}
+            >
+              1. Chờ đưa vào phòng khám ({waitingList.length})
+            </button>
+            <button
+              className={`sub-tab-btn ${tab === 'PENDING_STALL' ? 'active' : ''}`}
+              onClick={() => {
+                setTab('PENDING_STALL')
+                setAllocatingHorse(null)
+                setError('')
+              }}
+            >
+              2. Đã khám xong — Chờ xếp ô chuồng ({pendingStallList.length})
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="empty" style={{ padding: '36px' }}>Đang tải dữ liệu tiếp nhận ngựa…</div>
+          ) : tab === 'WAITING' ? (
+            <div>
+              <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', lineHeight: 1.5 }}>
+                Ngựa mới đăng ký cần được <b>Nhân viên chuồng</b> xác nhận đưa vào phòng chờ khám. Bác sĩ thú y trực ban sẽ tiếp nhận ca khám lâm sàng tại hàng chờ y tế.
+              </div>
+
+              {waitingList.length === 0 ? (
+                <div className="empty" style={{ padding: '30px' }}>
+                  Không có ngựa nào đang chờ đưa vào phòng khám.
+                </div>
+              ) : (
+                <div className="data-table" style={{ fontSize: '12px' }}>
+                  <div className="table-header" style={{ gridTemplateColumns: '110px 1fr 140px 170px' }}>
+                    <span>Mã ngựa</span>
+                    <span>Tên ngựa</span>
+                    <span>Phí dịch vụ</span>
+                    <span>Thao tác</span>
+                  </div>
+                  {waitingList.map((h) => (
+                    <div className="table-row" key={h.horseId} style={{ gridTemplateColumns: '110px 1fr 140px 170px', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600 }}>{h.code}</span>
+                      <span><b>{h.name}</b></span>
+                      <span>
+                        <span className={`status ${h.paymentStatus === 'PAID' ? 'active' : 'gold'}`} style={{ fontSize: '10px' }}>
+                          {h.paymentStatus === 'PAID' ? 'Đã đóng phí' : 'Được bảo lãnh'}
+                        </span>
+                      </span>
+                      <div>
+                        <button
+                          className="button primary"
+                          style={{ fontSize: '11px', padding: '4px 10px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                          disabled={admittingId === h.horseId}
+                          onClick={() => handleAdmitToWaiting(h)}
+                        >
+                          <UserCheck size={13} /> {admittingId === h.horseId ? 'Đang tiếp nhận…' : 'Đưa vào phòng chờ'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div>
+              <div style={{ fontSize: '12px', color: '#475569', marginBottom: '12px', lineHeight: 1.5 }}>
+                Danh sách ngựa đã có <b>xác nhận khám lâm sàng ban đầu từ Bác sĩ thú y</b>. Nhân viên chuồng chọn ô chuồng còn trống phù hợp để phân bổ.
+              </div>
+
+              {allocatingHorse && (
+                <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div>
+                      <b style={{ fontSize: '13px', color: '#0f172a' }}>Phân bổ chuồng cho ngựa: {allocatingHorse.name} ({allocatingHorse.code})</b>
+                      <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span>Bác sĩ phụ trách: <b>BS. {allocatingHorse.diagnosingVetName || 'Đã duyệt khám'}</b></span>
+                        <span>· Thể trạng: <b>{allocatingHorse.healthStatus || 'FIT'}</b></span>
+                      </div>
+                    </div>
+                    <button className="icon-button" style={{ width: '24px', height: '24px' }} onClick={() => setAllocatingHorse(null)}>
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  {compatibilityAlert && (
+                    <div className="notice error" style={{ fontSize: '11px', marginBottom: '12px' }}>
+                      <AlertTriangle size={14} /> {compatibilityAlert.text}
+                    </div>
+                  )}
+
+                  <form onSubmit={handleConfirmAssignment} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'flex-end' }}>
+                    <label className="field" style={{ margin: 0 }}>
+                      <span style={{ fontSize: '11px' }}>Khu chuồng *</span>
+                      <select
+                        value={targetStableId}
+                        onChange={(e) => setTargetStableId(e.target.value)}
+                        style={{ fontSize: '12px', height: '36px' }}
+                      >
+                        {stables.map((s) => {
+                          const occ = (s.stalls || []).filter((st) => st.currentAssignment).length
+                          const isFull = occ >= 4
+                          return (
+                            <option key={s.id} value={s.id} disabled={isFull}>
+                              Chuồng {s.name?.toUpperCase()} ({occ}/4 ô có ngựa) {isFull ? '— ĐÃ ĐẦY' : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                    </label>
+
+                    <label className="field" style={{ margin: 0 }}>
+                      <span style={{ fontSize: '11px' }}>Ô chuồng trống *</span>
+                      <select
+                        value={targetStallId}
+                        onChange={(e) => setTargetStallId(e.target.value)}
+                        style={{ fontSize: '12px', height: '36px' }}
+                        disabled={availableVacantStalls.length === 0}
+                      >
+                        {availableVacantStalls.length === 0 ? (
+                          <option value="">Không có ô trống</option>
+                        ) : (
+                          availableVacantStalls.map((st) => (
+                            <option key={st.id} value={st.id}>
+                              Ô {st.code}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </label>
+
+                    <button
+                      type="submit"
+                      className="button primary"
+                      style={{ height: '36px', fontSize: '12px' }}
+                      disabled={assignBusy || !targetStallId || compatibilityAlert?.level === 'error'}
+                    >
+                      {assignBusy ? 'Đang phân ô…' : 'Xác nhận xếp chuồng'}
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {pendingStallList.length === 0 ? (
+                <div className="empty" style={{ padding: '30px' }}>
+                  Hiện không có ngựa nào đang chờ xếp chuồng. Bác sĩ cần hoàn tất khám y tế tại hàng chờ để chuyển trạng thái.
+                </div>
+              ) : (
+                <div className="data-table" style={{ fontSize: '12px' }}>
+                  <div className="table-header" style={{ gridTemplateColumns: '100px 1fr 140px 140px 140px' }}>
+                    <span>Mã ngựa</span>
+                    <span>Tên ngựa</span>
+                    <span>Bác sĩ duyệt</span>
+                    <span>Thể trạng</span>
+                    <span>Thao tác</span>
+                  </div>
+                  {pendingStallList.map((h) => {
+                    const isAllocatingThis = allocatingHorse?.horseId === h.horseId
+                    return (
+                      <div className="table-row" key={h.horseId} style={{ gridTemplateColumns: '100px 1fr 140px 140px 140px', alignItems: 'center' }}>
+                        <span style={{ fontWeight: 600 }}>{h.code}</span>
+                        <span><b>{h.name}</b></span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#166534', fontSize: '11px' }}>
+                          <ShieldCheck size={14} style={{ color: '#16a34a' }} />
+                          <span>{h.diagnosingVetName ? `BS. ${h.diagnosingVetName}` : 'Đã duyệt khám'}</span>
+                        </span>
+                        <span>
+                          <span className={`status ${HEALTH_STATUS_MAP[h.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px' }}>
+                            {HEALTH_STATUS_MAP[h.healthStatus]?.label || h.healthStatus || 'FIT'}
+                          </span>
+                        </span>
+                        <div>
+                          <button
+                            className={`button ${isAllocatingThis ? 'primary' : 'secondary'}`}
+                            style={{ fontSize: '11px', padding: '4px 10px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            onClick={() => handleStartAllocating(h)}
+                          >
+                            <Plus size={13} /> {isAllocatingThis ? 'Đang chọn ô…' : 'Xếp ô chuồng'}
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="modal-actions" style={{ marginTop: 'auto', paddingTop: '12px' }}>
+            <button type="button" className="button secondary" onClick={onClose}>Đóng</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TransferStallModal({ horse, currentStable, stables, onClose, onTransferred }) {
+  const [targetStableId, setTargetStableId] = useState(currentStable?.id || stables?.[0]?.id || '')
+  const [targetStallId, setTargetStallId] = useState('')
+  const [reasonCategory, setReasonCategory] = useState('Chăm sóc dưỡng thương / Phục hồi')
+  const [customReason, setCustomReason] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const targetStable = useMemo(() => {
+    return (stables || []).find((s) => s.id === targetStableId) || null
+  }, [stables, targetStableId])
+
+  const targetOccupiedCount = useMemo(() => {
+    return (targetStable?.stalls || []).filter((st) => st.currentAssignment && st.currentAssignment.horseId !== horse.id).length
+  }, [targetStable, horse.id])
+
+  const isTargetStableFull = useMemo(() => {
+    return targetOccupiedCount >= 4
+  }, [targetOccupiedCount])
+
+  const availableStalls = useMemo(() => {
+    if (!targetStable) return []
+    return (targetStable.stalls || []).filter((st) => {
+      const isCurrentStall = (st.id === horse.stallId) || (st.code === horse.stallCode && targetStable.id === currentStable?.id)
+      return st.active && !st.currentAssignment && !isCurrentStall
+    })
+  }, [targetStable, horse, currentStable])
+
+  useEffect(() => {
+    if (availableStalls.length > 0 && (!targetStallId || !availableStalls.some((s) => s.id === targetStallId))) {
+      setTargetStallId(availableStalls[0].id)
+    } else if (availableStalls.length === 0) {
+      setTargetStallId('')
+    }
+  }, [availableStalls, targetStallId])
+
+  const compatibilityAlert = useMemo(() => {
+    if (!targetStable) return null
+    const horseHealth = (horse.healthStatus || 'FIT').toUpperCase()
+    const hasQuarantined = (targetStable.stalls || []).some(
+      (st) => st.currentAssignment && st.currentAssignment.horseId !== horse.id && (st.currentAssignment.horseHealthStatus || '').toUpperCase() === 'QUARANTINED'
+    )
+    const hasNonQuarantined = (targetStable.stalls || []).some(
+      (st) => st.currentAssignment && st.currentAssignment.horseId !== horse.id && (st.currentAssignment.horseHealthStatus || '').toUpperCase() !== 'QUARANTINED'
+    )
+
+    if (horseHealth === 'QUARANTINED' && hasNonQuarantined) {
+      return {
+        level: 'error',
+        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly (QUARANTINED). Không thể chuyển vào khu chuồng đang có ngựa bình thường!',
+      }
+    }
+    if (horseHealth !== 'QUARANTINED' && hasQuarantined) {
+      return {
+        level: 'error',
+        text: 'Cảnh báo y tế: Khu chuồng đích đang có ngựa cách ly (QUARANTINED). Không thể chuyển ngựa vào khu vực này!',
+      }
+    }
+    return null
+  }, [targetStable, horse])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!targetStableId || !targetStallId) {
+      setError('Vui lòng chọn khu chuồng và ô chuồng đích còn trống')
+      return
+    }
+    if (isTargetStableFull) {
+      setError('Khu chuồng đích đã đạt sức chứa tối đa 4 con ngựa')
+      return
+    }
+    if (compatibilityAlert?.level === 'error') {
+      setError(compatibilityAlert.text)
+      return
+    }
+
+    const fullReason = reasonCategory === 'Khác'
+      ? (customReason.trim() || 'Chuyển ô chuồng')
+      : (customReason.trim() ? `${reasonCategory} — ${customReason.trim()}` : reasonCategory)
+
+    setBusy(true)
+    setError('')
+    try {
+      await stableCareApi.transferHorse(horse.id, {
+        targetStableId,
+        targetStallId,
+        reason: fullReason,
+      })
+      onTransferred(targetStableId, targetStallId)
+    } catch (err) {
+      setError(err.message || 'Lỗi khi thực hiện chuyển ô chuồng')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 'min(640px, 100%)' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">ĐIỀU CHUYỂN Ô CHUỒNG</p>
+            <h2>Chuyển ô chuồng cho {horse.name}</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X /></button>
+        </div>
+
+        <form onSubmit={submit} style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {error && <div className="notice error"><X size={16} />{error}</div>}
+
+          <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', fontSize: '12px' }}>
+            <div>
+              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>MÃ / TÊN NGỰA</span>
+              <b>{horse.name}</b> ({horse.code})
+            </div>
+            <div>
+              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>Ô CHUỒNG HIỆN TẠI</span>
+              <b>Chuồng {currentStable?.name?.toUpperCase()} / Ô {horse.stallCode}</b>
+            </div>
+            <div>
+              <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỂ TRẠNG HIỆN TẠI</span>
+              <span className={`status ${HEALTH_STATUS_MAP[horse.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px', marginTop: '2px', display: 'inline-block' }}>
+                {HEALTH_STATUS_MAP[horse.healthStatus]?.label || horse.healthStatus || 'FIT'}
+              </span>
+            </div>
+          </div>
+
+          {compatibilityAlert && (
+            <div className="notice error" style={{ fontSize: '12px' }}>
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+              <span>{compatibilityAlert.text}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <label className="field" style={{ margin: 0 }}>
+              <span>Khu chuồng đích *</span>
+              <select
+                value={targetStableId}
+                onChange={(e) => setTargetStableId(e.target.value)}
+                required
+              >
+                {stables.map((s) => {
+                  const occ = (s.stalls || []).filter((st) => st.currentAssignment && st.currentAssignment.horseId !== horse.id).length
+                  const isFull = occ >= 4
+                  return (
+                    <option key={s.id} value={s.id} disabled={isFull}>
+                      Chuồng {s.name?.toUpperCase()} ({occ}/4 ô có ngựa) {isFull ? '— ĐÃ ĐẦY' : ''}
+                    </option>
+                  )
+                })}
+              </select>
+            </label>
+
+            <label className="field" style={{ margin: 0 }}>
+              <span>Ô chuồng đích còn trống *</span>
+              <select
+                value={targetStallId}
+                onChange={(e) => setTargetStallId(e.target.value)}
+                required
+                disabled={availableStalls.length === 0}
+              >
+                {availableStalls.length === 0 ? (
+                  <option value="">Không có ô trống khác</option>
+                ) : (
+                  availableStalls.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      Ô {st.code}
+                    </option>
+                  ))
+                )}
+              </select>
+            </label>
+          </div>
+
+          <label className="field" style={{ margin: 0 }}>
+            <span>Phân loại lý do chuyển chuồng *</span>
+            <select
+              value={reasonCategory}
+              onChange={(e) => setReasonCategory(e.target.value)}
+            >
+              <option value="Chăm sóc dưỡng thương / Phục hồi">Chăm sóc dưỡng thương / Phục hồi</option>
+              <option value="Bảo trì / Sửa chữa ô chuồng">Bảo trì / Sửa chữa ô chuồng</option>
+              <option value="Phân khu theo nhóm huấn luyện">Phân khu theo nhóm huấn luyện</option>
+              <option value="Yêu cầu từ bác sĩ thú y">Yêu cầu từ bác sĩ thú y</option>
+              <option value="Khác">Lý do khác (ghi chi tiết bên dưới)</option>
+            </select>
+          </label>
+
+          <label className="field" style={{ margin: 0 }}>
+            <span>Chi tiết lý do chuyển chuồng</span>
+            <input
+              type="text"
+              value={customReason}
+              onChange={(e) => setCustomReason(e.target.value)}
+              placeholder="Nhập ghi chú thêm về lý do điều chuyển ô chuồng…"
+            />
+          </label>
+
+          <div style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', borderRadius: '6px', padding: '8px 12px' }}>
+            ℹ️ <b>Bảo toàn dữ liệu:</b> Lịch trình sinh hoạt hằng ngày và khẩu phần dinh dưỡng hiện có của ngựa sẽ được <b>giữ nguyên</b>, không bị xáo trộn khi chuyển chuồng.
+          </div>
+
+          <div className="modal-actions" style={{ marginTop: '8px' }}>
+            <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+            <button
+              type="submit"
+              className="button primary"
+              disabled={busy || !targetStallId || isTargetStableFull || compatibilityAlert?.level === 'error'}
+            >
+              <ArrowRightLeft size={14} /> {busy ? 'Đang chuyển ô…' : 'Xác nhận chuyển ô'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function AssignSingleStallModal({ stall, stable, onClose, onAssigned }) {
+  const [clearedHorses, setClearedHorses] = useState([])
+  const [selectedHorseId, setSelectedHorseId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    setLoading(true)
+    stableCareApi.getPendingStall()
+      .then((data) => {
+        setClearedHorses(data || [])
+        if ((data || []).length > 0) {
+          setSelectedHorseId(data[0].horseId)
+        }
+      })
+      .catch((err) => setError(err.message || 'Lỗi khi tải danh sách ngựa chờ xếp chuồng'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const selectedHorse = useMemo(() => {
+    return clearedHorses.find((h) => h.horseId === selectedHorseId) || null
+  }, [clearedHorses, selectedHorseId])
+
+  const occupiedInStable = useMemo(() => {
+    return (stable?.stalls || []).filter((s) => s.currentAssignment).length
+  }, [stable])
+
+  const compatibilityAlert = useMemo(() => {
+    if (!selectedHorse || !stable) return null
+    const horseHealth = (selectedHorse.healthStatus || 'FIT').toUpperCase()
+    const hasQuarantined = (stable.stalls || []).some(
+      (st) => st.currentAssignment && (st.currentAssignment.horseHealthStatus || '').toUpperCase() === 'QUARANTINED'
+    )
+    const hasNonQuarantined = (stable.stalls || []).some(
+      (st) => st.currentAssignment && (st.currentAssignment.horseHealthStatus || '').toUpperCase() !== 'QUARANTINED'
+    )
+
+    if (horseHealth === 'QUARANTINED' && hasNonQuarantined) {
+      return {
+        level: 'error',
+        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly (QUARANTINED). Không thể xếp chung khu chuồng với ngựa bình thường.',
+      }
+    }
+    if (horseHealth !== 'QUARANTINED' && hasQuarantined) {
+      return {
+        level: 'error',
+        text: 'Cảnh báo y tế: Khu chuồng này đang có ngựa cách ly (QUARANTINED). Không thể xếp ngựa khỏe mạnh vào đây.',
+      }
+    }
+    return null
+  }, [selectedHorse, stable])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!selectedHorseId) {
+      setError('Vui lòng chọn một con ngựa')
+      return
+    }
+    if (occupiedInStable >= 4) {
+      setError('Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa')
+      return
+    }
+    if (compatibilityAlert?.level === 'error') {
+      setError(compatibilityAlert.text)
+      return
+    }
+
+    setBusy(true)
+    setError('')
+    try {
+      await stableCareApi.assignStall(stable.id, stall.id, selectedHorseId)
+      onAssigned()
+    } catch (err) {
+      setError(err.message || 'Lỗi khi phân bổ ô chuồng')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 'min(580px, 100%)' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">XẾP NGỰA VÀO Ô CHUỒNG</p>
+            <h2>Phân bổ ngựa vào Ô {stall.code} (Chuồng {stable?.name?.toUpperCase()})</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X /></button>
+        </div>
+
+        <form onSubmit={submit} style={{ padding: '0 24px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {error && <div className="notice error"><X size={16} />{error}</div>}
+
+          {compatibilityAlert && (
+            <div className="notice error" style={{ fontSize: '12px' }}>
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+              <span>{compatibilityAlert.text}</span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="empty" style={{ padding: '24px' }}>Đang tải danh sách ngựa chờ xếp ô…</div>
+          ) : clearedHorses.length === 0 ? (
+            <div className="empty" style={{ padding: '24px' }}>
+              Hiện không có ngựa nào đang chờ xếp chuồng. Ngựa mới cần được Bác sĩ thú y hoàn tất khám sàng lọc ban đầu trước khi phân chuồng.
+            </div>
+          ) : (
+            <>
+              <label className="field" style={{ margin: 0 }}>
+                <span>Chọn ngựa đủ điều kiện xếp chuồng *</span>
+                <select
+                  value={selectedHorseId}
+                  onChange={(e) => setSelectedHorseId(e.target.value)}
+                  required
+                >
+                  {clearedHorses.map((h) => (
+                    <option key={h.horseId} value={h.horseId}>
+                      {h.name} ({h.code}) — {h.healthStatus || 'FIT'} [BS. {h.diagnosingVetName || 'Đã duyệt'}]
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {selectedHorse && (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 14px', fontSize: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span>Tên ngựa: <b>{selectedHorse.name}</b></span>
+                    <span>Mã: <b>{selectedHorse.code}</b></span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#166534' }}>
+                      <ShieldCheck size={14} /> BS duyệt: <b>{selectedHorse.diagnosingVetName || 'Thú y đã khám'}</b>
+                    </span>
+                    <span>
+                      Thể trạng: <b className={`status ${HEALTH_STATUS_MAP[selectedHorse.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px' }}>
+                        {HEALTH_STATUS_MAP[selectedHorse.healthStatus]?.label || selectedHorse.healthStatus || 'FIT'}
+                      </b>
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ fontSize: '11px', color: '#64748b', background: '#f1f5f9', borderRadius: '6px', padding: '8px 12px' }}>
+                ℹ️ Khi xếp chuồng, ngựa sẽ tự động được gán lịch trình sinh hoạt mặc định theo thể trạng (nếu chưa có).
+              </div>
+
+              <div className="modal-actions" style={{ marginTop: '8px' }}>
+                <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+                <button
+                  type="submit"
+                  className="button primary"
+                  disabled={busy || !selectedHorseId || compatibilityAlert?.level === 'error'}
+                >
+                  <Plus size={14} /> {busy ? 'Đang xếp chuồng…' : `Xác nhận xếp vào ô ${stall.code}`}
+                </button>
+              </div>
+            </>
+          )}
+        </form>
+      </div>
     </div>
   )
 }
 
 function AddRoutineModal({ horse, onClose, onSaved }) {
-  const [form, setForm] = useState({ activityType: 'TURNOUT', startTime: '07:00', endTime: '08:30', notes: '' })
+  const isRestricted = horse.healthStatus === 'INJURED' || horse.trainingLocked || horse.emergencyActive
+  const [form, setForm] = useState({
+    activityType: isRestricted ? 'STALL_REST' : 'TURNOUT',
+    startTime: '07:00',
+    endTime: '08:30',
+    notes: '',
+  })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -563,12 +1582,20 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
         </div>
         <form className="form-grid" onSubmit={submit}>
           {error && <div className="notice error full"><X size={16} />{error}</div>}
+          {isRestricted && (
+            <div className="notice warning full" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+              <span><b>Lưu ý an toàn:</b> Ngựa đang trong chế độ hạn chế y tế / chấn thương. Không xếp lịch thả bãi dạo tự do (TURNOUT).</span>
+            </div>
+          )}
           <label className="field full">
             <span>Loại hoạt động sinh hoạt *</span>
             <select value={form.activityType} onChange={(e) => setForm({ ...form, activityType: e.target.value })}>
-              <option value="TURNOUT">Giờ thả bãi cỏ (Turnout)</option>
+              <option value="TURNOUT" disabled={isRestricted}>Giờ thả bãi cỏ (Turnout) {isRestricted ? '(Bị cấm do y tế)' : ''}</option>
               <option value="GROOMING">Chải lông & Vệ sinh (Grooming)</option>
               <option value="REST">Thời gian nghỉ ngơi (Rest)</option>
+              <option value="STALL_REST">Tĩnh dưỡng tại chuồng (Stall rest)</option>
+              <option value="ICE_BOOTS">Ngâm / Chườm đá chân (Ice boots)</option>
               <option value="FEEDING">Giờ ăn khẩu phần (Feeding)</option>
               <option value="WALKING">Dắt đi dạo nhẹ (Walking)</option>
               <option value="OTHER">Hoạt động khác</option>
@@ -596,9 +1623,162 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
   )
 }
 
+function RoutineBackfillModal({ onClose, onExecuted }) {
+  const [preview, setPreview] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [executing, setExecuting] = useState(false)
+  const [error, setError] = useState('')
+  const [successResult, setSuccessResult] = useState(null)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    stableCareApi.getRoutineBackfillPreview()
+      .then((data) => {
+        if (active) setPreview(data)
+      })
+      .catch((err) => {
+        if (active) setError(err.message || 'Không thể tải dữ liệu kiểm tra lịch sinh hoạt')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [])
+
+  const handleExecute = async () => {
+    setExecuting(true)
+    setError('')
+    try {
+      const res = await stableCareApi.executeRoutineBackfill()
+      setSuccessResult(res)
+      setTimeout(() => {
+        onExecuted()
+      }, 1200)
+    } catch (err) {
+      setError(err.message || 'Lỗi khi thực hiện khởi tạo lịch mặc định')
+    } finally {
+      setExecuting(false)
+    }
+  }
+
+  const eligibleCount = (preview?.eligibleHealthyCount || 0) + (preview?.eligibleRestrictedCount || 0)
+  const items = (preview?.details || []).filter((d) => d.statusAction?.startsWith('ELIGIBLE'))
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 'min(860px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <div>
+            <p className="eyebrow">QUẢN LÝ VẬN HÀNH · LỊCH SINH HOẠT MẪU</p>
+            <h2>Khởi tạo lịch sinh hoạt mặc định cho ngựa trong chuồng</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X /></button>
+        </div>
+
+        <div style={{ padding: '0 24px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {error && <div className="notice error"><X size={16} />{error}</div>}
+          {successResult && (
+            <div className="notice success" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle size={18} />
+              <span>
+                Thành công: Đã khởi tạo lịch sinh hoạt mặc định cho các ngựa trong chuồng!
+              </span>
+            </div>
+          )}
+
+          {loading ? (
+            <div className="empty" style={{ padding: '36px' }}>Đang kiểm tra dữ liệu ngựa và lịch sinh hoạt hiện có…</div>
+          ) : (
+            <>
+              {/* SUMMARY STATS */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px 16px' }}>
+                  <span style={{ fontSize: '11px', color: '#64748b', display: 'block' }}>TỔNG SỐ NGỰA TRONG CHUỒNG</span>
+                  <strong style={{ fontSize: '20px', color: '#0f172a' }}>{preview?.totalStabledHorses || 0}</strong>
+                </div>
+                <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '12px 16px' }}>
+                  <span style={{ fontSize: '11px', color: '#166534', display: 'block' }}>ĐÃ CÓ LỊCH SINH HOẠT (GIỮ NGUYÊN)</span>
+                  <strong style={{ fontSize: '20px', color: '#166534' }}>{preview?.alreadyConfiguredCount || 0}</strong>
+                </div>
+                <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '12px 16px' }}>
+                  <span style={{ fontSize: '11px', color: '#92400e', display: 'block' }}>CẦN KHỞI TẠO LỊCH MẶC ĐỊNH</span>
+                  <strong style={{ fontSize: '20px', color: '#92400e' }}>{eligibleCount}</strong>
+                </div>
+              </div>
+
+              <div style={{ fontSize: '12px', color: '#475569', lineHeight: 1.5 }}>
+                Hệ thống tuân thủ nguyên tắc <b>bảo toàn lịch hiện có (idempotent)</b>: Ngựa đã có lịch sinh hoạt sẽ không bị ghi đè. Ngựa chưa có lịch sẽ tự động nhận template phù hợp theo thể trạng (<b>Khỏe mạnh</b>: thả bãi cỏ + dạo nhẹ; <b>Chấn thương / Khóa tập</b>: tĩnh dưỡng tại chuồng, loại trừ hoạt động ngoài bãi).
+              </div>
+
+              {/* LIST OF ELIGIBLE HORSES */}
+              {items.length === 0 ? (
+                <div className="empty" style={{ padding: '24px' }}>
+                  Tất cả ngựa trong chuồng đều đã có lịch sinh hoạt đầy đủ. Không cần khởi tạo thêm.
+                </div>
+              ) : (
+                <div className="data-table" style={{ fontSize: '12px' }}>
+                  <div className="table-header" style={{ gridTemplateColumns: '90px 140px 120px 140px 1fr' }}>
+                    <span>Mã ngựa</span>
+                    <span>Tên ngựa</span>
+                    <span>Vị trí chuồng</span>
+                    <span>Thể trạng / Khóa</span>
+                    <span>Mẫu lịch dự kiến áp dụng</span>
+                  </div>
+                  {items.map((item) => {
+                    const isRestricted = item.targetTemplate === 'TEMPLATE_STALL_REST'
+                    return (
+                      <div key={item.horseId} className="table-row" style={{ gridTemplateColumns: '90px 140px 120px 140px 1fr' }}>
+                        <b>{item.horseCode}</b>
+                        <span>{item.horseName}</span>
+                        <span>{item.stableLocation}</span>
+                        <div>
+                          <span className={`status ${HEALTH_STATUS_MAP[item.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px' }}>
+                            <i /> {HEALTH_STATUS_MAP[item.healthStatus]?.label || item.healthStatus || 'Khỏe mạnh'}
+                          </span>
+                          {item.hasActiveLock && (
+                            <span style={{ display: 'block', fontSize: '9px', color: '#cf1322', marginTop: '2px' }}>
+                              🔒 Khóa tập
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <b style={{ color: isRestricted ? '#d97706' : '#166534' }}>
+                            {isRestricted ? 'Tĩnh dưỡng tại chuồng (Stall Rest)' : 'Lịch thường nhật (Healthy)'}
+                          </b>
+                          <small className="muted" style={{ display: 'block', fontSize: '10px' }}>
+                            {isRestricted ? 'Theo dõi y tế / hạn chế vận động ngoài chuồng' : 'Đủ điều kiện thả bãi & vận động dạo nhẹ'}
+                          </small>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="modal-actions" style={{ marginTop: 'auto', flexShrink: 0 }}>
+            <button type="button" className="button secondary" onClick={onClose} disabled={executing}>Đóng</button>
+            <button
+              className="button primary"
+              disabled={executing || loading || eligibleCount === 0 || !!successResult}
+              onClick={handleExecute}
+            >
+              {executing ? 'Đang khởi tạo…' : `Khởi tạo lịch mặc định (${eligibleCount} ngựa)`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // =========================================================================
 // 1b. TRAINING PREPARATION / READINESS (STABLE STAFF)
 // =========================================================================
+<<<<<<< Updated upstream
 function TrainingPreparationView({ isStaff }) {
   const [searchParams] = useSearchParams()
   const highlightScheduleId = searchParams.get('scheduleId')
@@ -606,6 +1786,24 @@ function TrainingPreparationView({ isStaff }) {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(false)
+=======
+<<<<<<< Updated upstream
+function NutritionView({ canEditPlan }) {
+  const [horses, setHorses] = useState([])
+  const [selectedHorseId, setSelectedHorseId] = useState('')
+=======
+function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff }) {
+  const [subTab, setSubTab] = useState('stables') // 'stables' or 'standard'
+>>>>>>> Stashed changes
+  const [targetDate, setTargetDate] = useState(today())
+  const [checklist, setChecklist] = useState(null)
+  const [activePlan, setActivePlan] = useState(null)
+  const [history, setHistory] = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [showCreatePlan, setShowCreatePlan] = useState(false)
+  const [applyModalStall, setApplyModalStall] = useState(null)
+  const [loading, setLoading] = useState(true)
+>>>>>>> Stashed changes
   const [error, setError] = useState('')
   const [actionSuccess, setActionSuccess] = useState('')
   const [actionLoadingId, setActionLoadingId] = useState(null)
@@ -910,6 +2108,12 @@ function NutritionView({ canEditPlan }) {
       setHistory([])
       return
     }
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+    setShowHistory(!showHistory)
+=======
+>>>>>>> Stashed changes
     setChecklistLoading(true)
     try {
       const [chk, hist] = await Promise.all([
@@ -930,8 +2134,23 @@ function NutritionView({ canEditPlan }) {
     loadHorseDetails()
   }, [loadHorseDetails])
 
+<<<<<<< Updated upstream
   const toggleHistory = () => {
     setShowHistory((prev) => !prev)
+=======
+  const checklistSectionRef = useRef(null)
+
+  const handleSelectStallForChecklist = useCallback((stallId) => {
+    setSelectedStallId(stallId)
+    setTimeout(() => {
+      checklistSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
+  }, [])
+
+  const toggleHistory = () => {
+    setShowHistory((prev) => !prev)
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
   }
 
   const toggleMealConfirmed = (mealKey) => {
@@ -1042,6 +2261,36 @@ function NutritionView({ canEditPlan }) {
               style={{ width: '150px', padding: '6px 10px', borderRadius: '6px', border: '1px solid #ccc' }}
             />
           </div>
+<<<<<<< Updated upstream
+=======
+<<<<<<< Updated upstream
+          <div className="data-table">
+            <div className="table-header" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }}>
+              <span>Phiên bản</span>
+              <span>Ngày áp dụng</span>
+              <span>Ghi chú / Khẩu phần</span>
+              <span>Trạng thái</span>
+            </div>
+            {history.map((ver) => (
+              <div className="table-row" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }} key={ver.id}>
+                <b>v{ver.version}</b>
+                <span>{ver.effectiveDate}</span>
+                <div>
+                  <b>{ver.notes || 'Khẩu phần ăn tiêu chuẩn'}</b>
+                  <small className="muted">{ver.meals?.length || 0} bữa/ngày</small>
+=======
+
+          {canApplyTemplate && (
+            <button
+              className="button secondary"
+              disabled={!selectedStall?.horseId}
+              title={!selectedStall?.horseId ? 'Vui lòng chọn ô chuồng có ngựa' : 'Áp dụng khẩu phần mẫu đã duyệt'}
+              onClick={() => setApplyModalStall(selectedStall)}
+            >
+              <Utensils size={15} /> Áp dụng khẩu phần mẫu
+            </button>
+          )}
+>>>>>>> Stashed changes
 
           {canEditPlan && (
             <button
@@ -1197,6 +2446,7 @@ function NutritionView({ canEditPlan }) {
                                 <button
                                   className={`button ${isSelected ? 'primary' : 'secondary'}`}
                                   style={{ width: '100%', minHeight: '32px', fontSize: '12px', justifyContent: 'center' }}
+<<<<<<< Updated upstream
                                   onClick={() => setSelectedStallId(s.stallId)}
                                 >
                                   {isSelected ? '✓ Đang xem checklist' : 'Xem checklist'}
@@ -1205,6 +2455,40 @@ function NutritionView({ canEditPlan }) {
                                 <div style={{ textAlign: 'center', color: '#94a3b8', fontSize: '12px', padding: '6px 0' }}>
                                   Không có feeding checklist
                                 </div>
+=======
+                                  onClick={() => handleSelectStallForChecklist(s.stallId)}
+                                >
+                                  {isSelected ? '✓ Đang xem checklist' : 'Xem checklist'}
+                                </button>
+                              ) : s.hasHorse ? (
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    className="button secondary"
+                                    style={{ flex: 1, minHeight: '32px', fontSize: '12px', justifyContent: 'center', opacity: 0.9 }}
+                                    onClick={() => handleSelectStallForChecklist(s.stallId)}
+                                  >
+                                    {isSelected ? '✓ Đang xem' : 'Chi tiết'}
+                                  </button>
+                                  {canApplyTemplate && (
+                                    <button
+                                      className="button primary"
+                                      style={{ flex: 1.3, minHeight: '32px', fontSize: '12px', justifyContent: 'center' }}
+                                      title="Chọn khẩu phần mẫu đã duyệt cho ngựa"
+                                      onClick={() => setApplyModalStall(s)}
+                                    >
+                                      + Khẩu phần
+                                    </button>
+                                  )}
+                                </div>
+                              ) : (
+                                <button
+                                  className="button secondary"
+                                  style={{ width: '100%', minHeight: '32px', fontSize: '12px', justifyContent: 'center', opacity: 0.6 }}
+                                  onClick={() => handleSelectStallForChecklist(s.stallId)}
+                                >
+                                  {isSelected ? '✓ Ô đang chọn' : 'Ô chuồng trống'}
+                                </button>
+>>>>>>> Stashed changes
                               )}
                             </div>
                           </div>
@@ -1233,12 +2517,19 @@ function NutritionView({ canEditPlan }) {
                       style={{
                         gridTemplateColumns: '170px 180px 1fr 140px 110px 130px',
                         background: isSelected ? 'rgba(38, 117, 75, 0.08)' : !s.hasHorse ? '#fafafa' : undefined,
+<<<<<<< Updated upstream
                         cursor: s.hasHorse ? 'pointer' : 'default',
                         opacity: !s.hasHorse ? 0.75 : 1,
                       }}
                       onClick={() => {
                         if (s.hasHorse) setSelectedStallId(s.stallId)
                       }}
+=======
+                        cursor: 'pointer',
+                        opacity: !s.hasHorse ? 0.75 : 1,
+                      }}
+                      onClick={() => handleSelectStallForChecklist(s.stallId)}
+>>>>>>> Stashed changes
                     >
                       <div>
                         <b style={{ color: '#123f32' }}>{s.stallLocationDisplay}</b>
@@ -1272,13 +2563,57 @@ function NutritionView({ canEditPlan }) {
                             style={{ minHeight: '30px', fontSize: '11px', padding: '0 10px' }}
                             onClick={(e) => {
                               e.stopPropagation()
+<<<<<<< Updated upstream
                               setSelectedStallId(s.stallId)
+=======
+                              handleSelectStallForChecklist(s.stallId)
+>>>>>>> Stashed changes
                             }}
                           >
                             {isSelected ? '✓ Đang chọn' : 'Xem checklist'}
                           </button>
+<<<<<<< Updated upstream
                         ) : (
                           <span className="muted" style={{ fontSize: '11px' }}>—</span>
+=======
+                        ) : s.hasHorse ? (
+                          <div style={{ display: 'flex', gap: '4px' }}>
+                            <button
+                              className="button secondary"
+                              style={{ minHeight: '30px', fontSize: '11px', padding: '0 8px' }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleSelectStallForChecklist(s.stallId)
+                              }}
+                            >
+                              Chi tiết
+                            </button>
+                            {canApplyTemplate && (
+                              <button
+                                className="button primary"
+                                style={{ minHeight: '30px', fontSize: '11px', padding: '0 8px' }}
+                                title="Chọn khẩu phần mẫu đã duyệt cho ngựa"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setApplyModalStall(s)
+                                }}
+                              >
+                                + Khẩu phần
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <button
+                            className="button secondary"
+                            style={{ minHeight: '30px', fontSize: '11px', padding: '0 8px', opacity: 0.7 }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSelectStallForChecklist(s.stallId)
+                            }}
+                          >
+                            {isSelected ? '✓ Đang chọn' : 'Xem ô'}
+                          </button>
+>>>>>>> Stashed changes
                         )}
                       </div>
                     </div>
@@ -1289,8 +2624,13 @@ function NutritionView({ canEditPlan }) {
           </section>
 
           {/* CHECKLIST & FEEDING DETAILS FOR SELECTED ACTIVE STALL */}
+<<<<<<< Updated upstream
           {selectedStall && selectedStall.hasHorse && selectedStall.hasChecklist && (
             <section className="card" style={{ padding: '24px', marginBottom: '20px' }}>
+=======
+          {selectedStall && (
+            <section ref={checklistSectionRef} className="card" style={{ padding: '24px', marginBottom: '20px' }}>
+>>>>>>> Stashed changes
               <div className="card-head" style={{ padding: '0 0 16px', borderBottom: '1px solid #eee', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1300,20 +2640,48 @@ function NutritionView({ canEditPlan }) {
                     )}
                   </div>
                   <p className="muted" style={{ margin: '4px 0 0', fontSize: '12px' }}>
+<<<<<<< Updated upstream
                     Ngày: <b>{formatVNDate(targetDate)}</b> · Ô chuồng: <b>{selectedStall.stallLocationDisplay}</b> · Ngựa: <b>{selectedStall.horseDisplay}</b> · Định mức: <b>{selectedStall.feedingSummary}</b>
+=======
+                    Ngày: <b>{formatVNDate(targetDate)}</b> · Ô chuồng: <b>{selectedStall.stallLocationDisplay}</b>
+                    {selectedStall.hasHorse ? (
+                      <> · Ngựa: <b>{selectedStall.horseDisplay}</b> · Định mức: <b>{selectedStall.feedingSummary}</b></>
+                    ) : (
+                      <> · <i style={{ color: '#8c959f' }}>Ô chuồng trống</i></>
+                    )}
+>>>>>>> Stashed changes
                   </p>
                 </div>
 
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+<<<<<<< Updated upstream
                   <button className="button secondary" onClick={toggleHistory}>
                     <RotateCcw size={14} /> {showHistory ? 'Ẩn lịch sử' : `Lịch sử phiên bản (${history.length})`}
                   </button>
+=======
+                  {selectedStall.hasHorse && canApplyTemplate && (
+                    <button
+                      className="button secondary"
+                      style={{ fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                      title="Áp dụng hoặc thay đổi khẩu phần mẫu đã duyệt"
+                      onClick={() => setApplyModalStall(selectedStall)}
+                    >
+                      <Utensils size={14} /> {selectedStall.hasChecklist ? 'Đổi khẩu phần mẫu' : 'Áp dụng khẩu phần mẫu'}
+                    </button>
+                  )}
+                  {selectedStall.hasHorse && history.length > 0 && (
+                    <button className="button secondary" onClick={toggleHistory}>
+                      <RotateCcw size={14} /> {showHistory ? 'Ẩn lịch sử' : `Lịch sử phiên bản (${history.length})`}
+                    </button>
+                  )}
+>>>>>>> Stashed changes
                   <Link to="/stable-care/tasks" className="button secondary" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Clock size={14} /> Xem nhiệm vụ trong ngày
                   </Link>
                 </div>
               </div>
 
+<<<<<<< Updated upstream
               {/* VERSION HISTORY ACCORDION */}
               {showHistory && (
                 <div style={{ background: '#fcfcfc', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
@@ -1420,6 +2788,143 @@ function NutritionView({ canEditPlan }) {
                     )
                   })}
                 </div>
+=======
+              {!selectedStall.hasHorse ? (
+                <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
+                  <Home size={26} style={{ color: 'var(--muted)', opacity: 0.7 }} />
+                  <b style={{ marginTop: '6px', fontSize: '14px' }}>Ô chuồng {selectedStall.stallLocationDisplay} đang trống</b>
+                  <span style={{ fontSize: '12px' }}>Chưa có ngựa được phân bổ vào ô chuồng này trong ngày {formatVNDate(targetDate)}.</span>
+                </div>
+              ) : !selectedStall.hasChecklist ? (
+                <div className="empty" style={{ minHeight: '160px', padding: '28px 20px', textAlign: 'center' }}>
+                  <Utensils size={32} style={{ color: '#d97706', marginBottom: '8px' }} />
+                  <b style={{ marginTop: '6px', fontSize: '14px', display: 'block', color: '#1f2937' }}>
+                    Chưa có kế hoạch dinh dưỡng hiệu lực cho {selectedStall.horseDisplay}
+                  </b>
+                  <p style={{ fontSize: '12px', color: '#6b7280', maxWidth: '560px', margin: '8px auto 16px', lineHeight: 1.5 }}>
+                    Ngựa hiện chưa có khẩu phần ăn được phê duyệt cho ngày {formatVNDate(targetDate)}. Nhân viên chuồng có thể chọn ngay một trong 3 khẩu phần mẫu cơ sở (Tiêu chuẩn, Dưỡng thương, hoặc Huấn luyện) phù hợp với thể trạng của ngựa.
+                  </p>
+                  {canApplyTemplate && (
+                    <button
+                      className="button primary"
+                      style={{ padding: '8px 18px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                      onClick={() => setApplyModalStall(selectedStall)}
+                    >
+                      <Utensils size={15} /> Chọn khẩu phần mẫu đã duyệt cho ngựa này
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* VERSION HISTORY ACCORDION */}
+                  {showHistory && (
+                    <div style={{ background: '#fcfcfc', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '16px', marginBottom: '20px' }}>
+                      <h4 style={{ margin: '0 0 10px', fontSize: '14px', color: '#123f32' }}>Lịch sử các phiên bản khẩu phần của ngựa này</h4>
+                      {history.length === 0 ? (
+                        <div className="empty" style={{ padding: '12px', fontSize: '12px' }}>Chưa có bản ghi lịch sử</div>
+                      ) : (
+                        <div className="data-table">
+                          <div className="table-header" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }}>
+                            <span>Phiên bản</span>
+                            <span>Ngày áp dụng</span>
+                            <span>Ghi chú / Khẩu phần</span>
+                            <span>Trạng thái</span>
+                          </div>
+                          {history.map((ver) => (
+                            <div className="table-row" style={{ gridTemplateColumns: '80px 140px 1fr 140px' }} key={ver.id}>
+                              <b>v{ver.version}</b>
+                              <span>{formatVNDate(ver.effectiveDate)}</span>
+                              <div>
+                                <b>{ver.notes || 'Khẩu phần ăn tiêu chuẩn'}</b>
+                                <small className="muted" style={{ display: 'block' }}>{ver.meals?.length || 0} bữa/ngày</small>
+                              </div>
+                              <span className={`status ${ver.status === 'ACTIVE' ? 'active' : 'retired'}`}>
+                                <i /> {ver.status === 'ACTIVE' ? 'ĐANG ÁP DỤNG' : 'HẾT HIỆU LỰC'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* SPECIAL INSTRUCTIONS (EMPTY STATE) */}
+                  <div style={{ background: '#fafbfc', border: '1px dashed #d0d7de', borderRadius: '8px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                    <div style={{ background: '#fff', borderRadius: '50%', padding: '8px', border: '1px solid #e1e4e8', display: 'flex' }}>
+                      <ShieldAlert size={20} style={{ color: '#6e7781' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <b style={{ fontSize: '13px', color: '#24292f' }}>Chỉ định đặc biệt:</b>
+                        <span className="badge-tag pending" style={{ background: '#f3f4f6', color: '#57606a', border: 'none' }}>0 chỉ định</span>
+                      </div>
+                      <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#57606a' }}>
+                        Chưa có chỉ định đặc biệt từ Bác sĩ thú y hoặc Huấn luyện viên trưởng cho ô chuồng này. Mọi bữa ăn tuân theo khẩu phần cơ sở đã được phê duyệt.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* MEALS CHECKLIST */}
+                  {checklistLoading ? (
+                    <div className="empty" style={{ minHeight: '120px', padding: '20px' }}>Đang tải thực đơn bữa ăn…</div>
+                  ) : !checklist?.meals?.length ? (
+                    <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
+                      <Utensils size={26} style={{ color: 'var(--muted)', opacity: 0.7 }} />
+                      <b style={{ marginTop: '6px', fontSize: '13px' }}>Chưa có kế hoạch dinh dưỡng</b>
+                      <span style={{ fontSize: '12px' }}>Ngựa này chưa được Bác sĩ thú y hoặc Huấn luyện viên trưởng thiết lập khẩu phần ăn.</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '14px' }}>
+                      {checklist.meals.map((meal, idx) => {
+                        const mealKey = `${targetDate}-${selectedStall.horseId}-${idx}`
+                        const isDone = !!confirmedMeals[mealKey]
+                        return (
+                          <div key={idx} className="checklist-card" style={{ borderColor: isDone ? '#bbf7d0' : undefined, background: isDone ? '#f0fdf4' : undefined }}>
+                            <span className="brand-mark" style={{ width: '40px', height: '40px', background: isDone ? '#dcfce7' : undefined, color: isDone ? '#166534' : undefined }}>
+                              {isDone ? <Check size={20} /> : <Clock size={18} />}
+                            </span>
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                <b style={{ fontSize: '15px', color: isDone ? '#166534' : '#123f32' }}>{meal.mealName}</b>
+                                <span className="badge-tag pending">{meal.feedingTime}</span>
+                                {isDone && <span className="badge-tag completed">Đã hoàn thành</span>}
+                              </div>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', marginTop: '10px' }}>
+                                <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
+                                  <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN TINH</span>
+                                  <b>{meal.concentrateKg} kg</b> {meal.concentrateType && `· ${meal.concentrateType}`}
+                                </div>
+                                <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
+                                  <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỨC ĂN THÔ XANH</span>
+                                  <b>{meal.forageKg} kg</b> {meal.forageType && `· ${meal.forageType}`}
+                                </div>
+                                <div style={{ background: isDone ? '#fff' : '#f6f8f4', padding: '8px 12px', borderRadius: '8px', fontSize: '12px', border: '1px solid ' + (isDone ? '#dcfce7' : '#ecefe8') }}>
+                                  <span className="muted" style={{ display: 'block', fontSize: '10px' }}>CHẤT BỔ SUNG / THUỐC</span>
+                                  <b>{meal.supplements || 'Không có'}</b>
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              className={`button ${isDone ? 'secondary' : 'primary'}`}
+                              style={{
+                                minHeight: '36px',
+                                fontSize: '11px',
+                                alignSelf: 'center',
+                                background: isDone ? '#dcfce7' : undefined,
+                                color: isDone ? '#166534' : undefined,
+                                borderColor: isDone ? '#86efac' : undefined,
+                              }}
+                              onClick={() => toggleMealConfirmed(mealKey)}
+                            >
+                              {isDone ? '✓ Đã cho ăn' : 'Xác nhận cho ăn'}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+>>>>>>> Stashed changes
               )}
             </section>
           )}
@@ -1478,6 +2983,10 @@ function NutritionView({ canEditPlan }) {
                 <div style={{ marginTop: 'auto', paddingTop: '10px', borderTop: '1px dashed #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <small className="muted" style={{ fontSize: '11px' }}>Dữ liệu chuẩn cơ sở (Chỉ đọc)</small>
                   <span className="status active" style={{ fontSize: '11px' }}><i></i> ĐANG HIỆU LỰC</span>
+<<<<<<< Updated upstream
+=======
+>>>>>>> Stashed changes
+>>>>>>> Stashed changes
                 </div>
               </div>
             ))}
@@ -1493,6 +3002,20 @@ function NutritionView({ canEditPlan }) {
           onSaved={() => {
             setShowCreatePlan(false)
             loadData()
+          }}
+        />
+      )}
+
+      {applyModalStall && (
+        <ApplyFeedingTemplateModal
+          horseId={applyModalStall.horseId}
+          horseInfo={`${applyModalStall.horseDisplay || applyModalStall.horseName} · ${applyModalStall.stallLocationDisplay}`}
+          targetDate={targetDate}
+          onClose={() => setApplyModalStall(null)}
+          onApplied={() => {
+            setApplyModalStall(null)
+            loadData()
+            loadHorseDetails()
           }}
         />
       )}
@@ -1629,6 +3152,262 @@ function CreateNutritionPlanModal({ horseId, horseInfo, onClose, onSaved }) {
           <div className="modal-actions">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
             <button className="button primary" disabled={busy}>{busy ? 'Đang lưu…' : 'Phê duyệt & Áp dụng'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ApplyFeedingTemplateModal({ horseId, horseInfo, targetDate, onClose, onApplied }) {
+  const [options, setOptions] = useState([])
+  const [selectedPlanCode, setSelectedPlanCode] = useState('')
+  const [effectiveDate, setEffectiveDate] = useState(targetDate || today())
+  const [notes, setNotes] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setError('')
+    stableCareApi.getFeedingTemplateOptions(horseId)
+      .then((data) => {
+        if (!active) return
+        const list = Array.isArray(data) ? data : []
+        setOptions(list)
+        const rec = list.find((o) => o.suitability === 'RECOMMENDED') || list.find((o) => o.canApply)
+        if (rec) setSelectedPlanCode(rec.planCode)
+      })
+      .catch((err) => {
+        if (!active) return
+        setError(err.message || 'Không thể tải danh sách khẩu phần mẫu')
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [horseId])
+
+  const selectedOption = useMemo(
+    () => options.find((o) => o.planCode === selectedPlanCode) || null,
+    [options, selectedPlanCode]
+  )
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!selectedOption) {
+      setError('Vui lòng chọn một khẩu phần mẫu.')
+      return
+    }
+    if (!selectedOption.canApply) {
+      setError(selectedOption.suitabilityReason || 'Khẩu phần này không đủ điều kiện áp dụng cho ngựa.')
+      return
+    }
+    if (selectedOption.requiresConfirmation && !confirmed) {
+      setError('Vui lòng đánh dấu xác nhận lâm sàng trước khi áp dụng khẩu phần này.')
+      return
+    }
+
+    setBusy(true)
+    setError('')
+    try {
+      await stableCareApi.applyFeedingTemplate(horseId, {
+        templateCode: selectedPlanCode,
+        effectiveDate,
+        notes,
+        confirmed: !!confirmed,
+      })
+      onApplied()
+    } catch (err) {
+      setError(err.message || 'Không thể áp dụng khẩu phần')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ width: 'min(820px, 100%)', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head" style={{ flexShrink: 0 }}>
+          <div>
+            <p className="eyebrow">KHẨU PHẦN MẪU ĐÃ PHÊ DUYỆT {horseInfo ? `· ${horseInfo}` : ''}</p>
+            <h2>Chọn khẩu phần dinh dưỡng mẫu</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X /></button>
+        </div>
+
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', overflowY: 'auto', flex: 1, padding: '0 24px 24px' }}>
+          {error && <div className="notice error" style={{ margin: '14px 0' }}><X size={16} />{error}</div>}
+
+          {loading ? (
+            <div className="empty" style={{ padding: '36px' }}>Đang đánh giá điều kiện và tải danh mục khẩu phần mẫu…</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+              <div style={{ fontSize: '13px', color: '#475569' }}>
+                Chọn một trong các khẩu phần mẫu cơ sở đã được phê duyệt. Hệ thống tự động đánh giá thể trạng và các cảnh báo y tế của ngựa để đề xuất phương án phù hợp nhất:
+              </div>
+
+              {/* TEMPLATES LIST */}
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {options.map((opt) => {
+                  const isSelected = selectedPlanCode === opt.planCode
+                  const isRec = opt.suitability === 'RECOMMENDED'
+                  const isConf = opt.suitability === 'CONFIRMATION_REQUIRED'
+                  const isInelig = opt.suitability === 'INELIGIBLE' || !opt.canApply
+
+                  let borderColor = '#e2e8f0'
+                  let bgColor = '#fff'
+                  if (isSelected) {
+                    borderColor = isConf ? '#d97706' : '#26754b'
+                    bgColor = isConf ? 'rgba(217, 119, 6, 0.04)' : 'rgba(38, 117, 75, 0.04)'
+                  } else if (isInelig) {
+                    bgColor = '#f8fafc'
+                  }
+
+                  return (
+                    <div
+                      key={opt.planCode}
+                      style={{
+                        border: `2px solid ${borderColor}`,
+                        borderRadius: '10px',
+                        padding: '16px',
+                        background: bgColor,
+                        opacity: isInelig ? 0.7 : 1,
+                        cursor: isInelig ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onClick={() => {
+                        if (!isInelig) {
+                          setSelectedPlanCode(opt.planCode)
+                          if (!isConf) setConfirmed(false)
+                        }
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <input
+                            type="radio"
+                            name="feedingTemplate"
+                            checked={isSelected}
+                            disabled={isInelig}
+                            onChange={() => {
+                              setSelectedPlanCode(opt.planCode)
+                              if (!isConf) setConfirmed(false)
+                            }}
+                            style={{ width: '18px', height: '18px', cursor: isInelig ? 'not-allowed' : 'pointer' }}
+                          />
+                          <div>
+                            <span style={{ fontSize: '15px', fontWeight: 'bold', color: isInelig ? '#64748b' : '#0f172a' }}>
+                              {opt.planName}
+                            </span>
+                            <span className="badge-tag" style={{ marginLeft: '8px', fontSize: '10px', background: '#f1f5f9', color: '#475569' }}>
+                              {opt.planCode}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* SUITABILITY BADGE */}
+                        <div>
+                          {isRec && (
+                            <span className="badge-tag completed" style={{ background: '#dcfce7', color: '#166534', border: '1px solid #86efac', fontWeight: 600 }}>
+                              🟢 Khuyến nghị áp dụng
+                            </span>
+                          )}
+                          {isConf && (
+                            <span className="badge-tag pending" style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d', fontWeight: 600 }}>
+                              🟡 Cần xác nhận lâm sàng
+                            </span>
+                          )}
+                          {isInelig && (
+                            <span className="badge-tag" style={{ background: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', fontWeight: 600 }}>
+                              🔴 Không đủ điều kiện
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <p style={{ margin: '8px 0 10px 28px', fontSize: '12px', color: '#475569', lineHeight: '1.4' }}>
+                        {opt.description}
+                      </p>
+
+                      {/* SUITABILITY REASON */}
+                      <div style={{ marginLeft: '28px', padding: '8px 12px', borderRadius: '6px', fontSize: '12px', background: isRec ? '#f0fdf4' : isConf ? '#fffbeb' : '#fef2f2', border: `1px solid ${isRec ? '#bbf7d0' : isConf ? '#fde68a' : '#fecaca'}`, color: isRec ? '#166534' : isConf ? '#92400e' : '#991b1b' }}>
+                        <b>Đánh giá điều kiện:</b> {opt.suitabilityReason}
+                      </div>
+
+                      {/* MEAL PREVIEW */}
+                      {opt.meals && opt.meals.length > 0 && (
+                        <div style={{ marginLeft: '28px', marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {opt.meals.map((m, mIdx) => (
+                            <span key={mIdx} style={{ fontSize: '11px', background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', color: '#334155' }}>
+                              <b>{m.mealName}</b> ({m.feedingTime}): {m.concentrateKg}kg tinh · {m.forageKg}kg thô
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* CONFIRMATION CHECKBOX IF REQUIRED */}
+              {selectedOption?.requiresConfirmation && (
+                <div className="notice warning" style={{ margin: '4px 0', border: '2px solid #f59e0b', background: '#fffbeb', borderRadius: '8px', padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <AlertTriangle size={20} style={{ color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+                    <div style={{ flex: 1 }}>
+                      <b style={{ color: '#92400e', fontSize: '13px' }}>Xác nhận lâm sàng đối với ngựa đang theo dõi:</b>
+                      <p style={{ margin: '4px 0 8px', fontSize: '12px', color: '#78350f' }}>
+                        {selectedOption.suitabilityReason}
+                      </p>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', fontWeight: 600, color: '#92400e' }}>
+                        <input
+                          type="checkbox"
+                          checked={confirmed}
+                          onChange={(e) => setConfirmed(e.target.checked)}
+                          style={{ width: '16px', height: '16px' }}
+                        />
+                        <span>Tôi xác nhận đã kiểm tra thực tế tình trạng sức khỏe của ngựa và chịu trách nhiệm khi áp dụng khẩu phần này.</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* EFFECTIVE DATE & NOTES */}
+              <div className="form-grid" style={{ marginTop: '8px' }}>
+                <label className="field">
+                  <span>Ngày bắt đầu áp dụng *</span>
+                  <input
+                    required
+                    type="date"
+                    value={effectiveDate}
+                    onChange={(e) => setEffectiveDate(e.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>Ghi chú điều chỉnh / lý do chọn</span>
+                  <input
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Ví dụ: Áp dụng theo hướng dẫn phục hồi của bác sĩ thú y"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
+
+          <div className="modal-actions" style={{ marginTop: '24px', flexShrink: 0 }}>
+            <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+            <button
+              className="button primary"
+              disabled={busy || loading || !selectedOption || !selectedOption.canApply || (selectedOption.requiresConfirmation && !confirmed)}
+            >
+              {busy ? 'Đang áp dụng…' : 'Xác nhận áp dụng khẩu phần'}
+            </button>
           </div>
         </form>
       </div>

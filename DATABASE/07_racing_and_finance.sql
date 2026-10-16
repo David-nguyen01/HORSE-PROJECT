@@ -127,12 +127,20 @@ BEGIN
         horse_ids_json NVARCHAR(MAX) NOT NULL CONSTRAINT df_owner_reports_horses DEFAULT N'[]',
         transaction_ids_json NVARCHAR(MAX) NOT NULL CONSTRAINT df_owner_reports_transactions DEFAULT N'[]',
         pdf_file_id UNIQUEIDENTIFIER NULL,
+<<<<<<< Updated upstream
+=======
+        content_hash VARCHAR(64) NOT NULL CONSTRAINT df_owner_reports_content_hash DEFAULT 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+>>>>>>> Stashed changes
         CONSTRAINT fk_owner_reports_owner FOREIGN KEY (owner_user_id) REFERENCES dbo.users(id),
         CONSTRAINT fk_owner_reports_generator FOREIGN KEY (generated_by_user_id) REFERENCES dbo.users(id),
         CONSTRAINT fk_owner_reports_pdf FOREIGN KEY (pdf_file_id) REFERENCES dbo.stored_files(id),
         CONSTRAINT ck_owner_reports_period CHECK (period_start <= period_end)
     );
     CREATE NONCLUSTERED INDEX idx_owner_reports_owner_period ON dbo.owner_reports(owner_user_id, period_end DESC);
+<<<<<<< Updated upstream
+=======
+    CREATE UNIQUE NONCLUSTERED INDEX ux_owner_reports_period_content ON dbo.owner_reports(owner_user_id, period_start, period_end, content_hash);
+>>>>>>> Stashed changes
 END;
 GO
 

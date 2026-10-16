@@ -12,7 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -24,8 +27,139 @@ public class OwnerReportService {
     private final FinanceService finance;
     private final AuditService audit;
 
+<<<<<<< Updated upstream
     public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance, AuditService audit) {
         this.jdbc = jdbc; this.json = json; this.finance = finance; this.audit = audit;
+=======
+<<<<<<< Updated upstream
+    public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance) {
+        this.jdbc = jdbc; this.json = json; this.finance = finance;
+=======
+    public record TransactionItem(
+            UUID id,
+            UUID horseId,
+            LocalDate date,
+            String type,
+            String category,
+            BigDecimal amount,
+            String description
+    ) {}
+
+    public OwnerReportService(JdbcTemplate jdbc, ObjectMapper json, FinanceService finance, AuditService audit) {
+        this.jdbc = jdbc; this.json = json; this.finance = finance; this.audit = audit;
+>>>>>>> Stashed changes
+    }
+
+    public static List<UUID> normalizeIds(Collection<UUID> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return ids.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(Comparator.comparing(UUID::toString))
+                .toList();
+    }
+
+    private static String formatAmount(BigDecimal amount) {
+        if (amount == null) return "0.00";
+        return amount.setScale(2, RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private static String clean(String s) {
+        return s == null ? "" : s.trim();
+    }
+
+    private static String canonicalHorse(HorseItem h) {
+        return (h.id() == null ? "" : h.id().toString().toLowerCase(Locale.ROOT))
+                + ":" + clean(h.code())
+                + ":" + clean(h.name());
+    }
+
+    private static String canonicalTransaction(TransactionItem t) {
+        return (t.id() == null ? "" : t.id().toString().toLowerCase(Locale.ROOT))
+                + ":" + (t.horseId() == null ? "" : t.horseId().toString().toLowerCase(Locale.ROOT))
+                + ":" + (t.date() == null ? "" : t.date().toString())
+                + ":" + clean(t.type()).toUpperCase(Locale.ROOT)
+                + ":" + clean(t.category()).toUpperCase(Locale.ROOT)
+                + ":" + formatAmount(t.amount())
+                + ":" + clean(t.description());
+    }
+
+    public static String computeContentHash(Collection<HorseItem> horses, Collection<TransactionItem> transactions) {
+        List<String> canonicalHorses = horses == null ? List.of() :
+                horses.stream()
+                        .filter(Objects::nonNull)
+                        .filter(h -> h.id() != null)
+                        .sorted(Comparator.comparing(h -> h.id().toString()))
+                        .map(OwnerReportService::canonicalHorse)
+                        .distinct()
+                        .toList();
+
+        List<String> canonicalTransactions = transactions == null ? List.of() :
+                transactions.stream()
+                        .filter(Objects::nonNull)
+                        .filter(t -> t.id() != null)
+                        .sorted(Comparator.comparing(t -> t.id().toString()))
+                        .map(OwnerReportService::canonicalTransaction)
+                        .distinct()
+                        .toList();
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("horses:").append(String.join(",", canonicalHorses));
+        sb.append(";transactions:").append(String.join(",", canonicalTransactions));
+
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(64);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    public static String computeContentHashFromIds(Collection<UUID> horses, Collection<UUID> transactionIds) {
+        List<HorseItem> hItems = horses == null ? List.of() :
+                horses.stream().filter(Objects::nonNull).map(id -> new HorseItem(id, "", "")).toList();
+        List<TransactionItem> tItems = transactionIds == null ? List.of() :
+                transactionIds.stream().filter(Objects::nonNull).map(id -> new TransactionItem(id, null, null, "", "", BigDecimal.ZERO, "")).toList();
+        return computeContentHash(hItems, tItems);
+    }
+
+    public List<HorseItem> queryOwnerHorses(UUID ownerId) {
+        String sql = """
+                select ho.horse_id as id, h.code, h.name
+                from horse_ownerships ho
+                left join horses h on h.id = ho.horse_id
+                where ho.owner_id = ?
+                order by ho.horse_id
+                """;
+        return jdbc.query(sql, (rs, row) -> new HorseItem(
+                rs.getObject("id", UUID.class),
+                rs.getString("code"),
+                rs.getString("name")), ownerId);
+    }
+
+    public List<TransactionItem> queryTransactionItems(List<UUID> horseIds, LocalDate start, LocalDate end) {
+        if (horseIds == null || horseIds.isEmpty()) return List.of();
+        String placeholders = String.join(",", Collections.nCopies(horseIds.size(), "?"));
+        List<Object> args = new ArrayList<>(horseIds);
+        args.add(start);
+        args.add(end);
+        String sql = "select id, horse_id, transaction_date, transaction_type, category, amount, description "
+                + "from financial_transactions where horse_id in (" + placeholders + ") and transaction_date between ? and ? "
+                + "order by id";
+        return jdbc.query(sql, (rs, row) -> new TransactionItem(
+                rs.getObject("id", UUID.class),
+                rs.getObject("horse_id", UUID.class),
+                rs.getObject("transaction_date", LocalDate.class),
+                rs.getString("transaction_type"),
+                rs.getString("category"),
+                rs.getBigDecimal("amount"),
+                rs.getString("description")), args.toArray());
+>>>>>>> Stashed changes
     }
 
     @Transactional
@@ -34,15 +168,29 @@ public class OwnerReportService {
         Integer owner = jdbc.queryForObject("select count(*) from users u join user_roles ur on ur.user_id=u.id where u.id=? and ur.role='HORSE_OWNER'",
                 Integer.class, ownerId);
         if (owner == null || owner == 0) throw new BusinessException("Tài khoản không phải chủ sở hữu ngựa");
-        List<UUID> horses = jdbc.query("select horse_id from horse_ownerships where owner_id=?",
-                (rs,row)->rs.getObject(1, UUID.class), ownerId);
-        List<UUID> transactionIds = transactionIds(horses, start, end);
+
+        List<HorseItem> horses = queryOwnerHorses(ownerId);
+        List<UUID> horseIds = horses.stream().map(HorseItem::id).filter(Objects::nonNull).toList();
+        List<TransactionItem> transactions = queryTransactionItems(horseIds, start, end);
+        List<UUID> transactionIds = transactions.stream().map(TransactionItem::id).filter(Objects::nonNull).toList();
+
+        List<UUID> normHorses = normalizeIds(horseIds);
+        List<UUID> normTransactions = normalizeIds(transactionIds);
+        String contentHash = computeContentHash(horses, transactions);
+
+        Integer duplicateExists = jdbc.queryForObject(
+                "select count(*) from owner_reports where owner_user_id=? and period_start=? and period_end=? and content_hash=?",
+                Integer.class, ownerId, start, end, contentHash);
+        if (duplicateExists != null && duplicateExists > 0) {
+            throw new BusinessException("Báo cáo cho kỳ này với nội dung tương đương đã tồn tại");
+        }
+
         UUID id = UUID.randomUUID();
         try {
-            jdbc.update("insert into owner_reports(id,owner_user_id,period_start,period_end,generated_at,generated_by_user_id,horse_ids_json,transaction_ids_json) values(?,?,?,?,?,?,?,?)",
-                    id,ownerId,start,end,OffsetDateTime.now(),actor,idsJson(horses),idsJson(transactionIds));
+            jdbc.update("insert into owner_reports(id,owner_user_id,period_start,period_end,generated_at,generated_by_user_id,horse_ids_json,transaction_ids_json,content_hash) values(?,?,?,?,?,?,?,?,?)",
+                    id,ownerId,start,end,OffsetDateTime.now(),actor,idsJson(normHorses),idsJson(normTransactions),contentHash);
         } catch (org.springframework.dao.DuplicateKeyException exception) {
-            throw new BusinessException("Báo cáo cho kỳ này đã tồn tại");
+            throw new BusinessException("Báo cáo cho kỳ này với nội dung tương đương đã tồn tại");
         }
         String ownerName = jdbc.queryForObject("select username from users where id=?", String.class, ownerId);
         audit.record(actor, "REPORTING", "REPORT_GENERATE", "OWNER_REPORT", id,

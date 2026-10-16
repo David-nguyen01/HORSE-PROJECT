@@ -74,6 +74,13 @@ public class StableController {
         return service.assign(stableId, stallId, request.horseId(), user(jwt));
     }
 
+    @PostMapping("/horses/{horseId}/transfer")
+    @PreAuthorize("hasAnyRole('CLUB_MANAGER','STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    StableService.AssignmentView transfer(@PathVariable UUID horseId, @AuthenticationPrincipal Jwt jwt,
+                                           @Valid @RequestBody TransferRequest request) {
+        return service.transferHorse(horseId, request.targetStableId(), request.targetStallId(), user(jwt), request.reason());
+    }
+
     @PostMapping("/assignments/{assignmentId}/end")
     @PreAuthorize("hasAnyRole('CLUB_MANAGER','STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.AssignmentView unassign(@PathVariable UUID assignmentId, @AuthenticationPrincipal Jwt jwt) {
@@ -109,6 +116,18 @@ public class StableController {
         service.deleteDailyRoutine(routineId);
     }
 
+    @GetMapping("/routines/backfill-preview")
+    @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
+    StableService.RoutineBackfillPreview previewRoutineBackfill() {
+        return service.previewRoutineBackfill();
+    }
+
+    @PostMapping("/routines/backfill-execute")
+    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    StableService.RoutineBackfillPreview executeRoutineBackfill(@AuthenticationPrincipal Jwt jwt) {
+        return service.executeRoutineBackfill(user(jwt));
+    }
+
     private UUID user(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }
 
     public record StableRequest(@NotBlank @Size(max=150) String name, @Size(max=300) String location,
@@ -117,4 +136,5 @@ public class StableController {
                                       Boolean active) {}
     public record StallRequest(@NotBlank @Size(max=50) String code) {}
     public record AssignmentRequest(@NotNull UUID horseId) {}
+    public record TransferRequest(@NotNull UUID targetStableId, @NotNull UUID targetStallId, String reason) {}
 }

@@ -41,16 +41,45 @@ public class DailyAutomationJob {
         if(generator==null) return;
         List<UUID> owners=jdbc.query("select distinct owner_id from horse_ownerships",(rs,row)->rs.getObject(1,UUID.class));
         for(UUID owner:owners){
-            Integer exists=jdbc.queryForObject("select count(*) from owner_reports where owner_user_id=? and period_start=? and period_end=?",Integer.class,owner,day,day);
+            List<com.racehorse.reporting.service.OwnerReportService.HorseItem> horses = jdbc.query(
+                    "select ho.horse_id as id, h.code, h.name from horse_ownerships ho left join horses h on h.id=ho.horse_id where ho.owner_id=? order by ho.horse_id",
+                    (rs, row) -> new com.racehorse.reporting.service.OwnerReportService.HorseItem(rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("name")), owner);
+            List<UUID> horseIds = horses.stream().map(com.racehorse.reporting.service.OwnerReportService.HorseItem::id).filter(java.util.Objects::nonNull).toList();
+            List<com.racehorse.reporting.service.OwnerReportService.TransactionItem> txs;
+            if (horseIds.isEmpty()) {
+                txs = List.of();
+            } else {
+                String placeholders = String.join(",", Collections.nCopies(horseIds.size(), "?"));
+                List<Object> args = new ArrayList<>(horseIds);
+                args.add(day);
+                args.add(day);
+                txs = jdbc.query("select id, horse_id, transaction_date, transaction_type, category, amount, description from financial_transactions where horse_id in ("
+                                + placeholders + ") and transaction_date between ? and ? order by id",
+                        (rs, row) -> new com.racehorse.reporting.service.OwnerReportService.TransactionItem(
+                                rs.getObject("id", UUID.class),
+                                rs.getObject("horse_id", UUID.class),
+                                rs.getObject("transaction_date", LocalDate.class),
+                                rs.getString("transaction_type"),
+                                rs.getString("category"),
+                                rs.getBigDecimal("amount"),
+                                rs.getString("description")), args.toArray());
+            }
+            String contentHash = com.racehorse.reporting.service.OwnerReportService.computeContentHash(horses, txs);
+            Integer exists=jdbc.queryForObject("select count(*) from owner_reports where owner_user_id=? and period_start=? and period_end=? and content_hash=?",Integer.class,owner,day,day,contentHash);
             if(exists!=null&&exists>0) continue;
             UUID report=UUID.randomUUID();
-            jdbc.update("""
-                    insert into owner_reports(id,owner_user_id,period_start,period_end,generated_at,generated_by_user_id,horse_ids_json,transaction_ids_json)
-                    select ?,?,?,?,?,?,
-                        (select ho.horse_id as id from horse_ownerships ho where ho.owner_id=? for json path),
-                        (select ft.id from financial_transactions ft join horse_ownerships ho on ho.horse_id=ft.horse_id
-                         where ho.owner_id=? and ft.transaction_date=? for json path)
-                    """,report,owner,day,day,OffsetDateTime.now(zone),generator,owner,owner,day);
+            try {
+                jdbc.update("""
+                        insert into owner_reports(id,owner_user_id,period_start,period_end,generated_at,generated_by_user_id,horse_ids_json,transaction_ids_json,content_hash)
+                        select ?,?,?,?,?,?,
+                            (select ho.horse_id as id from horse_ownerships ho where ho.owner_id=? for json path),
+                            (select ft.id from financial_transactions ft join horse_ownerships ho on ho.horse_id=ft.horse_id
+                             where ho.owner_id=? and ft.transaction_date=? for json path),
+                            ?
+                        """,report,owner,day,day,OffsetDateTime.now(zone),generator,owner,owner,day,contentHash);
+            } catch (org.springframework.dao.DuplicateKeyException ignore) {
+                continue;
+            }
             jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key) values(newid(),?,'OWNER_REPORT_READY','NORMAL',N'Báo cáo ngày mới',N'Báo cáo ngày '+convert(varchar(10),?,23)+N' đã sẵn sàng (VND).','OWNER_REPORT',?,?)",
                     owner,day,report,"owner-report:"+owner+":"+day);
         }

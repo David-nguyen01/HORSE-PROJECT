@@ -25,6 +25,13 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, "Thông tin đăng nhập không hợp lệ", request, Map.of());
     }
 
+    @ExceptionHandler({ForbiddenException.class, org.springframework.security.access.AccessDeniedException.class})
+    ResponseEntity<ApiErrorResponse> handleForbidden(
+            Exception exception,
+            HttpServletRequest request) {
+        return build(HttpStatus.FORBIDDEN, exception.getMessage() != null && !exception.getMessage().isBlank() ? exception.getMessage() : "Không có quyền truy cập", request, Map.of());
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     ResponseEntity<ApiErrorResponse> handleNotFound(
             ResourceNotFoundException exception,
