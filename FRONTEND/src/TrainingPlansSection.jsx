@@ -209,7 +209,7 @@ function PlanModal({ horseId, onClose, onSaved, isInjured }) {
 }
 
 function ScheduleModal({ horseId, phase, onClose, onSaved }) {
-  const [form, setForm] = useState({ taskName: '', trainingDate: '', slotStart: '06:00', racetrackId: '', laneId: '' });
+  const [form, setForm] = useState({ taskName: '', trainingDate: '', racetrackId: '', laneId: '' });
   const [racetracks, setRacetracks] = useState([]);
   const [lanes, setLanes] = useState([]);
   const [lanesLoading, setLanesLoading] = useState(false);
@@ -237,12 +237,12 @@ function ScheduleModal({ horseId, phase, onClose, onSaved }) {
     }
     let current = true;
     setLanesLoading(true); setLanesError('');
-    api(`/api/racetracks/${form.racetrackId}/availability?date=${form.trainingDate}&slotStart=${form.slotStart}`)
+    api(`/api/racetracks/${form.racetrackId}/availability?date=${form.trainingDate}`)
       .then(value => { if (current) setLanes(pageContent(value)); })
       .catch(err => { if (current) { setLanes([]); setLanesError(err.message); } })
       .finally(() => { if (current) setLanesLoading(false); });
     return () => { current = false; };
-  }, [form.racetrackId, form.trainingDate, form.slotStart]);
+  }, [form.racetrackId, form.trainingDate]);
 
   useEffect(() => {
     let current = true;
@@ -268,8 +268,7 @@ function ScheduleModal({ horseId, phase, onClose, onSaved }) {
           racetrackId: form.racetrackId,
           racetrackLaneId: form.laneId,
           taskName: form.taskName,
-          trainingDate: form.trainingDate,
-          slotStart: form.slotStart
+          trainingDate: form.trainingDate
         })
       });
       onSaved();
@@ -292,15 +291,15 @@ function ScheduleModal({ horseId, phase, onClose, onSaved }) {
           <label className="field full"><span>Tên bài tập *</span><input required maxLength={300} value={form.taskName} onChange={e => setForm({...form, taskName: e.target.value})} /></label>
           <label className="field full"><span>Sân tập *</span><select required value={form.racetrackId} disabled={racetracksLoading || racetracks.length === 0} onChange={e => setForm({...form, racetrackId: e.target.value})}><option value="">{racetracksLoading ? 'Đang tải sân tập...' : racetracks.length ? '-- Chọn sân tập --' : 'Không có sân tập hoạt động'}</option>{racetracks.map(track => <option key={track.id} value={track.id}>{track.name}</option>)}</select></label>
           <label className="field"><span>Ngày tập *</span><input required type="date" min={phase.startDate > todayVN() ? phase.startDate : todayVN()} max={phase.endDate} value={form.trainingDate} onChange={e => setForm({...form, trainingDate: e.target.value})} /></label>
-          <label className="field"><span>Slot 1 giờ *</span><select required value={form.slotStart} onChange={e => setForm({...form, slotStart: e.target.value})}>{Array.from({length: 18}, (_, index) => { const hour = index + 6; const start = `${String(hour).padStart(2, '0')}:00`; const end = `${String((hour + 1) % 24).padStart(2, '0')}:00`; return <option key={start} value={start}>{start} - {end}</option> })}</select></label>
-          <label className="field"><span>Làn còn trống *</span><select required value={form.laneId} disabled={!form.racetrackId || !form.trainingDate || lanesLoading || lanes.length === 0} onChange={e => setForm({...form, laneId: e.target.value})}><option value="">{lanesLoading ? 'Đang tải làn...' : lanesError ? 'Không tải được làn' : !form.racetrackId || !form.trainingDate ? 'Chọn sân tập và ngày trước' : lanes.length ? 'Chọn làn' : 'Không còn làn trống trong slot này'}</option>{lanes.map(lane => <option key={lane.laneId} value={lane.laneId}>Làn {lane.laneNumber}</option>)}</select></label>
+          <div className="evaluation-note">Khung giờ mặc định: 05:00 - 11:00</div>
+          <label className="field"><span>Làn còn trống *</span><select required value={form.laneId} disabled={!form.racetrackId || !form.trainingDate || lanesLoading || lanes.length === 0} onChange={e => setForm({...form, laneId: e.target.value})}><option value="">{lanesLoading ? 'Đang tải làn...' : lanesError ? 'Không tải được làn' : !form.racetrackId || !form.trainingDate ? 'Chọn sân tập và ngày trước' : lanes.length ? 'Chọn làn' : 'Không còn làn trống trong ngày này'}</option>{lanes.map(lane => <option key={lane.laneId} value={lane.laneId}>Làn {lane.laneNumber}</option>)}</select></label>
           {racetracksError && <div className="notice error full">{racetracksError}</div>}
           {lanesError && <div className="notice error full">{lanesError}</div>}
           {phase.workloadIntensity === 'HIGH' && lockState.state === 'locked' && <div className="notice error full">Ngựa đang bị khóa huấn luyện: {lockState.reason}. Không thể tạo buổi cường độ cao.</div>}
           {phase.workloadIntensity === 'HIGH' && lockState.state === 'loading' && <div className="evaluation-note full">Đang kiểm tra khóa huấn luyện…</div>}
           {phase.workloadIntensity === 'HIGH' && lockState.state === 'error' && <div className="notice error full">Không thể kiểm tra khóa huấn luyện: {lockState.reason}. Máy chủ vẫn áp dụng quy tắc khi lưu.</div>}
           {phase.restDays?.includes(form.trainingDate) && <div className="notice error full">Ngày này là ngày nghỉ của giai đoạn đã chọn.</div>}
-          <div className="evaluation-note full">Đường đua mở 06:00 - 00:00, mỗi slot 1 giờ. Nhân viên chuồng hoặc bác sĩ thú y tự nhận buổi tập.</div>
+          <div className="evaluation-note full">Buổi tập mặc định từ 05:00 đến 11:00. Nhân viên chăm sóc theo hồ sơ ngựa được thông báo để chuẩn bị.</div>
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
             <button className="button primary" disabled={busy || !racetracks.length || !form.laneId || phase.restDays?.includes(form.trainingDate) || (phase.workloadIntensity === 'HIGH' && ['loading', 'locked'].includes(lockState.state))}>{busy ? 'Đang lưu...' : 'Tạo buổi tập'}</button>

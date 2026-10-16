@@ -30,7 +30,7 @@ DATABASE/
 ├── 00_create_database.sql          # Khởi tạo DB racehorse_local, collation & login racehorse_local_app
 ├── 01_core_auth.sql                # Người dùng (users, wallet, plan), user_roles, login_sessions, role_permissions
 ├── 02_horses_and_profiles.sql      # Hồ sơ ngựa, phả hệ thủ công, cân nặng, gói dịch vụ, quyền sở hữu, file đính kèm
-├── 03_facilities.sql               # Chuồng trại, sân tập 06:00-00:00, 4 làn chạy/sân
+├── 03_facilities.sql               # Chuồng trại và 4 làn/sân; giờ hoạt động được cập nhật ở migration 37
 ├── 04_training_management.sql      # Kế hoạch/giai đoạn tập, khóa an toàn (training_locks), lịch tập (schedules), đặt làn & đánh giá
 ├── 05_health_and_care.sql          # Định nghĩa quy trình chăm sóc (definitions), việc chăm sóc (care_tasks), lịch phòng ngừa
 ├── 06_telemetry_and_alerts.sql     # Ngưỡng sinh trắc, phiên đo dữ liệu (telemetry_sessions), chỉ số (readings), cảnh báo
@@ -43,6 +43,8 @@ DATABASE/
 ├── 34_hourly_racetrack_slots.sql   # Nâng cấp DB đã tồn tại sang slot 1 giờ
 ├── 35_horse_intake_workflow.sql     # Tách trạng thái tiếp nhận khỏi trạng thái thanh toán, giữ phân chuồng cũ
 ├── 36_align_race_events_schema.sql  # Đồng bộ schema race_events (race_name, racecourse, race_class) với backend
+├── 37_fixed_training_window.sql     # Buổi tập mới cố định 05:00–11:00; giữ nguyên buổi cũ
+├── 38_owner_race_approval_final.sql # Chủ ngựa duyệt là xác nhận cuối cùng; cập nhật quyền duyệt
 ├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
 ├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
 ├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên
@@ -65,15 +67,15 @@ DATABASE/
    - Bảng `dbo.stored_files` & `dbo.horse_profile_files`: Lưu trữ siêu dữ liệu Cloudinary cho ảnh hồ sơ, tài liệu phê duyệt và file báo cáo.
 4. **`03_facilities.sql`**
    - Bảng `dbo.stables`: Danh mục khu chuồng nuôi.
-   - Bảng `dbo.racetracks`: Mở `06:00:00`, đóng `00:00:00` ngày hôm sau; slot 60 phút, bắt đầu mỗi giờ từ 06:00 đến 23:00.
+   - Bảng `dbo.racetracks`: Sau migration 37, mở `05:00:00`, đóng `11:00:00` cùng ngày; buổi tập mới dùng toàn khung 6 giờ.
    - Bảng `dbo.racetrack_lanes`: Mỗi sân tập có đúng 4 làn chạy được đánh số từ 1 đến 4.
 5. **`04_training_management.sql`**
    - Bảng `dbo.training_plans` & `dbo.training_plan_phases`: Kế hoạch và các giai đoạn tập luyện (`rest_days_json` lưu dạng JSON).
    - Bảng `dbo.training_locks`: Quản lý khóa huấn luyện an toàn (cột `reason`, `review_date`, `release_reason`), ngăn xếp lịch bài tập nặng khi ngựa đang có khóa chưa mở.
    - Bảng `dbo.training_schedules`: Lịch tập huấn luyện. Không còn phụ thuộc gán người trực tiếp trên lịch; kiểm soát trạng thái phiên tập theo `ck_training_v3_session_status` hỗ trợ `PREPARING`, `READY`, `IN_PROGRESS`, `COMPLETED`, `INJURED`, `EMERGENCY_STOPPED`.
-   - Bảng `dbo.trial_run_bookings`: Ràng buộc đặt làn chạy độc quyền trong cùng slot 1 giờ; làn có thể dùng ở slot khác.
+   - Bảng `dbo.trial_run_bookings`: Ràng buộc đặt làn chạy độc quyền trong toàn bộ khung buổi tập; dữ liệu đặt làn cũ được giữ nguyên.
    - Bảng `dbo.training_evaluations`: Lưu trữ đầy đủ các chỉ số chạy, nhịp tim, hồi phục (không có cột `training_load`), `perceived_exertion` (1..10, nullable).
-   - Triggers: Ràng buộc slot 1 giờ trong khung 06:00–00:00 (`tr_enforce_training_window`), chống trùng slot trên làn (`tr_trial_run_bookings_no_lane_overlap`), kiểm soát khớp ngựa và kế hoạch còn hạn (`tr_training_schedules_plan_and_lock`), chặn đánh giá kế hoạch hết hạn (`tr_training_evaluations_plan_expiry`).
+   - Triggers: Sau migration 37, buổi tập mới bắt buộc 05:00–11:00 (`tr_enforce_training_window`), chống trùng giờ trên làn (`tr_trial_run_bookings_no_lane_overlap`), kiểm soát khớp ngựa và kế hoạch còn hạn (`tr_training_schedules_plan_and_lock`), chặn đánh giá kế hoạch hết hạn (`tr_training_evaluations_plan_expiry`).
 6. **`05_health_and_care.sql`**
    - Bảng `dbo.care_routine_definitions`: 5 quy trình chăm sóc tiêu chuẩn hàng ngày.
    - Bảng `dbo.care_tasks`: Các nhiệm vụ chăm sóc thực tế theo ngày dành cho `STABLE_STAFF` (hỗ trợ ghi chú hoàn thành và hình ảnh xác thực).

@@ -26,7 +26,7 @@ export default function TrainingReceptionPage() {
   }
   return <div className="training-reception-page">
     <div className="page-heading training-reception-heading"><div><p className="eyebrow">HEAD TRAINER</p><h1>Tiếp nhận huấn luyện</h1>
-      <p>Ngựa đã thanh toán, có bác sĩ chẩn đoán và đang chờ huấn luyện viên tiếp nhận.</p></div>
+      <p>Ngựa đã thanh toán có thể được huấn luyện viên tiếp nhận ngay; việc khám và phân chuồng tiếp tục theo quy trình riêng.</p></div>
       <Link className="button secondary" to="/training-schedule">Xem lịch huấn luyện</Link></div>
     {error && <div className="notice error" role="alert">{error}</div>}
     {message && <div className="notice success" role="status">{message}</div>}
@@ -38,7 +38,7 @@ export default function TrainingReceptionPage() {
         : <div className="training-reception-rows">{horses.map(horse => <article className="training-reception-row" key={horse.horseId}>
           <div className="training-reception-horse"><span className="training-reception-avatar" aria-hidden="true">{horse.name?.trim().charAt(0).toUpperCase() || 'N'}</span>
             <div><b>{horse.name}</b><small>{horse.code}</small></div></div>
-          <div className="training-reception-checks"><span>Đã thanh toán</span><span>Đã có bác sĩ chẩn đoán</span></div>
+          <div className="training-reception-checks"><span>Đã thanh toán</span></div>
           <button className="button primary" disabled={busyId === horse.horseId} onClick={() => receive(horse)}>
             {busyId === horse.horseId ? 'Đang tiếp nhận…' : 'Tiếp nhận'}</button>
         </article>)}</div>}

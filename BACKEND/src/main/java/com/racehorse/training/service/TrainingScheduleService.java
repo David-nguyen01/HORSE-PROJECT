@@ -45,12 +45,11 @@ import java.util.UUID;
 public class TrainingScheduleService {
     private static final ZoneId CLUB_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    private static Instant slotStart(LocalDate date, LocalTime slot) {
-        if (slot == null || slot.getMinute() != 0 || slot.getSecond() != 0 || slot.getNano() != 0
-                || slot.getHour() < 6 || slot.getHour() > 23) {
-            throw new InvalidInputException("Slot tập phải bắt đầu đúng giờ từ 06:00 đến 23:00");
-        }
-        return date.atTime(slot).atZone(CLUB_ZONE).toInstant();
+    private static final LocalTime TRAINING_START = LocalTime.of(5, 0);
+    private static final long TRAINING_WINDOW_SECONDS = 6 * 3600L;
+
+    private static Instant trainingStart(LocalDate date) {
+        return date.atTime(TRAINING_START).atZone(CLUB_ZONE).toInstant();
     }
 
     private final TrainingScheduleRepository repository;
@@ -166,8 +165,8 @@ public class TrainingScheduleService {
                 || !track.isActive() || !track.getId().equals(request.racetrackId())) {
             throw new InvalidInputException("Làn chạy phải thuộc sân đang hoạt động đã chọn");
         }
-        Instant start = slotStart(date, request.slotStart());
-        Instant end = start.plusSeconds(3600);
+        Instant start = trainingStart(date);
+        Instant end = start.plusSeconds(TRAINING_WINDOW_SECONDS);
         if (repository.existsByHorseIdAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
                 horse.getId(), end, start)) {
             throw new BusinessException("Ngựa đã có buổi tập trùng khung giờ này");
@@ -220,8 +219,8 @@ public class TrainingScheduleService {
                 || !track.isActive() || !track.getId().equals(request.racetrackId())) {
             throw new InvalidInputException("Làn chạy phải thuộc sân đang hoạt động đã chọn");
         }
-        Instant start = slotStart(date, request.slotStart());
-        Instant end = start.plusSeconds(3600);
+        Instant start = trainingStart(date);
+        Instant end = start.plusSeconds(TRAINING_WINDOW_SECONDS);
         if (repository.existsByHorseIdAndIdNotAndCancelledAtIsNullAndScheduledStartLessThanAndScheduledEndGreaterThan(
                 schedule.getHorse().getId(), scheduleId, end, start)) {
             throw new BusinessException("Ngựa đã có buổi tập trùng khung giờ này");

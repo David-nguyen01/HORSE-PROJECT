@@ -45,7 +45,7 @@ class RaceEventOwnerAccessTest {
     }
 
     @Test
-    void trainerListIsScopedToAssignedActiveHorses() {
+    void trainerHistoryIsScopedToOwnSubmissionsOrCurrentlyAssignedHorses() {
         UUID trainerId = UUID.randomUUID();
         when(jdbc.query(any(String.class), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
 
@@ -53,9 +53,8 @@ class RaceEventOwnerAccessTest {
                 .registrations(null, null, null, null, trainerId);
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc).query(sql.capture(), any(RowMapper.class), eq(new Object[]{trainerId}));
-        assertThat(sql.getValue()).contains("h.current_trainer_id=?", "h.archived_at is null",
-                "h.intake_status='STABLED'", "h.payment_status='PAID'");
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), eq(new Object[]{trainerId, trainerId}));
+        assertThat(sql.getValue()).contains("m.user_id=?", "h.current_trainer_id=?", "h.archived_at is null");
     }
 
     @Test
@@ -120,7 +119,8 @@ class RaceEventOwnerAccessTest {
         service.decide(registrationId, ownerId, true, null);
 
         verify(horseAccess).requireOwned(horseId, ownerId);
-        verify(jdbc).update(contains("status='SUBMITTED'"), eq("APPROVE"), isNull(), any(String.class), eq(registrationId));
+        verify(jdbc).update(contains("status='SUBMITTED'"), eq("CONFIRMED"), isNull(), any(String.class),
+                any(String.class), eq(registrationId));
     }
 
     @Test
@@ -231,6 +231,28 @@ class RaceEventOwnerAccessTest {
 
         assertThatThrownBy(() -> service.register(eventId, horseId, UUID.randomUUID(), null, true))
                 .isInstanceOf(BusinessException.class).hasMessageContaining("chưa hoàn thành");
+        verify(jdbc, never()).update(contains("insert into module_records"), any(Object[].class));
+    }
+
+    @Test
+    void horseCannotRegisterForThirdRaceInSameRaceMonth() {
+        UUID eventId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        LocalDate raceDate = event(eventId, null).raceDate();
+        RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
+        doReturn(event(eventId, null)).when(service).event(eventId);
+        when(jdbc.queryForObject(contains("with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
+        when(jdbc.queryForObject(contains("JSON_VALUE(data_json,'$.raceEventId')=?"), eq(Integer.class),
+                eq(horseId), eq(eventId.toString()))).thenReturn(0);
+        when(jdbc.queryForObject(contains("e.completed_at is null"), eq(Integer.class), eq(horseId)))
+                .thenReturn(0);
+        when(jdbc.queryForObject(contains("e.race_date>=?"), eq(Integer.class), eq(horseId),
+                eq(raceDate.withDayOfMonth(1)), eq(raceDate.withDayOfMonth(1).plusMonths(1))))
+                .thenReturn(2);
+
+        assertThatThrownBy(() -> service.register(eventId, horseId, UUID.randomUUID(), null, true))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("tối đa 2 giải đua");
         verify(jdbc, never()).update(contains("insert into module_records"), any(Object[].class));
     }
 

@@ -76,13 +76,6 @@ public class RaceEventController {
         return service.decide(id, user(jwt), request.approve(), request.reason());
     }
 
-    @PostMapping("/registrations/{id}/confirm")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and (hasAuthority('PERM_RACING_EDIT') or hasAuthority('PERM_RACING_APPROVE'))")
-    RaceEventService.RegistrationView confirm(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
-                                               org.springframework.security.core.Authentication authentication) {
-        return service.confirm(id, user(jwt), manager(authentication));
-    }
-
     @PostMapping("/registrations/{id}/withdraw")
     @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_RACING_EDIT')")
     RaceEventService.RegistrationView withdraw(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,

@@ -31,8 +31,8 @@ import java.util.UUID;
 
 @Service
 public class RacetrackService {
-    private static final LocalTime OPENS_AT = LocalTime.of(6, 0);
-    private static final LocalTime CLOSES_AT = LocalTime.MIDNIGHT;
+    private static final LocalTime OPENS_AT = LocalTime.of(5, 0);
+    private static final LocalTime CLOSES_AT = LocalTime.of(11, 0);
 
     private final RacetrackRepository trackRepository;
     private final RacetrackLaneRepository laneRepository;
@@ -73,12 +73,11 @@ public class RacetrackService {
     }
 
     @Transactional(readOnly = true)
-    public List<TrackLaneAvailabilityResponse> availability(UUID racetrackId, LocalDate date, LocalTime slotStart) {
+    public List<TrackLaneAvailabilityResponse> availability(UUID racetrackId, LocalDate date) {
         Racetrack track = requireTrack(racetrackId);
         if (!track.isActive()) return List.of();
-        validateSlot(slotStart);
-        Instant start = date.atTime(slotStart).atZone(clubZone).toInstant();
-        Instant end = start.plusSeconds(3600);
+        Instant start = date.atTime(OPENS_AT).atZone(clubZone).toInstant();
+        Instant end = date.atTime(CLOSES_AT).atZone(clubZone).toInstant();
         List<TrialRunBooking> occupied = bookingRepository
                 .findByLaneRacetrackIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
                         racetrackId, end, start);
@@ -110,10 +109,9 @@ public class RacetrackService {
         if (schedule.getCancelledAt() != null) throw new BusinessException("Không thể đặt lượt chạy cho lịch đã hủy");
         LocalDate scheduleDate = schedule.getScheduledStart().atZone(clubZone).toLocalDate();
         if (!scheduleDate.equals(request.date())) throw new InvalidInputException("Ngày đặt làn phải trùng với ngày buổi tập");
-        LocalTime slotStart = schedule.getScheduledStart().atZone(clubZone).toLocalTime();
-        validateSlot(slotStart);
-        if (!schedule.getScheduledEnd().equals(schedule.getScheduledStart().plusSeconds(3600))) {
-            throw new InvalidInputException("Lượt chạy phải khớp slot 1 giờ của buổi tập");
+        if (!schedule.getScheduledStart().atZone(clubZone).toLocalTime().equals(OPENS_AT)
+                || !schedule.getScheduledEnd().atZone(clubZone).toLocalTime().equals(CLOSES_AT)) {
+            throw new InvalidInputException("Buổi tập phải trong khung cố định 05:00 - 11:00");
         }
         if (bookingRepository.existsByTrainingScheduleId(schedule.getId())) {
             throw new BusinessException("Lịch huấn luyện này đã có làn chạy");
@@ -155,16 +153,9 @@ public class RacetrackService {
         return value == null || value.isBlank() ? null : value.trim();
     }
 
-    private void validateSlot(LocalTime slot) {
-        if (slot == null || slot.getHour() < 6 || slot.getHour() > 23
-                || slot.getMinute() != 0 || slot.getSecond() != 0 || slot.getNano() != 0) {
-            throw new InvalidInputException("Slot chạy phải bắt đầu đúng giờ từ 06:00 đến 23:00");
-        }
-    }
-
     private RacetrackResponse toResponse(Racetrack track, List<RacetrackLane> lanes) {
         return new RacetrackResponse(track.getId(), track.getName(), track.getLocation(), track.isActive(),
-                OPENS_AT, CLOSES_AT, true, 60,
+                OPENS_AT, CLOSES_AT, false, 360,
                 lanes.stream().filter(lane -> lane.getLaneNumber() >= 1 && lane.getLaneNumber() <= 4)
                         .map(lane -> new RacetrackResponse.Lane(lane.getId(), lane.getLaneNumber(), lane.isActive())).toList());
     }

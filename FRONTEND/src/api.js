@@ -187,6 +187,7 @@ export const financeApi = {
 
 export const reportingApi = {
   getOwners: () => api('/api/owner-reports/owners'),
+  getMyExpenses: (from, to) => api(`/api/owner-reports/my-expenses?${new URLSearchParams({ ...(from ? { from } : {}), ...(to ? { to } : {}) })}`),
   getReports: (params = {}) => {
     const q = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })

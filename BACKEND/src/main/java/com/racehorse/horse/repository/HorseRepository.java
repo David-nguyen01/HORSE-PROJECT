@@ -49,16 +49,12 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
     @Query("""
             select h from Horse h
             where h.archivedAt is null and h.currentTrainer.id = :trainerId
-              and h.intakeStatus = 'STABLED'
-              and (h.serviceOverride = true or (h.paymentStatus = 'PAID'
-                   and (h.paidUntil is null or h.paidUntil >= :today)))
               and (:query is null or lower(h.code) like lower(concat('%', :query, '%'))
                    or lower(h.name) like lower(concat('%', :query, '%')))
               and (:status is null or h.status = :status)
             """)
     Page<Horse> searchForTrainer(@Param("query") String query, @Param("status") HorseStatus status,
-                                @Param("trainerId") UUID trainerId, @Param("today") LocalDate today,
-                                Pageable pageable);
+                                @Param("trainerId") UUID trainerId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer", "caretaker", "diagnosingVet"})
     @Query("""

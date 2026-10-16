@@ -136,8 +136,7 @@ public class HorseService {
         Horse horse = findHorse(id);
         boolean allowed = switch (role) {
             case CLUB_MANAGER -> true;
-            case HEAD_TRAINER -> horse.getArchivedAt() == null && isServiceVisible(horse)
-                    && "STABLED".equals(horse.getIntakeStatus())
+            case HEAD_TRAINER -> horse.getArchivedAt() == null
                     && horse.getCurrentTrainer() != null && userId.equals(horse.getCurrentTrainer().getId());
             case VETERINARIAN -> horse.getArchivedAt() == null && isServiceVisible(horse)
                     && Set.of("WAITING_FOR_VET", "IN_MEDICAL", "PENDING_STALL", "STABLED").contains(horse.getIntakeStatus());
@@ -168,7 +167,7 @@ public class HorseService {
     @Transactional(readOnly = true)
     public Page<HorseResponse> searchForTrainer(String query, HorseStatus status, UUID trainerId, Pageable pageable) {
         String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
-        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, serviceToday(), pageable)
+        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, pageable)
                 .map(this::toResponse);
     }
 

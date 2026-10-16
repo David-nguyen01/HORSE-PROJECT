@@ -83,6 +83,75 @@ public class OwnerReportService {
     }
 
     @Transactional(readOnly = true)
+    public ExpenseOverview myExpenses(UUID ownerId, LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to))
+            throw new BusinessException("Khoảng báo cáo không hợp lệ");
+        List<HorseItem> horses = jdbc.query("select h.id,h.code,h.name from horses h "
+                        + "join horse_ownerships ho on ho.horse_id=h.id "
+                        + "where ho.owner_id=? and h.archived_at is null order by h.name",
+                (rs, row) -> new HorseItem(rs.getObject("id", UUID.class),
+                        rs.getString("code"), rs.getString("name")), ownerId);
+        StringBuilder sql = new StringBuilder("""
+                select ft.id, ft.transaction_date, ft.category, ft.amount, ft.description,
+                       h.id horse_id, h.code horse_code, h.name horse_name,
+                       JSON_VALUE(m.data_json, '$.plan') plan_name
+                from financial_transactions ft
+                left join module_records m on m.id=ft.source_entity_id
+                    and ft.source_entity_type='WALLET' and m.module_code='SYSTEM'
+                left join horses h on h.id=coalesce(ft.horse_id,m.horse_id)
+                where ft.transaction_type='EXPENSE' and (
+                    (ft.source_entity_type='WALLET' and ft.wallet_owner_user_id=?
+                     and ft.category in ('SERVICE_FEE','LATE_FEE'))
+                    or ((ft.source_entity_type is null or ft.source_entity_type<>'WALLET')
+                        and exists(select 1 from horse_ownerships ho
+                                   where ho.horse_id=h.id and ho.owner_id=?))
+                )
+                """);
+        List<Object> args = new ArrayList<>(List.of(ownerId, ownerId));
+        if (from != null) { sql.append(" and ft.transaction_date>=?"); args.add(from); }
+        if (to != null) { sql.append(" and ft.transaction_date<=?"); args.add(to); }
+        sql.append(" order by ft.transaction_date desc, ft.created_at desc");
+        List<ExpenseItem> items = jdbc.query(sql.toString(), (rs, row) -> new ExpenseItem(
+                rs.getObject("id", UUID.class), rs.getObject("transaction_date", LocalDate.class),
+                rs.getObject("horse_id", UUID.class), rs.getString("horse_code"), rs.getString("horse_name"),
+                rs.getString("category"), rs.getString("plan_name"), rs.getBigDecimal("amount"),
+                rs.getString("description")), args.toArray());
+        BigDecimal total = items.stream().map(ExpenseItem::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        StringBuilder prizeSql = new StringBuilder("""
+                select ft.id,ft.transaction_date,ft.category,ft.amount,ft.description,
+                       h.id horse_id,h.code horse_code,h.name horse_name
+                from financial_transactions ft join horses h on h.id=ft.horse_id
+                where ft.transaction_type='REVENUE' and ft.category='PRIZE_REVENUE'
+                  and exists(select 1 from horse_ownerships ho where ho.horse_id=h.id and ho.owner_id=?)
+                """);
+        List<Object> prizeArgs = new ArrayList<>(List.of(ownerId));
+        if (from != null) { prizeSql.append(" and ft.transaction_date>=?"); prizeArgs.add(from); }
+        if (to != null) { prizeSql.append(" and ft.transaction_date<=?"); prizeArgs.add(to); }
+        prizeSql.append(" order by ft.transaction_date desc,ft.created_at desc");
+        List<ExpenseItem> prizes = jdbc.query(prizeSql.toString(), (rs, row) -> new ExpenseItem(
+                rs.getObject("id", UUID.class), rs.getObject("transaction_date", LocalDate.class),
+                rs.getObject("horse_id", UUID.class), rs.getString("horse_code"), rs.getString("horse_name"),
+                rs.getString("category"), null, rs.getBigDecimal("amount"), rs.getString("description")),
+                prizeArgs.toArray());
+        BigDecimal totalPrizeRevenue = prizes.stream().map(ExpenseItem::amount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        StringBuilder winsSql = new StringBuilder("""
+                select rr.id,rr.race_date,rr.race_name,rr.prize_money,rr.horse_id
+                from race_results rr
+                where rr.finish_position=1 and exists(select 1 from horse_ownerships ho
+                    where ho.horse_id=rr.horse_id and ho.owner_id=?)
+                """);
+        List<Object> winArgs = new ArrayList<>(List.of(ownerId));
+        if (from != null) { winsSql.append(" and rr.race_date>=?"); winArgs.add(from); }
+        if (to != null) { winsSql.append(" and rr.race_date<=?"); winArgs.add(to); }
+        winsSql.append(" order by rr.race_date desc");
+        List<RaceWin> wins = jdbc.query(winsSql.toString(), (rs, row) -> new RaceWin(
+                rs.getObject("id", UUID.class), rs.getObject("race_date", LocalDate.class),
+                rs.getObject("horse_id", UUID.class), rs.getString("race_name"),
+                rs.getString("prize_money")), winArgs.toArray());
+        return new ExpenseOverview("VND", total, totalPrizeRevenue, horses, items, prizes, wins);
+    }
+
+    @Transactional(readOnly = true)
     public ReportView get(UUID id, UUID requester, boolean manager) {
         String sql="select r.*,u.username from owner_reports r join users u on u.id=r.owner_user_id where r.id=?";
         List<ReportRow> rows=jdbc.query(sql,(rs,row)->new ReportRow(rs.getObject("owner_user_id",UUID.class),rs.getString("username"),
@@ -165,6 +234,13 @@ public class OwnerReportService {
     private record ReportRow(UUID ownerId,String username,LocalDate start,LocalDate end,OffsetDateTime generatedAt,UUID generatedBy,String horseIdsJson,String transactionIdsJson){}
 
     public record OwnerOption(UUID id, String username, String email, int horseCount) {}
+    public record ExpenseItem(UUID id, LocalDate transactionDate, UUID horseId, String horseCode,
+                              String horseName, String category, String planName, BigDecimal amount,
+                              String description) {}
+    public record RaceWin(UUID id, LocalDate raceDate, UUID horseId, String raceName, String prizeMoney) {}
+    public record ExpenseOverview(String currency, BigDecimal totalExpense, BigDecimal totalPrizeRevenue,
+                                  List<HorseItem> horses, List<ExpenseItem> items,
+                                  List<ExpenseItem> prizeRevenue, List<RaceWin> wins) {}
     public record ReportSummary(UUID id,UUID ownerId,String ownerUsername,LocalDate periodStart,LocalDate periodEnd,
                                 OffsetDateTime generatedAt,UUID generatedBy){}
     public record HorseItem(UUID id,String code,String name){}

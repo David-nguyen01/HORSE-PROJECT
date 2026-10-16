@@ -27,6 +27,8 @@ import { api, financeApi, reportingApi, pageContent, getAuth } from './api'
 const money = (val) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(val || 0)
 
 const CATEGORY_LABELS = {
+  SERVICE_FEE: 'Phí gói dịch vụ',
+  LATE_FEE: 'Phụ phí gia hạn trễ',
   FEED_COST: 'Chi phí thức ăn',
   MEDICAL_COST: 'Chi phí y tế & thú y',
   OPERATING_COST: 'Chi phí vận hành',
@@ -47,6 +49,11 @@ export function FinanceReportsPage() {
   const isOwner = user?.roles?.includes('HORSE_OWNER') && !isManager
 
   const [activeTab, setActiveTab] = useState(isOwner ? 'owner_reports' : 'ledger')
+  const [ownerFrom, setOwnerFrom] = useState(() => {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit' }).formatToParts(new Date())
+    return `${parts.find(part => part.type === 'year').value}-${parts.find(part => part.type === 'month').value}-01`
+  })
+  const [ownerTo, setOwnerTo] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
 
   return (
     <div className="finance-reports-container">
@@ -56,11 +63,19 @@ export function FinanceReportsPage() {
           <h1>{isOwner ? 'Báo cáo tài chính của tôi' : 'Tài chính & Báo cáo cấp cao'}</h1>
           <p>
             {isOwner
-              ? 'Theo dõi minh bạch chi phí chăm sóc, nuôi dưỡng, y tế và doanh thu tiền thưởng định kỳ của đàn ngựa.'
+              ? 'Theo dõi chi tiêu theo tháng và xem từng khoản chi của mỗi ngựa.'
               : 'Theo dõi dòng tiền, quản lý sổ quỹ thu/chi, lập báo cáo chủ ngựa và phân tích tài chính toàn diện.'}
           </p>
         </div>
       </div>
+
+      {isOwner && <div className="card audit-filter-panel finance-filter-panel" style={{ marginBottom: 18 }}>
+        <div className="audit-filter-grid finance-filter-grid owner-report-filter-grid" style={{ gridTemplateColumns: '1fr 1fr auto' }}>
+          <div className="finance-filter-field"><label htmlFor="owner-expense-from">Kỳ báo cáo từ ngày</label><input id="owner-expense-from" type="date" value={ownerFrom} max={ownerTo || undefined} onChange={event => setOwnerFrom(event.target.value)} /></div>
+          <div className="finance-filter-field"><label htmlFor="owner-expense-to">Đến ngày</label><input id="owner-expense-to" type="date" value={ownerTo} min={ownerFrom || undefined} onChange={event => setOwnerTo(event.target.value)} /></div>
+          <div className="audit-filter-actions finance-filter-actions" style={{ alignSelf: 'flex-end' }}><button type="button" className="button secondary" onClick={() => { setOwnerFrom(''); setOwnerTo('') }}><RotateCcw size={15} /> Đặt lại</button></div>
+        </div>
+      </div>}
 
       {!isOwner && (
         <div className="tab-pill-bar">
@@ -89,10 +104,86 @@ export function FinanceReportsPage() {
       )}
 
       {activeTab === 'ledger' && !isOwner && <FinancialLedgerTab />}
-      {activeTab === 'owner_reports' && <OwnerReportsTab isManager={isManager} />}
+      {activeTab === 'owner_reports' && (isOwner ? <OwnerMonthlyExpenses from={ownerFrom} to={ownerTo} /> : <OwnerReportsTab isManager={isManager} />)}
       {activeTab === 'executive' && !isOwner && <ExecutiveSummaryTab />}
     </div>
   )
+}
+
+function OwnerMonthlyExpenses({ from, to }) {
+  const [overview, setOverview] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (from && to && from > to) return
+    let active = true
+    setLoading(true)
+    setError('')
+    reportingApi.getMyExpenses(from, to)
+      .then(value => { if (active) setOverview(value) })
+      .catch(err => { if (active) { setOverview(null); setError(err.message) } })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [from, to])
+
+  const months = new Set([
+    ...(overview?.items || []).map(item => String(item.transactionDate).slice(0, 7)),
+    ...(overview?.prizeRevenue || []).map(item => String(item.transactionDate).slice(0, 7)),
+    ...(overview?.wins || []).map(win => String(win.raceDate).slice(0, 7))
+  ])
+  if (from && to && from <= to) {
+    const cursor = new Date(`${from.slice(0, 7)}-01T00:00:00Z`)
+    const lastMonth = to.slice(0, 7)
+    while (cursor.toISOString().slice(0, 7) <= lastMonth) {
+      months.add(cursor.toISOString().slice(0, 7))
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+    }
+  } else if (from) months.add(from.slice(0, 7))
+  if (!months.size) months.add((from || to || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit' }).format(new Date())).slice(0, 7))
+  const byMonth = [...months].sort((a, b) => b.localeCompare(a)).map(month => {
+    const expenses = (overview?.items || []).filter(item => String(item.transactionDate).startsWith(month))
+    const prizes = (overview?.prizeRevenue || []).filter(item => String(item.transactionDate).startsWith(month))
+    const wins = (overview?.wins || []).filter(win => String(win.raceDate).startsWith(month))
+    return {
+      month,
+      total: expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+      prizeTotal: prizes.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+      unassigned: expenses.filter(item => !item.horseId),
+      horses: (overview?.horses || []).map(horse => ({
+        ...horse,
+        expenses: expenses.filter(item => item.horseId === horse.id),
+        prizes: prizes.filter(item => item.horseId === horse.id),
+        wins: wins.filter(win => win.horseId === horse.id)
+      }))
+    }
+  })
+
+  return <section className="card" style={{ padding: 20, marginBottom: 18 }}>
+    <div><h2 style={{ margin: 0 }}>Chi tiêu theo tháng</h2><p className="muted">Phí gói, gia hạn và các khoản chi đã ghi nhận cho từng ngựa.</p></div>
+    {from && to && from > to && <div className="notice error">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</div>}
+    {error && <div className="notice error">{error}</div>}
+    {loading ? <p>Đang tải chi tiêu…</p> : <>
+      <p style={{ fontSize: 18, fontWeight: 700 }}>Tổng chi trong kỳ: {money(overview?.totalExpense)}</p>
+      <p className="muted">Tiền thưởng đã ghi nhận: {money(overview?.totalPrizeRevenue)}. Kết quả thắng đua được liệt kê riêng và không tự cộng vào doanh thu.</p>
+      {byMonth.length ? byMonth.map(group => <div key={group.month} style={{ marginTop: 18 }}>
+        <h3 style={{ marginBottom: 8 }}>Tháng {group.month.slice(5)}/{group.month.slice(0, 4)} · Chi {money(group.total)} · Thưởng đã ghi nhận {money(group.prizeTotal)}</h3>
+        {group.horses.map(horse => <details key={horse.id} className="card" style={{ padding: 14, marginTop: 10 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{horse.name} · {horse.code} — Chi {money(horse.expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0))}</summary>
+          {horse.expenses.length ? <div style={{ overflowX: 'auto', marginTop: 12 }}><table className="recent-audit-table"><thead><tr><th>Ngày</th><th>Khoản chi</th><th>Gói</th><th>Mô tả</th><th>Số tiền</th></tr></thead><tbody>
+            {horse.expenses.map(item => <tr key={item.id}><td>{item.transactionDate}</td><td>{CATEGORY_LABELS[item.category] || item.category}</td><td>{item.planName || '—'}</td><td>{item.description}</td><td>{money(item.amount)}</td></tr>)}
+          </tbody></table></div> : <p className="muted">Chưa có giao dịch chi phí gắn với ngựa này trong kỳ.</p>}
+          {horse.prizes.length > 0 && <div style={{ marginTop: 12 }}><strong>Tiền thưởng đã ghi nhận</strong><ul>{horse.prizes.map(item => <li key={item.id}>{item.transactionDate} · {money(item.amount)} · {item.description}</li>)}</ul></div>}
+          {horse.wins.length > 0 && <div style={{ marginTop: 12 }}><strong>Kết quả thắng giải</strong><ul>{horse.wins.map(win => <li key={win.id}>{win.raceDate} · {win.raceName} · Tiền thưởng ghi trên kết quả: {win.prizeMoney || 'Chưa ghi nhận'}</li>)}</ul></div>}
+        </details>)}
+        {group.unassigned.length > 0 && <details className="card" style={{ padding: 14, marginTop: 10 }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Khoản chi chưa gắn với ngựa — {money(group.unassigned.reduce((sum, item) => sum + Number(item.amount || 0), 0))}</summary>
+          <p className="muted">Các khoản này thuộc ví của bạn, nhưng dữ liệu cũ không ghi ngựa nhận gói nên chưa thể phân bổ cho từng ngựa.</p>
+          <ul>{group.unassigned.map(item => <li key={item.id}>{item.transactionDate} · {item.description} · {money(item.amount)}</li>)}</ul>
+        </details>}
+      </div>) : <p className="simple-empty">Chưa có giao dịch hoặc kết quả đua trong kỳ này.</p>}
+    </>}
+  </section>
 }
 
 /* =========================================================================

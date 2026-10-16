@@ -28,10 +28,9 @@ class RaceRoleBoundaryTest {
     }
 
     @Test
-    void ownerApprovalDoesNotAuthorizeFinalConfirmation() {
-        String rule = authorization(RaceEventController.class, "confirm");
-        assertThat(rule).contains("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER')")
-                .doesNotContain("HORSE_OWNER");
+    void ownerDecisionIsTheOnlyApprovalEndpoint() {
+        assertThat(Arrays.stream(RaceEventController.class.getDeclaredMethods())
+                .noneMatch(method -> method.getName().equals("confirm"))).isTrue();
         assertThat(authorization(RaceEventController.class, "decide"))
                 .contains("hasRole('HORSE_OWNER')", "PERM_RACING_APPROVE");
     }
