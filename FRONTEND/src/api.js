@@ -63,6 +63,30 @@ export async function api(path, options = {}, retry = true) {
   return parseResponse(response)
 }
 
+export async function apiBlob(path, options = {}, retry = true) {
+  const auth = getAuth()
+  const headers = new Headers(options.headers || {})
+  if (auth?.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`)
+  const response = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' })
+  if (response.status === 401 && retry && auth?.refreshToken && path !== '/api/auth/refresh') {
+    try {
+      const token = await refreshAccessToken()
+      headers.set('Authorization', `Bearer ${token}`)
+      const retryResponse = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' })
+      if (!retryResponse.ok) {
+        throw new Error(retryResponse.status === 403 ? 'Bạn không có quyền truy cập ảnh này' : `Yêu cầu thất bại (${retryResponse.status})`)
+      }
+      return retryResponse.blob()
+    } catch (error) { clearAuth(); throw error }
+  }
+  if (!response.ok) {
+    if (response.status === 403) throw new Error('Bạn không có quyền xem ảnh của nhiệm vụ này (403 Forbidden)')
+    if (response.status === 404) throw new Error('Nhiệm vụ này không có ảnh đính kèm (404 Not Found)')
+    throw new Error(`Yêu cầu thất bại (${response.status})`)
+  }
+  return response.blob()
+}
+
 export const authApi = {
   login: (payload) => api('/api/auth/login', { method: 'POST', body: JSON.stringify(payload) }, false),
   register: (payload) => api('/api/auth/register', { method: 'POST', body: JSON.stringify(payload) }, false),
@@ -119,6 +143,7 @@ export const stableCareApi = {
   createCareTask: (payload) => api('/api/care-tasks', { method: 'POST', body: JSON.stringify(payload) }),
   completeCareTask: (id, payload) => api(`/api/care-tasks/${id}/complete`, { method: 'POST', body: payload instanceof FormData ? payload : JSON.stringify(payload || {}) }),
   cancelCareTask: (id) => api(`/api/care-tasks/${id}/cancel`, { method: 'POST' }),
+  getCareTaskPhotoBlob: (id) => apiBlob(`/api/care-tasks/${id}/photo`),
 
   // FR16 Incidents
   createIncident: (payload) => api('/api/incidents', { method: 'POST', body: JSON.stringify(payload) }),

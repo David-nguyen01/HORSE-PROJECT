@@ -404,4 +404,38 @@ class CareTaskServiceTest {
         );
         assertThat(futureTask.isOverdue()).isFalse();
     }
+
+    @Test
+    void getTaskPhotoReturnsDataWhenPresent() {
+        UUID taskId = UUID.randomUUID();
+        byte[] bytes = new byte[] { 1, 2, 3 };
+        when(jdbc.query(contains("SELECT photo_bytes"), any(RowMapper.class), eq(taskId)))
+                .thenReturn(List.of(new CareTaskService.TaskPhotoData(bytes, "image/png", "/url", "Title")));
+
+        CareTaskService.TaskPhotoData data = service.getTaskPhoto(taskId);
+        assertThat(data.bytes()).isEqualTo(bytes);
+        assertThat(data.contentType()).isEqualTo("image/png");
+    }
+
+    @Test
+    void getTaskPhotoThrowsNotFoundWhenTaskNotFound() {
+        UUID taskId = UUID.randomUUID();
+        when(jdbc.query(contains("SELECT photo_bytes"), any(RowMapper.class), eq(taskId)))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.getTaskPhoto(taskId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy nhiệm vụ");
+    }
+
+    @Test
+    void getTaskPhotoThrowsNotFoundWhenNoPhotoAttached() {
+        UUID taskId = UUID.randomUUID();
+        when(jdbc.query(contains("SELECT photo_bytes"), any(RowMapper.class), eq(taskId)))
+                .thenReturn(List.of(new CareTaskService.TaskPhotoData(null, null, null, "Title")));
+
+        assertThatThrownBy(() -> service.getTaskPhoto(taskId))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("không có ảnh đính kèm");
+    }
 }

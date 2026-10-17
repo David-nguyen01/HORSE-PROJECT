@@ -55,7 +55,6 @@ public class SecurityConfiguration {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
-                                "/api/care-tasks/*/photo",
                                 "/api/wallet/payos/webhook")
                         .permitAll()
                         .anyRequest().authenticated())

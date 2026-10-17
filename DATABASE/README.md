@@ -83,7 +83,7 @@ DATABASE/
    - Triggers: Sau migration 41, buổi tập mới bắt buộc 05:00–11:00 (`tr_enforce_training_window`), chống trùng giờ trên làn (`tr_trial_run_bookings_no_lane_overlap`), kiểm soát khớp ngựa và kế hoạch còn hạn (`tr_training_schedules_plan_and_lock`), chặn đánh giá kế hoạch hết hạn (`tr_training_evaluations_plan_expiry`).
 6. **`05_health_and_care.sql`**
    - Bảng `dbo.care_routine_definitions`: 5 quy trình chăm sóc tiêu chuẩn hàng ngày.
-   - Bảng `dbo.care_tasks`: Các nhiệm vụ chăm sóc thực tế theo ngày dành cho `STABLE_STAFF` (hỗ trợ ghi chú hoàn thành và hình ảnh xác thực).
+   - Bảng `dbo.care_tasks`: Các nhiệm vụ chăm sóc thực tế theo ngày dành cho `STABLE_STAFF` (hỗ trợ ghi chú hoàn thành và hình ảnh xác thực với các cột `photo_url`, `photo_bytes`, `photo_content_type`).
    - Bảng `dbo.preventive_care_schedules`: Lịch tiêm phòng, tẩy giun và chăm sóc móng định kỳ.
 7. **`06_telemetry_and_alerts.sql`**
    - Bảng `dbo.horse_metric_thresholds`: Thiết lập ngưỡng nhịp tim và tốc độ cho từng ngựa.

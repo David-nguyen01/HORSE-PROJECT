@@ -75,6 +75,19 @@ BEGIN
 END;
 GO
 
+-- Idempotency guards for pre-existing care_tasks tables
+IF COL_LENGTH(N'dbo.care_tasks', N'photo_bytes') IS NULL
+BEGIN
+    ALTER TABLE dbo.care_tasks ADD photo_bytes VARBINARY(MAX) NULL;
+END;
+GO
+
+IF COL_LENGTH(N'dbo.care_tasks', N'photo_content_type') IS NULL
+BEGIN
+    ALTER TABLE dbo.care_tasks ADD photo_content_type VARCHAR(100) NULL;
+END;
+GO
+
 -- 3. Preventive Care Schedules (Vaccination, Deworming & Farrier Recurrence)
 IF OBJECT_ID(N'dbo.preventive_care_schedules', N'U') IS NULL
 BEGIN

@@ -3172,6 +3172,7 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
   const [error, setError] = useState('')
   const [completingTask, setCompletingTask] = useState(null)
   const [showCreateTask, setShowCreateTask] = useState(false)
+  const [viewingPhotoTask, setViewingPhotoTask] = useState(null)
 
   // Real operational attention metrics
   const [attention, setAttention] = useState({
@@ -3506,9 +3507,14 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
 
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
                     {task.photoUrl && (
-                      <a href={task.photoUrl} target="_blank" rel="noreferrer" className="button secondary" style={{ minHeight: '32px', fontSize: '11px' }}>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        style={{ minHeight: '32px', fontSize: '11px' }}
+                        onClick={() => setViewingPhotoTask(task)}
+                      >
                         <Eye size={13} /> Xem ảnh
-                      </a>
+                      </button>
                     )}
                     {task.status === 'PENDING' && (isManager || (isStaff && (task.assignedStaffId === currentUserId
                       || (task.assignedStaffId == null && task.taskCategory === 'ROUTINE')))) && (
@@ -3535,6 +3541,13 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
         />
       )}
 
+      {viewingPhotoTask && (
+        <ViewTaskPhotoModal
+          task={viewingPhotoTask}
+          onClose={() => setViewingPhotoTask(null)}
+        />
+      )}
+
       {showCreateTask && (
         <CreateTaskModal
           onClose={() => setShowCreateTask(false)}
@@ -3544,6 +3557,118 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
           }}
         />
       )}
+    </div>
+  )
+}
+
+function ViewTaskPhotoModal({ task, onClose }) {
+  const [loading, setLoading] = useState(true)
+  const [photoSrc, setPhotoSrc] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    let objectUrl = null
+
+    async function loadPhoto() {
+      setLoading(true)
+      setError('')
+      try {
+        if (task.photoUrl && (task.photoUrl.startsWith('http://') || task.photoUrl.startsWith('https://'))) {
+          if (active) {
+            setPhotoSrc(task.photoUrl)
+            setLoading(false)
+          }
+          return
+        }
+
+        const blob = await stableCareApi.getCareTaskPhotoBlob(task.id)
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
+        setPhotoSrc(objectUrl)
+      } catch (err) {
+        if (active) {
+          setError(err.message || 'Không thể tải ảnh bằng chứng')
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadPhoto()
+
+    return () => {
+      active = false
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
+    }
+  }, [task.id, task.photoUrl])
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ maxWidth: '640px', width: '90%' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">BẰNG CHỨNG HOÀN THÀNH</p>
+            <h2>Ảnh nhiệm vụ chăm sóc</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div className="form-stack" style={{ marginTop: '12px' }}>
+          <div style={{ background: '#f5f7f3', padding: '12px', borderRadius: '10px', fontSize: '12px' }}>
+            <div>Nhiệm vụ: <b>{task.title}</b></div>
+            <div>{task.horseName ? <>Ngựa: <b>{task.horseName}</b> ({task.horseCode})</> : <>Phạm vi: <b>Khu vực chung / Chuồng trại</b></>}</div>
+            {task.completionNotes && (
+              <div style={{ marginTop: '4px' }}>Ghi chú hoàn thành: <i>{task.completionNotes}</i></div>
+            )}
+            {task.completedByName && (
+              <div style={{ marginTop: '2px', color: 'var(--muted)' }}>Thực hiện bởi: <b>{task.completedByName}</b></div>
+            )}
+          </div>
+
+          {loading && (
+            <div style={{ padding: '40px 20px', textAlign: 'center', color: '#688275', fontSize: '13px' }}>
+              Đang tải ảnh bằng chứng...
+            </div>
+          )}
+
+          {error && (
+            <div className="notice error">
+              <X size={16} /> {error}
+            </div>
+          )}
+
+          {!loading && !error && photoSrc && (
+            <div style={{ textAlign: 'center', marginTop: '10px', maxHeight: '500px', overflow: 'hidden', borderRadius: '10px', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <img
+                src={photoSrc}
+                alt={`Bằng chứng: ${task.title}`}
+                style={{ maxWidth: '100%', maxHeight: '480px', objectFit: 'contain', display: 'block' }}
+              />
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '14px', gap: '8px' }}>
+            {!loading && !error && photoSrc && (
+              <a
+                href={photoSrc}
+                download={`care-task-${task.id}.png`}
+                className="button secondary"
+                style={{ fontSize: '12px' }}
+              >
+                Tải ảnh về
+              </a>
+            )}
+            <button type="button" className="button primary" onClick={onClose} style={{ fontSize: '12px' }}>
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
