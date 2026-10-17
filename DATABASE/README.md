@@ -23,7 +23,9 @@ Tài liệu này là đặc tả chuẩn quản trị cơ sở dữ liệu cho d
 
 ## 2. DATABASE STRUCTURE (MODULAR BASELINE)
 
-Thư mục `DATABASE/` có 11 script baseline (`00`–`10`) và các bản vá idempotent (`32`–`42`) được `setup-local.ps1` áp dụng sau baseline:
+Thư mục `DATABASE/` có 11 script modular baseline (`00`–`10`) và các bản vá idempotent (`32`–`42`) được `setup-local.ps1` áp dụng tự động theo chuỗi:
+
+> **Lưu ý về đánh số script:** Các script đánh số từ `11` đến `31` trong lịch sử dự án đã được tổng hợp và chuẩn hóa vào 11 file modular baseline (`00`–`10`). Các migration từ `32` đến `42` là các bản cập nhật tiếp nối sau giai đoạn chuẩn hóa baseline. Chuỗi thực thi chuẩn xác và đầy đủ là `00`–`10` tiếp đến `32`–`42`.
 
 ```text
 DATABASE/
@@ -175,4 +177,35 @@ Khi cần chia sẻ dữ liệu thử nghiệm giữa các thành viên mà khô
    powershell -ExecutionPolicy Bypass -File DATABASE/apply-sync.ps1 -UseWindowsAuth
    ```
    Script sẽ tự động quét và thực thi các file SQL mới trong `DATABASE/sync/` theo thứ tự tên file.
+
+---
+
+## 6. XỬ LÝ SỰ CỐ & HƯỚNG DẪN REBUILD CSDL (TROUBLESHOOTING)
+
+### Quy tắc quan trọng: Trình tự cập nhật mã nguồn & CSDL
+> [!IMPORTANT]
+> **LUÔN PULL CODE TRƯỚC KHI REBUILD DATABASE:**
+> Nếu đồng nghiệp hoặc chính bạn rebuild CSDL trên nhánh/commit cũ rồi mới pull code mới, CSDL cục bộ sẽ bị lệch pha với các thực thể JPA / câu truy vấn mới nhất của backend. Sau mỗi lần `git pull` có thay đổi trong thư mục `DATABASE/`, **bắt buộc** phải chạy lại `setup-local.ps1`.
+
+### Sự cố thường gặp: `Invalid object name 'dbo.care_routine_definitions'` (SQL Server Error 208)
+
+- **Triệu chứng:** Khi mở giao diện **Stable → Daily Tasks** hoặc gọi API `/api/care-tasks`, hệ thống báo lỗi SQL Server:
+  `Invalid object name 'dbo.care_routine_definitions'` (Error 208).
+- **Nguyên nhân gốc rễ:**
+  1. **Rebuild trước khi pull:** Người dùng đã chạy script CSDL khi đang ở commit cũ (hoặc nhánh cũ), sau đó mới pull commit mới về. Ở commit mới, backend truy vấn bảng `dbo.care_routine_definitions` (được định nghĩa trong `DATABASE/05_health_and_care.sql`). Do chưa chạy lại script sau khi pull, database cục bộ bị thiếu bảng này.
+  2. **Script 39 dừng giữa chừng (đã được sửa):** Script `39_seed_standard_feeding_plan_and_routine_templates.sql` trước đây thiếu lệnh `USE [racehorse_local]; GO`, dẫn đến `sqlcmd` dừng giữa chừng và không thực thi tiếp các script 40–42.
+- **Cách khắc phục triệt để:**
+  1. Đảm bảo nhánh hiện tại là `develop` và đã pull commit mới nhất:
+     ```powershell
+     git pull origin develop
+     ```
+  2. Tái tạo sạch cơ sở dữ liệu `racehorse_local`:
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -UseWindowsAuth -RecreateDatabase
+     ```
+  3. Kiểm tra xác nhận bảng và dữ liệu mẫu đã sẵn sàng:
+     ```powershell
+     sqlcmd -S localhost,1433 -E -C -Q "USE [racehorse_local]; SELECT code, title, is_active FROM dbo.care_routine_definitions;"
+     ```
+     Kết quả trả về đủ 5 quy trình chăm sóc cơ sở (Morning Mucking, Evening Bedding, Midday Forage, Stable Check, Water Trough Check) là hoàn tất.
 
