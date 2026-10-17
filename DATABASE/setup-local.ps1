@@ -73,7 +73,9 @@ $baselineScripts = @(
     "37_owner_report_duplicate_protection.sql",
     "38_seed_horse_daily_routines.sql",
     "39_seed_standard_feeding_plan_and_routine_templates.sql",
-    "40_backfill_stabled_horses_daily_routines.sql"
+    "40_backfill_stabled_horses_daily_routines.sql",
+    "41_fixed_training_window.sql",
+    "42_owner_race_approval_final.sql"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan

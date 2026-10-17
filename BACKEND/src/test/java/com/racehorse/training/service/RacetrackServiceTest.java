@@ -70,7 +70,7 @@ class RacetrackServiceTest {
                 any(), any(), any())).thenReturn(List.of(booking));
 
         List<TrackLaneAvailabilityResponse> availability =
-                service.availability(trackId, LocalDate.of(2026, 9, 16), LocalTime.of(6, 0));
+                service.availability(trackId, LocalDate.of(2026, 9, 16));
 
         assertThat(availability).extracting(TrackLaneAvailabilityResponse::laneNumber)
                 .containsExactly(1, 3, 4);
@@ -78,7 +78,7 @@ class RacetrackServiceTest {
     }
 
     @Test
-    void lastSlotChecksOnlyFrom23ToMidnight() {
+    void availabilityChecksTheWholeDefaultTrainingWindow() {
         UUID trackId = UUID.randomUUID();
         LocalDate date = LocalDate.of(2026, 9, 16);
         Racetrack track = new Racetrack("Track", null);
@@ -88,22 +88,10 @@ class RacetrackServiceTest {
         when(bookingRepository.findByLaneRacetrackIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
                 any(), any(), any())).thenReturn(List.of());
 
-        service.availability(trackId, date, LocalTime.of(23, 0));
+        service.availability(trackId, date);
 
-        var start = date.atTime(23, 0).atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        var start = date.atTime(5, 0).atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
         verify(bookingRepository).findByLaneRacetrackIdAndCancelledAtIsNullAndBookedStartLessThanAndBookedEndGreaterThan(
-                eq(trackId), eq(start.plusSeconds(3600)), eq(start));
-    }
-
-    @Test
-    void rejectsAvailabilityForNonHourlyOrClosedSlots() {
-        UUID trackId = UUID.randomUUID();
-        Racetrack track = new Racetrack("Track", null);
-        ReflectionTestUtils.setField(track, "id", trackId);
-        when(trackRepository.findById(trackId)).thenReturn(java.util.Optional.of(track));
-        assertThatThrownBy(() -> service.availability(trackId, LocalDate.of(2026, 9, 16), LocalTime.of(5, 0)))
-                .isInstanceOf(InvalidInputException.class);
-        assertThatThrownBy(() -> service.availability(trackId, LocalDate.of(2026, 9, 16), LocalTime.of(6, 30)))
-                .isInstanceOf(InvalidInputException.class);
+                eq(trackId), eq(start.plusSeconds(6 * 3600)), eq(start));
     }
 }

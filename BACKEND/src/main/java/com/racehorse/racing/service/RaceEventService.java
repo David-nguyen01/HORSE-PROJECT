@@ -106,6 +106,15 @@ public class RaceEventService {
                 Integer.class, horseId);
         if (pending != null && pending > 0)
             throw new BusinessException("Ngựa đã đăng ký một giải đua chưa hoàn thành");
+        LocalDate monthStart = event.raceDate().withDayOfMonth(1);
+        Integer monthlyRegistrations = jdbc.queryForObject("select count(*) from module_records m join race_events e "
+                + "on cast(e.id as varchar(36))=JSON_VALUE(m.data_json,'$.raceEventId') "
+                + "where m.module_code='RACING' and m.record_type='RACE_REGISTRATION' and m.horse_id=? "
+                + "and m.status in ('SUBMITTED','APPROVE','CONFIRMED') "
+                + "and e.race_date>=? and e.race_date<?",
+                Integer.class, horseId, monthStart, monthStart.plusMonths(1));
+        if (monthlyRegistrations != null && monthlyRegistrations >= 2)
+            throw new BusinessException("Mỗi ngựa chỉ được đăng ký tối đa 2 giải đua khác nhau trong một tháng");
         validateAge(event, horseId);
         RaceReadinessResponse readiness = measurement.readiness(horseId, eventId, actor, true);
         if (!readiness.ready()) throw new BusinessException("Ngựa chưa sẵn sàng dự đua: " + String.join("; ", readiness.failedRules()));
@@ -118,6 +127,13 @@ public class RaceEventService {
         jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,event_date,data_json) "
                         + "values(?,'RACING','RACE_REGISTRATION','api',?,?,'SUBMITTED',?,?)",
                 id, horseId, actor, event.raceDate(), toJson(data));
+        jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,"
+                        + "related_entity_type,related_entity_id,deduplication_key) "
+                        + "select newid(),ho.owner_id,'RACE_REGISTRATION','NORMAL',N'Yêu cầu đăng ký đua',"
+                        + "N'Huấn luyện viên đã gửi đăng ký đua cho ngựa của bạn. Vui lòng duyệt hoặc từ chối.',"
+                        + "'RACE_REGISTRATION',?,concat('race-registration:',cast(? as varchar(36)),':',cast(ho.owner_id as varchar(36))) "
+                        + "from horse_ownerships ho where ho.horse_id=?",
+                id, id, horseId);
         return registration(id);
     }
 
@@ -171,8 +187,9 @@ public class RaceEventService {
         if (normalizedReason != null && normalizedReason.length() > 500) throw new BusinessException("Lý do tối đa 500 ký tự");
 
         jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
-        jdbc.update("update module_records set status=?,data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.decisionReason',?),'$.decidedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='SUBMITTED'",
-                approve ? "APPROVE" : "REJECT", normalizedReason, OffsetDateTime.now().toString(), registrationId);
+        jdbc.update("update module_records set status=?,data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.decisionReason',?),'$.decidedAt',?),'$.confirmedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='SUBMITTED'",
+                approve ? "CONFIRMED" : "REJECT", normalizedReason, OffsetDateTime.now().toString(),
+                approve ? OffsetDateTime.now().toString() : null, registrationId);
         return registration(registrationId);
     }
 
@@ -222,10 +239,8 @@ public class RaceEventService {
         if (status != null && !status.isBlank()) { sql.append(" and m.status=?"); args.add(status.trim().toUpperCase(Locale.ROOT)); }
         if (ownerId != null) { sql.append(" and exists (select 1 from horse_ownerships ho where ho.horse_id=m.horse_id and ho.owner_id=?)"); args.add(ownerId); }
         if (trainerId != null) {
-            sql.append(" and h.current_trainer_id=? and h.archived_at is null and h.intake_status='STABLED'");
-            sql.append(" and (h.service_override=1 or (h.payment_status='PAID' "
-                    + "and (h.paid_until is null or h.paid_until>=cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date))))");
-            args.add(trainerId);
+            sql.append(" and (m.user_id=? or (h.current_trainer_id=? and h.archived_at is null))");
+            args.add(trainerId); args.add(trainerId);
         }
         sql.append(" order by m.created_at desc");
         return jdbc.query(sql.toString(), (rs,row)->registration(rs,row), args.toArray());

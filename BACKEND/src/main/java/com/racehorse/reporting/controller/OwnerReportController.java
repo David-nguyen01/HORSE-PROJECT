@@ -28,6 +28,14 @@ public class OwnerReportController {
         return service.getOwners();
     }
 
+    @GetMapping("/my-expenses")
+    @PreAuthorize("hasRole('HORSE_OWNER')")
+    OwnerReportService.ExpenseOverview myExpenses(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate to) {
+        return service.myExpenses(user(jwt), from, to);
+    }
+
     @GetMapping
     List<OwnerReportService.ReportSummary> list(@AuthenticationPrincipal Jwt jwt,Authentication auth,
             @RequestParam(required=false) @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate from,

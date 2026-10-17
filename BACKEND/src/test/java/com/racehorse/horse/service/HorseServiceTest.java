@@ -390,6 +390,25 @@ class HorseServiceTest {
         verify(ownershipRepository).saveAll(any());
     }
 
+    @Test
+    void currentTrainerCanViewAssignedHorseBeforeStallAssignment() {
+        UUID horseId = UUID.randomUUID();
+        UUID trainerId = UUID.randomUUID();
+        Horse horse = horseEntity("H-PENDING-STALL");
+        UserAccount trainer = new UserAccount("trainer", "trainer@example.com", "encoded", Set.of(Role.HEAD_TRAINER));
+        ReflectionTestUtils.setField(horse, "id", horseId);
+        ReflectionTestUtils.setField(trainer, "id", trainerId);
+        ReflectionTestUtils.setField(horse, "currentTrainer", trainer);
+        horse.setIntakeStatus("PENDING_STALL");
+        horse.setPaymentStatus("PAID");
+        when(horseRepository.findDetailById(horseId)).thenReturn(Optional.of(horse));
+        when(ownershipRepository.findByHorseIdOrderByOwnerUsernameAsc(horseId)).thenReturn(List.of());
+
+        assertThat(horseService.getByIdForUser(horseId, trainerId, Role.HEAD_TRAINER).id()).isEqualTo(horseId);
+        assertThatThrownBy(() -> horseService.getByIdForUser(horseId, UUID.randomUUID(), Role.HEAD_TRAINER))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     private CreateHorseRequest request(String code, HorseStatus status) {
         return new CreateHorseRequest(
                 code,

@@ -245,14 +245,14 @@ class TrainingScheduleServiceTest {
         var created = service.create(actorId, request(), false, true).getFirst();
 
         assertThat(created.trainingDate()).isEqualTo(TRAINING_DATE);
-        assertThat(created.operatingWindowStart()).isEqualTo(LocalTime.of(6, 0));
-        assertThat(created.operatingWindowEnd()).isEqualTo(LocalTime.of(7, 0));
-        assertThat(created.scheduledEnd()).isEqualTo(created.scheduledStart().plusSeconds(3600));
+        assertThat(created.operatingWindowStart()).isEqualTo(LocalTime.of(5, 0));
+        assertThat(created.operatingWindowEnd()).isEqualTo(LocalTime.of(11, 0));
+        assertThat(created.scheduledEnd()).isEqualTo(created.scheduledStart().plusSeconds(6 * 3600));
         verify(bookingRepository).saveAndFlush(any(TrialRunBooking.class));
     }
 
     @Test
-    void lastHourlySlotEndsAtMidnightNextDay() {
+    void defaultWindowEndsAtElevenOnTrainingDay() {
         prepareCreate(false);
         when(userRepository.findById(actorId)).thenReturn(Optional.of(trainer));
         when(repository.saveAndFlush(any(TrainingSchedule.class))).thenAnswer(invocation -> {
@@ -262,26 +262,12 @@ class TrainingScheduleServiceTest {
         });
         when(bookingRepository.saveAndFlush(any(TrialRunBooking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        var created = service.create(actorId,
-                new CreateTrainingScheduleRequest(phaseId, trackId, laneId, "Late run", TRAINING_DATE, LocalTime.of(23, 0)),
-                false, true).getFirst();
+        var created = service.create(actorId, request(), false, true).getFirst();
 
         assertThat(created.scheduledStart().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalTime())
-                .isEqualTo(LocalTime.of(23, 0));
+                .isEqualTo(LocalTime.of(5, 0));
         assertThat(created.scheduledEnd().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate())
-                .isEqualTo(TRAINING_DATE.plusDays(1));
-    }
-
-    @Test
-    void rejectsSlotOutsideOpeningHours() {
-        when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
-        when(horseAccessService.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
-        when(laneRepository.findDetailByIdForUpdate(laneId)).thenReturn(Optional.of(lane));
-        assertThatThrownBy(() -> service.create(actorId,
-                new CreateTrainingScheduleRequest(phaseId, trackId, laneId, "Early run", TRAINING_DATE, LocalTime.of(5, 0)),
-                false, true))
-                .isInstanceOf(com.racehorse.common.exception.InvalidInputException.class)
-                .hasMessageContaining("06:00");
+                .isEqualTo(TRAINING_DATE);
     }
 
     @Test
@@ -298,7 +284,7 @@ class TrainingScheduleServiceTest {
         when(bookingRepository.findByTrainingScheduleId(scheduleId)).thenReturn(Optional.of(booking));
 
         var result = service.update(scheduleId, actorId,
-                new UpdateTrainingScheduleRequest("Updated run", newDate, trackId, laneId, LocalTime.of(6, 0)), false, true);
+                new UpdateTrainingScheduleRequest("Updated run", newDate, trackId, laneId), false, true);
 
         assertThat(result.taskName()).isEqualTo("Updated run");
         assertThat(result.trainingDate()).isEqualTo(newDate);
@@ -319,7 +305,7 @@ class TrainingScheduleServiceTest {
         when(bookingRepository.findByTrainingScheduleIdForUpdate(scheduleId)).thenReturn(Optional.of(booking));
 
         service.update(scheduleId, actorId,
-                new UpdateTrainingScheduleRequest("Updated run", TRAINING_DATE, trackId, laneId, LocalTime.of(6, 0)), false, true);
+                new UpdateTrainingScheduleRequest("Updated run", TRAINING_DATE, trackId, laneId), false, true);
         assertThat(current.getTaskName()).isEqualTo("Updated run");
         assertThat(current.getSessionStatus()).isEqualTo("READY");
     }
@@ -387,7 +373,7 @@ class TrainingScheduleServiceTest {
     }
 
     private CreateTrainingScheduleRequest request() {
-        return new CreateTrainingScheduleRequest(phaseId, trackId, laneId, "Trial run", TRAINING_DATE, LocalTime.of(6, 0));
+        return new CreateTrainingScheduleRequest(phaseId, trackId, laneId, "Trial run", TRAINING_DATE);
     }
 
     private TrainingSchedule schedule() {
