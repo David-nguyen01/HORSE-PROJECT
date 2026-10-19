@@ -435,3 +435,6 @@ FodyWeavers.xsd
 /.idea/
 /.vscode/
 Main_Update_Assessment_And_Plan.md
+phan1_vet_code_review.md
+PROJECT_ISSUES_REPORT.md
+phan2_vet_implementation_report.md

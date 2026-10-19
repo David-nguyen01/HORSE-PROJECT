@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -87,6 +88,15 @@ public class MedicalExaminationService {
         data.put("medicationNotes", trimToNull(req.medicationNotes()));
         data.put("followUpDate", req.followUpDate() != null ? req.followUpDate().toString() : null);
         data.put("healthStatusAfter", healthStatusAfter);
+        if (req.heartRateBpm() != null) data.put("heartRateBpm", req.heartRateBpm());
+        if (req.bodyLengthCm() != null) data.put("bodyLengthCm", req.bodyLengthCm());
+        if (req.temperatureCelsius() != null) data.put("temperatureCelsius", req.temperatureCelsius());
+        if (req.heightCm() != null) data.put("heightCm", req.heightCm());
+        if (req.weightKg() != null) {
+            data.put("weightKg", req.weightKg());
+            jdbc.update("update horses set weight_kg=?, weight_record_id=?, weight_measured_at=SYSDATETIMEOFFSET(), weight_measured_by_user_id=?, weight_notes=?, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?",
+                    req.weightKg(), examId, veterinarianId, "Ghi nhận lúc khám lâm sàng: " + req.diagnosis().trim(), horseId);
+        }
 
         jdbc.update("""
                 insert into module_records(
@@ -191,7 +201,12 @@ public class MedicalExaminationService {
                 req.followUpDate(),
                 healthStatusAfter,
                 createdAt,
-                0);
+                0,
+                req.heartRateBpm(),
+                req.bodyLengthCm(),
+                req.temperatureCelsius(),
+                req.heightCm(),
+                req.weightKg());
     }
 
     @Transactional
@@ -297,10 +312,17 @@ public class MedicalExaminationService {
                 }
             }
 
+            Integer heartRateBpm = node.hasNonNull("heartRateBpm") ? node.path("heartRateBpm").asInt() : null;
+            Integer bodyLengthCm = node.hasNonNull("bodyLengthCm") ? node.path("bodyLengthCm").asInt() : null;
+            BigDecimal temperatureCelsius = node.hasNonNull("temperatureCelsius") ? new BigDecimal(node.path("temperatureCelsius").asText()) : null;
+            Integer heightCm = node.hasNonNull("heightCm") ? node.path("heightCm").asInt() : null;
+            BigDecimal weightKg = node.hasNonNull("weightKg") ? new BigDecimal(node.path("weightKg").asText()) : null;
+
             return new MedicalExaminationDetailResponse(
                     id, horseId, horseCode, horseName, vetId, vetName,
                     examDate, symptoms, diagnosis, treatment, medication,
-                    followUpDate, healthStatusAfter, createdAt, List.of(), scheduleIds);
+                    followUpDate, healthStatusAfter, createdAt, List.of(), scheduleIds,
+                    heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg);
         }, examId);
 
         if (rows.isEmpty()) {
@@ -336,7 +358,9 @@ public class MedicalExaminationService {
                 exam.examinationDate(), exam.symptoms(), exam.diagnosis(),
                 exam.treatmentProtocol(), exam.medicationNotes(),
                 exam.followUpDate(), exam.healthStatusAfter(),
-                exam.createdAt(), addenda, exam.preventiveScheduleIds());
+                exam.createdAt(), addenda, exam.preventiveScheduleIds(),
+                exam.heartRateBpm(), exam.bodyLengthCm(), exam.temperatureCelsius(),
+                exam.heightCm(), exam.weightKg());
     }
 
     @Transactional(readOnly = true)
@@ -372,11 +396,17 @@ public class MedicalExaminationService {
             String followUpStr = node.path("followUpDate").isNull() ? null : node.path("followUpDate").asText(null);
             LocalDate followUpDate = followUpStr != null && !followUpStr.isBlank() ? LocalDate.parse(followUpStr) : null;
             String healthStatusAfter = node.path("healthStatusAfter").isNull() ? null : node.path("healthStatusAfter").asText(null);
+            Integer heartRateBpm = node.hasNonNull("heartRateBpm") ? node.path("heartRateBpm").asInt() : null;
+            Integer bodyLengthCm = node.hasNonNull("bodyLengthCm") ? node.path("bodyLengthCm").asInt() : null;
+            BigDecimal temperatureCelsius = node.hasNonNull("temperatureCelsius") ? new BigDecimal(node.path("temperatureCelsius").asText()) : null;
+            Integer heightCm = node.hasNonNull("heightCm") ? node.path("heightCm").asInt() : null;
+            BigDecimal weightKg = node.hasNonNull("weightKg") ? new BigDecimal(node.path("weightKg").asText()) : null;
 
             return new MedicalExaminationResponse(
                     id, horseId, vetId, vetName,
                     examDate, symptoms, diagnosis, treatment, medication,
-                    followUpDate, healthStatusAfter, createdAt, addendaCount);
+                    followUpDate, healthStatusAfter, createdAt, addendaCount,
+                    heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg);
         }, horseId);
     }
 

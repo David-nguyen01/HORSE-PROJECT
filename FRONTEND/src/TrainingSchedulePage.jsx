@@ -1230,7 +1230,20 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
           {error && <div className="notice error full"><X size={17} />{error}</div>}
           {loading && <div className="notice full">Đang tải bài đánh giá…</div>}
 
-          <label className="field"><span>Khung giờ buổi tập</span><input readOnly value={slotLabel(schedule)} /></label>
+          <label className="field">
+            <span>Ngày buổi tập (tự động khóa theo lịch) *</span>
+            <input
+              type="text"
+              readOnly
+              value={schedule.trainingDate || ''}
+              style={{ background: '#f5f7f3', fontWeight: 700, color: '#1b4b3a', cursor: 'not-allowed' }}
+            />
+            <small style={{ color: '#276e4c', fontWeight: 600 }}>✓ Ngày đánh giá tự động khớp với ngày buổi tập ({schedule.trainingDate}).</small>
+          </label>
+          <label className="field">
+            <span>Khung giờ buổi tập</span>
+            <input readOnly value={slotLabel(schedule)} style={{ background: '#f5f7f3', color: '#466057', cursor: 'not-allowed' }} />
+          </label>
           <label className="field"><span>Thời lượng vận động thực tế (phút) *</span><input type="number" min="1" required value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} /><small>Thời lượng vận động thực tế của ngựa trong buổi tập.</small></label>
           <label className="field"><span>Quãng đường (m) *</span><input type="number" step="0.01" min="0.01" required value={form.distanceMeters} onChange={e => setForm({...form, distanceMeters: e.target.value})} /></label>
           <label className="field"><span>Thời gian hoàn thành đường chạy (giây) *</span><input type="number" step="0.001" min="0.001" required value={form.trackCompletionSeconds} onChange={e => setForm({...form, trackCompletionSeconds: e.target.value})} /></label>

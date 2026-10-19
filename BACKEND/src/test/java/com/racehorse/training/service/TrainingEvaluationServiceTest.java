@@ -38,9 +38,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.racehorse.horse.repository.HorseOwnershipRepository;
+import com.racehorse.notification.service.NotificationService;
+import com.racehorse.training.dto.CreateVetAssessmentRequest;
+import com.racehorse.training.dto.VetAssessmentResponse;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,12 +57,15 @@ class TrainingEvaluationServiceTest {
     @Mock UserAccountRepository userRepository;
     @Mock HorseAccessService horseAccess;
     @Mock TrainingScheduleRepository schedules;
+    @Mock JdbcTemplate jdbc;
+    @Mock HorseOwnershipRepository ownershipRepository;
+    @Mock NotificationService notificationService;
     private final Instant now = Instant.parse("2026-09-10T02:00:00Z");
     private TrainingEvaluationService service;
 
     @BeforeEach void setUp() {
         service = new TrainingEvaluationService(repository, userRepository, horseAccess, schedules,
-                Clock.fixed(now, ZoneOffset.UTC));
+                Clock.fixed(now, ZoneOffset.UTC), jdbc, ownershipRepository, notificationService);
     }
 
     @Test void computesEvaluationAndLeavesCompletedSessionTimestampUnchanged() {
@@ -189,5 +200,112 @@ class TrainingEvaluationServiceTest {
                 Instant.parse("2026-09-09T01:00:00Z"), Instant.parse("2026-09-09T02:00:00Z"), trainer());
         if (ready) { schedule.markReady(UUID.randomUUID(), now); schedule.startTraining(now); }
         return schedule;
+    }
+
+    @Test void saveVetAssessmentSuccessfullyPersistsAndNotifiesHeadTrainers() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        Horse horse = horse(horseId);
+        TrainingSchedule session = schedule(horse, true);
+        org.springframework.test.util.ReflectionTestUtils.setField(session, "id", scheduleId);
+
+        UserAccount vet = new UserAccount("dr_vet", "vet@test.local", "pw", Set.of(Role.VETERINARIAN));
+        UserAccount headTrainer = trainer();
+
+        when(schedules.findDetailById(scheduleId)).thenReturn(Optional.of(session));
+        when(userRepository.findById(vetId)).thenReturn(Optional.of(vet));
+        when(userRepository.findByRoles(List.of(Role.HEAD_TRAINER))).thenReturn(List.of(headTrainer));
+
+        CreateVetAssessmentRequest req = new CreateVetAssessmentRequest(
+                "GOOD", 55, "NORMAL", "NORMAL", "EXCELLENT",
+                "Horse recovered well with no sign of muscle stiffness.",
+                "Maintain current intensity", false);
+
+        VetAssessmentResponse response = service.saveVetAssessment(scheduleId, vetId, req);
+
+        assertThat(response).isNotNull();
+        assertThat(response.scheduleId()).isEqualTo(scheduleId);
+        assertThat(response.horseId()).isEqualTo(horseId);
+        assertThat(response.horseCode()).isEqualTo("H-001");
+        assertThat(response.horseName()).isEqualTo("Lightning");
+        assertThat(response.veterinarianId()).isEqualTo(vetId);
+        assertThat(response.veterinarianName()).isEqualTo("dr_vet");
+        assertThat(response.overallCondition()).isEqualTo("GOOD");
+        assertThat(response.heartRateRecoveryBpm()).isEqualTo(55);
+        assertThat(response.clinicalConclusion()).isEqualTo("Horse recovered well with no sign of muscle stiffness.");
+        assertThat(response.requiresMedicalIntervention()).isFalse();
+
+        org.mockito.Mockito.verify(jdbc).update(org.mockito.ArgumentMatchers.contains("insert into module_records"),
+                any(UUID.class), eq(horseId), eq(vetId), any(LocalDate.class), anyString());
+        org.mockito.Mockito.verify(notificationService).create(
+                eq(headTrainer), eq("VET_ASSESSMENT_COMPLETED"), any(), anyString(), anyString(), eq("TRAINING_SCHEDULE"), eq(scheduleId));
+    }
+
+    @Test void saveVetAssessmentThrowsWhenScheduleNotFound() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        when(schedules.findDetailById(scheduleId)).thenReturn(Optional.empty());
+
+        CreateVetAssessmentRequest req = new CreateVetAssessmentRequest(
+                "GOOD", 55, "NORMAL", "NORMAL", "EXCELLENT", "Conclusion", null, false);
+
+        assertThatThrownBy(() -> service.saveVetAssessment(scheduleId, vetId, req))
+                .isInstanceOf(com.racehorse.common.exception.ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy lịch huấn luyện");
+    }
+
+    @Test void getVetAssessmentReturnsAssessmentFromModuleRecords() {
+        UUID scheduleId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        UUID recordId = UUID.randomUUID();
+
+        String dataJson = """
+                {
+                  "scheduleId": "%s",
+                  "overallCondition": "GOOD",
+                  "heartRateRecoveryBpm": 52,
+                  "respiratoryStatus": "NORMAL",
+                  "gaitStatus": "NORMAL",
+                  "muscleCondition": "EXCELLENT",
+                  "clinicalConclusion": "Excellent condition",
+                  "recommendation": "Ready for high speed drill",
+                  "requiresMedicalIntervention": false,
+                  "veterinarianId": "%s",
+                  "veterinarianName": "dr_vet"
+                }
+                """.formatted(scheduleId, vetId);
+
+        java.util.Map<String, Object> row = new java.util.HashMap<>();
+        row.put("id", recordId);
+        row.put("horse_id", horseId);
+        row.put("horse_code", "H-001");
+        row.put("horse_name", "Lightning");
+        row.put("user_id", vetId);
+        row.put("vet_name", "dr_vet");
+        row.put("data_json", dataJson);
+        row.put("created_at", java.time.OffsetDateTime.now(ZoneOffset.UTC));
+
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("VET_TRAINING_ASSESSMENT"), eq(scheduleId.toString())))
+                .thenReturn(List.of(row));
+
+        VetAssessmentResponse response = service.getVetAssessment(scheduleId);
+
+        assertThat(response).isNotNull();
+        assertThat(response.id()).isEqualTo(recordId);
+        assertThat(response.scheduleId()).isEqualTo(scheduleId);
+        assertThat(response.horseId()).isEqualTo(horseId);
+        assertThat(response.heartRateRecoveryBpm()).isEqualTo(52);
+        assertThat(response.clinicalConclusion()).isEqualTo("Excellent condition");
+        assertThat(response.recommendation()).isEqualTo("Ready for high speed drill");
+    }
+
+    @Test void getVetAssessmentReturnsNullWhenNotFound() {
+        UUID scheduleId = UUID.randomUUID();
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("VET_TRAINING_ASSESSMENT"), eq(scheduleId.toString())))
+                .thenReturn(List.of());
+
+        assertThat(service.getVetAssessment(scheduleId)).isNull();
     }
 }

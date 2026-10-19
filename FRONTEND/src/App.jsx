@@ -138,9 +138,7 @@ function AppLayout() {
     { to: '/vet', label: 'Bảng điều khiển y tế', icon: HeartPulse },
     { to: '/vet/health-map', label: 'Bản đồ chuồng & Thể trạng', icon: Home },
     { to: '/vet/medical-records', label: 'Hồ sơ bệnh án & Chấn thương', icon: FileText },
-    { to: '/vet/nutrition', label: 'Đề xuất khẩu phần ăn', icon: Utensils },
     { to: '/vet/training', label: 'Theo dõi & Đánh giá buổi tập', icon: Activity },
-    { to: '/vet/horses', label: 'Hồ sơ ngựa', icon: Award },
   ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/wallet', label: 'Ví & gói dịch vụ', image: walletIcon }] : []),
@@ -219,6 +217,7 @@ function NotificationBell() {
     try {
       let target = null
       const isStaffUser = hasAny(user, 'STABLE_STAFF')
+      const isVetUser = hasAny(user, 'VETERINARIAN')
       const canOpenTraining = hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER')
       const id = encodeURIComponent(item.relatedEntityId || '')
 
@@ -237,6 +236,20 @@ function NotificationBell() {
           target = '/stable-care/inventory'
         } else {
           target = '/stable-care/tasks'
+        }
+      } else if (isVetUser) {
+        if (item.notificationType === 'HORSE_WAITING_FOR_VET') {
+          target = '/vet'
+        } else if (item.relatedEntityType === 'INCIDENT_REPORT') {
+          target = id ? `/vet/injuries?incidentId=${id}` : '/vet/injuries'
+        } else if (item.relatedEntityType === 'PREVENTIVE_CARE' || item.notificationType === 'PREVENTIVE_CARE_SCHEDULED') {
+          target = id ? `/vet/medical-records?horseId=${id}` : '/vet/medical-records'
+        } else if (item.relatedEntityType === 'TRAINING_EVALUATION' || item.relatedEntityType === 'TRAINING_SESSION') {
+          target = '/vet/training'
+        } else if (item.relatedEntityType === 'HORSE') {
+          target = id ? `/vet/medical-records?horseId=${id}` : '/vet'
+        } else {
+          target = '/vet'
         }
       } else {
         if (item.relatedEntityType === 'HORSE' && item.relatedEntityId) target = '/horses/' + id
@@ -483,8 +496,19 @@ function HorseDetail() {
   }, [id, isOwner])
   const load = useCallback(async () => {
     try {
-      const [h, p, r, e] = await Promise.all([api(`/api/horses/${id}`), api(`/api/horses/${id}/pedigree`), api(`/api/horses/${id}/race-results`), api(`/api/horses/${id}/training-evaluations?size=20`)])
-      setHorse(h); setPedigree(p); setHistory(r); setEvaluations(pageContent(e))
+      const [hRes, pRes, rRes, eRes] = await Promise.allSettled([
+        api(`/api/horses/${id}`),
+        api(`/api/horses/${id}/pedigree`),
+        api(`/api/horses/${id}/race-results`),
+        api(`/api/horses/${id}/training-evaluations?size=20`)
+      ])
+      if (hRes.status !== 'fulfilled') {
+        throw new Error(hRes.reason?.message || 'Không thể tải thông tin ngựa')
+      }
+      setHorse(hRes.value)
+      setPedigree(pRes.status === 'fulfilled' ? pRes.value : null)
+      setHistory(rRes.status === 'fulfilled' ? rRes.value : null)
+      setEvaluations(eRes.status === 'fulfilled' ? pageContent(eRes.value) : [])
       const [health, readiness] = await Promise.allSettled([
         api(`/api/horses/${id}/health-status`),
         api(`/api/horses/${id}/race-readiness`),

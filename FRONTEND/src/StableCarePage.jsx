@@ -94,6 +94,22 @@ const formatVNDate = (val) => {
   }
 }
 
+const cleanStableName = (stable) => {
+  if (!stable) return 'Chuồng'
+  const raw = typeof stable === 'string' ? stable : (stable.name || '')
+  const trimmed = raw.trim()
+  if (!trimmed) return 'Chuồng'
+  const withoutPrefix = trimmed.replace(/^(chuồng\s*)+/i, '').trim()
+  return withoutPrefix ? `Chuồng ${withoutPrefix}` : 'Chuồng'
+}
+
+const cleanStableLocation = (loc) => {
+  if (!loc) return 'Chưa thiết lập vị trí'
+  let clean = loc.trim()
+  clean = clean.replace(/^(Khu\s*)+/i, 'Khu ')
+  return clean
+}
+
 const formatVNDateTime = (val) => {
   if (!val) return '—'
   try {
@@ -461,7 +477,7 @@ function StablesView({ canEditRoutine, isStaff }) {
               setRoutines([])
             }}
           >
-            Chuồng {s.name?.toUpperCase()} ({s.stalls?.length || 0} ô)
+            {cleanStableName(s).toUpperCase()} ({s.stalls?.length || 0} ô)
           </button>
         ))}
       </div>
@@ -471,10 +487,10 @@ function StablesView({ canEditRoutine, isStaff }) {
         <section className="card" style={{ padding: '20px' }}>
           <div className="card-head" style={{ padding: '0 0 16px' }}>
             <div>
-              <h3>Sơ đồ ô chuồng — Chuồng {activeStable?.name?.toUpperCase()}</h3>
+              <h3>Sơ đồ ô chuồng — {cleanStableName(activeStable).toUpperCase()}</h3>
               <small className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
                 <MapPin size={13} style={{ color: '#27704e' }} />
-                <span>Vị trí: <b>{activeStable?.location ? `Khu ${activeStable.location}` : 'Chưa thiết lập vị trí'}</b></span>
+                <span>Vị trí: <b>{cleanStableLocation(activeStable?.location)}</b></span>
               </small>
             </div>
             <span className="record-count">{allStalls.length} ô chuồng</span>
@@ -1020,7 +1036,7 @@ function HorseIntakeModal({ stables, onClose, onAssigned }) {
                           const isFull = occ >= 4
                           return (
                             <option key={s.id} value={s.id} disabled={isFull}>
-                              Chuồng {s.name?.toUpperCase()} ({occ}/4 ô có ngựa) {isFull ? '— ĐÃ ĐẦY' : ''}
+                              {cleanStableName(s).toUpperCase()} ({occ}/4 ô có ngựa) {isFull ? '— ĐÃ ĐẦY' : ''}
                             </option>
                           )
                         })}
@@ -1230,7 +1246,7 @@ function TransferStallModal({ horse, currentStable, stables, onClose, onTransfer
             </div>
             <div>
               <span className="muted" style={{ display: 'block', fontSize: '10px' }}>Ô CHUỒNG HIỆN TẠI</span>
-              <b>Chuồng {currentStable?.name?.toUpperCase()} / Ô {horse.stallCode}</b>
+              <b>{cleanStableName(currentStable).toUpperCase()} / Ô {horse.stallCode}</b>
             </div>
             <div>
               <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỂ TRẠNG HIỆN TẠI</span>
@@ -1260,7 +1276,7 @@ function TransferStallModal({ horse, currentStable, stables, onClose, onTransfer
                   const isFull = occ >= 4
                   return (
                     <option key={s.id} value={s.id} disabled={isFull}>
-                      Chuồng {s.name?.toUpperCase()} ({occ}/4 ô có ngựa) {isFull ? '— ĐÃ ĐẦY' : ''}
+                      {cleanStableName(s).toUpperCase()} ({occ}/4 ô có ngựa) {isFull ? '— ĐÃ ĐẦY' : ''}
                     </option>
                   )
                 })}
@@ -1418,7 +1434,7 @@ function AssignSingleStallModal({ stall, stable, onClose, onAssigned }) {
         <div className="modal-head">
           <div>
             <p className="eyebrow">XẾP NGỰA VÀO Ô CHUỒNG</p>
-            <h2>Phân bổ ngựa vào Ô {stall.code} (Chuồng {stable?.name?.toUpperCase()})</h2>
+            <h2>Phân bổ ngựa vào Ô {stall.code} ({cleanStableName(stable).toUpperCase()})</h2>
           </div>
           <button className="icon-button" onClick={onClose}><X /></button>
         </div>

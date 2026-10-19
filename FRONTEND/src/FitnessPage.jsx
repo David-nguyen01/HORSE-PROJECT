@@ -80,17 +80,249 @@ function ChartTooltip({ active, payload }) {
 }
 
 function EvaluationModal({ horses, initialHorseId, onClose, onSaved }) {
-  const [form, setForm] = useState({ horseId: initialHorseId || horses[0]?.horseId || '', sessionDate: today(), durationMinutes: '', distanceMeters: '', averageSpeedKmh: '', heartRateRecoveryBpm: '', fitnessStatus: 'GREEN', trainerNotes: '', videoUrl: '' })
-  const [busy, setBusy] = useState(false); const [error, setError] = useState('')
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
-  const submit = async (event) => {
-    event.preventDefault(); setBusy(true); setError('')
-    try {
-      await api('/api/training-evaluations', { method: 'POST', body: JSON.stringify({ ...form, durationMinutes: Number(form.durationMinutes), distanceMeters: Number(form.distanceMeters), averageSpeedKmh: Number(form.averageSpeedKmh), heartRateRecoveryBpm: Number(form.heartRateRecoveryBpm), videoUrl: form.videoUrl || null }) })
-      onSaved()
-    } catch (err) { setError(err.message) } finally { setBusy(false) }
+  const [form, setForm] = useState({
+    horseId: initialHorseId || horses[0]?.horseId || '',
+    trainingScheduleId: '',
+    sessionDate: '',
+    durationMinutes: '45',
+    distanceMeters: '',
+    trackCompletionSeconds: '',
+    maxSpeedKmh: '',
+    stopBpm: '',
+    oneMinuteBpm: '',
+    injured: 'false',
+    injuryLocation: '',
+    injuryNotes: '',
+    trainerNotes: '',
+    videoUrl: ''
+  })
+  const [schedules, setSchedules] = useState([])
+  const [loadingSchedules, setLoadingSchedules] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!form.horseId) {
+      setSchedules([])
+      return
+    }
+    let active = true
+    setLoadingSchedules(true)
+    api(`/api/training-schedules?horseId=${encodeURIComponent(form.horseId)}`)
+      .then((data) => {
+        if (!active) return
+        const list = Array.isArray(data) ? data : (data?.content || [])
+        const completed = list.filter((s) => s.status === 'COMPLETED' && !s.evaluation)
+        setSchedules(completed)
+        if (completed.length > 0) {
+          const first = completed[0]
+          setForm((prev) => ({
+            ...prev,
+            trainingScheduleId: first.id,
+            sessionDate: first.trainingDate || ''
+          }))
+        } else {
+          setForm((prev) => ({ ...prev, trainingScheduleId: '', sessionDate: '' }))
+        }
+      })
+      .catch((err) => {
+        if (active) setError(err.message || 'Không thể tải lịch tập của ngựa')
+      })
+      .finally(() => {
+        if (active) setLoadingSchedules(false)
+      })
+    return () => { active = false }
+  }, [form.horseId])
+
+  const onSelectSchedule = (e) => {
+    const selectedId = e.target.value
+    const found = schedules.find((s) => s.id === selectedId)
+    setForm((prev) => ({
+      ...prev,
+      trainingScheduleId: selectedId,
+      sessionDate: found?.trainingDate || ''
+    }))
   }
-  return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={(e) => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">FR07 · ĐÁNH GIÁ BUỔI TẬP</p><h2>Nhập thông số hoàn tất</h2></div><button className="icon-button" onClick={onClose}><X /></button></div><form className="form-grid" onSubmit={submit}>{error && <div className="notice error full"><X size={17} />{error}</div>}<Field label="Ngựa *"><select required value={form.horseId} onChange={set('horseId')}><option value="">Chọn ngựa</option>{horses.map((horse) => <option value={horse.horseId} key={horse.horseId}>{horse.horseCode} · {horse.horseName}</option>)}</select></Field><Field label="Ngày buổi tập *"><input required type="date" max={today()} value={form.sessionDate} onChange={set('sessionDate')} /></Field><Field label="Thời lượng (phút) *"><input required type="number" min="1" value={form.durationMinutes} onChange={set('durationMinutes')} /></Field><Field label="Cự ly đã chạy (mét) *"><input required type="number" min="0.01" step="0.01" value={form.distanceMeters} onChange={set('distanceMeters')} /></Field><Field label="Tốc độ trung bình (km/h) *"><input required type="number" min="0.01" step="0.01" value={form.averageSpeedKmh} onChange={set('averageSpeedKmh')} /></Field><Field label="Hồi phục nhịp tim (BPM) *"><input required type="number" min="0" max="300" value={form.heartRateRecoveryBpm} onChange={set('heartRateRecoveryBpm')} /></Field><Field label="Trạng thái thể lực *"><select value={form.fitnessStatus} onChange={set('fitnessStatus')}>{Object.entries(STATUS_LABELS).map(([key, value]) => <option value={key} key={key}>{value}</option>)}</select></Field><Field label="Liên kết video"><input type="url" value={form.videoUrl} onChange={set('videoUrl')} placeholder="https://…" /></Field><label className="field full"><span>Ghi chú huấn luyện viên *</span><textarea required maxLength="4000" rows="4" value={form.trainerNotes} onChange={set('trainerNotes')} /></label><div className="evaluation-note full"><HeartPulse size={18} /><span>Các thông số được lưu đúng giá trị bạn nhập và không được backend tự tính lại.</span></div><div className="modal-actions full"><button type="button" className="button secondary" onClick={onClose}>Hủy</button><button className="button primary" disabled={busy}><Check size={17} />{busy ? 'Đang lưu…' : 'Hoàn tất đánh giá'}</button></div></form></div></div>
+
+  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value })
+
+  const distance = Number(form.distanceMeters)
+  const trackSeconds = Number(form.trackCompletionSeconds)
+  const average = distance > 0 && trackSeconds > 0 ? (distance / trackSeconds) * 3.6 : 0
+  const maximum = Number(form.maxSpeedKmh)
+  const stopBpm = Number(form.stopBpm)
+  const oneMinuteBpm = Number(form.oneMinuteBpm)
+
+  const submit = async (event) => {
+    event.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      if (!form.trainingScheduleId) {
+        throw new Error('Vui lòng chọn một buổi tập đã hoàn thành để đánh giá.')
+      }
+      if (maximum < average) {
+        throw new Error('Tốc độ tối đa không được nhỏ hơn tốc độ trung bình tính toán (' + average.toFixed(2) + ' km/h).')
+      }
+      if (oneMinuteBpm > stopBpm) {
+        throw new Error('Nhịp tim sau nghỉ 1 phút không được lớn hơn nhịp tim đỉnh.')
+      }
+      await api('/api/training-evaluations', {
+        method: 'POST',
+        body: JSON.stringify({
+          horseId: form.horseId,
+          trainingScheduleId: form.trainingScheduleId,
+          sessionDate: form.sessionDate,
+          durationMinutes: Number(form.durationMinutes),
+          distanceMeters: distance,
+          trackCompletionSeconds: trackSeconds,
+          maxSpeedKmh: maximum,
+          stopBpm,
+          oneMinuteBpm,
+          injured: form.injured === 'true',
+          injuryLocation: form.injuryLocation || null,
+          injuryNotes: form.injuryNotes || null,
+          trainerNotes: form.trainerNotes.trim(),
+          videoUrl: form.videoUrl || null
+        })
+      })
+      onSaved()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ maxWidth: '640px' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">FR07 · ĐÁNH GIÁ BUỔI TẬP</p>
+            <h2>Nhập thông số hoàn tất</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X /></button>
+        </div>
+        <form className="form-grid" onSubmit={submit}>
+          {error && <div className="notice error full"><X size={17} />{error}</div>}
+
+          <Field label="Ngựa *">
+            <select required value={form.horseId} onChange={set('horseId')}>
+              <option value="">Chọn ngựa</option>
+              {horses.map((horse) => (
+                <option value={horse.horseId} key={horse.horseId}>
+                  {horse.horseCode} · {horse.horseName}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Buổi tập đã hoàn thành *">
+            {loadingSchedules ? (
+              <input readOnly value="Đang tải lịch tập…" style={{ background: '#f5f7f3' }} />
+            ) : schedules.length > 0 ? (
+              <select required value={form.trainingScheduleId} onChange={onSelectSchedule}>
+                {schedules.map((s) => (
+                  <option value={s.id} key={s.id}>
+                    {s.taskName} · Ngày {s.trainingDate} ({String(s.operatingWindowStart || '05:00').slice(0, 5)} - {String(s.operatingWindowEnd || '11:00').slice(0, 5)})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div style={{ fontSize: '11px', color: '#a54740', padding: '8px 0' }}>
+                Chưa có buổi tập hoàn thành nào chưa được đánh giá.
+              </div>
+            )}
+          </Field>
+
+          {schedules.length === 0 && !loadingSchedules && (
+            <div className="notice full" style={{ background: '#fdf6e9', color: '#885816', border: '1px solid #fae2b6' }}>
+              Ngựa này hiện chưa có buổi tập nào ở trạng thái HOÀN THÀNH. Theo quy trình FR07, buổi tập phải được thực hiện và kết thúc trong Lịch huấn luyện trước khi tạo đánh giá.
+            </div>
+          )}
+
+          <Field label="Ngày buổi tập (tự động khóa theo lịch) *">
+            <input
+              type="text"
+              readOnly
+              value={form.sessionDate || ''}
+              style={{ background: '#f5f7f3', fontWeight: 700, color: '#1b4b3a', cursor: 'not-allowed' }}
+              placeholder="Chọn buổi tập để khóa ngày"
+            />
+            {form.sessionDate && (
+              <small style={{ color: '#276e4c', fontWeight: 600 }}>
+                ✓ Ngày đánh giá tự động khớp với ngày buổi tập ({form.sessionDate}).
+              </small>
+            )}
+          </Field>
+
+          <Field label="Thời lượng vận động (phút) *">
+            <input required type="number" min="1" value={form.durationMinutes} onChange={set('durationMinutes')} />
+          </Field>
+
+          <Field label="Cự ly chạy (mét) *">
+            <input required type="number" min="0.01" step="0.01" value={form.distanceMeters} onChange={set('distanceMeters')} />
+          </Field>
+
+          <Field label="Thời gian hoàn thành (giây) *">
+            <input required type="number" min="0.001" step="0.001" value={form.trackCompletionSeconds} onChange={set('trackCompletionSeconds')} />
+          </Field>
+
+          <Field label="Tốc độ trung bình tính toán (km/h)">
+            <input readOnly value={average > 0 ? average.toFixed(2) : '-'} style={{ background: '#f5f7f3' }} />
+          </Field>
+
+          <Field label="Tốc độ tối đa (km/h) *">
+            <input required type="number" min="0.01" step="0.01" value={form.maxSpeedKmh} onChange={set('maxSpeedKmh')} />
+          </Field>
+
+          <Field label="Nhịp tim đỉnh (BPM) *">
+            <input required type="number" min="0" max="300" value={form.stopBpm} onChange={set('stopBpm')} />
+          </Field>
+
+          <Field label="Nhịp tim sau nghỉ 1 phút (BPM) *">
+            <input required type="number" min="0" max="300" value={form.oneMinuteBpm} onChange={set('oneMinuteBpm')} />
+          </Field>
+
+          <Field label="Ngựa bị chấn thương?">
+            <select value={form.injured} onChange={set('injured')}>
+              <option value="false">Không</option>
+              <option value="true">Có</option>
+            </select>
+          </Field>
+
+          {form.injured === 'true' && (
+            <>
+              <Field label="Vị trí chấn thương">
+                <input maxLength="200" value={form.injuryLocation} onChange={set('injuryLocation')} />
+              </Field>
+              <label className="field full">
+                <span>Ghi chú chấn thương</span>
+                <textarea maxLength="4000" rows="2" value={form.injuryNotes} onChange={set('injuryNotes')} />
+              </label>
+            </>
+          )}
+
+          <Field label="Liên kết video">
+            <input type="url" value={form.videoUrl} onChange={set('videoUrl')} placeholder="https://…" />
+          </Field>
+
+          <label className="field full">
+            <span>Ghi chú huấn luyện viên *</span>
+            <textarea required maxLength="4000" rows="3" value={form.trainerNotes} onChange={set('trainerNotes')} />
+          </label>
+
+          <div className="modal-actions full">
+            <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+            <button className="button primary" disabled={busy || schedules.length === 0}>
+              <Check size={17} />{busy ? 'Đang lưu…' : 'Hoàn tất đánh giá'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 function Field({ label, children }) { return <label className="field"><span>{label}</span>{children}</label> }

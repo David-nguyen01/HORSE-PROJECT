@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -17,7 +18,12 @@ public record CreateMedicalExaminationRequest(
         LocalDate followUpDate,
         @Size(max = 30) String healthStatusAfter,
         CreatePreventiveCareRequest preventiveCareSchedule,
-        List<CreatePreventiveCareRequest> preventiveSchedules
+        List<CreatePreventiveCareRequest> preventiveSchedules,
+        Integer heartRateBpm,
+        Integer bodyLengthCm,
+        BigDecimal temperatureCelsius,
+        Integer heightCm,
+        BigDecimal weightKg
 ) {
     public CreateMedicalExaminationRequest(
             LocalDate examinationDate,
@@ -28,7 +34,7 @@ public record CreateMedicalExaminationRequest(
             LocalDate followUpDate,
             String healthStatusAfter
     ) {
-        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, null, null);
+        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, null, null, null, null, null, null, null);
     }
 
     public CreateMedicalExaminationRequest(
@@ -41,6 +47,21 @@ public record CreateMedicalExaminationRequest(
             String healthStatusAfter,
             CreatePreventiveCareRequest preventiveCareSchedule
     ) {
-        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, preventiveCareSchedule, null);
+        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, preventiveCareSchedule, null, null, null, null, null, null);
+    }
+
+    public CreateMedicalExaminationRequest(
+            LocalDate examinationDate,
+            String symptoms,
+            String diagnosis,
+            String treatmentProtocol,
+            String medicationNotes,
+            LocalDate followUpDate,
+            String healthStatusAfter,
+            CreatePreventiveCareRequest preventiveCareSchedule,
+            List<CreatePreventiveCareRequest> preventiveSchedules
+    ) {
+        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, preventiveCareSchedule, preventiveSchedules, null, null, null, null, null);
     }
 }
+

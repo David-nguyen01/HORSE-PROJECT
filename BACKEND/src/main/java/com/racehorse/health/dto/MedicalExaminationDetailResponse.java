@@ -1,5 +1,6 @@
 package com.racehorse.health.dto;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -21,8 +22,37 @@ public record MedicalExaminationDetailResponse(
         String healthStatusAfter,
         OffsetDateTime createdAt,
         List<AddendumView> addenda,
-        List<UUID> preventiveScheduleIds
+        List<UUID> preventiveScheduleIds,
+        Integer heartRateBpm,
+        Integer bodyLengthCm,
+        BigDecimal temperatureCelsius,
+        Integer heightCm,
+        BigDecimal weightKg
 ) {
+    public MedicalExaminationDetailResponse(
+            UUID id,
+            UUID horseId,
+            String horseCode,
+            String horseName,
+            UUID veterinarianId,
+            String veterinarianName,
+            LocalDate examinationDate,
+            String symptoms,
+            String diagnosis,
+            String treatmentProtocol,
+            String medicationNotes,
+            LocalDate followUpDate,
+            String healthStatusAfter,
+            OffsetDateTime createdAt,
+            List<AddendumView> addenda,
+            List<UUID> preventiveScheduleIds
+    ) {
+        this(id, horseId, horseCode, horseName, veterinarianId, veterinarianName,
+                examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes,
+                followUpDate, healthStatusAfter, createdAt, addenda, preventiveScheduleIds,
+                null, null, null, null, null);
+    }
+
     public MedicalExaminationDetailResponse(
             UUID id,
             UUID horseId,
@@ -42,7 +72,8 @@ public record MedicalExaminationDetailResponse(
     ) {
         this(id, horseId, horseCode, horseName, veterinarianId, veterinarianName,
                 examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes,
-                followUpDate, healthStatusAfter, createdAt, addenda, List.of());
+                followUpDate, healthStatusAfter, createdAt, addenda, List.of(),
+                null, null, null, null, null);
     }
 
     public record AddendumView(
@@ -54,3 +85,4 @@ public record MedicalExaminationDetailResponse(
             OffsetDateTime createdAt
     ) {}
 }
+

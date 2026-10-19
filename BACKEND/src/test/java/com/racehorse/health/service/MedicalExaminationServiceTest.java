@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -282,5 +283,32 @@ class MedicalExaminationServiceTest {
         verify(horseAccessService).requireActive(horseId);
         verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(addendumId));
         verify(jdbc).update(contains("set health_status = 'FIT'"), eq(actorId), eq(horseId));
+    }
+
+    @Test
+    void createWithBiometricsPersistsAndReturnsAllBiometrics() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Tachypnea", "Mild Heat Stress",
+                "Hydration and shade", "Electrolytes",
+                LocalDate.now().plusDays(2), "MONITOR",
+                null, List.of(),
+                48, 185, new java.math.BigDecimal("38.5"), 162, new java.math.BigDecimal("480.5"));
+
+        when(jdbc.query(contains("select username from users"), any(RowMapper.class), eq(vetId)))
+                .thenReturn(List.of("dr_vet"));
+
+        MedicalExaminationResponse response = service.create(horseId, vetId, req);
+
+        assertThat(response).isNotNull();
+        assertThat(response.heartRateBpm()).isEqualTo(48);
+        assertThat(response.bodyLengthCm()).isEqualTo(185);
+        assertThat(response.temperatureCelsius()).isEqualByComparingTo("38.5");
+        assertThat(response.heightCm()).isEqualTo(162);
+        assertThat(response.weightKg()).isEqualByComparingTo("480.5");
+
+        verify(jdbc).update(contains("update horses set weight_kg=?"),
+                eq(new java.math.BigDecimal("480.5")), any(), eq(vetId), anyString(), eq(horseId));
     }
 }

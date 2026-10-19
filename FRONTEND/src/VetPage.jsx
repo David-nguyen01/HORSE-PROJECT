@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Clock,
   ExternalLink,
+  Eye,
   FilePlus2,
   FileText,
   Filter,
@@ -172,26 +173,19 @@ const isMedicalEligible = (horse) => {
   return ps === 'PAID' || ps === 'IN_MEDICAL' || ps === 'PENDING_TRAINING' || ps === 'TRAINING'
 }
 
-const renderPaymentBadge = () => null
-
 function cleanStableName(stable) {
   if (!stable) return 'Chuồng'
-  const stalls = stable.stalls || []
-  if (stalls.length > 0 && stalls[0].code) {
-    const prefix = stalls[0].code.split('-')[0].trim().toUpperCase()
-    if (['A', 'B', 'C', 'D', 'E'].includes(prefix)) {
-      return `Chuồng ${prefix}`
-    }
-  }
-  const raw = (stable.name || '').trim()
-  if (/^chuồng\s+/i.test(raw)) return raw
-  return `Chuồng ${raw}`
+  const raw = typeof stable === 'string' ? stable : (stable.name || '')
+  const trimmed = raw.trim()
+  if (!trimmed) return 'Chuồng'
+  const withoutPrefix = trimmed.replace(/^(chuồng\s*)+/i, '').trim()
+  return withoutPrefix ? `Chuồng ${withoutPrefix}` : 'Chuồng'
 }
 
 function cleanStableLocation(loc) {
   if (!loc) return 'Chưa thiết lập vị trí'
   let clean = loc.trim()
-  clean = clean.replace(/^(Khu\s+)+/i, 'Khu ')
+  clean = clean.replace(/^(Khu\s*)+/i, 'Khu ')
   return clean
 }
 
@@ -273,13 +267,13 @@ export default function VetPage() {
   return (
     <>
       {activeTab === 'dashboard' && <VetDashboard onNavigate={setTab} />}
-      {activeTab === 'health-map' && <BarnHealthMapView onNavigate={setTab} />}
+      {activeTab === 'health-map' && <BarnHealthMapView onNavigate={setTab} initialHorseId={initialHorseId} />}
       {activeTab === 'medical-records' && <MedicalRecordsView initialHorseId={initialHorseId} />}
       {activeTab === 'injuries' && <MedicalRecordsView initialHorseId={initialHorseId} defaultSubTab="injuries" />}
       {activeTab === 'preventive' && <Navigate to={`/vet/medical-records${initialHorseId ? `?horseId=${initialHorseId}` : ''}`} replace />}
-      {activeTab === 'nutrition' && <NutritionProposalView initialHorseId={initialHorseId} />}
+      {activeTab === 'nutrition' && <Navigate to="/vet" replace />}
       {(activeTab === 'training-assessment' || activeTab === 'training') && <TrainingAssessmentView onNavigate={setTab} />}
-      {activeTab === 'horses' && <HorseProfileView onNavigate={setTab} initialHorseId={initialHorseId} />}
+      {activeTab === 'horses' && <Navigate to={`/vet/health-map${initialHorseId ? `?horseId=${initialHorseId}` : ''}`} replace />}
       {activeTab === 'training-locks' && <AutomatedLocksNotice onNavigate={setTab} />}
     </>
   )
@@ -297,6 +291,7 @@ function VetDashboard({ onNavigate }) {
   const [duePreventive, setDuePreventive] = useState([])
   const [loading, setLoading] = useState(true)
   const [actionBusyId, setActionBusyId] = useState(null)
+  const [dashboardConfirm, setDashboardConfirm] = useState(null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -337,17 +332,25 @@ function VetDashboard({ onNavigate }) {
     }
   }
 
-  const handleComplete = async (horseId) => {
-    if (!window.confirm('Xác nhận hoàn tất khám y tế ban đầu? Ngựa sẽ chuyển sang chờ nhân viên phân ô chuồng; chỉ ngựa đủ điều kiện y tế mới được HLV tiếp nhận.')) return
-    setActionBusyId(horseId)
-    try {
-      await vetApi.completeMedicalQueue(horseId)
-      await loadData()
-    } catch (err) {
-      alert(`Lỗi hoàn tất khám: ${err.message}`)
-    } finally {
-      setActionBusyId(null)
-    }
+  const handleComplete = (horseId) => {
+    setDashboardConfirm({
+      title: 'Xác nhận hoàn tất khám y tế ban đầu',
+      message: 'Ngựa sẽ chuyển sang chờ nhân viên phân ô chuồng. Chỉ những con ngựa đủ điều kiện y tế mới được HLV tiếp nhận tập luyện.',
+      confirmLabel: 'Hoàn tất khám',
+      isDanger: false,
+      onConfirm: async () => {
+        setActionBusyId(horseId)
+        try {
+          await vetApi.completeMedicalQueue(horseId)
+          await loadData()
+        } catch (err) {
+          alert(`Lỗi hoàn tất khám: ${err.message}`)
+        } finally {
+          setActionBusyId(null)
+          setDashboardConfirm(null)
+        }
+      },
+    })
   }
 
   const handleCreateExamFromIncident = async (inc) => {
@@ -375,17 +378,25 @@ function VetDashboard({ onNavigate }) {
     }
   }
 
-  const handleDismissIncident = async (inc) => {
-    if (!window.confirm('Xác nhận bỏ qua/đóng báo cáo sự cố này?')) return
-    setActionBusyId(inc.id)
-    try {
-      await vetApi.dismissIncident(inc.id, 'Bác sĩ thú y đánh giá không cần can thiệp y tế')
-      await loadData()
-    } catch (err) {
-      alert(`Lỗi bỏ qua sự cố: ${err.message}`)
-    } finally {
-      setActionBusyId(null)
-    }
+  const handleDismissIncident = (inc) => {
+    setDashboardConfirm({
+      title: 'Xác nhận bỏ qua sự cố',
+      message: `Bạn có chắc muốn đóng/bỏ qua báo cáo sự cố "${inc.title || inc.incidentType || 'sự cố'}"? Bác sĩ thú y đánh giá không cần can thiệp y tế.`,
+      confirmLabel: 'Bỏ qua sự cố',
+      isDanger: true,
+      onConfirm: async () => {
+        setActionBusyId(inc.id)
+        try {
+          await vetApi.dismissIncident(inc.id, 'Bác sĩ thú y đánh giá không cần can thiệp y tế')
+          await loadData()
+        } catch (err) {
+          alert(`Lỗi bỏ qua sự cố: ${err.message}`)
+        } finally {
+          setActionBusyId(null)
+          setDashboardConfirm(null)
+        }
+      },
+    })
   }
 
   const injuredHorses = useMemo(
@@ -412,11 +423,14 @@ function VetDashboard({ onNavigate }) {
       </div>
 
       <div className="stats-grid">
-        <div className="stat card rose">
+        <div className="stat card rose" title="Tổng số ngựa & hạng mục y tế cần can thiệp: Ngựa chấn thương, Hàng chờ khám ban đầu, Lịch tiêm đến hạn">
           <span className="stat-icon"><HeartPulse size={22} /></span>
           <div>
             <strong>{loading ? '…' : totalCareNeeded}</strong>
             <span>Cần chăm sóc y tế</span>
+            <small style={{ display: 'block', fontSize: '10px', color: '#7a8e84', marginTop: '3px', fontWeight: 500 }}>
+              {injuredHorses.length} chấn thương · {medicalQueue.length} chờ khám mới · {duePreventive.length} lịch tiêm
+            </small>
           </div>
         </div>
         <div className="stat card blue">
@@ -595,6 +609,11 @@ function VetDashboard({ onNavigate }) {
               <div className="empty" style={{ padding: '24px' }}>
                 <CheckCircle2 size={28} color="#27714d" />
                 <b>Không có ngựa nào trong tình trạng chấn thương cấp tính</b>
+                {duePreventive.length > 0 && (
+                  <div style={{ marginTop: '10px', fontSize: '12px', color: '#1e40af', background: '#eff6ff', padding: '8px 12px', borderRadius: '6px', border: '1px solid #bfdbfe', textAlign: 'left' }}>
+                    💡 Đang có <b>{duePreventive.length}</b> lịch tiêm phòng / chăm sóc phòng ngừa đến hạn trong 7 ngày tới (xem bảng bên phải để mở hồ sơ tiêm).
+                  </div>
+                )}
               </div>
             )}
           </section>
@@ -713,9 +732,20 @@ function VetDashboard({ onNavigate }) {
                       fontSize: '11px',
                     }}
                   >
-                    <b>{item.details || PREVENTIVE_TYPES[item.careType] || item.careType}</b>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
+                      <b>{item.details || PREVENTIVE_TYPES[item.careType] || item.careType}</b>
+                      <button
+                        type="button"
+                        className="button primary"
+                        style={{ height: '22px', padding: '0 8px', fontSize: '10px', minHeight: 'unset', flexShrink: 0 }}
+                        onClick={() => onNavigate(`medical-records?horseId=${item.horseId || ''}`)}
+                        title="Mở hồ sơ bệnh án của ngựa để khám hoặc xác nhận tiêm"
+                      >
+                        <Stethoscope size={11} /> Mở hồ sơ
+                      </button>
+                    </div>
                     <div style={{ color: '#555', marginTop: '3px' }}>
-                      Ngựa: <b>{item.horseName || '—'}</b> • Hạn: <span style={{ color: '#b08412' }}>{formatVNDate(item.dueDate)}</span>
+                      Ngựa: <b>{item.horseName || '—'}</b> • Hạn: <span style={{ color: '#b08412', fontWeight: 600 }}>{formatVNDate(item.dueDate)}</span>
                     </div>
                   </div>
                 ))}
@@ -728,6 +758,27 @@ function VetDashboard({ onNavigate }) {
           </section>
         </div>
       </div>
+
+      {dashboardConfirm && (
+        <div className="modal-backdrop" onClick={() => setDashboardConfirm(null)}>
+          <div className="modal card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px', padding: '24px' }}>
+            <h3 style={{ margin: '0 0 10px', fontSize: '17px', color: '#133e31' }}>{dashboardConfirm.title}</h3>
+            <p style={{ margin: '0 0 18px', fontSize: '13px', color: '#55665e', lineHeight: 1.5 }}>{dashboardConfirm.message}</p>
+            <div className="modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button type="button" className="button secondary" onClick={() => setDashboardConfirm(null)}>
+                Hủy
+              </button>
+              <button
+                type="button"
+                className={`button ${dashboardConfirm.isDanger ? 'danger' : 'primary'}`}
+                onClick={dashboardConfirm.onConfirm}
+              >
+                {dashboardConfirm.confirmLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -735,7 +786,7 @@ function VetDashboard({ onNavigate }) {
 // =========================================================================
 // TAB 2: STABLES & STALLS GRID - BẢN ĐỒ Ô CHUỒNG & THỂ TRẠNG LÂM SÀNG
 // =========================================================================
-function BarnHealthMapView({ onNavigate }) {
+function BarnHealthMapView({ onNavigate, initialHorseId }) {
   const [stables, setStables] = useState([])
   const [selectedStableId, setSelectedStableId] = useState('')
   const [selectedHorse, setSelectedHorse] = useState(null)
@@ -745,6 +796,7 @@ function BarnHealthMapView({ onNavigate }) {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterHealth, setFilterHealth] = useState('')
+  const [profileHorseId, setProfileHorseId] = useState(initialHorseId || null)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -826,7 +878,7 @@ function BarnHealthMapView({ onNavigate }) {
     })
   }, [allStalls, search, filterHealth, horsesMap])
 
-  const handleSelectStall = async (stall) => {
+  const handleSelectStall = useCallback(async (stall) => {
     if (stall.currentAssignment) {
       const horseId = stall.currentAssignment.horseId
       const rawHorse = horsesMap[horseId] || {}
@@ -864,7 +916,24 @@ function BarnHealthMapView({ onNavigate }) {
       setSelectedHorse(null)
       setSelectedHorseExtra({ lastExamDate: null, lastPreventiveDate: null, currentLock: null })
     }
-  }
+  }, [horsesMap, activeStable?.name])
+
+  // Auto-focus horse when initialHorseId is given
+  useEffect(() => {
+    if (initialHorseId) {
+      setProfileHorseId(initialHorseId)
+      if (stables.length > 0) {
+        for (const s of stables) {
+          const matchStall = (s.stalls || []).find((st) => st.currentAssignment?.horseId === initialHorseId)
+          if (matchStall) {
+            setSelectedStableId(s.id)
+            handleSelectStall(matchStall)
+            break
+          }
+        }
+      }
+    }
+  }, [initialHorseId, stables, handleSelectStall])
 
   const selectedHealthCfg = selectedHorse
     ? HEALTH_STATUS_MAP[selectedHorse.healthStatus] || HEALTH_STATUS_MAP.FIT
@@ -926,7 +995,7 @@ function BarnHealthMapView({ onNavigate }) {
               setSelectedHorse(null)
             }}
           >
-            <Warehouse size={14} /> {cleanStableName(s)} ({s.stalls?.length || 0} ô)
+            <Warehouse size={14} /> {cleanStableName(s).toUpperCase()} ({s.stalls?.length || 0} ô)
           </button>
         ))}
       </div>
@@ -961,7 +1030,7 @@ function BarnHealthMapView({ onNavigate }) {
         <section className="card" style={{ padding: '20px' }}>
           <div className="card-head" style={{ padding: '0 0 16px' }}>
             <div>
-              <h3>Sơ đồ ô chuồng — {cleanStableName(activeStable)}</h3>
+              <h3>Sơ đồ ô chuồng — {cleanStableName(activeStable).toUpperCase()}</h3>
               <small className="muted" style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', marginTop: '3px' }}>
                 <MapPin size={13} style={{ color: '#27704e' }} />
                 <span>Vị trí: <b>{cleanStableLocation(activeStable?.location)}</b></span>
@@ -1021,6 +1090,20 @@ function BarnHealthMapView({ onNavigate }) {
                             </span>
                           </div>
                         )}
+                        <div style={{ marginTop: '8px' }}>
+                          <button
+                            type="button"
+                            className="button secondary"
+                            style={{ fontSize: '11px', padding: '3px 8px', minHeight: '24px', width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSelectStall(stall)
+                              setProfileHorseId(assigned.horseId)
+                            }}
+                          >
+                            <Eye size={12} /> Xem hồ sơ
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="muted" style={{ fontSize: '11px', marginTop: '6px' }}>
@@ -1088,26 +1171,37 @@ function BarnHealthMapView({ onNavigate }) {
               </div>
             </div>
 
-            {/* Link Xem hồ sơ bệnh án theo Section 4 */}
+            {/* Actions: Xem hồ sơ ngựa chi tiết & Sổ khám */}
             <div style={{ display: 'grid', gap: '8px' }}>
               <button
+                type="button"
                 className="button primary wide"
-                style={{ padding: '10px', fontSize: '13px' }}
-                onClick={() => onNavigate(`medical-records?horseId=${selectedHorse.id}`)}
+                style={{ padding: '10px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                onClick={() => setProfileHorseId(selectedHorse.id)}
               >
-                <FileText size={15} /> Xem hồ sơ bệnh án →
+                <Eye size={16} /> Xem hồ sơ ngựa chi tiết
               </button>
               <button
+                type="button"
                 className="button secondary wide"
-                style={{ padding: '9px', fontSize: '12px' }}
-                onClick={() => onNavigate(`nutrition?horseId=${selectedHorse.id}`)}
+                style={{ padding: '9px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                onClick={() => onNavigate(`medical-records?horseId=${selectedHorse.id}`)}
               >
-                <Utensils size={14} /> Đề xuất khẩu phần dinh dưỡng
+                <FileText size={14} /> Sổ khám & Điều trị →
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* FACEBOOK-STYLE POPUP MODAL: HỒ SƠ NGỰA CHI TIẾT */}
+      {profileHorseId && (
+        <HorseProfileModal
+          horseId={profileHorseId}
+          onClose={() => setProfileHorseId(null)}
+          onNavigate={onNavigate}
+        />
+      )}
     </>
   )
 }
@@ -1151,9 +1245,72 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   const [updateText, setUpdateText] = useState('')
   const [nextStatus, setNextStatus] = useState('RECOVERING')
   const [addendumText, setAddendumText] = useState('')
-  const [busy, setBusy] = useState(false)
   const [preventiveList, setPreventiveList] = useState([])
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [completeCareModal, setCompleteCareModal] = useState(null)
+  const [showAddPreventiveModal, setShowAddPreventiveModal] = useState(false)
+
+  // Sub-tabs & retention limits for preventive care
+  const [preventiveTab, setPreventiveTab] = useState('due') // 'due' (Cần làm ngay), 'future' (Chạy ngầm tương lai), 'completed' (Đã xong), 'all'
+  const [completedLimit, setCompletedLimit] = useState(5)
+
+  // Examination Pagination & Filter States
+  const [examPage, setExamPage] = useState(1)
+  const [examTimeFilter, setExamTimeFilter] = useState('ALL') // 'ALL', '30D', '90D', '180D'
+
+  const in30DaysStr = useMemo(() => new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10), [])
+
+  // 1. Cần thực hiện / Đến hạn (Due now or within 30 days)
+  const dueSoonSchedules = useMemo(() => {
+    return preventiveList.filter((p) => {
+      const isDone = Boolean(p.completedAt || p.status === 'COMPLETED')
+      if (isDone) return false
+      const due = p.dueDate || p.scheduledDate
+      return !due || due <= in30DaysStr
+    })
+  }, [preventiveList, in30DaysStr])
+
+  // 2. Chạy ngầm trong tương lai xa (> 30 ngày)
+  const futureBackgroundSchedules = useMemo(() => {
+    return preventiveList.filter((p) => {
+      const isDone = Boolean(p.completedAt || p.status === 'COMPLETED')
+      if (isDone) return false
+      const due = p.dueDate || p.scheduledDate
+      return due && due > in30DaysStr
+    })
+  }, [preventiveList, in30DaysStr])
+
+  // 3. Lịch sử đã hoàn tất (Completed history)
+  const completedSchedules = useMemo(() => {
+    return preventiveList.filter((p) => Boolean(p.completedAt || p.status === 'COMPLETED'))
+  }, [preventiveList])
+
+  const displayedPreventiveList = useMemo(() => {
+    if (preventiveTab === 'due') return dueSoonSchedules
+    if (preventiveTab === 'future') return futureBackgroundSchedules
+    if (preventiveTab === 'completed') return completedSchedules.slice(0, completedLimit)
+    return preventiveList
+  }, [preventiveTab, dueSoonSchedules, futureBackgroundSchedules, completedSchedules, completedLimit, preventiveList])
+
+  // Filter and Paginate Exams to keep DOM clean and resource-light
+  const filteredRecords = useMemo(() => {
+    if (examTimeFilter === 'ALL') return records
+    const days = examTimeFilter === '30D' ? 30 : examTimeFilter === '90D' ? 90 : 180
+    const cutoffDate = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    return records.filter((r) => {
+      const d = r.examinationDate || r.examDate
+      return d && d >= cutoffDate
+    })
+  }, [records, examTimeFilter])
+
+  const EXAMS_PER_PAGE = 5
+  const totalExamPages = Math.max(1, Math.ceil(filteredRecords.length / EXAMS_PER_PAGE))
+  const currentExamPage = Math.min(examPage, totalExamPages)
+
+  const displayedRecords = useMemo(() => {
+    const start = (currentExamPage - 1) * EXAMS_PER_PAGE
+    return filteredRecords.slice(start, start + EXAMS_PER_PAGE)
+  }, [filteredRecords, currentExamPage])
 
   const loadHorses = useCallback(async () => {
     try {
@@ -1196,6 +1353,14 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
         await loadExams()
         await loadHorses()
         await loadPreventive()
+      } else if (deleteConfirm.type === 'prune_exams') {
+        for (const examId of deleteConfirm.ids) {
+          try {
+            await vetApi.deleteMedicalExam(examId)
+          } catch {}
+        }
+        await loadExams()
+        await loadHorses()
       } else if (deleteConfirm.type === 'injury') {
         await vetApi.deleteInjury(deleteConfirm.id)
         await loadInjuries()
@@ -1220,6 +1385,17 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       id: examId,
       title: 'Xóa phiếu khám lâm sàng',
       description: `Bạn có chắc muốn xóa phiếu khám ngày ${formatVNDate(examDate)}? Mọi chẩn đoán và phụ lục đính kèm sẽ bị xóa vĩnh viễn khỏi hồ sơ bệnh án.`,
+    })
+  }
+
+  const promptPruneOldExams = () => {
+    if (records.length <= 5) return
+    const toPrune = records.slice(5)
+    setDeleteConfirm({
+      type: 'prune_exams',
+      ids: toPrune.map((r) => r.id),
+      title: `Dọn dẹp ${toPrune.length} phiếu khám cũ`,
+      description: `Hệ thống sẽ giữ lại 5 phiếu khám mới nhất và xóa ${toPrune.length} phiếu khám cũ hơn để giải phóng tài nguyên. Bạn có chắc muốn tiếp tục?`,
     })
   }
 
@@ -1250,14 +1426,53 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     })
   }
 
+  const promptCompletePreventiveCare = (care) => {
+    setCompleteCareModal({
+      id: care.id,
+      careType: care.careType,
+      careName: care.details || PREVENTIVE_TYPES[care.careType] || care.careType,
+      horseName: activeHorse?.name || 'Ngựa',
+      dueDate: care.dueDate || care.scheduledDate,
+      recurrenceDays: care.recurrenceDays,
+      performedAt: new Date().toISOString().slice(0, 16),
+      notes: 'Đã hoàn tất theo chỉ định thú y',
+      busy: false,
+      error: '',
+    })
+  }
+
+  const executeCompletePreventiveCare = async () => {
+    if (!completeCareModal) return
+    setCompleteCareModal((prev) => ({ ...prev, busy: true, error: '' }))
+    try {
+      const performedIso = completeCareModal.performedAt
+        ? new Date(completeCareModal.performedAt).toISOString()
+        : new Date().toISOString()
+      await vetApi.completePreventiveCare(completeCareModal.id, {
+        performedAt: performedIso,
+        notes: completeCareModal.notes || 'Đã thực hiện theo chỉ định thú y',
+      })
+      await loadPreventive()
+      await loadExams()
+      setCompleteCareModal(null)
+    } catch (err) {
+      setCompleteCareModal((prev) => ({
+        ...prev,
+        busy: false,
+        error: err.message || 'Lỗi khi ghi nhận hoàn tất chăm sóc phòng ngừa',
+      }))
+    }
+  }
+
   const loadExams = useCallback(async () => {
     if (!selectedHorseId) return
     setLoading(true)
     try {
       const data = await vetApi.getHorseMedicalExams(selectedHorseId)
       const list = Array.isArray(data) ? data : pageContent(data) || []
-      const detailed = await Promise.all(
-        list.map(async (exam) => {
+      // Tối ưu tài nguyên mạng: Chỉ fetch detail cho 5 phiếu mới nhất của trang đầu
+      const initialDetailed = await Promise.all(
+        list.slice(0, 5).map(async (exam) => {
           try {
             return await vetApi.getMedicalExamDetail(exam.id)
           } catch {
@@ -1265,7 +1480,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           }
         })
       )
-      setRecords(detailed)
+      setRecords([...initialDetailed, ...list.slice(5)])
     } catch (err) {
       console.error('Lỗi tải bệnh án:', err)
       setRecords([])
@@ -1308,40 +1523,6 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
 
   const activeHorse = horses.find((h) => h.id === selectedHorseId)
   const isEligible = isMedicalEligible(activeHorse)
-
-  const handleDeleteExam = async (examId, examDate) => {
-    if (!window.confirm(`Xác nhận xóa phiếu khám ngày ${formatVNDate(examDate)}? Mọi chẩn đoán và phụ lục đính kèm sẽ bị xóa vĩnh viễn.`)) return
-    try {
-      await vetApi.deleteMedicalExam(examId)
-      await loadExams()
-      await loadHorses()
-      await loadPreventive()
-    } catch (err) {
-      alert(`Lỗi xóa phiếu khám: ${err.message}`)
-    }
-  }
-
-  const handleDeleteAddendum = async (addendumId) => {
-    if (!window.confirm('Xác nhận xóa dòng phụ lục theo dõi này?')) return
-    try {
-      await vetApi.deleteMedicalExamAddendum(addendumId)
-      await loadExams()
-      await loadHorses()
-    } catch (err) {
-      alert(`Lỗi xóa phụ lục: ${err.message}`)
-    }
-  }
-
-  const handleDeleteInjury = async (injuryId, location) => {
-    if (!window.confirm(`Xác nhận xóa mốc theo dõi chấn thương tại "${location}"? Hành động này không thể hoàn tác.`)) return
-    try {
-      await vetApi.deleteInjury(injuryId)
-      await loadInjuries()
-      await loadHorses()
-    } catch (err) {
-      alert(`Lỗi xóa chấn thương: ${err.message}`)
-    }
-  }
 
   const handleAddAddendum = async (e) => {
     e.preventDefault()
@@ -1458,41 +1639,246 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       {/* VIEW 1: HỒ SƠ KHÁM & ĐIỀU TRỊ */}
       {subTab === 'exams' && (
         <div style={{ display: 'grid', gap: '14px' }}>
-          {preventiveList.length > 0 && (
+          {activeHorse && (
             <div className="card" style={{ padding: '16px', background: '#fcfdfb', border: '1px solid #d8e4dc' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                <b style={{ fontSize: '13px', color: '#27714d' }}>📅 Tổng hợp lịch chăm sóc phòng ngừa ({activeHorse?.name})</b>
-                <span style={{ fontSize: '11px', color: '#666' }}>{preventiveList.length} lịch ghi nhận</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <b style={{ fontSize: '13px', color: '#27714d' }}>📅 Lịch tiêm phòng & Chăm sóc phòng ngừa ({activeHorse?.name})</b>
+                  <span style={{ fontSize: '11px', color: '#666', marginLeft: '8px' }}>
+                    ({dueSoonSchedules.length} cần làm · {futureBackgroundSchedules.length} chạy ngầm · {completedSchedules.length} đã xong)
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  className="button secondary"
+                  style={{ height: '28px', padding: '0 10px', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  onClick={() => setShowAddPreventiveModal(true)}
+                >
+                  <Plus size={13} /> Thêm lịch phòng ngừa
+                </button>
               </div>
-              <div style={{ display: 'grid', gap: '6px' }}>
-                {preventiveList.map((p) => {
-                  const isDone = p.status === 'COMPLETED'
-                  return (
-                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '8px 12px', background: 'white', borderRadius: '6px', border: '1px solid #edf0eb' }}>
-                      <div>
-                        <span style={{ fontWeight: 600, color: '#173129' }}>{PREVENTIVE_TYPES[p.careType] || p.careType}</span>
-                        {p.details && <span style={{ color: '#555' }}> · {p.details}</span>}
-                        <span style={{ color: '#888', marginLeft: '6px' }}>(Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)})</span>
+
+              {/* Sub-tabs điều hướng */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', borderBottom: '1px solid #e2ebe5', paddingBottom: '8px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={() => setPreventiveTab('due')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    background: preventiveTab === 'due' ? '#27714d' : '#f0f4f1',
+                    color: preventiveTab === 'due' ? '#fff' : '#41574d',
+                    borderColor: preventiveTab === 'due' ? '#27714d' : '#d2ded6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  ⚡ Cần làm ngay / Đến hạn ({dueSoonSchedules.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreventiveTab('future')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    background: preventiveTab === 'future' ? '#1e40af' : '#f0f4f1',
+                    color: preventiveTab === 'future' ? '#fff' : '#41574d',
+                    borderColor: preventiveTab === 'future' ? '#1e40af' : '#d2ded6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                  title="Các chu kỳ tiêm xa (>30 ngày) chạy ngầm tự động trong hệ thống"
+                >
+                  ⏳ Chạy ngầm tương lai ({futureBackgroundSchedules.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreventiveTab('completed')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    background: preventiveTab === 'completed' ? '#475569' : '#f0f4f1',
+                    color: preventiveTab === 'completed' ? '#fff' : '#41574d',
+                    borderColor: preventiveTab === 'completed' ? '#475569' : '#d2ded6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  ✅ Lịch sử hoàn tất ({completedSchedules.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreventiveTab('all')}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    background: preventiveTab === 'all' ? '#173129' : '#f0f4f1',
+                    color: preventiveTab === 'all' ? '#fff' : '#41574d',
+                    borderColor: preventiveTab === 'all' ? '#173129' : '#d2ded6',
+                  }}
+                >
+                  Tất cả ({preventiveList.length})
+                </button>
+              </div>
+
+              {/* Thông báo chế độ chạy ngầm tương lai */}
+              {preventiveTab === 'future' && (
+                <div style={{ padding: '10px 12px', background: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe', fontSize: '12px', color: '#1e40af', marginBottom: '10px' }}>
+                  ℹ️ <b>Cơ chế chạy ngầm:</b> Các chu kỳ tiêm nhắc lại xa (trên 30 ngày) được lưu trữ ngầm an toàn để tránh làm rối danh sách công việc hàng ngày. Khi tới gần hạn tiêm (trong vòng 30 ngày), lịch sẽ <b>tự động xuất hiện</b> ở mục <i>"Cần làm ngay"</i> và hệ thống tự động gửi thông báo nhắc nhở lúc <b>06:00 sáng</b>.
+                </div>
+              )}
+
+              {displayedPreventiveList.length === 0 ? (
+                <div style={{ padding: '16px', textAlign: 'center', color: '#888', fontSize: '12px', background: 'white', borderRadius: '6px', border: '1px dashed #d8e4dc' }}>
+                  {preventiveTab === 'due' && 'Hiện không có lịch tiêm phòng nào cần thực hiện gấp hoặc đến hạn trong vòng 30 ngày.'}
+                  {preventiveTab === 'future' && 'Không có lịch tiêm phòng nào chạy ngầm trong tương lai xa.'}
+                  {preventiveTab === 'completed' && 'Chưa có lịch sử tiêm phòng / chăm sóc phòng ngừa nào được ghi nhận.'}
+                  {preventiveTab === 'all' && 'Chưa có lịch tiêm phòng hoặc chăm sóc phòng ngừa nào cho ngựa này.'}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gap: '6px' }}>
+                  {displayedPreventiveList.map((p) => {
+                    const isDone = Boolean(p.completedAt || p.status === 'COMPLETED')
+                    return (
+                      <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '8px 12px', background: 'white', borderRadius: '6px', border: '1px solid #edf0eb' }}>
+                        <div>
+                          <span style={{ fontWeight: 600, color: '#173129' }}>{PREVENTIVE_TYPES[p.careType] || p.careType}</span>
+                          {p.details && <span style={{ color: '#555' }}> · {p.details}</span>}
+                          <span style={{ color: '#888', marginLeft: '6px' }}>(Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)})</span>
+                          {p.recurrenceDays ? (
+                            <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', background: '#eaf1fa', color: '#1e40af', fontWeight: 600 }}>
+                              🔁 Chu kỳ: Mỗi {p.recurrenceDays} ngày
+                            </span>
+                          ) : (
+                            <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', background: '#f3f4f6', color: '#6b7280' }}>
+                              Mũi đơn
+                            </span>
+                          )}
+                          {p.completionNotes && isDone && (
+                            <div style={{ fontSize: '11px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>
+                              Ghi chú: {p.completionNotes}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
+                            {isDone ? `✅ Đã thực hiện (${formatVNDate(p.completedAt)})` : '⏳ Chờ thực hiện'}
+                          </span>
+                          {!isDone && (
+                            <>
+                              <button
+                                type="button"
+                                className="button secondary"
+                                style={{ height: '24px', padding: '0 8px', fontSize: '11px', color: '#1d5a3a', borderColor: '#b5d9c2' }}
+                                onClick={() => promptCompletePreventiveCare(p)}
+                              >
+                                <Check size={12} /> Đã thực hiện
+                              </button>
+                              <button
+                                type="button"
+                                className="icon-button danger"
+                                style={{ width: '22px', height: '22px' }}
+                                title="Xóa lịch phòng ngừa"
+                                onClick={() => promptDeletePreventiveCare(p.id)}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
-                          {isDone ? '✅ Đã thực hiện' : '⏳ Chờ thực hiện'}
-                        </span>
-                        {!isDone && (
-                          <button
-                            type="button"
-                            className="icon-button danger"
-                            style={{ width: '22px', height: '22px' }}
-                            title="Xóa lịch phòng ngừa"
-                            onClick={() => promptDeletePreventiveCare(p.id)}
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
+                    )
+                  })}
+
+                  {/* Giới hạn lịch sử hoàn tất để tránh danh sách dài tốn tài nguyên */}
+                  {preventiveTab === 'completed' && completedSchedules.length > 5 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8faf7', borderRadius: '6px', fontSize: '11px', color: '#666' }}>
+                      <span>Hiển thị {Math.min(completedLimit, completedSchedules.length)} / {completedSchedules.length} lịch tiêm hoàn tất gần nhất (tối ưu tài nguyên)</span>
+                      <button
+                        type="button"
+                        className="button secondary"
+                        style={{ height: '24px', fontSize: '10px', padding: '0 8px' }}
+                        onClick={() => setCompletedLimit((prev) => (prev === 5 ? completedSchedules.length : 5))}
+                      >
+                        {completedLimit === 5 ? `Xem thêm ${completedSchedules.length - 5} lịch cũ` : 'Thu gọn về 5'}
+                      </button>
                     </div>
-                  )
-                })}
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* THANH CÔNG CỤ QUẢN LÝ PHIẾU KHÁM & DỌN DẸP TÀI NGUYÊN */}
+          {!loading && records.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8faf7', padding: '10px 14px', borderRadius: '8px', border: '1px solid #dce5df', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: '#334e40' }}>Lọc thời gian phiếu:</span>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {[
+                    { value: 'ALL', label: 'Tất cả' },
+                    { value: '30D', label: '30 ngày' },
+                    { value: '90D', label: '90 ngày' },
+                    { value: '180D', label: '6 tháng' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        border: '1px solid',
+                        cursor: 'pointer',
+                        background: examTimeFilter === opt.value ? '#27714d' : '#fff',
+                        color: examTimeFilter === opt.value ? '#fff' : '#555',
+                        borderColor: examTimeFilter === opt.value ? '#27714d' : '#d0dbd4',
+                      }}
+                      onClick={() => {
+                        setExamTimeFilter(opt.value)
+                        setExamPage(1)
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '11px', color: '#666' }}>
+                  Trang {currentExamPage}/{totalExamPages} ({filteredRecords.length} phiếu · Giới hạn 5 phiếu/trang)
+                </span>
+                {records.length > 5 && (
+                  <button
+                    type="button"
+                    className="button secondary"
+                    style={{ height: '26px', fontSize: '11px', padding: '0 8px', color: '#a74842', borderColor: '#f0c6c4' }}
+                    onClick={promptPruneOldExams}
+                    title="Xóa bớt các phiếu khám cũ chỉ giữ lại 5 phiếu mới nhất để giải phóng bộ nhớ"
+                  >
+                    <Trash2 size={12} /> Dọn bớt phiếu cũ (giữ 5)
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -1505,8 +1891,12 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
               <b>Chưa có lịch sử bệnh án cho ngựa {activeHorse?.name}</b>
               <span>Bấm vào "Tạo phiếu khám mới" ở góc trên để lập hồ sơ lâm sàng đầu tiên.</span>
             </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="empty card" style={{ padding: '30px', textAlign: 'center' }}>
+              <span>Không tìm thấy phiếu khám nào trong khoảng thời gian đã chọn. Bấm <b>"Tất cả"</b> để xem toàn bộ lịch sử.</span>
+            </div>
           ) : (
-            records.map((rec) => (
+            displayedRecords.map((rec) => (
               <div key={rec.id} className="card" style={{ padding: '22px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #edf0eb', paddingBottom: '12px' }}>
                   <div>
@@ -1539,6 +1929,39 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                     </button>
                   </div>
                 </div>
+
+                {(rec.heartRateBpm || rec.temperatureCelsius || rec.bodyLengthCm || rec.heightCm || rec.weightKg) && (
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '12px 0 6px', background: '#f6f9f7', padding: '8px 12px', borderRadius: '8px', border: '1px solid #e1ebe4' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#27714d', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '4px' }}>
+                      <Activity size={13} /> Chỉ số sinh trắc:
+                    </span>
+                    {rec.heartRateBpm && (
+                      <span className="badge" style={{ fontSize: '11px', background: '#eef6f0', color: '#1d5a3a', border: '1px solid #cce5d4' }}>
+                        ❤️ Nhịp tim: <b>{rec.heartRateBpm} BPM</b>
+                      </span>
+                    )}
+                    {rec.temperatureCelsius && (
+                      <span className="badge" style={{ fontSize: '11px', background: '#fff7e6', color: '#b08412', border: '1px solid #ffe7ba' }}>
+                        🌡️ Thân nhiệt: <b>{rec.temperatureCelsius} °C</b>
+                      </span>
+                    )}
+                    {rec.bodyLengthCm && (
+                      <span className="badge" style={{ fontSize: '11px', background: '#e6f7ff', color: '#096dd9', border: '1px solid #bae7ff' }}>
+                        📏 Chiều dài: <b>{rec.bodyLengthCm} cm</b>
+                      </span>
+                    )}
+                    {rec.heightCm && (
+                      <span className="badge" style={{ fontSize: '11px', background: '#f9f0ff', color: '#722ed1', border: '1px solid #efdbff' }}>
+                        📐 Chiều cao: <b>{rec.heightCm} cm</b>
+                      </span>
+                    )}
+                    {rec.weightKg && (
+                      <span className="badge" style={{ fontSize: '11px', background: '#f6ffed', color: '#389e0d', border: '1px solid #b7eb8f' }}>
+                        ⚖️ Cân nặng: <b>{rec.weightKg} kg</b>
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', margin: '16px 0' }}>
                   <div>
@@ -1604,19 +2027,34 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
                               <div>
                                 • <b>{PREVENTIVE_TYPES[p.careType] || p.careType}:</b> {p.details || 'Theo phác đồ'} — Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)}
+                                {p.recurrenceDays ? (
+                                  <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', background: '#eaf1fa', color: '#1e40af', fontWeight: 600 }}>
+                                    🔁 Chu kỳ: {p.recurrenceDays} ngày
+                                  </span>
+                                ) : null}
                                 <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
                                   {isDone ? `✅ Đã thực hiện (${formatVNDate(p.completedAt)})` : '⏳ Chờ thực hiện'}
                                 </span>
                               </div>
                               {!isDone && (
-                                <button
-                                  type="button"
-                                  className="button secondary"
-                                  style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#a74842' }}
-                                  onClick={() => promptDeletePreventiveCare(p.id)}
-                                >
-                                  Xóa
-                                </button>
+                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                  <button
+                                    type="button"
+                                    className="button secondary"
+                                    style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#1d5a3a', borderColor: '#b5d9c2' }}
+                                    onClick={() => promptCompletePreventiveCare(p)}
+                                  >
+                                    <Check size={11} /> Đã tiêm
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="button secondary"
+                                    style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#a74842' }}
+                                    onClick={() => promptDeletePreventiveCare(p.id)}
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
                               )}
                             </div>
                           )
@@ -1627,6 +2065,53 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                 })()}
               </div>
             ))
+          )}
+
+          {/* THANH ĐIỀU HƯỚNG PHÂN TRANG (Tối ưu DOM & không sinh danh sách vô tận) */}
+          {!loading && totalExamPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', padding: '16px 0', borderTop: '1px solid #e5ebe7', marginTop: '10px' }}>
+              <button
+                type="button"
+                className="button secondary"
+                style={{ height: '30px', fontSize: '12px', padding: '0 12px' }}
+                disabled={currentExamPage === 1}
+                onClick={() => setExamPage((p) => Math.max(1, p - 1))}
+              >
+                « Trang trước
+              </button>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {Array.from({ length: totalExamPages }, (_, i) => i + 1).map((pg) => (
+                  <button
+                    key={pg}
+                    type="button"
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      borderRadius: '6px',
+                      border: '1px solid',
+                      fontSize: '12px',
+                      fontWeight: pg === currentExamPage ? 700 : 500,
+                      background: pg === currentExamPage ? '#27714d' : '#fff',
+                      color: pg === currentExamPage ? '#fff' : '#333',
+                      borderColor: pg === currentExamPage ? '#27714d' : '#d2ded6',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setExamPage(pg)}
+                  >
+                    {pg}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="button secondary"
+                style={{ height: '30px', fontSize: '12px', padding: '0 12px' }}
+                disabled={currentExamPage >= totalExamPages}
+                onClick={() => setExamPage((p) => Math.min(totalExamPages, p + 1))}
+              >
+                Trang sau »
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1752,6 +2237,18 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
             loadExams()
             loadHorses()
             loadPreventive()
+          }}
+        />
+      )}
+
+      {showAddPreventiveModal && (
+        <CreatePreventiveModal
+          horse={activeHorse}
+          onClose={() => setShowAddPreventiveModal(false)}
+          onSaved={() => {
+            setShowAddPreventiveModal(false)
+            loadPreventive()
+            loadExams()
           }}
         />
       )}
@@ -1888,7 +2385,252 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           </div>
         </div>
       )}
+      {completeCareModal && (
+        <div className="modal-backdrop" onMouseDown={() => !completeCareModal.busy && setCompleteCareModal(null)}>
+          <div className="modal" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow">XÁC NHẬN HOÀN TẤT CHĂM SÓC</p>
+                <h3 style={{ margin: 0, color: '#163f33' }}>Ghi nhận đã thực hiện {PREVENTIVE_TYPES[completeCareModal.careType] || ''}</h3>
+              </div>
+              <button
+                className="icon-button"
+                disabled={completeCareModal.busy}
+                onClick={() => setCompleteCareModal(null)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ padding: '16px', display: 'grid', gap: '12px' }}>
+              <div style={{ background: '#f4fbf7', border: '1px solid #cce8d5', borderRadius: '8px', padding: '12px' }}>
+                <div style={{ fontWeight: 600, fontSize: '13px', color: '#173129' }}>
+                  {completeCareModal.careName}
+                </div>
+                <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
+                  • Ngựa: <b>{completeCareModal.horseName}</b> · Ngày dự kiến: <b>{formatVNDate(completeCareModal.dueDate)}</b>
+                </div>
+                {completeCareModal.recurrenceDays ? (
+                  <div style={{ fontSize: '12px', color: '#1e40af', marginTop: '6px', background: '#eff6ff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                    🔁 <b>Chu kỳ lặp lại ({completeCareModal.recurrenceDays} ngày):</b> Sau khi xác nhận, hệ thống sẽ tự động tạo lịch tiêm cho đợt kế tiếp sau {completeCareModal.recurrenceDays} ngày.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    • Mũi tiêm đơn (không lặp lại chu kỳ).
+                  </div>
+                )}
+              </div>
+
+              <div className="field">
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>Thời điểm thực hiện *</span>
+                <input
+                  type="datetime-local"
+                  required
+                  value={completeCareModal.performedAt}
+                  onChange={(e) => setCompleteCareModal({ ...completeCareModal, performedAt: e.target.value })}
+                />
+              </div>
+
+              <div className="field">
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>Ghi chú sau tiêm / thực hiện</span>
+                <textarea
+                  rows={2}
+                  placeholder="Tình trạng ngựa sau tiêm, phản ứng, số lô vắc-xin..."
+                  value={completeCareModal.notes}
+                  onChange={(e) => setCompleteCareModal({ ...completeCareModal, notes: e.target.value })}
+                />
+              </div>
+
+              {completeCareModal.error && (
+                <div style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '12px' }}>
+                  ⚠️ {completeCareModal.error}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={completeCareModal.busy}
+                  onClick={() => setCompleteCareModal(null)}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  className="button primary"
+                  disabled={completeCareModal.busy}
+                  onClick={executeCompletePreventiveCare}
+                  style={{ background: '#27714d', borderColor: '#27714d' }}
+                >
+                  {completeCareModal.busy ? 'Đang lưu…' : 'Xác nhận hoàn thành'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
+  )
+}
+
+function CreatePreventiveModal({ horse, onClose, onSaved }) {
+  const [form, setForm] = useState({
+    careType: 'VACCINATION',
+    details: '',
+    dueDate: new Date(Date.now() + 86400000 * 7).toISOString().slice(0, 10),
+    recurrencePreset: '180',
+    customRecurrenceDays: '',
+    reminderLeadDays: 3,
+  })
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  const getRecurrenceDays = () => {
+    if (form.recurrencePreset === 'none') return null
+    if (form.recurrencePreset === 'custom') {
+      const val = parseInt(form.customRecurrenceDays, 10)
+      return val > 0 ? val : null
+    }
+    const val = parseInt(form.recurrencePreset, 10)
+    return val > 0 ? val : null
+  }
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const recurrenceDays = getRecurrenceDays()
+      await vetApi.createPreventiveCare(horse.id, {
+        careType: form.careType,
+        details: form.details.trim(),
+        dueDate: form.dueDate,
+        recurrenceDays: recurrenceDays,
+        reminderLeadDays: Number(form.reminderLeadDays) || 0,
+      })
+      onSaved()
+    } catch (err) {
+      setError(err.message || 'Lỗi thêm lịch chăm sóc phòng ngừa')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">CHĂM SÓC PHÒNG NGỪA</p>
+            <h3 style={{ margin: 0, color: '#163f33' }}>Thêm lịch tiêm phòng / chăm sóc · {horse?.name}</h3>
+          </div>
+          <button className="icon-button" onClick={onClose}><X size={16} /></button>
+        </div>
+        <form onSubmit={submit} className="form-grid" style={{ padding: '16px' }}>
+          <div className="field">
+            <span>Loại chăm sóc *</span>
+            <select
+              value={form.careType}
+              onChange={(e) => setForm({ ...form, careType: e.target.value })}
+            >
+              <option value="VACCINATION">Tiêm phòng (Vaccination)</option>
+              <option value="DEWORMING">Tẩy giun (Deworming)</option>
+              <option value="FARRIER">Chăm sóc móng (Farrier)</option>
+            </select>
+          </div>
+
+          <div className="field">
+            <span>Ngày dự kiến thực hiện *</span>
+            <input
+              type="date"
+              required
+              value={form.dueDate}
+              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+            />
+          </div>
+
+          <div className="field full">
+            <span>Tên thuốc / Vắc-xin / Chi tiết *</span>
+            <input
+              required
+              placeholder="VD: Vắc-xin cúm ngựa Equine Influenza, Uốn ván Tetanus..."
+              value={form.details}
+              onChange={(e) => setForm({ ...form, details: e.target.value })}
+            />
+          </div>
+
+          <div className="field">
+            <span>Chu kỳ lặp lại</span>
+            <select
+              value={form.recurrencePreset}
+              onChange={(e) => setForm({ ...form, recurrencePreset: e.target.value })}
+            >
+              <option value="none">Không lặp lại (Chỉ 1 lần)</option>
+              <option value="30">Mỗi tháng (30 ngày)</option>
+              <option value="90">Mỗi quý (90 ngày / 3 tháng)</option>
+              <option value="180">Định kỳ 6 tháng (180 ngày)</option>
+              <option value="365">Định kỳ hàng năm (365 ngày)</option>
+              <option value="custom">Tùy chỉnh số ngày...</option>
+            </select>
+          </div>
+
+          {form.recurrencePreset === 'custom' ? (
+            <div className="field">
+              <span>Số ngày lặp lại *</span>
+              <input
+                type="number"
+                min="1"
+                placeholder="VD: 60"
+                required
+                value={form.customRecurrenceDays}
+                onChange={(e) => setForm({ ...form, customRecurrenceDays: e.target.value })}
+              />
+            </div>
+          ) : (
+            <div className="field">
+              <span>Nhắc trước (ngày)</span>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                value={form.reminderLeadDays}
+                onChange={(e) => setForm({ ...form, reminderLeadDays: e.target.value })}
+              />
+            </div>
+          )}
+
+          {form.recurrencePreset === 'custom' && (
+            <div className="field">
+              <span>Nhắc trước (ngày)</span>
+              <input
+                type="number"
+                min="0"
+                max="30"
+                value={form.reminderLeadDays}
+                onChange={(e) => setForm({ ...form, reminderLeadDays: e.target.value })}
+              />
+            </div>
+          )}
+
+          <div className="full" style={{ fontSize: '11px', color: '#27714d', background: '#f4fbf7', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d2ebd9' }}>
+            ℹ️ Sau khi hoàn thành mũi tiêm, nếu có chu kỳ lặp lại, hệ thống sẽ tự động tạo ngay mũi tiêm tiếp theo và gửi thông báo khi đến hạn.
+          </div>
+
+          {error && (
+            <div className="full" style={{ padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', color: '#991b1b', fontSize: '12px' }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          <div className="modal-actions full">
+            <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
+            <button type="submit" className="button primary" disabled={busy}>
+              {busy ? 'Đang lưu…' : 'Tạo lịch chăm sóc'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
@@ -1900,7 +2642,12 @@ function CreateExamModal({ horse, onClose, onSaved }) {
     treatmentProtocol: '',
     medicationNotes: '',
     followUpDate: '',
-    healthStatusAfter: 'INJURED',
+    healthStatusAfter: 'FIT',
+    heartRateBpm: '',
+    bodyLengthCm: '',
+    heightCm: '',
+    temperatureCelsius: '',
+    weightKg: '',
   })
   const [preventiveSchedules, setPreventiveSchedules] = useState([])
   const [busy, setBusy] = useState(false)
@@ -1912,6 +2659,7 @@ function CreateExamModal({ horse, onClose, onSaved }) {
         careType: 'VACCINATION',
         details: '',
         dueDate: '',
+        recurrenceDays: '180',
         reminderLeadDays: 3,
       },
     ])
@@ -1937,7 +2685,7 @@ function CreateExamModal({ horse, onClose, onSaved }) {
           careType: s.careType,
           details: s.details || '',
           dueDate: s.dueDate,
-          recurrenceDays: null,
+          recurrenceDays: s.recurrenceDays && Number(s.recurrenceDays) > 0 ? Number(s.recurrenceDays) : null,
           reminderLeadDays: Number(s.reminderLeadDays) || 0,
         }))
 
@@ -1949,6 +2697,11 @@ function CreateExamModal({ horse, onClose, onSaved }) {
         medicationNotes: form.medicationNotes || null,
         followUpDate: form.followUpDate || null,
         healthStatusAfter: form.healthStatusAfter || null,
+        heartRateBpm: form.heartRateBpm ? parseInt(form.heartRateBpm, 10) : null,
+        bodyLengthCm: form.bodyLengthCm ? parseInt(form.bodyLengthCm, 10) : null,
+        heightCm: form.heightCm ? parseInt(form.heightCm, 10) : null,
+        temperatureCelsius: form.temperatureCelsius ? parseFloat(form.temperatureCelsius) : null,
+        weightKg: form.weightKg ? parseFloat(form.weightKg) : null,
         preventiveSchedules: validSchedules.length > 0 ? validSchedules : null,
         preventiveCareSchedule: validSchedules.length === 1 ? validSchedules[0] : null,
       })
@@ -1992,6 +2745,73 @@ function CreateExamModal({ horse, onClose, onSaved }) {
               <option value="QUARANTINED">Cách ly kiểm dịch (QUARANTINED)</option>
             </select>
           </div>
+
+          {/* Section: Chỉ số sinh trắc học lúc khám */}
+          <div className="full" style={{ border: '1px solid #d4e3d9', borderRadius: '10px', padding: '14px', background: '#f8faf8', marginTop: '2px' }}>
+            <span style={{ fontWeight: 700, color: '#163f33', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+              <Activity size={15} color="#27714d" /> Chỉ số sinh trắc học & Thể chất lúc khám (tùy chọn)
+            </span>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
+              <div className="field">
+                <span style={{ fontSize: '11px' }}>Nhịp tim (BPM)</span>
+                <input
+                  type="number"
+                  placeholder="VD: 44"
+                  min="20"
+                  max="240"
+                  value={form.heartRateBpm}
+                  onChange={(e) => setForm({ ...form, heartRateBpm: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <span style={{ fontSize: '11px' }}>Thân nhiệt (°C)</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  placeholder="VD: 37.8"
+                  min="34"
+                  max="44"
+                  value={form.temperatureCelsius}
+                  onChange={(e) => setForm({ ...form, temperatureCelsius: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <span style={{ fontSize: '11px' }}>Chiều dài thân (cm)</span>
+                <input
+                  type="number"
+                  placeholder="VD: 180"
+                  min="80"
+                  max="300"
+                  value={form.bodyLengthCm}
+                  onChange={(e) => setForm({ ...form, bodyLengthCm: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <span style={{ fontSize: '11px' }}>Chiều cao (cm)</span>
+                <input
+                  type="number"
+                  placeholder="VD: 160"
+                  min="80"
+                  max="250"
+                  value={form.heightCm}
+                  onChange={(e) => setForm({ ...form, heightCm: e.target.value })}
+                />
+              </div>
+              <div className="field">
+                <span style={{ fontSize: '11px' }}>Cân nặng (kg)</span>
+                <input
+                  type="number"
+                  step="0.5"
+                  placeholder="VD: 480"
+                  min="100"
+                  max="1200"
+                  value={form.weightKg}
+                  onChange={(e) => setForm({ ...form, weightKg: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="field full">
             <span>Triệu chứng phát hiện *</span>
             <textarea
@@ -2079,7 +2899,6 @@ function CreateExamModal({ horse, onClose, onSaved }) {
                       <option value="VACCINATION">Tiêm phòng (Vaccination)</option>
                       <option value="DEWORMING">Tẩy giun (Deworming)</option>
                       <option value="FARRIER">Chăm sóc móng (Farrier)</option>
-                      <option value="OTHER">Khác (Other)</option>
                     </select>
                   </div>
                   <div className="field">
@@ -2099,6 +2918,19 @@ function CreateExamModal({ horse, onClose, onSaved }) {
                       value={sched.details}
                       onChange={(e) => updateSchedule(idx, 'details', e.target.value)}
                     />
+                  </div>
+                  <div className="field">
+                    <span>Chu kỳ lặp lại</span>
+                    <select
+                      value={sched.recurrenceDays ?? ''}
+                      onChange={(e) => updateSchedule(idx, 'recurrenceDays', e.target.value)}
+                    >
+                      <option value="">Không lặp (Chỉ 1 lần)</option>
+                      <option value="30">Mỗi tháng (30 ngày)</option>
+                      <option value="90">Mỗi quý (90 ngày)</option>
+                      <option value="180">Định kỳ 6 tháng (180 ngày)</option>
+                      <option value="365">Định kỳ hàng năm (365 ngày)</option>
+                    </select>
                   </div>
                   <div className="field">
                     <span>Nhắc trước (ngày)</span>
@@ -2130,13 +2962,6 @@ function CreateExamModal({ horse, onClose, onSaved }) {
       </div>
     </div>
   )
-}
-
-// =========================================================================
-// TAB 4: THEO DÕI CHẤN THƯƠNG (Wrapper delegating to MedicalRecordsView)
-// =========================================================================
-function InjuryTrackingView() {
-  return <MedicalRecordsView defaultSubTab="injuries" />
 }
 
 function CreateInjuryModal({ horse, onClose, onSaved }) {
@@ -2311,677 +3136,6 @@ function CreateInjuryModal({ horse, onClose, onSaved }) {
         </form>
       </div>
     </div>
-  )
-}
-
-// =========================================================================
-// TAB 5: LỆNH KHÓA HUẤN LUYỆN (Tự động hóa hoàn toàn)
-// =========================================================================
-function TrainingLockView() {
-  const navigate = useNavigate()
-  return <AutomatedLocksNotice onNavigate={(t) => navigate(t === 'dashboard' ? '/vet' : `/vet/${t}`)} />
-}
-
-// =========================================================================
-// TAB 6: PHÒNG NGỪA ĐỊNH KỲ
-// =========================================================================
-function PreventiveCareView({ initialHorseId }) {
-  const [horses, setHorses] = useState([])
-  const [selectedHorseId, setSelectedHorseId] = useState(initialHorseId || '')
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [showAddModal, setShowAddModal] = useState(false)
-
-  useEffect(() => {
-    vetApi.getEligibleHorses().then((res) => {
-      const list = pageContent(res)
-      setHorses(list)
-      if (list.length > 0 && !selectedHorseId) {
-        const found = initialHorseId && list.find((h) => h.id === initialHorseId)
-        setSelectedHorseId(found ? found.id : list[0].id)
-      }
-    })
-  }, [initialHorseId, selectedHorseId])
-
-  const loadPreventive = useCallback(async () => {
-    if (!selectedHorseId) return
-    setLoading(true)
-    try {
-      const res = await vetApi.getHorsePreventiveCare(selectedHorseId)
-      const raw = Array.isArray(res) ? res : pageContent(res) || []
-      setItems(raw.filter((item) => !item.cancelledAt))
-    } catch (err) {
-      console.error('Lỗi tải lịch phòng ngừa:', err)
-      setItems([])
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedHorseId])
-
-  useEffect(() => {
-    loadPreventive()
-  }, [loadPreventive])
-
-  const handleMarkComplete = async (item) => {
-    const title = item.details || PREVENTIVE_TYPES[item.careType] || item.careType
-    if (!window.confirm(`Xác nhận hoàn thành hạng mục "${title}"? Hệ thống sẽ tự động lên lịch cho chu kỳ tiếp theo.`)) return
-    try {
-      await vetApi.completePreventiveCare(item.id, {
-        performedAt: new Date().toISOString(),
-        notes: 'Đã hoàn thành định kỳ',
-      })
-      await loadPreventive()
-    } catch (err) {
-      alert(`Lỗi ghi nhận hoàn thành: ${err.message}`)
-    }
-  }
-
-  const handleDelete = async (item) => {
-    const title = item.details || PREVENTIVE_TYPES[item.careType] || item.careType
-    if (!window.confirm(`Xác nhận xóa hạng mục chăm sóc "${title}"? Thao tác này không thể hoàn tác.`)) return
-    try {
-      await vetApi.cancelPreventiveCare(item.id)
-      await loadPreventive()
-    } catch (err) {
-      alert(`Lỗi xóa lịch: ${err.message}`)
-    }
-  }
-
-  const activeHorse = horses.find((h) => h.id === selectedHorseId)
-
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">PHÒNG NGỪA ĐỊNH KỲ</p>
-          <h1>Chăm sóc phòng ngừa định kỳ</h1>
-          <p>Quản lý lịch tiêm chủng vắc-xin, tẩy giun, kiểm tra móng guốc và nha khoa tự động lặp chu kỳ.</p>
-        </div>
-        <button
-          className="button primary"
-          onClick={() => setShowAddModal(true)}
-          disabled={!activeHorse}
-        >
-          <Plus size={16} /> Tạo lịch chăm sóc mới
-        </button>
-      </div>
-
-      <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, fontSize: '13px' }}>Chọn con ngựa:</span>
-        <CustomDropdown
-          value={selectedHorseId}
-          onChange={setSelectedHorseId}
-          style={{ width: '340px' }}
-          options={horses.map((h) => ({
-            value: h.id,
-            label: `${h.name} (${h.code})`,
-            dot: h.healthStatus === 'FIT' || h.healthStatus === 'ACTIVE' || !h.healthStatus ? '#27714d' : h.healthStatus === 'INJURED' ? '#a74842' : '#b08412',
-          }))}
-        />
-        <span className="record-count">{items.length} hạng mục phòng ngừa</span>
-      </div>
-
-      <div style={{ display: 'grid', gap: '12px' }}>
-        {loading ? (
-          <div className="empty">Đang tải lịch chăm sóc…</div>
-        ) : items.length === 0 ? (
-          <div className="empty card" style={{ padding: '36px' }}>
-            <Calendar size={32} color="#718078" />
-            <b>Chưa có lịch phòng ngừa cho {activeHorse?.name}</b>
-          </div>
-        ) : (
-          items.map((item) => {
-            const isCompleted = !!item.completedAt || !!item.isCompleted
-            const isOverdue = !isCompleted && new Date(item.dueDate) < new Date()
-            const itemTitle = item.details || item.title || PREVENTIVE_TYPES[item.careType] || item.careType
-            return (
-              <div
-                key={item.id}
-                className="card"
-                style={{
-                  padding: '18px 22px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderLeft: isCompleted ? '4px solid #27714d' : isOverdue ? '4px solid #ad4842' : '4px solid #d59d32',
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 8px', borderRadius: '4px', background: '#eef2ed', color: '#27714d' }}>
-                      {PREVENTIVE_TYPES[item.careType] || item.careType}
-                    </span>
-                    {isCompleted ? (
-                      <span style={{ color: '#27714d', fontSize: '11px', fontWeight: 700 }}>✓ ĐÃ HOÀN THÀNH</span>
-                    ) : isOverdue ? (
-                      <span style={{ color: '#ad4842', fontSize: '11px', fontWeight: 700 }}>⚠️ ĐÃ QUÁ HẠN</span>
-                    ) : (
-                      <span style={{ color: '#b08412', fontSize: '11px', fontWeight: 700 }}>⏳ SẮP ĐẾN HẠN</span>
-                    )}
-                  </div>
-                  <h3 style={{ margin: '6px 0 3px', fontSize: '15px' }}>{itemTitle}</h3>
-                  <div style={{ fontSize: '12px', color: '#555' }}>
-                    Hạn chót: <b>{formatVNDate(item.dueDate)}</b> • Chu kỳ lặp: <b>{item.recurrenceDays ? `${Math.round(item.recurrenceDays / 30)} tháng/lần` : (item.intervalMonths ? `${item.intervalMonths} tháng/lần` : 'Một lần')}</b>
-                    {item.completionNotes && <span> • Đã xử lý: {item.completionNotes}</span>}
-                    {item.notes && !item.completionNotes && <span> • Ghi chú: {item.notes}</span>}
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {!isCompleted && (
-                    <button
-                      className="button primary"
-                      style={{ padding: '6px 14px', fontSize: '12px', height: '36px' }}
-                      onClick={() => handleMarkComplete(item)}
-                    >
-                      <Check size={14} /> Đánh dấu hoàn thành
-                    </button>
-                  )}
-                  <button
-                    className="icon-button"
-                    title="Xóa lịch chăm sóc"
-                    style={{ color: '#ad4842' }}
-                    onClick={() => handleDelete(item)}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-
-      {showAddModal && (
-        <CreatePreventiveModal
-          horse={activeHorse}
-          onClose={() => setShowAddModal(false)}
-          onSaved={() => {
-            setShowAddModal(false)
-            loadPreventive()
-          }}
-        />
-      )}
-    </>
-  )
-}
-
-function CreatePreventiveModal({ horse, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    careType: 'VACCINATION',
-    title: '',
-    dueDate: '',
-    intervalMonths: '6',
-    notes: '',
-  })
-  const [busy, setBusy] = useState(false)
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      const recurrenceDays = Number(form.intervalMonths) > 0 ? Number(form.intervalMonths) * 30 : null
-      const details = form.title + (form.notes ? ` - ${form.notes}` : '')
-      await vetApi.createPreventiveCare(horse.id, {
-        careType: form.careType,
-        details: details,
-        dueDate: form.dueDate,
-        recurrenceDays: recurrenceDays,
-        reminderLeadDays: 7,
-      })
-      onSaved()
-    } catch (err) {
-      alert(`Lỗi tạo lịch: ${err.message}`)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal" onMouseDown={(e) => e.stopPropagation()} style={{ width: '520px' }}>
-        <div className="modal-head">
-          <div>
-            <p className="eyebrow">LÊN LỊCH PHÒNG NGỪA</p>
-            <h2>Lịch mới · {horse?.name}</h2>
-          </div>
-          <button className="icon-button" onClick={onClose}><X size={16} /></button>
-        </div>
-        <form onSubmit={submit} className="form-stack">
-          <div className="field">
-            <span>Loại hình chăm sóc phòng ngừa</span>
-            <select
-              value={form.careType}
-              onChange={(e) => setForm({ ...form, careType: e.target.value })}
-            >
-              {Object.entries(PREVENTIVE_TYPES).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <span>Tiêu đề nhiệm vụ *</span>
-            <input
-              required
-              placeholder="VD: Tiêm ngừa cúm ngựa, Tẩy giun Ivermectin..."
-              value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <span>Ngày đến hạn thực hiện *</span>
-            <input
-              type="date"
-              required
-              value={form.dueDate}
-              onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-            />
-          </div>
-          <div className="field">
-            <span>Chu kỳ lặp lại tự động</span>
-            <select
-              value={form.intervalMonths}
-              onChange={(e) => setForm({ ...form, intervalMonths: e.target.value })}
-            >
-              <option value="0">Không lặp (Một lần duy nhất)</option>
-              <option value="1">Hàng tháng (1 tháng/lần)</option>
-              <option value="3">Hàng quý (3 tháng/lần)</option>
-              <option value="6">Định kỳ 6 tháng/lần</option>
-              <option value="12">Hàng năm (12 tháng/lần)</option>
-            </select>
-          </div>
-          <div className="field">
-            <span>Ghi chú chuyên môn</span>
-            <textarea
-              rows={2}
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-            />
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
-            <button type="submit" className="button primary" disabled={busy}>Lên lịch</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-// =========================================================================
-// TAB 7: DINH DƯỠNG LÂM SÀNG & KHẨU PHẦN
-// =========================================================================
-const DEFAULT_MEALS = [
-  {
-    mealName: 'Bữa sáng',
-    feedingTime: '07:00',
-    concentrateKg: 2.0,
-    concentrateType: 'Cám viên dinh dưỡng tiêu chuẩn',
-    forageKg: 4.0,
-    forageType: 'Cỏ Timothy khô',
-    supplements: 'Bổ sung điện giải & Vitamin C',
-  },
-  {
-    mealName: 'Bữa trưa',
-    feedingTime: '11:30',
-    concentrateKg: 1.5,
-    concentrateType: 'Cám viên tăng lực',
-    forageKg: 3.5,
-    forageType: 'Cỏ linh lăng Alfalfa',
-    supplements: '',
-  },
-  {
-    mealName: 'Bữa chiều',
-    feedingTime: '15:30',
-    concentrateKg: 1.5,
-    concentrateType: 'Cám viên tiêu chuẩn',
-    forageKg: 3.0,
-    forageType: 'Cỏ Timothy khô',
-    supplements: 'Khoáng chất vi lượng',
-  },
-  {
-    mealName: 'Bữa tối',
-    feedingTime: '19:00',
-    concentrateKg: 2.0,
-    concentrateType: 'Cám viên tiêu chuẩn',
-    forageKg: 5.0,
-    forageType: 'Cỏ khô hỗn hợp',
-    supplements: '',
-  },
-]
-
-function NutritionProposalView({ initialHorseId }) {
-  const [horses, setHorses] = useState([])
-  const [selectedHorseId, setSelectedHorseId] = useState(initialHorseId || '')
-  const [activePlan, setActivePlan] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [effectiveDate, setEffectiveDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [notes, setNotes] = useState('')
-  const [meals, setMeals] = useState(DEFAULT_MEALS)
-
-  useEffect(() => {
-    vetApi.getEligibleHorses().then((res) => {
-      const list = pageContent(res)
-      setHorses(list)
-      if (list.length > 0 && !selectedHorseId) {
-        const found = initialHorseId && list.find((h) => h.id === initialHorseId)
-        setSelectedHorseId(found ? found.id : list[0].id)
-      }
-    })
-  }, [initialHorseId, selectedHorseId])
-
-  const loadActivePlan = useCallback(async () => {
-    if (!selectedHorseId) return
-    setLoading(true)
-    try {
-      const plan = await vetApi.getHorseNutritionPlan(selectedHorseId)
-      setActivePlan(plan)
-    } catch {
-      setActivePlan(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedHorseId])
-
-  useEffect(() => {
-    loadActivePlan()
-  }, [loadActivePlan])
-
-  const activeHorse = horses.find((h) => h.id === selectedHorseId)
-
-  const handleMealChange = (index, field, value) => {
-    setMeals((prev) => {
-      const next = [...prev]
-      next[index] = { ...next[index], [field]: value }
-      return next
-    })
-  }
-
-  const handleSubmitProposal = async (e) => {
-    e.preventDefault()
-    if (!activeHorse) return
-    setSaving(true)
-    try {
-      const payload = {
-        effectiveDate,
-        notes: notes.trim() || undefined,
-        meals: meals.map((m) => ({
-          mealName: m.mealName,
-          feedingTime: m.feedingTime.length === 5 ? `${m.feedingTime}:00` : m.feedingTime,
-          concentrateKg: parseFloat(m.concentrateKg) || 0,
-          concentrateType: m.concentrateType || '',
-          forageKg: parseFloat(m.forageKg) || 0,
-          forageType: m.forageType || '',
-          supplements: m.supplements || '',
-        })),
-      }
-      await vetApi.createNutritionPlan(selectedHorseId, payload)
-      alert(`Đã gửi đề xuất khẩu phần dinh dưỡng cho ngựa ${activeHorse?.name} thành công! Nhân viên chăm sóc chuồng sẽ theo dõi và cho ăn theo kế hoạch này.`)
-      await loadActivePlan()
-    } catch (err) {
-      alert(`Lỗi tạo đề xuất dinh dưỡng: ${err.message}`)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleDeletePlan = async () => {
-    if (!window.confirm(`Xác nhận xóa đề xuất khẩu phần dinh dưỡng hiện tại của ${activeHorse?.name}?`)) return
-    try {
-      await vetApi.deleteNutritionPlan(selectedHorseId)
-      alert('Đã xóa khẩu phần dinh dưỡng thành công.')
-      await loadActivePlan()
-    } catch (err) {
-      alert(`Lỗi xóa khẩu phần: ${err.message}`)
-    }
-  }
-
-  const totalConcentrate = meals.reduce((sum, m) => sum + (parseFloat(m.concentrateKg) || 0), 0)
-  const totalForage = meals.reduce((sum, m) => sum + (parseFloat(m.forageKg) || 0), 0)
-
-  return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">DINH DƯỠNG LÂM SÀNG & KHẨU PHẦN</p>
-          <h1>Đề xuất khẩu phần dinh dưỡng</h1>
-          <p>Chỉ định khẩu phần ăn và chất bổ sung theo thể trạng y tế gửi trực tiếp cho nhân viên chăm sóc chuồng.</p>
-        </div>
-      </div>
-
-      <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 600, fontSize: '13px' }}>Chọn con ngựa:</span>
-        <CustomDropdown
-          value={selectedHorseId}
-          onChange={setSelectedHorseId}
-          style={{ width: '340px' }}
-          options={horses.map((h) => ({
-            value: h.id,
-            label: `${h.name} (${h.code})`,
-            dot: h.healthStatus === 'FIT' || h.healthStatus === 'ACTIVE' || !h.healthStatus ? '#27714d' : h.healthStatus === 'INJURED' ? '#a74842' : '#b08412',
-          }))}
-        />
-        {activePlan && (
-          <span style={{ fontSize: '12px', color: '#27714d', fontWeight: 600, background: '#e8f5ec', padding: '4px 10px', borderRadius: '6px' }}>
-            ✓ Đang áp dụng kế hoạch v{activePlan.version} ({formatVNDate(activePlan.effectiveDate)})
-          </span>
-        )}
-      </div>
-
-      {loading ? (
-        <div className="empty">Đang tải thông tin dinh dưỡng…</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: activePlan ? '1fr 1fr' : '1fr', gap: '20px', alignItems: 'start' }}>
-          {/* Active Plan Card (if exists) */}
-          {activePlan && (
-            <div className="card" style={{ padding: '24px', borderLeft: '4px solid #27714d' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                <div>
-                  <span style={{ fontSize: '11px', fontWeight: 700, padding: '3px 8px', borderRadius: '4px', background: '#e8f5ec', color: '#27714d' }}>
-                    KHẨU PHẦN ĐANG ÁP DỤNG (v{activePlan.version})
-                  </span>
-                  <h3 style={{ margin: '8px 0 4px', fontSize: '18px' }}>Chỉ định cho {activeHorse?.name}</h3>
-                  <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                    Áp dụng từ: <b>{formatVNDate(activePlan.effectiveDate)}</b>
-                  </p>
-                </div>
-                <button
-                  className="button secondary"
-                  style={{ color: '#ad4842', borderColor: '#f2c6c4', padding: '6px 12px', fontSize: '12px' }}
-                  onClick={handleDeletePlan}
-                >
-                  <Trash2 size={14} /> Xóa kế hoạch
-                </button>
-              </div>
-
-              {activePlan.notes && (
-                <div style={{ background: '#f8faf7', padding: '12px 16px', borderRadius: '8px', fontSize: '13px', marginBottom: '16px', borderLeft: '3px solid #718078' }}>
-                  <strong>Chỉ định chuyên môn:</strong> {activePlan.notes}
-                </div>
-              )}
-
-              <h4 style={{ margin: '14px 0 10px', fontSize: '14px', color: '#333' }}>Chi tiết các bữa ăn trong ngày:</h4>
-              <div style={{ display: 'grid', gap: '8px' }}>
-                {(activePlan.meals || []).map((m, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #e2e8e2',
-                      borderRadius: '8px',
-                      padding: '12px 14px',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Clock size={14} color="#718078" />
-                        <strong style={{ fontSize: '13px' }}>{m.mealName} ({m.feedingTime ? String(m.feedingTime).substring(0, 5) : '—'})</strong>
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#555', marginTop: '4px' }}>
-                        🌾 Cám tinh: <b>{m.concentrateKg} kg</b> {m.concentrateType && `(${m.concentrateType})`} •
-                        🌿 Cỏ thô: <b>{m.forageKg} kg</b> {m.forageType && `(${m.forageType})`}
-                      </div>
-                      {m.supplements && (
-                        <div style={{ fontSize: '11px', color: '#27714d', marginTop: '2px' }}>
-                          💊 Bổ sung: {m.supplements}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Form to create / update proposal */}
-          <div className="card" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-              <Utensils size={20} color="#27714d" />
-              <div>
-                <h3 style={{ margin: 0, fontSize: '17px' }}>
-                  {activePlan ? 'Cập nhật đề xuất khẩu phần mới' : 'Thiết lập đề xuất khẩu phần'}
-                </h3>
-                <p style={{ margin: 0, fontSize: '12px', color: '#666' }}>
-                  Đề xuất gửi tới nhân viên chuồng để chuẩn bị lượng cám và cỏ theo bữa
-                </p>
-              </div>
-            </div>
-
-            <form onSubmit={handleSubmitProposal} className="form-stack">
-              <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="field">
-                  <span>Ngày bắt đầu áp dụng *</span>
-                  <input
-                    type="date"
-                    required
-                    value={effectiveDate}
-                    onChange={(e) => setEffectiveDate(e.target.value)}
-                  />
-                </div>
-                <div className="field">
-                  <span>Tổng định lượng / ngày</span>
-                  <div style={{ padding: '10px 14px', background: '#f5f7f5', borderRadius: '11px', fontSize: '13px', fontWeight: 600, color: '#27714d' }}>
-                    🌾 Cám: {totalConcentrate.toFixed(1)} kg • 🌿 Cỏ: {totalForage.toFixed(1)} kg
-                  </div>
-                </div>
-              </div>
-
-              <div className="field">
-                <span>Chỉ định lâm sàng / Ghi chú cho nhân viên chuồng</span>
-                <textarea
-                  rows={2}
-                  placeholder="VD: Phục hồi sau chấn thương gân, ngâm cám nước ấm 20 phút trước khi cho ăn, bổ sung điện giải sau vận động..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
-
-              <h4 style={{ margin: '14px 0 8px', fontSize: '14px', color: '#2b3a32' }}>
-                Lịch phân bổ 4 bữa ăn trong ngày:
-              </h4>
-
-              <div style={{ display: 'grid', gap: '12px' }}>
-                {meals.map((meal, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: '#f9fbf9',
-                      border: '1px solid #e1e7e2',
-                      borderRadius: '10px',
-                      padding: '14px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                      <strong style={{ fontSize: '14px', color: '#27714d' }}>{meal.mealName}</strong>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontSize: '12px', color: '#666' }}>Giờ cho ăn:</span>
-                        <input
-                          type="time"
-                          value={meal.feedingTime}
-                          onChange={(e) => handleMealChange(idx, 'feedingTime', e.target.value)}
-                          style={{ width: '110px', padding: '4px 8px', minHeight: '34px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr 2fr', gap: '8px', marginBottom: '8px' }}>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#666', display: 'block' }}>Cám tinh (kg)</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={meal.concentrateKg}
-                          onChange={(e) => handleMealChange(idx, 'concentrateKg', e.target.value)}
-                          style={{ minHeight: '34px', padding: '4px 8px' }}
-                        />
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#666', display: 'block' }}>Loại cám</span>
-                        <input
-                          type="text"
-                          placeholder="Loại cám"
-                          value={meal.concentrateType}
-                          onChange={(e) => handleMealChange(idx, 'concentrateType', e.target.value)}
-                          style={{ minHeight: '34px', padding: '4px 8px' }}
-                        />
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#666', display: 'block' }}>Cỏ thô (kg)</span>
-                        <input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          value={meal.forageKg}
-                          onChange={(e) => handleMealChange(idx, 'forageKg', e.target.value)}
-                          style={{ minHeight: '34px', padding: '4px 8px' }}
-                        />
-                      </div>
-                      <div>
-                        <span style={{ fontSize: '11px', color: '#666', display: 'block' }}>Loại cỏ</span>
-                        <input
-                          type="text"
-                          placeholder="Loại cỏ"
-                          value={meal.forageType}
-                          onChange={(e) => handleMealChange(idx, 'forageType', e.target.value)}
-                          style={{ minHeight: '34px', padding: '4px 8px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <span style={{ fontSize: '11px', color: '#666', display: 'block' }}>Thực phẩm bổ sung / Thuốc kèm</span>
-                      <input
-                        type="text"
-                        placeholder="VD: Vitamin C, Men tiêu hóa, Dầu hạt lanh... (nếu có)"
-                        value={meal.supplements}
-                        onChange={(e) => handleMealChange(idx, 'supplements', e.target.value)}
-                        style={{ minHeight: '34px', padding: '4px 8px' }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
-                <button
-                  type="submit"
-                  className="button primary"
-                  disabled={saving || !activeHorse}
-                  style={{ padding: '10px 24px', fontSize: '14px' }}
-                >
-                  <Utensils size={16} /> {saving ? 'Đang gửi đề xuất…' : 'Gửi đề xuất tới nhân viên chăm sóc'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
   )
 }
 
@@ -3586,11 +3740,11 @@ function VetAssessmentModal({ session, existingAssessment, onClose, onSaved }) {
 }
 
 // =========================================================================
-// TAB 9: HỒ SƠ NGỰA (Horse Profile - Read-only for Veterinarian)
+// FACEBOOK-STYLE POPUP MODAL: HỒ SƠ NGỰA & BỆNH ÁN LÂM SÀNG
 // =========================================================================
-function HorseProfileView({ onNavigate, initialHorseId }) {
+export function HorseProfileModal({ horseId, onClose, onNavigate }) {
   const [horses, setHorses] = useState([])
-  const [selectedHorseId, setSelectedHorseId] = useState(initialHorseId || '')
+  const [selectedHorseId, setSelectedHorseId] = useState(horseId || '')
   const [horse, setHorse] = useState(null)
   const [healthStatus, setHealthStatus] = useState(null)
   const [medicalExams, setMedicalExams] = useState([])
@@ -3601,16 +3755,34 @@ function HorseProfileView({ onNavigate, initialHorseId }) {
   const [weights, setWeights] = useState([])
   const [loading, setLoading] = useState(false)
 
+  // ESC key listener to dismiss modal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  // Prevent background scrolling while modal is open
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = origOverflow
+    }
+  }, [])
+
   useEffect(() => {
     vetApi.getEligibleHorses().then((res) => {
       const list = pageContent(res)
       setHorses(list)
-      if (list.length > 0 && !selectedHorseId) {
-        const found = initialHorseId && list.find((h) => h.id === initialHorseId)
-        setSelectedHorseId(found ? found.id : list[0].id)
-      }
     })
-  }, [initialHorseId, selectedHorseId])
+  }, [])
+
+  useEffect(() => {
+    if (horseId) setSelectedHorseId(horseId)
+  }, [horseId])
 
   const loadProfile = useCallback(async () => {
     if (!selectedHorseId) return
@@ -3715,244 +3887,424 @@ function HorseProfileView({ onNavigate, initialHorseId }) {
   const healthSt = HEALTH_STATUS_MAP[healthStatus?.status || horse?.healthStatus || 'FIT'] || HEALTH_STATUS_MAP.FIT
 
   return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">HỒ SƠ NGỰA (CHỈ ĐỌC)</p>
-          <h1>Hồ sơ chi tiết & Lịch sử y tế</h1>
-          <p>Bác sĩ thú y xem toàn diện hồ sơ định danh, thể trạng, lịch sử khám, chấn thương và tiến độ tập luyện của ngựa.</p>
-        </div>
-      </div>
-
-      <div className="toolbar card" style={{ display: 'flex', gap: '14px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontWeight: 600, fontSize: '13px' }}>Chọn con ngựa:</span>
-          <CustomDropdown
-            value={selectedHorseId}
-            onChange={setSelectedHorseId}
-            style={{ width: '340px' }}
-            options={horses.map((h) => ({
-              value: h.id,
-              label: `${h.name} (${h.code})`,
-              dot: h.healthStatus === 'FIT' || h.healthStatus === 'ACTIVE' || !h.healthStatus ? '#27714d' : h.healthStatus === 'INJURED' ? '#a74842' : '#b08412',
-            }))}
-          />
-        </div>
-
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button
-            className="button secondary"
-            style={{ fontSize: '12px', padding: '6px 14px' }}
-            onClick={() => onNavigate(`medical-records?horseId=${selectedHorseId}`)}
-          >
-            <Stethoscope size={14} /> Sổ khám y tế
-          </button>
-          <button
-            className="button secondary"
-            style={{ fontSize: '12px', padding: '6px 14px' }}
-            onClick={() => onNavigate(`injuries?horseId=${selectedHorseId}`)}
-          >
-            <HeartPulse size={14} /> Chấn thương
-          </button>
-          <button
-            className="button secondary"
-            style={{ fontSize: '12px', padding: '6px 14px' }}
-            onClick={() => onNavigate(`medical-records?horseId=${selectedHorseId}`)}
-          >
-            <Syringe size={14} /> Lịch phòng ngừa
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="empty">Đang tải hồ sơ ngựa…</div>
-      ) : !horse ? (
-        <div className="empty card" style={{ padding: '36px' }}>Vui lòng chọn ngựa để xem hồ sơ.</div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'start' }}>
-          {/* CỘT TRÁI: THÔNG TIN ĐỊNH DANH & THỂ TRẠNG */}
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {/* THÔNG TIN CƠ BẢN */}
-            <div className="card" style={{ padding: '22px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #edf2ed', paddingBottom: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <User size={18} color="#27714d" /> Thông tin cơ bản
-                </h3>
-                <span style={{ fontSize: '12px', fontWeight: 700, color: '#4a6056', background: '#f0f4f1', padding: '3px 8px', borderRadius: '4px' }}>
-                  MÃ: {horse.code}
-                </span>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', fontSize: '13px' }}>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Tên ngựa</span>
-                  <strong style={{ fontSize: '15px', color: '#1f382b' }}>{horse.name}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Giống ngựa</span>
-                  <strong>{horse.breed || 'Thoroughbred'}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Ngày sinh & Tuổi</span>
-                  <strong>{formatVNDate(horse.birthDate)} {age !== null && `(${age} tuổi)`}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Giới tính</span>
-                  <strong>{genderLabel}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Màu lông & Nhận dạng</span>
-                  <strong>{horse.colorMarkings || horse.color || 'Nâu hạt dẻ / Không dị tật'}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Cân nặng gần nhất</span>
-                  <strong>{latestWeight ? `${latestWeight.weightKg} kg (${formatVNDate(latestWeight.recordedAt || latestWeight.date)})` : (horse.weightKg ? `${horse.weightKg} kg` : 'Chưa cân')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Chiều cao</span>
-                  <strong>{horse.heightCm ? `${horse.heightCm} cm` : (horse.heightHands ? `${horse.heightHands} hands` : '—')}</strong>
-                </div>
-                <div>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Chủ sở hữu</span>
-                  <strong>{(horse.owners && horse.owners.length > 0) ? horse.owners.map((o) => o.username || o.name).join(', ') : 'Chưa có thông tin'}</strong>
-                </div>
-                <div style={{ gridColumn: 'span 2' }}>
-                  <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Ô chuồng hiện tại</span>
-                  <strong>{cleanStableName(horse.stable)} • {horse.stallLocation || horse.stallCode || 'Chưa xếp ô chuồng'} ({cleanStableLocation(horse.stable?.location)})</strong>
-                </div>
-              </div>
+    <div
+      className="facebook-profile-modal-backdrop"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 99999,
+        background: 'rgba(10, 20, 15, 0.75)',
+        backdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        className="facebook-profile-modal-card"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: '1100px',
+          maxHeight: '92vh',
+          background: '#ffffff',
+          borderRadius: '16px',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.45)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          border: '1px solid #d4dfd8',
+        }}
+      >
+        {/* TOP BAR / HEADER (Facebook post style) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '16px 24px',
+            borderBottom: '1px solid #e2ebe5',
+            background: '#f9fbf9',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div
+              style={{
+                width: '44px',
+                height: '44px',
+                borderRadius: '50%',
+                background: '#e8f5ec',
+                color: '#27714d',
+                display: 'grid',
+                placeItems: 'center',
+                fontSize: '20px',
+                boxShadow: '0 2px 8px rgba(39, 113, 77, 0.15)',
+              }}
+            >
+              🏇
             </div>
-
-            {/* TRẠNG THÁI HIỆN TẠI */}
-            <div className="card" style={{ padding: '22px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #edf2ed', paddingBottom: '12px' }}>
-                <Activity size={18} color="#27714d" />
-                <h3 style={{ margin: 0, fontSize: '17px' }}>Trạng thái hiện tại</h3>
-              </div>
-
-              <div style={{ display: 'grid', gap: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8faf7', padding: '12px 16px', borderRadius: '8px' }}>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#666', display: 'block' }}>Thể trạng y tế:</span>
-                    <strong style={{ fontSize: '14px', color: healthSt.color }}>{healthSt.label}</strong>
-                  </div>
-                  <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: healthSt.bg, color: healthSt.color }}>
-                    {healthStatus?.status || horse?.healthStatus || 'FIT'}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h2 style={{ margin: 0, fontSize: '19px', color: '#133e31', fontWeight: 800 }}>
+                  {horse?.name || 'Chiến mã'}
+                </h2>
+                {horse?.code && (
+                  <span style={{ fontSize: '12px', fontWeight: 700, color: '#335043', background: '#e5ece7', padding: '2px 8px', borderRadius: '4px' }}>
+                    {horse.code}
                   </span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8faf7', padding: '12px 16px', borderRadius: '8px' }}>
-                  <div>
-                    <span style={{ fontSize: '12px', color: '#666', display: 'block' }}>Tiến trình y tế:</span>
-                    <strong style={{ fontSize: '14px' }}>
-                      {horse.paymentStatus === 'IN_MEDICAL' ? '🏥 Đang trong ca khám ban đầu' : horse.paymentStatus === 'PENDING_TRAINING' ? '⏳ Chờ HLV tiếp nhận tập luyện' : horse.paymentStatus === 'TRAINING' ? '🏇 Đang trong chế độ huấn luyện' : '✓ Đủ điều kiện chăm sóc'}
-                    </strong>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: activeLock ? '#fff2f0' : '#f8faf7', padding: '12px 16px', borderRadius: '8px', border: activeLock ? '1px solid #f2c6c4' : 'none' }}>
-                  <div>
-                    <span style={{ fontSize: '12px', color: activeLock ? '#ad4842' : '#666', display: 'block' }}>Khóa huấn luyện (Training Lock):</span>
-                    <strong style={{ fontSize: '14px', color: activeLock ? '#ad4842' : '#27714d' }}>
-                      {activeLock ? `🔒 ĐANG KHÓA đến ${formatVNDate(activeLock.lockUntil || activeLock.unlockDate || activeLock.endDate)}` : '✓ Không bị khóa lịch tập'}
-                    </strong>
-                    {activeLock?.reason && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#882222' }}>Lý do: {activeLock.reason}</p>}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* CỘT PHẢI: LỊCH SỬ Y TẾ TÓM TẮT & KẾ HOẠCH TẬP */}
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {/* TÓM TẮT Y TẾ */}
-            <div className="card" style={{ padding: '22px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #edf2ed', paddingBottom: '12px' }}>
-                <Stethoscope size={18} color="#27714d" />
-                <h3 style={{ margin: 0, fontSize: '17px' }}>Tóm tắt lịch sử y tế</h3>
-              </div>
-
-              <div style={{ display: 'grid', gap: '12px', fontSize: '13px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e8eee8' }}>
-                  <span style={{ color: '#666' }}>Lần khám gần nhất:</span>
-                  <strong>{latestExam ? formatVNDate(latestExam.examDate || latestExam.examinationDate || latestExam.createdAt) : 'Chưa có phiếu khám'}</strong>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e8eee8' }}>
-                  <span style={{ color: '#666' }}>Số lần khám trong năm {new Date().getFullYear()}:</span>
-                  <strong>{currentYearExamsCount} lần khám</strong>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e8eee8' }}>
-                  <span style={{ color: '#666' }}>Chấn thương đang theo dõi:</span>
-                  <strong style={{ color: activeInjuries.length > 0 ? '#ad4842' : '#27714d' }}>
-                    {activeInjuries.length > 0 ? `${activeInjuries.length} chấn thương (${activeInjuries.map((i) => i.bodyLocation || i.diagnosis || 'Chấn thương').join(', ')})` : '0 (Không có)'}
-                  </strong>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px dashed #e8eee8' }}>
-                  <span style={{ color: '#666' }}>Tiêm phòng gần nhất:</span>
-                  <strong>{latestVaccine ? `${formatVNDate(latestVaccine.completedAt || latestVaccine.dueDate)} (${latestVaccine.details || 'Vắc-xin'})` : 'Chưa ghi nhận'}</strong>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0' }}>
-                  <span style={{ color: '#666' }}>Tẩy giun gần nhất:</span>
-                  <strong>{latestDeworming ? `${formatVNDate(latestDeworming.completedAt || latestDeworming.dueDate)} (${latestDeworming.details || 'Tẩy giun'})` : 'Chưa ghi nhận'}</strong>
-                </div>
-              </div>
-            </div>
-
-            {/* SƠ ĐỒ CƠ THỂ & CHẤN THƯƠNG 3D */}
-            <div className="card" style={{ padding: '22px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #edf2ed', paddingBottom: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '17px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <HeartPulse size={18} color="#27714d" /> Sơ đồ cơ thể & Chấn thương 3D
-                </h3>
-                <span className="record-count" style={{ fontSize: '12px', color: activeInjuries.length > 0 ? '#ad4842' : '#27714d', fontWeight: 600 }}>
-                  {activeInjuries.length > 0 ? `${activeInjuries.length} chấn thương đang theo dõi` : 'Không có chấn thương'}
+                )}
+                <span
+                  style={{
+                    padding: '2px 8px',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    background: healthSt.bg,
+                    color: healthSt.color,
+                  }}
+                >
+                  {healthSt.label}
                 </span>
               </div>
-              <HorseBodyModel3D injuries={activeInjuries} height={340} readonly={true} />
-              <p style={{ fontSize: '11px', color: '#888', marginTop: '8px', textAlign: 'center' }}>
-                🖱️ Kéo để xoay 3D · Cuộn để phóng to/thu nhỏ · Nhấp điểm đánh dấu để xem chi tiết
+              <p style={{ margin: '3px 0 0', fontSize: '12px', color: '#667d71' }}>
+                {cleanStableName(horse?.stable)} • Ô {horse?.stallLocation || horse?.stallCode || '—'} · {horse?.breed || 'Thoroughbred'}
               </p>
             </div>
+          </div>
 
-            {/* KẾ HOẠCH HUẤN LUYỆN HIỆN TẠI */}
-            <div className="card" style={{ padding: '22px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #edf2ed', paddingBottom: '12px' }}>
-                <Calendar size={18} color="#27714d" />
-                <h3 style={{ margin: 0, fontSize: '17px' }}>Kế hoạch huấn luyện hiện tại</h3>
-              </div>
-
-              {currentPlan ? (
-                <div style={{ display: 'grid', gap: '10px', fontSize: '13px' }}>
-                  <div>
-                    <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Tên kế hoạch</span>
-                    <strong style={{ fontSize: '14px', color: '#1f382b' }}>{currentPlan.title || currentPlan.name || 'Kế hoạch phát triển thể lực'}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Giai đoạn hiện tại</span>
-                    <strong>{currentPlan.currentPhase?.name || currentPlan.phase || 'Giai đoạn tích lũy'}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Thời gian thực hiện</span>
-                    <strong>{formatVNDate(currentPlan.startDate)} → {formatVNDate(currentPlan.endDate)}</strong>
-                  </div>
-                  <div>
-                    <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Huấn luyện viên phụ trách</span>
-                    <strong>{currentPlan.trainer?.username || horse.currentTrainer?.username || 'Chưa phân công HLV'}</strong>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px 0', color: '#777', fontSize: '13px' }}>
-                  Ngựa hiện chưa được gán kế hoạch huấn luyện chính thức.
-                </div>
-              )}
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            {horses.length > 1 && (
+              <CustomDropdown
+                value={selectedHorseId}
+                onChange={setSelectedHorseId}
+                style={{ width: '260px' }}
+                options={horses.map((h) => ({
+                  value: h.id,
+                  label: `${h.name} (${h.code})`,
+                  dot: h.healthStatus === 'FIT' || h.healthStatus === 'ACTIVE' || !h.healthStatus ? '#27714d' : h.healthStatus === 'INJURED' ? '#a74842' : '#b08412',
+                }))}
+              />
+            )}
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Đóng"
+              title="Đóng (ESC)"
+              onClick={onClose}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                background: '#e4e6eb',
+                color: '#1c1e21',
+                border: 'none',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={20} />
+            </button>
           </div>
         </div>
+
+        {/* BIOMETRICS BAR */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))',
+            gap: '12px',
+            padding: '14px 24px',
+            background: '#ffffff',
+            borderBottom: '1px solid #edf2ed',
+          }}
+        >
+          <div style={{ background: '#f8faf8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5ebe7' }}>
+            <span style={{ fontSize: '11px', color: '#687e74', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <HeartPulse size={13} color="#ad4842" /> Nhịp tim lúc nghỉ
+            </span>
+            <strong style={{ fontSize: '15px', color: '#133e31', marginTop: '2px', display: 'block' }}>
+              {latestExam?.heartRateBpm ? `${latestExam.heartRateBpm} BPM` : '36 - 44 BPM'}
+            </strong>
+          </div>
+          <div style={{ background: '#f8faf8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5ebe7' }}>
+            <span style={{ fontSize: '11px', color: '#687e74', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Activity size={13} color="#27714d" /> Chiều dài thân
+            </span>
+            <strong style={{ fontSize: '15px', color: '#133e31', marginTop: '2px', display: 'block' }}>
+              {latestExam?.bodyLengthCm ? `${latestExam.bodyLengthCm} cm` : (horse?.bodyLengthCm ? `${horse.bodyLengthCm} cm` : '160 - 175 cm')}
+            </strong>
+          </div>
+          <div style={{ background: '#f8faf8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5ebe7' }}>
+            <span style={{ fontSize: '11px', color: '#687e74', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Zap size={13} color="#b08412" /> Thân nhiệt lâm sàng
+            </span>
+            <strong style={{ fontSize: '15px', color: '#133e31', marginTop: '2px', display: 'block' }}>
+              {latestExam?.temperatureCelsius ? `${latestExam.temperatureCelsius} °C` : '37.5 - 38.5 °C'}
+            </strong>
+          </div>
+          <div style={{ background: '#f8faf8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5ebe7' }}>
+            <span style={{ fontSize: '11px', color: '#687e74', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Sparkles size={13} color="#2b6e9b" /> Chiều cao
+            </span>
+            <strong style={{ fontSize: '15px', color: '#133e31', marginTop: '2px', display: 'block' }}>
+              {horse?.heightCm ? `${horse.heightCm} cm` : (latestExam?.heightCm ? `${latestExam.heightCm} cm` : (horse?.heightHands ? `${horse.heightHands} hands` : '—'))}
+            </strong>
+          </div>
+          <div style={{ background: '#f8faf8', padding: '10px 14px', borderRadius: '10px', border: '1px solid #e5ebe7' }}>
+            <span style={{ fontSize: '11px', color: '#687e74', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <Clock size={13} color="#4a6056" /> Cân nặng gần nhất
+            </span>
+            <strong style={{ fontSize: '15px', color: '#133e31', marginTop: '2px', display: 'block' }}>
+              {latestWeight ? `${latestWeight.weightKg} kg` : (horse?.weightKg ? `${horse.weightKg} kg` : '—')}
+            </strong>
+          </div>
+        </div>
+
+        {/* SCROLLABLE MODAL BODY */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '22px 24px' }}>
+          {loading ? (
+            <div className="empty" style={{ minHeight: '260px' }}>Đang tải chi tiết hồ sơ ngựa…</div>
+          ) : !horse ? (
+            <div className="empty" style={{ minHeight: '260px' }}>Không tìm thấy thông tin chiến mã.</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px', alignItems: 'start' }}>
+              {/* CỘT TRÁI: THÔNG TIN ĐỊNH DANH & THỂ TRẠNG */}
+              <div style={{ display: 'grid', gap: '18px' }}>
+                {/* THÔNG TIN CƠ BẢN */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', borderBottom: '1px solid #edf2ed', paddingBottom: '10px' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <User size={17} color="#27714d" /> Thông tin cơ bản
+                    </h3>
+                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#4a6056', background: '#f0f4f1', padding: '3px 8px', borderRadius: '4px' }}>
+                      MÃ: {horse.code}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                    <div>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Tên ngựa</span>
+                      <strong style={{ fontSize: '15px', color: '#1f382b' }}>{horse.name}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Giống ngựa</span>
+                      <strong>{horse.breed || 'Thoroughbred'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Ngày sinh & Tuổi</span>
+                      <strong>{formatVNDate(horse.birthDate)} {age !== null && `(${age} tuổi)`}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Giới tính</span>
+                      <strong>{genderLabel}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Màu lông & Nhận dạng</span>
+                      <strong>{horse.colorMarkings || horse.color || 'Nâu hạt dẻ / Không dị tật'}</strong>
+                    </div>
+                    <div>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Chủ sở hữu</span>
+                      <strong>{(horse.owners && horse.owners.length > 0) ? horse.owners.map((o) => o.username || o.name).join(', ') : 'Chưa có thông tin'}</strong>
+                    </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                      <span style={{ color: '#718078', fontSize: '12px', display: 'block' }}>Ô chuồng hiện tại</span>
+                      <strong>{cleanStableName(horse.stable)} • {horse.stallLocation || horse.stallCode || 'Chưa xếp ô chuồng'} ({cleanStableLocation(horse.stable?.location)})</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* TRẠNG THÁI HIỆN TẠI & LỆNH KHÓA */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', borderBottom: '1px solid #edf2ed', paddingBottom: '10px' }}>
+                    <Activity size={17} color="#27714d" />
+                    <h3 style={{ margin: 0, fontSize: '16px' }}>Trạng thái hiện tại</h3>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: '12px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8faf7', padding: '10px 14px', borderRadius: '8px' }}>
+                      <div>
+                        <span style={{ fontSize: '12px', color: '#666', display: 'block' }}>Thể trạng y tế:</span>
+                        <strong style={{ fontSize: '14px', color: healthSt.color }}>{healthSt.label}</strong>
+                      </div>
+                      <span style={{ padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 700, background: healthSt.bg, color: healthSt.color }}>
+                        {healthStatus?.status || horse?.healthStatus || 'FIT'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8faf7', padding: '10px 14px', borderRadius: '8px' }}>
+                      <div>
+                        <span style={{ fontSize: '12px', color: '#666', display: 'block' }}>Tiến trình y tế:</span>
+                        <strong style={{ fontSize: '13px' }}>
+                          {horse.paymentStatus === 'IN_MEDICAL' ? '🏥 Đang trong ca khám ban đầu' : horse.paymentStatus === 'PENDING_TRAINING' ? '⏳ Chờ HLV tiếp nhận tập luyện' : horse.paymentStatus === 'TRAINING' ? '🏇 Đang trong chế độ huấn luyện' : '✓ Đủ điều kiện chăm sóc'}
+                        </strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: activeLock ? '#fff2f0' : '#f8faf7', padding: '10px 14px', borderRadius: '8px', border: activeLock ? '1px solid #f2c6c4' : 'none' }}>
+                      <div>
+                        <span style={{ fontSize: '12px', color: activeLock ? '#ad4842' : '#666', display: 'block' }}>Khóa huấn luyện (Training Lock):</span>
+                        <strong style={{ fontSize: '13px', color: activeLock ? '#ad4842' : '#27714d' }}>
+                          {activeLock ? `🔒 ĐANG KHÓA đến ${formatVNDate(activeLock.lockUntil || activeLock.unlockDate || activeLock.endDate)}` : '✓ Sẵn sàng tập luyện (Không bị khóa)'}
+                        </strong>
+                        {activeLock?.reason && <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#882222' }}>Lý do: {activeLock.reason}</p>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* CỘT PHẢI: LỊCH SỬ Y TẾ TÓM TẮT & KẾ HOẠCH TẬP */}
+              <div style={{ display: 'grid', gap: '18px' }}>
+                {/* TÓM TẮT Y TẾ */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px', borderBottom: '1px solid #edf2ed', paddingBottom: '10px' }}>
+                    <Stethoscope size={17} color="#27714d" />
+                    <h3 style={{ margin: 0, fontSize: '16px' }}>Tóm tắt lịch sử y tế</h3>
+                  </div>
+
+                  <div style={{ display: 'grid', gap: '10px', fontSize: '13px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #e8eee8' }}>
+                      <span style={{ color: '#666' }}>Lần khám gần nhất:</span>
+                      <strong>{latestExam ? formatVNDate(latestExam.examDate || latestExam.examinationDate || latestExam.createdAt) : 'Chưa có phiếu khám'}</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #e8eee8' }}>
+                      <span style={{ color: '#666' }}>Số lần khám năm {new Date().getFullYear()}:</span>
+                      <strong>{currentYearExamsCount} lần khám</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #e8eee8' }}>
+                      <span style={{ color: '#666' }}>Chấn thương đang theo dõi:</span>
+                      <strong style={{ color: activeInjuries.length > 0 ? '#ad4842' : '#27714d' }}>
+                        {activeInjuries.length > 0 ? `${activeInjuries.length} chấn thương` : '0 (Không có)'}
+                      </strong>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed #e8eee8' }}>
+                      <span style={{ color: '#666' }}>Tiêm phòng gần nhất:</span>
+                      <strong>{latestVaccine ? `${formatVNDate(latestVaccine.completedAt || latestVaccine.dueDate)}` : 'Chưa ghi nhận'}</strong>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                      <span style={{ color: '#666' }}>Tẩy giun gần nhất:</span>
+                      <strong>{latestDeworming ? `${formatVNDate(latestDeworming.completedAt || latestDeworming.dueDate)}` : 'Chưa ghi nhận'}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SƠ ĐỒ CƠ THỂ & CHẤN THƯƠNG 3D */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', borderBottom: '1px solid #edf2ed', paddingBottom: '10px' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <HeartPulse size={17} color="#27714d" /> Sơ đồ cơ thể & Chấn thương 3D
+                    </h3>
+                    <span className="record-count" style={{ fontSize: '11px', color: activeInjuries.length > 0 ? '#ad4842' : '#27714d', fontWeight: 600 }}>
+                      {activeInjuries.length > 0 ? `${activeInjuries.length} chấn thương` : 'Khỏe mạnh'}
+                    </span>
+                  </div>
+                  <HorseBodyModel3D injuries={activeInjuries} height={300} readonly={true} />
+                  <p style={{ fontSize: '11px', color: '#888', marginTop: '6px', textAlign: 'center' }}>
+                    🖱️ Kéo để xoay 3D · Cuộn để phóng to/thu nhỏ
+                  </p>
+                </div>
+
+                {/* KẾ HOẠCH HUẤN LUYỆN HIỆN TẠI */}
+                <div className="card" style={{ padding: '20px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', borderBottom: '1px solid #edf2ed', paddingBottom: '10px' }}>
+                    <Calendar size={17} color="#27714d" />
+                    <h3 style={{ margin: 0, fontSize: '16px' }}>Kế hoạch huấn luyện hiện tại</h3>
+                  </div>
+
+                  {currentPlan ? (
+                    <div style={{ display: 'grid', gap: '8px', fontSize: '13px' }}>
+                      <div>
+                        <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Tên kế hoạch</span>
+                        <strong style={{ fontSize: '14px', color: '#1f382b' }}>{currentPlan.title || currentPlan.name || 'Kế hoạch phát triển thể lực'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Giai đoạn hiện tại</span>
+                        <strong>{currentPlan.currentPhase?.name || currentPlan.phase || 'Giai đoạn tích lũy'}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Thời gian thực hiện</span>
+                        <strong>{formatVNDate(currentPlan.startDate)} → {formatVNDate(currentPlan.endDate)}</strong>
+                      </div>
+                      <div>
+                        <span style={{ color: '#666', fontSize: '12px', display: 'block' }}>Huấn luyện viên phụ trách</span>
+                        <strong>{currentPlan.trainer?.username || horse.currentTrainer?.username || 'Chưa phân công HLV'}</strong>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '16px 0', color: '#777', fontSize: '12px' }}>
+                      Ngựa hiện chưa được gán kế hoạch huấn luyện chính thức.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* MODAL FOOTER */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 24px',
+            borderTop: '1px solid #e2ebe5',
+            background: '#f9fbf9',
+          }}
+        >
+          <span style={{ fontSize: '12px', color: '#667d71' }}>
+            Nhấn phím <b>ESC</b> hoặc nhấp ra ngoài để đóng
+          </span>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button type="button" className="button secondary" onClick={onClose} style={{ padding: '8px 18px', fontSize: '13px' }}>
+              Đóng
+            </button>
+            <button
+              type="button"
+              className="button primary"
+              onClick={() => {
+                onClose()
+                onNavigate(`medical-records?horseId=${selectedHorseId}`)
+              }}
+              style={{ padding: '8px 18px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <FileText size={15} /> Mở sổ khám bệnh án chi tiết →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Backward-compatibility wrapper for standalone horse profile route
+export function HorseProfileView({ onNavigate, initialHorseId }) {
+  const [modalHorseId, setModalHorseId] = useState(initialHorseId || '')
+  return (
+    <>
+      <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
+        <h3>Hồ sơ chiến mã</h3>
+        <p style={{ color: '#687e74', margin: '8px 0 16px' }}>Hồ sơ ngựa hiện được tích hợp dạng popup trực tiếp trên Bản đồ ô chuồng.</p>
+        <button className="button primary" onClick={() => onNavigate('health-map')}>
+          Đi tới Bản đồ ô chuồng
+        </button>
+      </div>
+      {modalHorseId && (
+        <HorseProfileModal
+          horseId={modalHorseId}
+          onClose={() => setModalHorseId(null)}
+          onNavigate={onNavigate}
+        />
       )}
     </>
   )
 }
+

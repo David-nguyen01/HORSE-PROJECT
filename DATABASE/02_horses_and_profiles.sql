@@ -20,7 +20,7 @@ BEGIN
         id UNIQUEIDENTIFIER NOT NULL CONSTRAINT pk_horses PRIMARY KEY,
         code VARCHAR(50) NOT NULL CONSTRAINT uq_horses_code UNIQUE,
         name NVARCHAR(150) NOT NULL,
-        microchip_passport_number VARCHAR(100) NULL CONSTRAINT uq_horses_microchip UNIQUE,
+        microchip_passport_number VARCHAR(100) NULL,
         birth_date DATE NOT NULL,
         gender VARCHAR(20) NOT NULL,
         color_markings NVARCHAR(500) NOT NULL,
@@ -79,6 +79,7 @@ BEGIN
     CREATE NONCLUSTERED INDEX idx_horses_trainer ON dbo.horses(current_trainer_id);
     CREATE NONCLUSTERED INDEX idx_horses_caretaker ON dbo.horses(caretaker_user_id);
     CREATE NONCLUSTERED INDEX idx_horses_status ON dbo.horses(status, health_status);
+    CREATE UNIQUE NONCLUSTERED INDEX uq_horses_microchip ON dbo.horses (microchip_passport_number) WHERE microchip_passport_number IS NOT NULL;
 END;
 GO
 
