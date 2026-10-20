@@ -340,16 +340,26 @@ public class TrainingEvaluationService {
         data.put("veterinarianName", vet.getUsername());
         data.put("createdAt", now.toString());
 
-        jdbc.update("""
-                insert into module_records(
-                    id, module_code, record_type, source_table,
-                    horse_id, user_id, status, event_date, data_json,
-                    created_at, updated_at
-                ) values (?, 'TRAINING', 'VET_TRAINING_ASSESSMENT', 'training_schedules',
-                          ?, ?, 'COMPLETED', ?, ?,
-                          SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
-                """,
-                assessmentId, schedule.getHorse().getId(), vetId, today, toJson(data));
+        List<UUID> existing = jdbc.query(
+                "select id from module_records where module_code='TRAINING' and record_type='VET_TRAINING_ASSESSMENT' and JSON_VALUE(data_json, '$.scheduleId')=?",
+                (rs, n) -> toUuid(rs.getObject("id")),
+                scheduleId.toString());
+        if (!existing.isEmpty()) {
+            assessmentId = existing.getFirst();
+            jdbc.update("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                    toJson(data), assessmentId);
+        } else {
+            jdbc.update("""
+                    insert into module_records(
+                        id, module_code, record_type, source_table,
+                        horse_id, user_id, status, event_date, data_json,
+                        created_at, updated_at
+                    ) values (?, 'TRAINING', 'VET_TRAINING_ASSESSMENT', 'training_schedules',
+                              ?, ?, 'COMPLETED', ?, ?,
+                              SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                    """,
+                    assessmentId, schedule.getHorse().getId(), vetId, today, toJson(data));
+        }
 
         if (notificationService != null) {
             List<UserAccount> headTrainers = userRepository.findByRoles(List.of(Role.HEAD_TRAINER));
@@ -436,12 +446,17 @@ public class TrainingEvaluationService {
         }
     }
 
+    private UUID toUuid(Object value) {
+        if (value == null) return null;
+        return value instanceof UUID uuid ? uuid : UUID.fromString(value.toString());
+    }
+
     private VetAssessmentResponse mapVetAssessmentRow(Map<String, Object> row) {
-        UUID id = (UUID) row.get("id");
-        UUID horseId = (UUID) row.get("horse_id");
+        UUID id = toUuid(row.get("id"));
+        UUID horseId = toUuid(row.get("horse_id"));
         String horseCode = (String) row.get("horse_code");
         String horseName = (String) row.get("horse_name");
-        UUID vetId = (UUID) row.get("user_id");
+        UUID vetId = toUuid(row.get("user_id"));
         String vetName = (String) row.get("vet_name");
         Object createdAtObj = row.get("created_at");
         OffsetDateTime createdAt = createdAtObj instanceof OffsetDateTime odt

@@ -3174,10 +3174,11 @@ const MUSCLE_OPTIONS = {
 function TrainingAssessmentView({ onNavigate }) {
   const [subTab, setSubTab] = useState('mine') // 'mine' | 'calendar'
   const todayStr = () => new Date().toISOString().split('T')[0]
+  const pastDt = (days) => new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
   const futureDt = (days) => new Date(Date.now() + days * 86400000).toISOString().split('T')[0]
 
   // Date range filter for open & mine
-  const [dateFrom, setDateFrom] = useState(todayStr())
+  const [dateFrom, setDateFrom] = useState(pastDt(7))
   const [dateTo, setDateTo] = useState(futureDt(14))
 
   // Single date for calendar view
@@ -3209,17 +3210,29 @@ function TrainingAssessmentView({ onNavigate }) {
       if (assessmentsRes.status === 'fulfilled') {
         const assessList = Array.isArray(assessmentsRes.value) ? assessmentsRes.value : pageContent(assessmentsRes.value) || []
         assessList.forEach((a) => {
-          if (a.scheduleId) map[a.scheduleId] = a
+          if (a.scheduleId) {
+            map[a.scheduleId] = a
+            if (typeof a.scheduleId === 'string') map[a.scheduleId.toLowerCase()] = a
+          }
         })
       }
 
       // Query assessment for each session in list
       await Promise.allSettled(
         list.map(async (s) => {
-          if (!map[s.id]) {
+          const key = s.id
+          const keyLower = typeof key === 'string' ? key.toLowerCase() : key
+          if (!map[key] && !map[keyLower]) {
             try {
               const a = await vetApi.getVetAssessment(s.id)
-              if (a && a.id) map[s.id] = a
+              if (a && (a.id || a.scheduleId)) {
+                map[key] = a
+                map[keyLower] = a
+                if (a.scheduleId) {
+                  map[a.scheduleId] = a
+                  if (typeof a.scheduleId === 'string') map[a.scheduleId.toLowerCase()] = a
+                }
+              }
             } catch (e) {
               // no assessment yet
             }
@@ -3250,9 +3263,35 @@ function TrainingAssessmentView({ onNavigate }) {
       const assessList = assessmentsRes.status === 'fulfilled' ? (Array.isArray(assessmentsRes.value) ? assessmentsRes.value : pageContent(assessmentsRes.value) || []) : []
       const map = {}
       assessList.forEach((a) => {
-        if (a.scheduleId) map[a.scheduleId] = a
+        if (a.scheduleId) {
+          map[a.scheduleId] = a
+          if (typeof a.scheduleId === 'string') map[a.scheduleId.toLowerCase()] = a
+        }
       })
-      setAssessmentsMap(map)
+
+      // Also query individual assessment if not matched by date
+      await Promise.allSettled(
+        sessList.map(async (s) => {
+          const key = s.id
+          const keyLower = typeof key === 'string' ? key.toLowerCase() : key
+          if (!map[key] && !map[keyLower]) {
+            try {
+              const a = await vetApi.getVetAssessment(s.id)
+              if (a && (a.id || a.scheduleId)) {
+                map[key] = a
+                map[keyLower] = a
+                if (a.scheduleId) {
+                  map[a.scheduleId] = a
+                  if (typeof a.scheduleId === 'string') map[a.scheduleId.toLowerCase()] = a
+                }
+              }
+            } catch (e) {
+              // no assessment yet
+            }
+          }
+        })
+      )
+      setAssessmentsMap({ ...map })
     } catch (err) {
       console.error('Lỗi tải buổi tập theo ngày:', err)
       setCalendarSessions([])
@@ -3368,7 +3407,7 @@ function TrainingAssessmentView({ onNavigate }) {
             </div>
           ) : (
             mySessions.map((sess) => {
-              const assess = assessmentsMap[sess.id]
+              const assess = assessmentsMap[sess.id] || (typeof sess.id === 'string' ? assessmentsMap[sess.id.toLowerCase()] : null)
               const isAssessed = !!assess
               const horseName = sess.horse?.name || sess.horseName || 'Ngựa tập'
               const horseCode = sess.horse?.code || sess.horseCode || ''
@@ -3483,7 +3522,7 @@ function TrainingAssessmentView({ onNavigate }) {
             </div>
           ) : (
             calendarSessions.map((sess) => {
-              const assess = assessmentsMap[sess.id]
+              const assess = assessmentsMap[sess.id] || (typeof sess.id === 'string' ? assessmentsMap[sess.id.toLowerCase()] : null)
               const isAssessed = !!assess
               const horseName = sess.horse?.name || sess.horseName || 'Ngựa tập'
               const horseCode = sess.horse?.code || sess.horseCode || ''
