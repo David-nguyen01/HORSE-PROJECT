@@ -39,7 +39,7 @@ async function refreshAccessToken() {
   const auth = getAuth()
   if (!auth?.refreshToken) throw new Error('Phiên đăng nhập đã hết hạn')
   const response = await fetch(`${API_URL}/api/auth/refresh`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
     body: JSON.stringify({ refreshToken: auth.refreshToken }),
   })
   const refreshed = await parseResponse(response)
@@ -50,6 +50,7 @@ async function refreshAccessToken() {
 export async function api(path, options = {}, retry = true) {
   const auth = getAuth()
   const headers = new Headers(options.headers || {})
+  headers.set('bypass-tunnel-reminder', 'true')
   if (auth?.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`)
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const response = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' })

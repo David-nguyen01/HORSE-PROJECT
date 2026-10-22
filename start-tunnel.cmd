@@ -10,5 +10,5 @@ echo Dang lay dia chi HTTPS cong khai...
 echo Copy dia chi "your url is: https://..." ben duoi de dan vao VITE_API_URL tren Vercel!
 echo ================================================================
 echo.
-npx --yes localtunnel --port 8080
+npx --yes localtunnel --port 8080 --subdomain racehorse-club-api
 pause
