@@ -16,6 +16,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.sql.ResultSet;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,6 +92,40 @@ class InjuryServiceTest {
         // Verify 2 inserts: marker and initial recovery timeline update
         verify(jdbc, times(2)).update(contains("insert into module_records"),
                 any(), any(), any(), any(), any(), anyString());
+    }
+
+    @Test
+    void detailKeepsStructuredRegionsAndAdditionalNotes() throws Exception {
+        UUID injuryId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        ResultSet row = mock(ResultSet.class);
+        when(row.getObject("id", UUID.class)).thenReturn(injuryId);
+        when(row.getObject("horse_id", UUID.class)).thenReturn(horseId);
+        when(row.getObject("user_id", UUID.class)).thenReturn(vetId);
+        when(row.getString("horse_code")).thenReturn("H-01");
+        when(row.getString("horse_name")).thenReturn("Horse");
+        when(row.getString("username")).thenReturn("doctor");
+        when(row.getString("data_json")).thenReturn("""
+                {"bodyLocation":"Gối trước phải","bodyRegions":["FL_KNEE_RIGHT"],
+                 "additionalNotes":"Mặt ngoài","severity":"MODERATE","currentStatus":"ACUTE"}
+                """);
+        when(row.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
+        when(row.getObject("updated_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
+        when(jdbc.query(contains("select m.id"), any(RowMapper.class), eq(injuryId)))
+                .thenAnswer(invocation -> {
+                    RowMapper<?> mapper = invocation.getArgument(1);
+                    return List.of(mapper.mapRow(row, 0));
+                });
+        when(jdbc.query(contains("select u.id"), any(RowMapper.class), eq(injuryId.toString())))
+                .thenReturn(List.of());
+
+        var detail = service.getDetail(injuryId, vetId, true);
+
+        assertThat(detail.bodyRegions()).containsExactly("FL_KNEE_RIGHT");
+        assertThat(detail.additionalNotes()).isEqualTo("Mặt ngoài");
+        assertThat(detail.x()).isNull();
+        verify(horseAccessService).requireReadable(horseId, vetId, true);
     }
 
     @Test

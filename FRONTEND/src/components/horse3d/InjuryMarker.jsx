@@ -6,9 +6,12 @@ import { SEVERITY_COLOR } from './bodyRegionMap'
 
 function SeverityBadge({ severity }) {
   const map = {
-    LOW:      { label: 'Nhẹ',         bg: '#f5a623' },
-    MEDIUM:   { label: 'Trung bình',  bg: '#e8612c' },
-    HIGH:     { label: 'Nặng',        bg: '#c62828' },
+    MILD:     { label: 'Nhẹ',         bg: SEVERITY_COLOR.MILD },
+    LOW:      { label: 'Nhẹ',         bg: SEVERITY_COLOR.LOW },
+    MODERATE: { label: 'Trung bình',  bg: SEVERITY_COLOR.MODERATE },
+    MEDIUM:   { label: 'Trung bình',  bg: SEVERITY_COLOR.MEDIUM },
+    SEVERE:   { label: 'Nghiêm trọng', bg: SEVERITY_COLOR.SEVERE },
+    HIGH:     { label: 'Nặng',        bg: SEVERITY_COLOR.HIGH },
     CRITICAL: { label: 'Nghiêm trọng',bg: '#7b1fa2' },
   }
   const s = map[severity] ?? { label: severity ?? '—', bg: '#555' }

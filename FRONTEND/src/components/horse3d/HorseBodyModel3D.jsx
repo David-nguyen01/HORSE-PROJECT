@@ -3,7 +3,8 @@ import React, { Component, Suspense, useMemo, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
-import { BODY_REGION_MAP, SEVERITY_COLOR, resolveRegionsFromInjury } from './bodyRegionMap'
+import { BODY_REGION_MAP, resolveRegionsFromInjury } from './bodyRegionMap'
+import { normalizeHorseScene, projectRegionsOnHorse } from './horseGeometry'
 import InjuryMarker from './InjuryMarker'
 import HorseModelFallback from './HorseModelFallback'
 
@@ -31,27 +32,10 @@ class WebGLErrorBoundary extends Component {
 }
 
 // ── Model ngựa đồng nhất với tự động căn chỉnh & tỉ lệ chuẩn ──────
-function HorseModel() {
+function HorseScene({ regionInjuryMap, activeMarker, selectedRegion, setActiveMarker }) {
   const { scene } = useGLTF('/models/horse.glb')
-
   const normalizedScene = useMemo(() => {
-    const clone = scene.clone(true)
-    const box = new THREE.Box3().setFromObject(clone)
-    const size = box.getSize(new THREE.Vector3())
-    const maxDim = Math.max(size.x, size.y, size.z)
-
-    // Chuẩn hóa chiều dài ~ 2.5 đơn vị
-    const targetScale = maxDim > 5 ? 2.5 / maxDim : 1.0
-    clone.scale.setScalar(targetScale)
-
-    // Đặt 4 móng tiếp đất tại y = 0 và tâm tại giữa thân
-    const scaledBox = new THREE.Box3().setFromObject(clone)
-    const center = scaledBox.getCenter(new THREE.Vector3())
-    clone.position.x = -center.x
-    clone.position.y = -scaledBox.min.y
-    clone.position.z = -center.z
-
-    // Áp dụng màu nâu be đồng nhất (#C8A882) theo yêu cầu thiết kế
+    const clone = normalizeHorseScene(scene)
     clone.traverse((child) => {
       if (child.isMesh) {
         child.material = new THREE.MeshStandardMaterial({
@@ -66,8 +50,29 @@ function HorseModel() {
 
     return clone
   }, [scene])
+  const regionCodes = Object.keys(regionInjuryMap)
+  const positions = useMemo(
+    () => projectRegionsOnHorse(normalizedScene, regionCodes),
+    [normalizedScene, regionCodes.join('|')],
+  )
 
-  return <primitive object={normalizedScene} />
+  return <group>
+    <primitive object={normalizedScene} />
+    {regionCodes.map((regionCode) => {
+      const injList = regionInjuryMap[regionCode]
+      const regionMeta = BODY_REGION_MAP[regionCode] || BODY_REGION_MAP.OTHER
+      const worstSeverity = getWorstSeverity(injList.map((inj) => inj.severity || 'DEFAULT'))
+      return <InjuryMarker
+        key={regionCode}
+        position={positions[regionCode]}
+        label={regionMeta.label}
+        injuries={injList}
+        severity={worstSeverity}
+        isActive={activeMarker === regionCode || selectedRegion === regionCode}
+        onClick={() => setActiveMarker(activeMarker === regionCode ? null : regionCode)}
+      />
+    })}
+  </group>
 }
 
 // ── Loading placeholder khi model đang tải ───────────────────────
@@ -83,12 +88,10 @@ function HorseLoadingPlaceholder() {
 }
 
 // ── Helper: lấy severity nghiêm trọng nhất trong danh sách ────────
-const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MEDIUM', 'MODERATE', 'LOW', 'MILD']
+const SEVERITY_ORDER = ['CRITICAL', 'SEVERE', 'HIGH', 'MODERATE', 'MEDIUM', 'MILD', 'LOW']
 function getWorstSeverity(severities) {
   for (const s of SEVERITY_ORDER) {
     if (severities.includes(s)) {
-      if (s === 'MODERATE') return 'MEDIUM'
-      if (s === 'MILD') return 'LOW'
       return s
     }
   }
@@ -116,6 +119,7 @@ export default function HorseBodyModel3D({
     injuries.forEach((inj) => {
       const regions = resolveRegionsFromInjury(inj)
       regions.forEach((r) => {
+        if (BODY_REGION_MAP[r]?.localized === false) return
         if (!map[r]) map[r] = []
         map[r].push(inj)
       })
@@ -124,6 +128,9 @@ export default function HorseBodyModel3D({
   }, [injuries])
 
   const totalRegions = Object.keys(regionInjuryMap).length
+  const unlocalizedCount = injuries.filter((inj) =>
+    resolveRegionsFromInjury(inj).every((code) => BODY_REGION_MAP[code]?.localized === false)
+  ).length
 
   return (
     <WebGLErrorBoundary injuries={injuries}>
@@ -160,11 +167,20 @@ export default function HorseBodyModel3D({
           <div>🖱️ Kéo chuột để xoay · Cuộn để zoom</div>
           {totalRegions > 0 ? (
             <div style={{ marginTop: '2px', color: '#c62828', fontWeight: 700 }}>
-              ● {totalRegions} vùng chấn thương đang theo dõi
+              ● {totalRegions} vùng chấn thương đã định vị
+            </div>
+          ) : unlocalizedCount > 0 ? (
+            <div style={{ marginTop: '2px', color: '#a1681c', fontWeight: 700 }}>
+              ● Chưa có vị trí đủ cụ thể để đánh dấu 3D
             </div>
           ) : (
             <div style={{ marginTop: '2px', color: '#27714d', fontWeight: 600 }}>
               ● Thể trạng toàn vẹn (Không chấn thương)
+            </div>
+          )}
+          {unlocalizedCount > 0 && totalRegions > 0 && (
+            <div style={{ marginTop: '2px', color: '#a1681c' }}>
+              {unlocalizedCount} chấn thương khác chưa định vị 3D
             </div>
           )}
         </div>
@@ -216,30 +232,12 @@ export default function HorseBodyModel3D({
           </mesh>
 
           <Suspense fallback={<HorseLoadingPlaceholder />}>
-            <group position={[0, 0, 0]}>
-              <HorseModel />
-
-              {/* Render các điểm chấn thương 3D */}
-              {Object.entries(regionInjuryMap).map(([regionCode, injList]) => {
-                const regionMeta = BODY_REGION_MAP[regionCode] || BODY_REGION_MAP.OTHER
-                const worstSeverity = getWorstSeverity(injList.map((i) => i.severity || 'DEFAULT'))
-                const isSelected = activeMarker === regionCode || selectedRegion === regionCode
-
-                return (
-                  <InjuryMarker
-                    key={regionCode}
-                    position={regionMeta.position}
-                    label={regionMeta.label}
-                    injuries={injList}
-                    severity={worstSeverity}
-                    isActive={isSelected}
-                    onClick={() => {
-                      setActiveMarker(activeMarker === regionCode ? null : regionCode)
-                    }}
-                  />
-                )
-              })}
-            </group>
+            <HorseScene
+              regionInjuryMap={regionInjuryMap}
+              activeMarker={activeMarker}
+              selectedRegion={selectedRegion}
+              setActiveMarker={setActiveMarker}
+            />
           </Suspense>
 
           {/* Orbit controls cho phép xoay và zoom */}

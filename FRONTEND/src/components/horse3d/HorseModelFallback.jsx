@@ -31,12 +31,16 @@ export default function HorseModelFallback({ injuries = [] }) {
   injuries.forEach((inj) => {
     const regions = resolveRegionsFromInjury(inj)
     regions.forEach((code) => {
+      if (BODY_REGION_MAP[code]?.localized === false) return
       if (!regionInjuryMap[code]) regionInjuryMap[code] = []
       regionInjuryMap[code].push(inj)
     })
   })
 
   const regionCount = Object.keys(regionInjuryMap).length
+  const unlocalizedCount = injuries.filter((inj) =>
+    resolveRegionsFromInjury(inj).every((code) => BODY_REGION_MAP[code]?.localized === false)
+  ).length
 
   return (
     <div style={{
@@ -58,8 +62,13 @@ export default function HorseModelFallback({ injuries = [] }) {
         <div style={{ marginTop: 10, fontSize: 12, fontWeight: 600, color: regionCount > 0 ? '#c62828' : '#27714d' }}>
           {regionCount > 0
             ? `⚠️ Phát hiện ${regionCount} vùng có chấn thương ghi nhận`
-            : '✅ Không có chấn thương ghi nhận'}
+            : unlocalizedCount > 0 ? '⚠️ Có chấn thương chưa rõ vị trí giải phẫu' : '✅ Không có chấn thương ghi nhận'}
         </div>
+        {unlocalizedCount > 0 && regionCount > 0 && (
+          <div style={{ fontSize: 11, color: '#8b681c', marginTop: 4 }}>
+            {unlocalizedCount} chấn thương khác chưa định vị trên sơ đồ
+          </div>
+        )}
 
         {regionCount > 0 && (
           <div style={{
@@ -72,11 +81,8 @@ export default function HorseModelFallback({ injuries = [] }) {
           }}>
             {Object.entries(regionInjuryMap).map(([code, injList]) => {
               const meta = BODY_REGION_MAP[code] || { label: code }
-              const worst = injList.some((i) => i.severity === 'CRITICAL')
-                ? 'CRITICAL'
-                : injList.some((i) => i.severity === 'HIGH')
-                ? 'HIGH'
-                : 'MEDIUM'
+              const worst = ['CRITICAL', 'SEVERE', 'HIGH', 'MODERATE', 'MEDIUM', 'MILD', 'LOW']
+                .find((severity) => injList.some((injury) => injury.severity === severity)) || 'DEFAULT'
               const color = SEVERITY_COLOR[worst] || '#c62828'
               return (
                 <span

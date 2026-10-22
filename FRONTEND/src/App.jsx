@@ -316,13 +316,13 @@ function HorseRow({ horse }) {
       </div>
       <Status value={horse.status} />
       <span className="stable">
-        {horse.stableLocation || 'Chưa xếp'}
+        <span className="stable-location">{horse.stableLocation || 'Chưa xếp'}</span>
         {isPaid ? (
-          <span className="badge-payment paid" style={{marginLeft:'6px'}}>✓ Đã trả phí</span>
+          <span className="badge-payment paid">✓ Đã trả phí</span>
         ) : isOverride ? (
-          <span className="badge-payment override" style={{marginLeft:'6px'}} title={horse.overrideReason || 'CLB bảo lãnh'}>⭐ Bảo lãnh</span>
+          <span className="badge-payment override" title={horse.overrideReason || 'CLB bảo lãnh'}>⭐ Bảo lãnh</span>
         ) : (
-          <span className="badge-payment unpaid" style={{marginLeft:'6px'}}>⚠️ Chưa phí</span>
+          <span className="badge-payment unpaid">⚠️ Chưa phí</span>
         )}
       </span>
       <ChevronRight size={18} />

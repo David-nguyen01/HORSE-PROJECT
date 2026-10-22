@@ -1,5 +1,7 @@
 // FRONTEND/src/components/horse3d/bodyRegionMap.js
 
+// position = [trục đầu→đuôi, chiều cao, bên trái→phải] trong sơ đồ giải phẫu.
+// Đây là điểm gợi ý; horseGeometry.js chiếu điểm lên bề mặt của horse.glb.
 export const BODY_REGION_MAP = {
   // ── ĐẦU & CỔ ──────────────────────────────────────────────
   HEAD_POLL:        { position: [ 1.10,  1.60,  0.00], label: 'Đỉnh đầu (Poll)' },
@@ -51,21 +53,48 @@ export const BODY_REGION_MAP = {
   HL_HOOF_RIGHT:    { position: [-0.55, -0.02, -0.22], label: 'Móng sau phải' },
 
   // ── MÔ MỀM / KHÁC ─────────────────────────────────────────
-  TENDON_LEFT:      { position: [ 0.50,  0.15,  0.22], label: 'Gân trái' },
-  TENDON_RIGHT:     { position: [ 0.50,  0.15, -0.22], label: 'Gân phải' },
-  LIGAMENT:         { position: [ 0.00,  0.50,  0.10], label: 'Dây chằng' },
-  SKIN_LACERATION:  { position: [ 0.00,  0.90,  0.30], label: 'Da / Vết rách' },
-  OTHER:            { position: [ 0.00,  0.70,  0.00], label: 'Vị trí khác' },
+  TENDON_LEFT:      { position: [ 0.50,  0.34,  0.22], label: 'Gân chân trước trái' },
+  TENDON_RIGHT:     { position: [ 0.50,  0.34, -0.22], label: 'Gân chân trước phải' },
+  // Không có một tọa độ giải phẫu duy nhất; hiển thị trong hồ sơ, không ghim sai trên 3D.
+  LIGAMENT:         { position: [ 0.00,  0.50,  0.10], label: 'Dây chằng (chưa rõ vùng)', localized: false },
+  SKIN_LACERATION:  { position: [ 0.00,  0.90,  0.30], label: 'Da / Vết rách (chưa rõ vùng)', localized: false },
+  OTHER:            { position: [ 0.00,  0.70,  0.00], label: 'Vị trí khác', localized: false },
 }
 
 // Màu điểm theo mức độ (severity)
 export const SEVERITY_COLOR = {
-  LOW:      '#f5a623',  // vàng cam
-  MEDIUM:   '#e8612c',  // cam đỏ
-  HIGH:     '#c62828',  // đỏ đậm
-  CRITICAL: '#7b1fa2',  // tím — cực kỳ nghiêm trọng
+  MILD:     '#2e7a53',
+  LOW:      '#2e7a53',
+  MODERATE: '#b08412',
+  MEDIUM:   '#b08412',
+  SEVERE:   '#c62828',
+  HIGH:     '#c62828',
+  CRITICAL: '#7b1fa2',
   DEFAULT:  '#e53935',  // đỏ mặc định khi không có severity
 }
+
+const REGION_LABEL_ALIASES = {
+  NECK_CREST: ['Gáy'],
+  FL_SHOULDER_LEFT: ['Vai trước trái'],
+  FL_SHOULDER_RIGHT: ['Vai trước phải'],
+  FL_KNEE_LEFT: ['Gối trước trái (Carpus)'],
+  FL_KNEE_RIGHT: ['Gối trước phải'],
+  FL_CANNON_LEFT: ['Ống chân trước trái (Cannon)'],
+  FL_FETLOCK_RIGHT: ['Cổ chân trước phải'],
+  HL_HIP_RIGHT: ['Háng phải'],
+  HL_STIFLE_RIGHT: ['Gối sau phải'],
+  HL_HOCK_RIGHT: ['Khoeo phải'],
+  TENDON_LEFT: ['Gân trái'],
+  TENDON_RIGHT: ['Gân phải'],
+  LIGAMENT: ['Dây chằng'],
+  SKIN_LACERATION: ['Da / Vết rách'],
+  OTHER: ['Khác (kèm ghi chú)'],
+}
+
+const normalizeLabel = (value) => value.toLocaleLowerCase('vi-VN').replace(/\s+/g, ' ').trim()
+const REGION_LABELS = Object.entries(BODY_REGION_MAP).flatMap(([code, meta]) =>
+  [meta.label, ...(REGION_LABEL_ALIASES[code] || [])].map((label) => ({ code, label: normalizeLabel(label) }))
+)
 
 /**
  * Trích xuất danh sách mã vùng giải phẫu từ một bản ghi chấn thương.
@@ -100,26 +129,18 @@ export function resolveRegionsFromInjury(inj) {
         return
       }
 
-      // Khớp gần đúng qua nhãn tiếng Việt / tiếng Anh
-      const cleanPart = part.toLowerCase().replace(/[\(\)\[\]]/g, ' ').replace(/\s+/g, ' ').trim()
-      let bestKey = null
-
-      for (const [key, meta] of Object.entries(BODY_REGION_MAP)) {
-        if (key === 'OTHER') continue
-        const cleanKey = key.toLowerCase()
-        const cleanLabel = meta.label.toLowerCase().replace(/[\(\)\[\]]/g, ' ').replace(/\s+/g, ' ').trim()
-
-        if (cleanPart === cleanKey || cleanPart === cleanLabel) {
-          bestKey = key
-          break
-        }
-        // So khớp từ khóa chính (vd: "gối trước trái", "ống chân trước phải", "vai trái")
-        const labelBase = cleanLabel.split(' ')[0] + ' ' + (cleanLabel.split(' ')[1] || '')
-        if (cleanPart.includes(cleanKey) || cleanLabel.includes(cleanPart) || (cleanPart.includes(labelBase) && labelBase.length > 5)) {
-          bestKey = key
-          break
-        }
-      }
+      const cleanPart = normalizeLabel(part)
+      const exact = REGION_LABELS.find((item) => item.label === cleanPart)
+      // Bản ghi cũ có thể thêm mô tả quanh tên vùng. Chỉ khớp khi bên trái/phải
+      // và chân trước/sau không mâu thuẫn; nếu không rõ thì để OTHER.
+      const compatible = ({ code, label }) =>
+        label.length >= 6 && cleanPart.includes(label) &&
+        (!cleanPart.includes('phải') || code.endsWith('_RIGHT')) &&
+        (!cleanPart.includes('trái') || code.endsWith('_LEFT')) &&
+        (!cleanPart.includes('trước') || code.startsWith('FL_')) &&
+        (!cleanPart.includes('sau') || code.startsWith('HL_'))
+      const fuzzy = !exact && REGION_LABELS.filter(compatible).sort((a, b) => b.label.length - a.label.length)[0]
+      const bestKey = exact?.code || fuzzy?.code
 
       if (bestKey && !matched.includes(bestKey)) {
         matched.push(bestKey)

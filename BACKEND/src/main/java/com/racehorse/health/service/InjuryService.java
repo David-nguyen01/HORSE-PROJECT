@@ -49,9 +49,9 @@ public class InjuryService {
         String effectiveBodyLocation = req.bodyLocation() != null && !req.bodyLocation().isBlank()
                 ? req.bodyLocation().trim()
                 : (req.bodyRegions() != null && !req.bodyRegions().isEmpty() ? String.join(", ", req.bodyRegions()) : "OTHER");
-        double x = req.x() != null ? req.x() : 0.0;
-        double y = req.y() != null ? req.y() : 0.0;
-        double z = req.z() != null ? req.z() : 0.0;
+        Double x = req.x();
+        Double y = req.y();
+        Double z = req.z();
 
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("examinationId", req.examinationId() != null ? req.examinationId().toString() : null);
@@ -213,9 +213,9 @@ public class InjuryService {
             String bodyLocation = node.path("bodyLocation").asText("");
             List<String> bodyRegions = parseStringList(node.path("bodyRegions"));
             String additionalNotes = node.path("additionalNotes").isNull() ? null : node.path("additionalNotes").asText(null);
-            Double x = node.path("x").asDouble();
-            Double y = node.path("y").asDouble();
-            Double z = node.path("z").asDouble();
+            Double x = node.hasNonNull("x") ? node.path("x").asDouble() : null;
+            Double y = node.hasNonNull("y") ? node.path("y").asDouble() : null;
+            Double z = node.hasNonNull("z") ? node.path("z").asDouble() : null;
             String severity = node.path("severity").asText("");
             String currentStatus = node.path("currentStatus").asText("");
             String notes = node.path("notes").isNull() ? null : node.path("notes").asText(null);
@@ -262,6 +262,7 @@ public class InjuryService {
         return new InjuryDetailResponse(
                 detail.id(), detail.horseId(), detail.horseCode(), detail.horseName(),
                 detail.examinationId(), detail.bodyLocation(),
+                detail.bodyRegions(), detail.additionalNotes(),
                 detail.x(), detail.y(), detail.z(),
                 detail.severity(), detail.currentStatus(), detail.initialNotes(),
                 detail.attachmentFileIds(), detail.recordedByUserId(),
@@ -318,9 +319,9 @@ public class InjuryService {
             String bodyLocation = node.path("bodyLocation").asText("");
             List<String> bodyRegions = parseStringList(node.path("bodyRegions"));
             String additionalNotes = node.path("additionalNotes").isNull() ? null : node.path("additionalNotes").asText(null);
-            Double x = node.path("x").asDouble();
-            Double y = node.path("y").asDouble();
-            Double z = node.path("z").asDouble();
+            Double x = node.hasNonNull("x") ? node.path("x").asDouble() : null;
+            Double y = node.hasNonNull("y") ? node.path("y").asDouble() : null;
+            Double z = node.hasNonNull("z") ? node.path("z").asDouble() : null;
             String severity = node.path("severity").asText("");
             String currentStatus = node.path("currentStatus").asText("");
             String notes = node.path("notes").isNull() ? null : node.path("notes").asText(null);

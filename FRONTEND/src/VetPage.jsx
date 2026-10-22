@@ -142,10 +142,10 @@ const ANATOMICAL_REGIONS = [
   {
     category: 'Mô mềm / Khác',
     items: [
-      { code: 'TENDON_LEFT', label: 'Gân trái' },
-      { code: 'TENDON_RIGHT', label: 'Gân phải' },
-      { code: 'LIGAMENT', label: 'Dây chằng' },
-      { code: 'SKIN_LACERATION', label: 'Da / Vết rách' },
+      { code: 'TENDON_LEFT', label: 'Gân chân trước trái' },
+      { code: 'TENDON_RIGHT', label: 'Gân chân trước phải' },
+      { code: 'LIGAMENT', label: 'Dây chằng (chưa rõ vùng)' },
+      { code: 'SKIN_LACERATION', label: 'Da / Vết rách (chưa rõ vùng)' },
       { code: 'OTHER', label: 'Khác (kèm ghi chú)' },
     ],
   },
@@ -2126,7 +2126,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
               <span className="record-count">{injuries.length} chấn thương</span>
             </div>
             <p style={{ margin: '0 0 14px', fontSize: '12px', color: '#5e7269' }}>
-              Định vị không gian 3 chiều các điểm tổn thương. Bấm trực tiếp vào điểm để xem chẩn đoán:
+              Điểm được đặt theo vùng giải phẫu trên mô hình minh họa, không phải tọa độ đo lâm sàng. Bấm vào điểm để xem chẩn đoán:
             </p>
             <HorseBodyModel3D
               injuries={injuries}
@@ -2965,7 +2965,7 @@ function CreateExamModal({ horse, onClose, onSaved }) {
 }
 
 function CreateInjuryModal({ horse, onClose, onSaved }) {
-  const [selectedRegions, setSelectedRegions] = useState(['FL_KNEE_LEFT'])
+  const [selectedRegions, setSelectedRegions] = useState([])
   const [additionalNotes, setAdditionalNotes] = useState('')
   const [form, setForm] = useState({
     severity: 'MODERATE',
@@ -2998,9 +2998,6 @@ function CreateInjuryModal({ horse, onClose, onSaved }) {
         severity: form.severity,
         initialStatus: form.initialStatus,
         notes: combinedNotes,
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
         attachmentFileIds: [],
       })
       onSaved()
@@ -3081,6 +3078,11 @@ function CreateInjuryModal({ horse, onClose, onSaved }) {
             {selectedRegions.length > 0 && (
               <small style={{ color: '#27714d', fontSize: '11px', display: 'block', marginTop: '6px' }}>
                 Đã chọn: <b>{selectedRegions.map((c) => ANATOMICAL_REGION_MAP[c] || c).join(', ')}</b>
+              </small>
+            )}
+            {selectedRegions.some((code) => ['LIGAMENT', 'SKIN_LACERATION', 'OTHER'].includes(code)) && (
+              <small style={{ color: '#94651e', fontSize: '11px' }}>
+                Vùng chưa cụ thể sẽ được lưu trong hồ sơ nhưng không đặt điểm 3D để tránh đánh dấu sai. Hãy ghi rõ vị trí trong ô ghi chú.
               </small>
             )}
           </div>

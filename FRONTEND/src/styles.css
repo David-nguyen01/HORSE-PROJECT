@@ -965,3 +965,62 @@ a { color: inherit; text-decoration: none; }
 @media(max-width:1100px){.race-readiness{grid-template-columns:minmax(180px,1fr) minmax(260px,1.5fr)}.race-readiness-issues{grid-column:1/-1;border-left:0;border-top:1px solid var(--readiness-line);padding:14px 0 0}}
 @media(max-width:700px){.race-readiness{grid-template-columns:1fr}.race-readiness-issues{grid-column:1}}
 @media(max-width:580px){.race-readiness-metrics{grid-template-columns:1fr}}
+
+/* Readability: keep small labels legible without changing the page hierarchy. */
+body { font-size: 14px; line-height: 1.5; }
+.sidebar nav a, .button, .field, .field input, .field select,
+.field textarea, .toolbar select, select, .search-box input { font-size: 14px; }
+.sidebar .nav-group, .eyebrow { font-size: 11px; line-height: 1.4; }
+.sidebar-brand small, .user-chip small { font-size: 11px; }
+.user-chip b, .logout-button, .topbar, .page-heading > div > p:last-child,
+.card-head a, .stat div span, .role-card > p:not(.eyebrow) { font-size: 13px; }
+.notification-head small, .notification-item small { font-size: 11px; }
+.notification-item b, .notification-item p, .notification-empty { font-size: 12px; }
+.payment-badge, .badge-payment, .status, .role-pills span { font-size: 11px; line-height: 1.35; }
+.record-count, .empty span, .simple-empty, .comparison-card > span,
+.comparison-card small, .finance-lines > div, .admin-table-row small,
+.archived-list small, .audit-list small, .audit-list p { font-size: 12px; }
+.admin-table-head, .admin-table-row b, .role-tags span,
+.account-state, .compact-roles label, .audit-list b,
+.audit-detail dt, .audit-detail dd { font-size: 12px; }
+.table-header, .table-row, .user-cell small, .role-options small,
+.info-grid dt, .owner-row small, .race-row small { font-size: 12px; }
+.user-cell b, .role-options b, .info-grid dd,
+.owner-row b, .race-row b { font-size: 13px; }
+.fitness-filter select, .fitness-filter > input, .fitness-filter > span,
+.fitness-horse small, .fitness-horse > small, .fitness-badge,
+.metric-chart > div:first-child > span, .chart-empty,
+.source-table th, .source-table td, .source-table td small,
+.training-history-row small, .training-history-row dt { font-size: 12px; }
+.horse-row {
+  grid-template-columns: 43px minmax(150px, 1fr) minmax(140px, auto) minmax(135px, 180px) 20px;
+  gap: 16px;
+  min-height: 78px;
+}
+.horse-main { min-width: 0; gap: 2px; }
+.horse-main b { font-size: 15px; line-height: 1.3; }
+.horse-main > span { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.4; }
+.horse-row .status { justify-self: start; white-space: nowrap; font-size: 12px; line-height: 1.4; }
+.horse-row .status i { flex: 0 0 8px; width: 8px; height: 8px; }
+.horse-row .stable {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.horse-row .stable-location { overflow-wrap: anywhere; }
+.horse-row .badge-payment { margin: 0; white-space: nowrap; }
+.horse-row > svg { justify-self: end; }
+@media (max-width: 1000px) {
+  .horse-row { grid-template-columns: 43px minmax(0, 1fr) minmax(140px, auto) 20px; }
+  .horse-row .stable { display: none; }
+}
+@media (max-width: 650px) {
+  .horse-row { grid-template-columns: 40px minmax(0, 1fr) 18px; }
+  .horse-row .status { display: none; }
+}
