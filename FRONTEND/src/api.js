@@ -23,7 +23,15 @@ export async function apiFetch(path, options = {}) {
 }
 
 export async function checkLocalBackend() {
-  const response = await apiFetch('/actuator/health')
+  let response
+  try {
+    response = await apiFetch('/actuator/health', { signal: AbortSignal.timeout(15000) })
+  } catch (error) {
+    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+      throw new Error('Hết thời gian kiểm tra. Hãy mở trang bằng Chrome/Edge và cho phép truy cập mạng cục bộ, rồi thử lại.')
+    }
+    throw error
+  }
   const contentType = response.headers.get('content-type') || ''
   if (!response.ok || !contentType.includes('json')) throw new Error('Địa chỉ API chưa trả về trạng thái backend hợp lệ.')
   const health = await response.json()
