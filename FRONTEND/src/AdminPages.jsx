@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArchiveRestore, ArrowRight, Boxes, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronUp, DollarSign, Download, Filter, HeartPulse, KeyRound, Lock, LogOut, Monitor, Package, Pencil, Plus, RotateCcw, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Smartphone, Tag, Trash2, Unlock, UserPlus, Utensils, Warehouse, X, XCircle } from 'lucide-react'
-import { api, inventoryApi, stableCareApi } from './api'
+import { api, apiFetch, inventoryApi, stableCareApi } from './api'
 
 const initials = (name = '') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'RC'
 
@@ -485,9 +485,7 @@ export function AuditLogs(){
 
       const auth=JSON.parse(sessionStorage.getItem('racehorse.auth')||'{}');
       const token=auth?.accessToken;
-      const url=`${(import.meta.env.VITE_API_URL||'').replace(/\/$/,'')}/api/admin/audit-logs/export?${p}`;
-
-      const res=await fetch(url,{headers:token?{Authorization:`Bearer ${token}`}:{}});
+      const res=await apiFetch(`/api/admin/audit-logs/export?${p}`,{headers:token?{Authorization:`Bearer ${token}`}:{}});
       if(!res.ok)throw new Error('Không thể tải xuống tệp kiểm toán');
       const blob=await res.blob();
       const downloadUrl=window.URL.createObjectURL(blob);

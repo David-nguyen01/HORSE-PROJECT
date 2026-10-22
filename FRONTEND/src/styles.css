@@ -23,6 +23,10 @@ a { color: inherit; text-decoration: none; }
 .story-stats div { display: grid; gap: 4px; }.story-stats strong { font-size: 22px; color: var(--lime); }.story-stats span { color: #a9c1b7; font-size: 12px; }
 .auth-panel { padding: 50px clamp(30px, 7vw, 110px); display: grid; place-items: center; background: #f8f8f4; }
 .auth-card { width: min(430px, 100%); }.auth-card h2, .modal-head h2 { margin: 0; font: 700 34px 'Playfair Display'; }.auth-card > .muted { margin-bottom: 30px; }.muted { color: var(--muted); line-height: 1.6; }
+.local-api-panel{display:grid;gap:9px;margin:0 0 18px;padding:13px 15px;border:1px solid #dbe6dc;border-radius:13px;background:#f2f7f1;color:#244a3b;font-size:12px}
+.local-api-panel>div{display:grid;gap:4px}.local-api-panel span{color:#536a5e;line-height:1.45;overflow-wrap:anywhere}
+.local-api-panel button{justify-self:start;border:1px solid #b7d4bf;border-radius:9px;background:white;color:#19543b;padding:7px 11px;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer}
+.local-api-panel button:disabled{opacity:.6;cursor:wait}.local-api-panel p{margin:0;line-height:1.45}.local-api-ok{color:#236b42}.local-api-error{color:#ad4438}
 .form-stack { display: grid; gap: 16px; }.field { display: grid; gap: 7px; color: #3f554c; font-size: 13px; font-weight: 600; }
 .field input, .field select, .field textarea, .toolbar select, select { width: 100%; border: 1px solid #d9ded6; background: white; border-radius: 11px; padding: 10px 14px; min-height: 42px; outline: 0; color: #173129; font-family: 'DM Sans', sans-serif; font-size: 13px; transition: .2s; }
 .field textarea { resize: vertical; min-height: 80px; }

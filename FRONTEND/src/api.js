@@ -1,5 +1,35 @@
-const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+// The deployed UI is shared, but every member runs their own backend and SQL Server.
+// Never use a build-time tunnel URL in production: it would route everyone to one PC.
+const API_URL = import.meta.env.PROD
+  ? 'http://127.0.0.1:8080'
+  : (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 const STORAGE_KEY = 'racehorse.auth'
+
+export const localApiUrl = API_URL || 'http://127.0.0.1:8080'
+
+export async function apiFetch(path, options = {}) {
+  try {
+    return await fetch(`${API_URL}${path}`, {
+      cache: 'no-store',
+      ...options,
+      ...(import.meta.env.PROD ? { targetAddressSpace: 'loopback' } : {}),
+    })
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('Không kết nối được backend trên máy này. Hãy chạy SQL Server và backend tại 127.0.0.1:8080, sau đó cho phép trình duyệt truy cập mạng cục bộ.')
+    }
+    throw error
+  }
+}
+
+export async function checkLocalBackend() {
+  const response = await apiFetch('/actuator/health')
+  const contentType = response.headers.get('content-type') || ''
+  if (!response.ok || !contentType.includes('json')) throw new Error('Địa chỉ API chưa trả về trạng thái backend hợp lệ.')
+  const health = await response.json()
+  if (health.status !== 'UP') throw new Error('Backend đang chạy nhưng chưa sẵn sàng. Hãy kiểm tra kết nối SQL Server.')
+  return health
+}
 
 export function getAuth() {
   try { return JSON.parse(sessionStorage.getItem(STORAGE_KEY)) } catch { return null }
@@ -12,6 +42,9 @@ async function parseResponse(response) {
   if (response.status === 204) return null
   const type = response.headers.get('content-type') || ''
   const body = type.includes('application/json') ? await response.json() : await response.text()
+  if (response.ok && type.includes('text/html')) {
+    throw new Error('Địa chỉ API đang trả về trang web thay vì backend. Hãy kiểm tra cấu hình kết nối.')
+  }
   if (!response.ok) {
     const validationErrors = body && typeof body === 'object' ? body.validationErrors : null
     const validationMessage = validationErrors && typeof validationErrors === 'object'
@@ -38,8 +71,8 @@ async function parseResponse(response) {
 async function refreshAccessToken() {
   const auth = getAuth()
   if (!auth?.refreshToken) throw new Error('Phiên đăng nhập đã hết hạn')
-  const response = await fetch(`${API_URL}/api/auth/refresh`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'bypass-tunnel-reminder': 'true' },
+  const response = await apiFetch('/api/auth/refresh', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: auth.refreshToken }),
   })
   const refreshed = await parseResponse(response)
@@ -50,15 +83,14 @@ async function refreshAccessToken() {
 export async function api(path, options = {}, retry = true) {
   const auth = getAuth()
   const headers = new Headers(options.headers || {})
-  headers.set('bypass-tunnel-reminder', 'true')
   if (auth?.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`)
   if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' })
+  const response = await apiFetch(path, { ...options, headers })
   if (response.status === 401 && retry && auth?.refreshToken && path !== '/api/auth/refresh') {
     try {
       const token = await refreshAccessToken()
       headers.set('Authorization', `Bearer ${token}`)
-      return parseResponse(await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' }))
+      return parseResponse(await apiFetch(path, { ...options, headers }))
     } catch (error) { clearAuth(); throw error }
   }
   return parseResponse(response)
@@ -68,12 +100,12 @@ export async function apiBlob(path, options = {}, retry = true) {
   const auth = getAuth()
   const headers = new Headers(options.headers || {})
   if (auth?.accessToken) headers.set('Authorization', `Bearer ${auth.accessToken}`)
-  const response = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' })
+  const response = await apiFetch(path, { ...options, headers })
   if (response.status === 401 && retry && auth?.refreshToken && path !== '/api/auth/refresh') {
     try {
       const token = await refreshAccessToken()
       headers.set('Authorization', `Bearer ${token}`)
-      const retryResponse = await fetch(`${API_URL}${path}`, { ...options, headers, cache: 'no-store' })
+      const retryResponse = await apiFetch(path, { ...options, headers })
       if (!retryResponse.ok) {
         throw new Error(retryResponse.status === 403 ? 'Bạn không có quyền truy cập ảnh này' : `Yêu cầu thất bại (${retryResponse.status})`)
       }
@@ -207,7 +239,7 @@ export const financeApi = {
     const q = new URLSearchParams()
     Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== '') q.set(k, v) })
     const auth = getAuth()
-    const response = await fetch(`${API_URL}/api/financial-transactions/export?${q}`, {
+    const response = await apiFetch(`/api/financial-transactions/export?${q}`, {
       headers: auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}
     })
     if (!response.ok) throw new Error('Không thể tải file CSV')
@@ -235,7 +267,7 @@ export const reportingApi = {
   generateReport: (payload) => api('/api/owner-reports', { method: 'POST', body: JSON.stringify(payload) }),
   downloadJson: async (id) => {
     const auth = getAuth()
-    const response = await fetch(`${API_URL}/api/owner-reports/${id}/download`, {
+    const response = await apiFetch(`/api/owner-reports/${id}/download`, {
       headers: auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}
     })
     if (!response.ok) throw new Error('Không thể tải file JSON')
@@ -251,7 +283,7 @@ export const reportingApi = {
   },
   downloadCsv: async (id) => {
     const auth = getAuth()
-    const response = await fetch(`${API_URL}/api/owner-reports/${id}/export-csv`, {
+    const response = await apiFetch(`/api/owner-reports/${id}/export-csv`, {
       headers: auth?.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {}
     })
     if (!response.ok) throw new Error('Không thể tải file CSV')

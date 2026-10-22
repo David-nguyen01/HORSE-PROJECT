@@ -9,8 +9,8 @@ export default defineConfig({
       ignored: ['**/public/models/**'],
     },
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/actuator': 'http://localhost:8080',
+      '/api': 'http://127.0.0.1:8080',
+      '/actuator': 'http://127.0.0.1:8080',
     },
   },
 })

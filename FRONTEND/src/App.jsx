@@ -1,7 +1,7 @@
 import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Activity, AlertTriangle, ArrowLeft, ArchiveRestore, Award, Bell, Calendar, Check, ChevronRight, CircleUserRound, Clock, DollarSign, FileSpreadsheet, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Package, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Utensils, Warehouse, X, Zap } from 'lucide-react'
-import { api, authApi, clearAuth, getAuth, pageContent, reportingApi, saveAuth } from './api'
+import { api, authApi, checkLocalBackend, clearAuth, getAuth, localApiUrl, pageContent, reportingApi, saveAuth } from './api'
 import { walletIcon, horseIcon, trainingIcon, scheduleIcon } from './navIcons'
 import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, InventoryCatalogPage, PermissionsPage, StablesPage } from './AdminPages'
 
@@ -75,6 +75,16 @@ function AuthShell({ mode }) {
   const [roles, setRoles] = useState([])
   const [form, setForm] = useState({ username: '', email: '', password: '', confirmPassword: '', role: 'HEAD_TRAINER' })
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false)
+  const [connection, setConnection] = useState({ checking: false, message: '', ready: false })
+  const testConnection = async () => {
+    setConnection({ checking: true, message: '', ready: false })
+    try {
+      await checkLocalBackend()
+      setConnection({ checking: false, message: 'Backend và database trên máy này đã sẵn sàng.', ready: true })
+    } catch (err) {
+      setConnection({ checking: false, message: err.message, ready: false })
+    }
+  }
   useEffect(() => { if (!isLogin) authApi.roles().then(setRoles).catch(() => setRoles(Object.keys(ROLE_LABELS).filter((r) => r !== 'CLUB_MANAGER'))) }, [isLogin])
   if (auth) return <Navigate to="/" replace />
   const submit = async (event) => {
@@ -96,6 +106,11 @@ function AuthShell({ mode }) {
     </section>
     <section className="auth-panel"><div className="auth-card">
       <p className="eyebrow">CỔNG ĐIỀU HÀNH</p><h2>{isLogin ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}</h2><p className="muted">{isLogin ? 'Đăng nhập để tiếp tục quản lý câu lạc bộ.' : 'Chọn đúng vai trò để bắt đầu sử dụng hệ thống.'}</p>
+      <div className="local-api-panel">
+        <div><strong>Dữ liệu riêng trên máy này</strong><span>Chạy SQL Server và backend trước khi đăng nhập. API: {localApiUrl}</span></div>
+        <button type="button" onClick={testConnection} disabled={connection.checking}>{connection.checking ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}</button>
+        {connection.message && <p className={connection.ready ? 'local-api-ok' : 'local-api-error'}>{connection.message}</p>}
+      </div>
       {location.state?.registered && <div className="notice success"><Check size={17} /> Đăng ký thành công. Bạn có thể đăng nhập.</div>}
       {error && <div className="notice error"><X size={17} /> {error}</div>}
       <form onSubmit={submit} className="form-stack">
