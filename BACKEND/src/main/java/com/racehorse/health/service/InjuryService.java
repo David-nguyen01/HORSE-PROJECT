@@ -97,6 +97,23 @@ public class InjuryService {
                 """,
                 updateId, horseId, veterinarianId, initialStatus, today, toJson(updateData));
 
+        if (!"RESOLVED".equals(initialStatus)) {
+            // A recorded active injury must immediately prevent training, even when
+            // the marker is created outside a medical examination.
+            jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+            jdbc.update("""
+                    update horses set health_status=case when health_status='QUARANTINED' then health_status else 'INJURED' end,
+                        health_changed_by_user_id=?, health_source_type='INJURY_MARKER', health_source_id=?,
+                        health_changed_at=SYSDATETIMEOFFSET(), updated_at=SYSDATETIMEOFFSET(), version=version+1
+                    where id=?
+                    """, veterinarianId, injuryId, horseId);
+            jdbc.update("""
+                    insert into training_locks(id,horse_id,reason,review_date,locked_by_user_id,locked_at)
+                    select ?,?, ?,null,?,SYSDATETIMEOFFSET()
+                    where not exists (select 1 from training_locks where horse_id=? and released_at is null)
+                    """, UUID.randomUUID(), horseId, "Tự động khóa: Chấn thương mới", veterinarianId, horseId);
+        }
+
         String vetName = findUsername(veterinarianId);
         OffsetDateTime now = OffsetDateTime.now();
 

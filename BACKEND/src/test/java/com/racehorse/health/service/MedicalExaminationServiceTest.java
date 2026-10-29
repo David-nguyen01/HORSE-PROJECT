@@ -12,7 +12,9 @@ import com.racehorse.health.repository.TrainingLockRepository;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.notification.service.NotificationService;
+import com.racehorse.medical.service.FollowUpService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,15 +46,22 @@ class MedicalExaminationServiceTest {
     @Mock private NotificationService notificationService;
     private final ObjectMapper json = new ObjectMapper();
     private MedicalExaminationService service;
+    private Horse existingHorse;
 
     @BeforeEach
     void setUp() {
         service = new MedicalExaminationService(
                 jdbc, horseAccessService, trainingLockRepository, trainingLockService,
                 preventiveCareService, userRepository, notificationService, json);
-        Horse existingHorse = mock(Horse.class);
+        existingHorse = mock(Horse.class);
         lenient().when(existingHorse.getIntakeStatus()).thenReturn("STABLED");
         lenient().when(horseAccessService.requireActive(any(UUID.class))).thenReturn(existingHorse);
+    }
+
+    private void assignOriginalVeterinarian(UUID veterinarianId) {
+        UserAccount originalVet = mock(UserAccount.class);
+        when(originalVet.getId()).thenReturn(veterinarianId);
+        when(existingHorse.getDiagnosingVet()).thenReturn(originalVet);
     }
 
     @Test
@@ -79,7 +88,20 @@ class MedicalExaminationServiceTest {
 
         assertThatThrownBy(() -> service.create(horseId, vetId, req))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Ngày tái khám phải sau hoặc bằng");
+                .hasMessageContaining("Ngày tái khám phải sau ngày khám");
+    }
+
+    @Test
+    void createRejectsFollowUpOnTheSameDayAsExam() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        LocalDate examDate = LocalDate.now();
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                examDate, "Kiểm tra", "Theo dõi", "Nghỉ ngơi", null, examDate, "MONITOR");
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ngày tái khám phải sau ngày khám");
     }
 
     @Test
@@ -130,9 +152,64 @@ class MedicalExaminationServiceTest {
     }
 
     @Test
+    void createRejectsOtherDoctorWhileFollowUpIsAssigned() {
+        UUID horseId = UUID.randomUUID();
+        UUID otherVet = UUID.randomUUID();
+        FollowUpService followUps = mock(FollowUpService.class);
+        MedicalExaminationService protectedService = new MedicalExaminationService(
+                jdbc, horseAccessService, trainingLockRepository, trainingLockService,
+                preventiveCareService, userRepository, notificationService, followUps, json);
+        when(followUps.requireAssignedForExamination(horseId, otherVet))
+                .thenThrow(new BusinessException("Ca tái khám do bác sĩ khác tiếp nhận"));
+        CreateMedicalExaminationRequest request = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Kiểm tra", "Theo dõi", "Nghỉ ngơi", null, null, "MONITOR");
+
+        assertThatThrownBy(() -> protectedService.create(horseId, otherVet, request))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("bác sĩ khác");
+        verify(jdbc, never()).update(contains("insert into module_records"), any(Object[].class));
+    }
+
+    @Test
+    void createRejectsOtherDoctorAfterInitialExamWhenNoFollowUpIsOpen() {
+        UUID horseId = UUID.randomUUID();
+        UUID originalVetId = UUID.randomUUID();
+        UUID otherVetId = UUID.randomUUID();
+        assignOriginalVeterinarian(originalVetId);
+        CreateMedicalExaminationRequest request = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Kiểm tra", "Theo dõi", "Nghỉ ngơi", null, null, "MONITOR");
+
+        assertThatThrownBy(() -> service.create(horseId, otherVetId, request))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("Chỉ bác sĩ phụ trách");
+        verify(jdbc, never()).update(contains("insert into module_records"), any(Object[].class));
+    }
+
+    @Test
+    void acceptedFollowUpDoctorMayExamineWithoutChangingPrimaryVetHere() {
+        UUID horseId = UUID.randomUUID();
+        UUID newVetId = UUID.randomUUID();
+        UUID followUpId = UUID.randomUUID();
+        FollowUpService followUps = mock(FollowUpService.class);
+        MedicalExaminationService protectedService = new MedicalExaminationService(
+                jdbc, horseAccessService, trainingLockRepository, trainingLockService,
+                preventiveCareService, userRepository, notificationService, followUps, json);
+        when(followUps.requireAssignedForExamination(horseId, newVetId)).thenReturn(followUpId);
+        when(jdbc.query(contains("select username from users"), any(RowMapper.class), eq(newVetId)))
+                .thenReturn(List.of("new_vet"));
+        CreateMedicalExaminationRequest request = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Tái khám", "Ổn định", "Theo dõi", null, null, "FIT");
+
+        protectedService.create(horseId, newVetId, request);
+
+        verify(followUps).recordExamination(eq(horseId), eq(newVetId), any(UUID.class),
+                eq(followUpId), eq(request.examinationDate()), isNull());
+        verify(jdbc, never()).update(contains("set diagnosing_vet_user_id=?"), any(), any());
+    }
+
+    @Test
     void createPersistsExaminationAndUpdatesHorseHealthStatus() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
         CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
                 LocalDate.now(), "Lameness in left hind", "Sprain",
                 "Cold compress and rest", "Anti-inflammatory 10mg",
@@ -160,10 +237,25 @@ class MedicalExaminationServiceTest {
     }
 
     @Test
+    void createDoesNotDuplicateLegacyPreventiveSchedule() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
+        CreatePreventiveCareRequest care = new CreatePreventiveCareRequest(
+                "VACCINATION", "Routine vaccine", LocalDate.now().plusDays(7), null, 3);
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Check", "Normal", "Observe", null, null, "FIT",
+                care, List.of(care));
+        service.create(horseId, vetId, req);
+        verify(preventiveCareService, times(1)).create(horseId, vetId, care);
+    }
+
+    @Test
     void addAddendumAppendsAndUpdatesHealthStatus() {
         UUID examId = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
 
         when(jdbc.queryForList(contains("select id, horse_id"), eq(examId)))
                 .thenReturn(List.of(Map.of("id", examId, "horse_id", horseId)));
@@ -208,6 +300,7 @@ class MedicalExaminationServiceTest {
     void createWithPreventiveSchedulesAndAlias() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
         CreatePreventiveCareRequest sched1 = new CreatePreventiveCareRequest("VACCINATION", "Flu shot", LocalDate.now().plusDays(10), null, 3);
         CreatePreventiveCareRequest sched2 = new CreatePreventiveCareRequest("DEWORMING", "Ivermectin", LocalDate.now().plusDays(20), null, 2);
 
@@ -218,9 +311,6 @@ class MedicalExaminationServiceTest {
 
         when(jdbc.query(contains("select username from users"), any(RowMapper.class), eq(vetId)))
                 .thenReturn(List.of("dr_vet"));
-        Horse mockHorse = org.mockito.Mockito.mock(Horse.class);
-        when(horseAccessService.requireActive(horseId)).thenReturn(mockHorse);
-
         MedicalExaminationResponse response = service.create(horseId, vetId, req);
 
         assertThat(response).isNotNull();
@@ -247,6 +337,7 @@ class MedicalExaminationServiceTest {
         service.delete(examId, actorId);
 
         verify(horseAccessService).requireActive(horseId);
+        verify(jdbc).update(contains("'$.sourceExaminationDeleted',1"), eq(examId.toString()));
         verify(jdbc).update(contains("record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(examId.toString()));
         verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId));
         verify(jdbc).update(contains("set health_status = 'FIT'"), eq(actorId), eq(horseId));
@@ -289,6 +380,7 @@ class MedicalExaminationServiceTest {
     void createWithBiometricsPersistsAndReturnsAllBiometrics() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
         CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
                 LocalDate.now(), "Tachypnea", "Mild Heat Stress",
                 "Hydration and shade", "Electrolytes",

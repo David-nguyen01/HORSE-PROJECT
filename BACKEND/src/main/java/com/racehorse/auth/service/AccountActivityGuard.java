@@ -40,7 +40,9 @@ public class AccountActivityGuard {
     private static final List<Blocker> ACTIVE_ASSIGNMENT_BLOCKERS = List.of(
             new Blocker("vẫn đang sở hữu ngựa đang hoạt động", "from dbo.horse_ownerships o join dbo.horses h on h.id=o.horse_id where o.owner_id=? and h.archived_at is null"),
             new Blocker("vẫn phụ trách ngựa đang hoạt động", "from dbo.horses where archived_at is null and ? in (current_trainer_id, caretaker_user_id)"),
+            new Blocker("vẫn là bác sĩ phụ trách ngựa đang hoạt động", "from dbo.horses where archived_at is null and diagnosing_vet_user_id=?"),
             new Blocker("vẫn đang giữ ca khám ban đầu", "from dbo.module_records where module_code='MEDICAL' and record_type='MEDICAL_ASSIGNMENT' and status='ACTIVE' and user_id=?"),
+            new Blocker("vẫn đang giữ ca tái khám", "from dbo.module_records where module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP' and status in ('ASSIGNED','HANDOVER_REQUESTED') and user_id=?"),
             new Blocker("vẫn có công việc chăm sóc chưa hoàn thành", "from dbo.care_tasks where assigned_staff_id=? and status='PENDING'")
     );
 

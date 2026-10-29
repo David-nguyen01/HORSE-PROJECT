@@ -62,6 +62,28 @@ class AccountActivityGuardTest {
     }
 
     @Test
+    void primaryVeterinarianCannotBeDisabledWhileResponsibleForHorse() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(id)))
+                .thenAnswer(invocation -> ((String) invocation.getArgument(0)).contains("diagnosing_vet_user_id") ? 1 : 0);
+
+        assertThatThrownBy(() -> new AccountActivityGuard(jdbc).requireNoActiveAssignments(id))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("bác sĩ phụ trách ngựa");
+    }
+
+    @Test
+    void substituteVeterinarianCannotBeDisabledBeforeVisitIsCompleted() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(id)))
+                .thenAnswer(invocation -> ((String) invocation.getArgument(0)).contains("MEDICAL_FOLLOW_UP") ? 1 : 0);
+
+        assertThatThrownBy(() -> new AccountActivityGuard(jdbc).requireNoActiveAssignments(id))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ca tái khám");
+    }
+
+    @Test
     void completedHistoryDoesNotBlockDisable() {
         UUID id = UUID.randomUUID();
         when(jdbc.queryForObject(anyString(), eq(Integer.class), eq(id))).thenReturn(0);

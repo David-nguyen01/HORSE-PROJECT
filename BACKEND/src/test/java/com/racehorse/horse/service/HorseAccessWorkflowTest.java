@@ -74,6 +74,19 @@ class HorseAccessWorkflowTest {
     }
 
     @Test
+    void oldActiveInjuryStillBlocksTrainingWhenHealthAndLockAreOutOfSync() {
+        horse.setIntakeStatus("STABLED");
+        ReflectionTestUtils.setField(horse, "diagnosingVet", mock(UserAccount.class));
+        ReflectionTestUtils.setField(horse, "healthStatus", "FIT");
+        when(jdbc.queryForObject(contains("STALL_ASSIGNMENT"), eq(Integer.class), eq(horseId))).thenReturn(1);
+        when(jdbc.queryForObject(contains("training_locks"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.queryForObject(contains("INJURY_MARKER"), eq(Integer.class), eq(horseId))).thenReturn(1);
+
+        assertThatThrownBy(() -> service.requireTrainingReady(horseId))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("chấn thương");
+    }
+
+    @Test
     void managerGuaranteeGrantsServiceAccessButNotTrainingBeforeIntake() {
         horse.setPaymentStatus("UNPAID");
         horse.setServiceOverride(true);

@@ -75,7 +75,10 @@ $baselineScripts = @(
     "39_seed_standard_feeding_plan_and_routine_templates.sql",
     "40_backfill_stabled_horses_daily_routines.sql",
     "41_fixed_training_window.sql",
-    "42_owner_race_approval_final.sql"
+    "42_owner_race_approval_final.sql",
+    "43_medical_follow_up_handover.sql",
+    "44_monthly_medical_checks.sql",
+    "45_remove_unexamined_follow_ups.sql"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan

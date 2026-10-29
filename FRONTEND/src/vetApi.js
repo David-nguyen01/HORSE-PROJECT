@@ -79,6 +79,16 @@ export const vetApi = {
     api(`/api/medical/queue/${horseId}/complete`, {
       method: 'POST',
     }),
+  getMedicalFollowUps: () => api('/api/medical/follow-ups'),
+  requestFollowUpHandover: (id, reason, mode) =>
+    api(`/api/medical/follow-ups/${id}/handover`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, mode }),
+    }),
+  acceptFollowUpHandover: (id) =>
+    api(`/api/medical/follow-ups/${id}/accept`, { method: 'POST' }),
+  cancelFollowUpHandover: (id) =>
+    api(`/api/medical/follow-ups/${id}/handover/cancel`, { method: 'POST' }),
 
   // Nutrition Plan
   getHorseNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`),

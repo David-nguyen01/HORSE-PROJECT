@@ -67,7 +67,7 @@ public class BarnHealthService {
             String gender = rs.getString("gender");
             String healthStatus = rs.getString("health_status");
             if (healthStatus == null || healthStatus.isBlank()) {
-                healthStatus = "FIT";
+                healthStatus = "UNKNOWN";
             }
             String stableLocation = rs.getString("stable_location");
             BarnHealthMapResponse.TrainingLockView lockView = activeLocks.get(id);
@@ -160,7 +160,7 @@ public class BarnHealthService {
                     case "MONITOR" -> monitorCount++;
                     case "INJURED" -> injuredCount++;
                     case "QUARANTINED" -> quarantinedCount++;
-                    default -> fitCount++;
+                    default -> { /* Unknown or legacy status must not be reported as FIT. */ }
                 }
                 if (h.trainingLock() != null && h.trainingLock().isLocked()) {
                     lockedCount++;

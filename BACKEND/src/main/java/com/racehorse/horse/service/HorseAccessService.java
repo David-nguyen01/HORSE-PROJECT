@@ -86,6 +86,12 @@ public class HorseAccessService {
             if (stallCount == null || stallCount == 0 || lockCount != null && lockCount > 0) {
                 throw new BusinessException("Ngựa chưa có ô chuồng hoạt động hoặc vẫn đang bị khóa huấn luyện");
             }
+            Integer activeInjuries = jdbc.queryForObject("select count(*) from module_records where module_code='MEDICAL' "
+                    + "and record_type='INJURY_MARKER' and horse_id=? and status in ('ACUTE','RECOVERING')",
+                    Integer.class, horseId);
+            if (activeInjuries != null && activeInjuries > 0) {
+                throw new BusinessException("Ngựa còn chấn thương đang theo dõi; bác sĩ phải xác nhận bình phục trước khi huấn luyện");
+            }
         }
         return horse;
     }

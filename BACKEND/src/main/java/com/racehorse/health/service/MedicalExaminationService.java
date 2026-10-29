@@ -14,6 +14,7 @@ import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.notification.entity.NotificationPriority;
 import com.racehorse.notification.service.NotificationService;
+import com.racehorse.medical.service.FollowUpService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +34,7 @@ public class MedicalExaminationService {
     private final PreventiveCareService preventiveCareService;
     private final UserAccountRepository userRepository;
     private final NotificationService notificationService;
+    private final FollowUpService followUpService;
     private final ObjectMapper json;
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -44,6 +46,7 @@ public class MedicalExaminationService {
             PreventiveCareService preventiveCareService,
             UserAccountRepository userRepository,
             NotificationService notificationService,
+            FollowUpService followUpService,
             ObjectMapper json) {
         this.jdbc = jdbc;
         this.horseAccessService = horseAccessService;
@@ -52,14 +55,25 @@ public class MedicalExaminationService {
         this.preventiveCareService = preventiveCareService;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.followUpService = followUpService;
         this.json = json;
+    }
+
+    public MedicalExaminationService(JdbcTemplate jdbc, HorseAccessService horseAccessService,
+                                     TrainingLockRepository trainingLockRepository,
+                                     TrainingLockService trainingLockService,
+                                     PreventiveCareService preventiveCareService,
+                                     UserAccountRepository userRepository,
+                                     NotificationService notificationService, ObjectMapper json) {
+        this(jdbc, horseAccessService, trainingLockRepository, trainingLockService,
+                preventiveCareService, userRepository, notificationService, null, json);
     }
 
     public MedicalExaminationService(
             JdbcTemplate jdbc,
             HorseAccessService horseAccessService,
             ObjectMapper json) {
-        this(jdbc, horseAccessService, null, null, null, null, null, json);
+        this(jdbc, horseAccessService, null, null, null, null, null, null, json);
     }
 
     @Transactional
@@ -67,18 +81,22 @@ public class MedicalExaminationService {
             UUID horseId,
             UUID veterinarianId,
             CreateMedicalExaminationRequest req) {
+        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
         Horse horse = horseAccessService.requireActive(horseId);
         requireInitialExamAccess(horseId, veterinarianId, horse.getIntakeStatus());
+        UUID currentFollowUpId = followUpService != null
+                ? followUpService.requireAssignedForExamination(horseId, veterinarianId) : null;
 
         LocalDate today = LocalDate.now();
         if (req.examinationDate().isAfter(today)) {
             throw new BusinessException("Ngày khám không được ở tương lai");
         }
-        if (req.followUpDate() != null && req.followUpDate().isBefore(req.examinationDate())) {
-            throw new BusinessException("Ngày tái khám phải sau hoặc bằng ngày khám");
+        if (req.followUpDate() != null && !req.followUpDate().isAfter(req.examinationDate())) {
+            throw new BusinessException("Ngày tái khám phải sau ngày khám");
         }
 
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
+        requireDoctorForExamination(horse, veterinarianId, currentFollowUpId);
 
         UUID examId = UUID.randomUUID();
         Map<String, Object> data = new LinkedHashMap<>();
@@ -153,7 +171,10 @@ public class MedicalExaminationService {
             schedules.addAll(req.preventiveSchedules());
         }
         if (req.preventiveCareSchedule() != null) {
-            schedules.add(req.preventiveCareSchedule());
+            // Older clients may send the same schedule in both request fields.
+            if (!schedules.contains(req.preventiveCareSchedule())) {
+                schedules.add(req.preventiveCareSchedule());
+            }
         }
 
         List<UUID> createdScheduleIds = new ArrayList<>();
@@ -183,6 +204,11 @@ public class MedicalExaminationService {
         if (!createdScheduleIds.isEmpty()) {
             data.put("preventiveScheduleIds", createdScheduleIds.stream().map(UUID::toString).toList());
             jdbc.update("update module_records set data_json = ? where id = ?", toJson(data), examId);
+        }
+
+        if (followUpService != null) {
+            followUpService.recordExamination(horseId, veterinarianId, examId,
+                    currentFollowUpId, req.examinationDate(), req.followUpDate());
         }
 
         String vetName = findUsername(veterinarianId);
@@ -224,10 +250,14 @@ public class MedicalExaminationService {
         }
 
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
+        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
         Horse horse = horseAccessService.requireActive(horseId);
         requireInitialExamAccess(horseId, authorId, horse.getIntakeStatus());
+        UUID currentFollowUpId = followUpService != null
+                ? followUpService.requireAssignedForExamination(horseId, authorId) : null;
 
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
+        requireDoctorForExamination(horse, authorId, currentFollowUpId);
 
         UUID addendumId = UUID.randomUUID();
         Map<String, Object> data = new LinkedHashMap<>();
@@ -432,8 +462,22 @@ public class MedicalExaminationService {
         }
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         if (horseId != null) {
+            jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
             horseAccessService.requireActive(horseId);
+            requireFollowUpMutationAccess(horseId, actorId);
         }
+        // The monthly check remains due even when its source examination is removed.
+        // Bring it forward to today so the responsible veterinarian can reassess the horse.
+        jdbc.update("""
+                update module_records set event_date=case when event_date>CONVERT(date,SYSDATETIMEOFFSET() AT TIME ZONE 'SE Asia Standard Time')
+                                                            then CONVERT(date,SYSDATETIMEOFFSET() AT TIME ZONE 'SE Asia Standard Time') else event_date end,
+                    data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.sourceExaminationId',NULL),
+                                          '$.sourceExaminationDeleted',1),
+                    updated_at=SYSDATETIMEOFFSET()
+                where module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
+                  and status in ('ASSIGNED','HANDOVER_REQUESTED')
+                  and JSON_VALUE(data_json,'$.sourceExaminationId')=?
+                """, examId.toString());
         // Delete addenda of this examination
         jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM' and JSON_VALUE(data_json, '$.examinationId')=?", examId.toString());
         // Delete examination record
@@ -455,7 +499,9 @@ public class MedicalExaminationService {
         }
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         if (horseId != null) {
+            jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
             horseAccessService.requireActive(horseId);
+            requireFollowUpMutationAccess(horseId, actorId);
         }
         jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'", addendumId);
 
@@ -541,6 +587,21 @@ public class MedicalExaminationService {
         if (assignedToThisVet == null || assignedToThisVet == 0) {
             throw new BusinessException("Ca khám ban đầu đã được bác sĩ khác tiếp nhận; bạn chỉ có thể xem trạng thái");
         }
+    }
+
+    private void requireDoctorForExamination(Horse horse, UUID veterinarianId, UUID currentFollowUpId) {
+        if ("IN_MEDICAL".equals(horse.getIntakeStatus())) return;
+        if (("PENDING_STALL".equals(horse.getIntakeStatus()) || "STABLED".equals(horse.getIntakeStatus()))
+                && (currentFollowUpId != null || horse.getDiagnosingVet() != null
+                && veterinarianId.equals(horse.getDiagnosingVet().getId()))) return;
+        throw new BusinessException("Chỉ bác sĩ phụ trách ca khám ban đầu hoặc ca tái khám đã nhận bàn giao mới được ghi phiếu khám");
+    }
+
+    private void requireFollowUpMutationAccess(UUID horseId, UUID actorId) {
+        if (followUpService == null) return;
+        if (userRepository != null && userRepository.findById(actorId)
+                .map(user -> user.getRoles().contains(Role.CLUB_MANAGER)).orElse(false)) return;
+        followUpService.requireAssignedForExamination(horseId, actorId);
     }
 
     private String findUsername(UUID userId) {

@@ -736,13 +736,17 @@ function RoleModal({ user, onClose, onSaved }) {
 }
 
 export default function App() {
-  return <AppErrorBoundary><AuthProvider><Routes><Route path="/login" element={<AuthShell mode="login" />} /><Route path="/register" element={<AuthShell mode="register" />} /><Route path="/*" element={<Protected><AppLayout /></Protected>} /></Routes></AuthProvider></AppErrorBoundary>
+  const location = useLocation()
+  return <AppErrorBoundary resetKey={location.pathname}><AuthProvider><Routes><Route path="/login" element={<AuthShell mode="login" />} /><Route path="/register" element={<AuthShell mode="register" />} /><Route path="/*" element={<Protected><AppLayout /></Protected>} /></Routes></AuthProvider></AppErrorBoundary>
 }
 
 class AppErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { error: null } }
   static getDerivedStateFromError(error) { return { error } }
   componentDidCatch(error, info) { console.error('Frontend runtime error', error, info) }
+  componentDidUpdate(previousProps) {
+    if (this.state.error && previousProps.resetKey !== this.props.resetKey) this.setState({ error: null })
+  }
   render() {
     if (!this.state.error) return this.props.children
     return <main className="fatal-error"><div className="card"><X size={28}/><h1>Không thể hiển thị trang</h1><p>Giao diện gặp lỗi tạm thời. Hãy tải lại trang để tiếp tục.</p><button className="button primary" onClick={()=>window.location.reload()}>Tải lại</button></div></main>

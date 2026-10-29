@@ -92,6 +92,9 @@ class InjuryServiceTest {
         // Verify 2 inserts: marker and initial recovery timeline update
         verify(jdbc, times(2)).update(contains("insert into module_records"),
                 any(), any(), any(), any(), any(), anyString());
+        verify(jdbc).update(contains("update horses set health_status"), eq(vetId), any(UUID.class), eq(horseId));
+        verify(jdbc).update(contains("insert into training_locks"),
+                any(UUID.class), eq(horseId), anyString(), eq(vetId), eq(horseId));
     }
 
     @Test

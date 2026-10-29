@@ -87,6 +87,12 @@ mvn test
 | `GET` | `/api/medical/queue/overview` | Mọi bác sĩ xem ngựa chờ khám và ca đã được bác sĩ khác tiếp nhận (chỉ xem trạng thái) |
 | `POST` | `/api/medical/queue/{horseId}/receive` | Bác sĩ nhận ngựa từ phòng chờ để khám |
 | `POST` | `/api/medical/queue/{horseId}/complete` | Bác sĩ hoàn tất sau khi lưu hồ sơ khám; ngựa chuyển sang chờ ô chuồng |
+| `GET` | `/api/medical/follow-ups` | Bác sĩ xem lịch khám tháng/tái khám và yêu cầu khám thay hoặc bàn giao; mỗi mục có `visitType`, `handoverMode` |
+| `POST` | `/api/medical/follow-ups/{id}/handover` | Gửi `{ "reason": "...", "mode": "COVER_VISIT" }` để nhờ khám thay một lần; dùng `TRANSFER_CARE` để chuyển bác sĩ phụ trách lâu dài |
+| `POST` | `/api/medical/follow-ups/{id}/accept` | Bác sĩ khác nhận yêu cầu; chỉ người nhận đầu tiên thành công |
+| `POST` | `/api/medical/follow-ups/{id}/handover/cancel` | Bác sĩ đã gửi rút yêu cầu khi chưa ai nhận |
+
+Lịch khám hằng tháng chỉ được lập sau khi đã có phiếu khám lâm sàng thật. Dữ liệu cũ có bác sĩ phụ trách nhưng chưa có phiếu khám cần được khám lần đầu; hệ thống không tạo phiếu khám giả để hợp thức hóa lịch.
 | `GET` | `/api/horse-intake/stall/pending` | Staff/Club Manager xem ngựa đã khám xong, chờ phân ô chuồng, kể cả ngựa bị thương |
 | `POST` | `/api/stables/{stableId}/stalls/{stallId}/assign` | Staff/Club Manager phân ô chuồng cho ngựa đã khám xong |
 | `GET` | `/api/horses/{id}` | Xem chi tiết hồ sơ |
@@ -130,7 +136,7 @@ mvn test
 | `GET` | `/api/horses/{id}/training-locks/current` | Xem khóa đang hoạt động |
 | `GET` | `/api/horses/{id}/training-locks` | Xem lịch sử khóa huấn luyện |
 
-Luồng tiếp nhận dùng `intakeStatus` trong `HorseResponse`: `PENDING_WAITING_ROOM` → `WAITING_FOR_VET` → `IN_MEDICAL` → `PENDING_STALL` → `STABLED`. `paymentStatus` vẫn chỉ biểu thị thanh toán; bảo lãnh của Club Manager dùng `serviceOverride`. Khi nhân viên đưa ngựa vào phòng chờ, mọi bác sĩ đang hoạt động được thông báo. Không có bước phân công trước: bác sĩ đầu tiên tiếp nhận sẽ phụ trách lần khám ban đầu; bác sĩ khác xem trạng thái qua `/api/medical/queue/overview` nhưng không thể tiếp nhận lại hoặc ghi hồ sơ khám ban đầu cho ca này. Sau khi hoàn tất, các lần tái khám không bị ràng buộc vào bác sĩ tiếp nhận ban đầu. Ngựa bị thương vẫn được phân ô chuồng để chăm sóc, nhưng chỉ có thể gán HLV và tạo/bắt đầu lịch tập khi ở `STABLED`, sức khỏe `FIT`, có phân ô còn hiệu lực và không còn khóa huấn luyện.
+Luồng tiếp nhận dùng `intakeStatus` trong `HorseResponse`: `PENDING_WAITING_ROOM` → `WAITING_FOR_VET` → `IN_MEDICAL` → `PENDING_STALL` → `STABLED`. `paymentStatus` vẫn chỉ biểu thị thanh toán; bảo lãnh của Club Manager dùng `serviceOverride`. Khi nhân viên đưa ngựa vào phòng chờ, mọi bác sĩ đang hoạt động được thông báo. Bác sĩ đầu tiên tiếp nhận được ghi vào ca khám ban đầu; bác sĩ khác chỉ xem trạng thái. Khi hoàn tất ca, `diagnosingVet` trở thành bác sĩ phụ trách ngựa lâu dài, hiển thị ở mục “Ngựa tôi phụ trách” trên web. Mỗi phiếu khám tạo lịch kiểm tra tiếp theo không muộn hơn một tháng lịch tính từ ngày khám; nếu bác sĩ đặt ngày tái khám sớm hơn, dùng ngày đó. `COVER_VISIT` chỉ chuyển quyền ghi phiếu cho một lần khám; lần kế tiếp quay về bác sĩ phụ trách ngựa. `TRANSFER_CARE` đổi `diagnosingVet` khi bác sĩ khác chấp nhận và chuyển cả các lịch tương lai. Mỗi yêu cầu chỉ có một người nhận; người gửi có thể rút trước khi được nhận. Khi đang chờ nhận, không ai được ghi phiếu cho ca đó. Club Manager không phải duyệt hay phân công. Ngựa bị thương vẫn được phân ô chuồng để chăm sóc, nhưng chỉ có thể gán HLV và tạo/bắt đầu lịch tập khi ở `STABLED`, sức khỏe `FIT`, có phân ô còn hiệu lực và không còn khóa huấn luyện.
 
 ## Phân quyền API đã triển khai
 
