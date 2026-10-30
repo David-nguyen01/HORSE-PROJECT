@@ -127,6 +127,17 @@ class TrainingScheduleServiceTest {
     }
 
     @Test
+    void rejectsCreatingSessionForQuarantinedHorse() {
+        ReflectionTestUtils.setField(horse, "healthStatus", "QUARANTINED");
+        when(phaseRepository.findDetailById(phaseId)).thenReturn(Optional.of(phase));
+        when(horseAccessService.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
+
+        assertThatThrownBy(() -> service.create(actorId, request(), false, true))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("đang cách ly");
+        verify(repository, never()).saveAndFlush(any(TrainingSchedule.class));
+    }
+
+    @Test
     void blocksOccupiedLaneForAnotherSessionOnTheSameDate() {
         prepareCreate(true);
 

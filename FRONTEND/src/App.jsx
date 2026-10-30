@@ -256,7 +256,7 @@ function NotificationBell() {
         if (item.notificationType === 'HORSE_WAITING_FOR_VET') {
           target = '/vet'
         } else if (item.relatedEntityType === 'INCIDENT_REPORT') {
-          target = id ? `/vet/injuries?incidentId=${id}` : '/vet/injuries'
+          target = '/vet'
         } else if (item.relatedEntityType === 'PREVENTIVE_CARE' || item.notificationType === 'PREVENTIVE_CARE_SCHEDULED') {
           target = id ? `/vet/medical-records?horseId=${id}` : '/vet/medical-records'
         } else if (item.relatedEntityType === 'TRAINING_EVALUATION' || item.relatedEntityType === 'TRAINING_SESSION') {

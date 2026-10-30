@@ -289,7 +289,7 @@ class IncidentReportServiceTest {
         String currentJson = """
                 {
                   "incidentType": "FEVER",
-                  "severity": "HIGH",
+                  "severity": "MEDIUM",
                   "description": "Sốt 39.5 độ"
                 }
                 """;
@@ -370,5 +370,36 @@ class IncidentReportServiceTest {
                 new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã nhận"), false);
         verify(jdbc).update(contains("update module_records set status"),
                 eq("ACKNOWLEDGED"), anyString(), eq(incidentId));
+    }
+
+    @Test
+    void emergencyCannotBeAcknowledgedWithoutClaim() {
+        UUID incidentId = UUID.randomUUID();
+        IncidentReportService guarded = spy(service);
+        IncidentReportResponse report = mock(IncidentReportResponse.class);
+        when(report.severity()).thenReturn("CRITICAL");
+        doReturn(report).when(guarded).getReport(incidentId);
+
+        assertThatThrownBy(() -> guarded.updateStatus(incidentId, UUID.randomUUID(),
+                new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã xem"), true))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("Nhận cấp cứu");
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
+    void emergencyClaimRejectsSecondDoctorWhileHorseHasOpenClaim() {
+        UUID incidentId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        IncidentReportService guarded = spy(service);
+        IncidentReportResponse report = mock(IncidentReportResponse.class);
+        when(report.severity()).thenReturn("HIGH");
+        when(report.horseId()).thenReturn(horseId);
+        doReturn(report).when(guarded).getReport(incidentId);
+        when(jdbc.queryForObject(contains("select count(*) from module_records where horse_id=?"),
+                eq(Integer.class), eq(horseId))).thenReturn(1);
+
+        assertThatThrownBy(() -> guarded.claimEmergency(incidentId, UUID.randomUUID()))
+                .isInstanceOf(BusinessException.class).hasMessageContaining("bác sĩ khác tiếp nhận");
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
 }

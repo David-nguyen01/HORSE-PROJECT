@@ -171,6 +171,8 @@ Với API chăm sóc, Owner chỉ đọc dữ liệu của ngựa mình sở h�
 
 Hoàn thành nhiệm vụ chăm sóc (`POST /api/care-tasks/{id}/complete`): Stable Staff chỉ hoàn thành nhiệm vụ được giao cho chính mình; nhiệm vụ định kỳ chưa phân công là việc chung, người hoàn thành đầu tiên được ghi vào `assigned_staff_id`. Club Manager có thể hoàn thành thay khi cần; Head Trainer chỉ tạo/phân công/hủy, không đánh dấu hoàn thành; Stable Staff không tự tạo hoặc hủy nhiệm vụ. Cập nhật trạng thái sự cố (`PUT /api/incidents/{id}/status`, `POST /acknowledge`, `POST /dismiss`): Stable Staff chỉ thao tác báo cáo do mình gửi; Veterinarian và Club Manager có thể xử lý báo cáo của người khác.
 
+Ca cấp cứu (mức `HIGH`/`CRITICAL`): tất cả bác sĩ thú y được thông báo và xem qua `GET /api/incidents`. Bác sĩ nhận đầu tiên gọi `POST /api/incidents/{id}/claim-emergency` (cần `PERM_MEDICAL_EDIT`); chỉ người đó được lập phiếu khám cho ngựa qua `POST /api/horses/{horseId}/medical-examinations` trong lúc ca đang mở. Lưu phiếu khám đóng ca cấp cứu và ghi liên kết `emergencyExaminationId`; bác sĩ phụ trách lâu dài của ngựa không đổi. Thao tác `acknowledge` thông thường không áp dụng cho ca cấp cứu chưa ai nhận.
+
 Các endpoint phân trang trả cấu trúc ổn định gồm `content` và `page` (`size`, `number`, `totalElements`, `totalPages`). Tham số `sort` có dạng `field,direction`, ví dụ `sort=name,asc`.
 
 Hệ thống có đúng 5 role cố định. Khi `CLUB_MANAGER` thay role của một tài khoản khác, backend đọc lại role từ database trên mỗi request nên quyền mới có hiệu lực ở request kế tiếp mà không buộc người dùng đăng nhập lại. JWT không được dùng làm nguồn quyền sau khi phát hành.
@@ -536,7 +538,10 @@ Nguồn nghiệp vụ cho ngưỡng nghỉ: [AAEP Care Guidelines](https://aaep.
 
 ### Chăm sóc phòng ngừa FR12
 
+Lịch tiêm phòng, tẩy giun và chăm sóc móng là lịch riêng của ngựa, không tự tạo theo phiếu khám. `POST /api/horses/{horseId}/medical-examinations` từ chối các trường `preventiveCareSchedule` và `preventiveSchedules`; dùng API dưới đây để tạo lịch. Lịch kiểm tra sức khỏe hằng tháng/tái khám thuộc quy trình khám bệnh và là loại lịch khác.
+
 - `POST /api/horses/{horseId}/preventive-care` — bác sĩ tạo lịch, chu kỳ và số ngày báo trước.
+- `careType` nhận `VACCINATION`, `DEWORMING`, `FARRIER` hoặc `OTHER`. Với `OTHER`, gửi thêm `careName` (tên tự nhập, tối đa 120 ký tự). `details` là mô tả tùy chọn. Lịch mới mặc định không lặp; chỉ tạo lịch kế tiếp sau khi xác nhận hoàn tất nếu bác sĩ đã chọn `recurrenceDays`. Ngày kế tiếp tính từ ngày thực hiện thực tế.
 - `GET /api/horses/{horseId}/preventive-care` — xem và lọc lịch theo loại, trạng thái, khoảng ngày.
 - `PUT|DELETE /api/preventive-care/{id}` — bác sĩ sửa hoặc hủy lịch chưa hoàn thành.
 - `POST /api/preventive-care/{id}/complete` — xác nhận hoàn thành; lịch kế tiếp tự sinh đúng một lần nếu có `recurrenceDays`. Các yêu cầu hoàn thành đồng thời được khóa theo lịch, yêu cầu đến sau nhận lỗi đã xử lý.

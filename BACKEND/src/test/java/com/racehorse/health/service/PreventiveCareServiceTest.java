@@ -16,6 +16,7 @@ import org.springframework.jdbc.core.RowMapper;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -67,8 +68,28 @@ class PreventiveCareServiceTest {
 
         verify(access).requireActive(horseId);
         verify(jdbc).update(contains("insert into preventive_care_schedules"),
-                any(), eq(horseId), eq("VACCINATION"), eq("Rabies booster"),
+                any(), eq(horseId), eq("VACCINATION"), isNull(), eq("Rabies booster"),
                 eq(req.dueDate()), eq(180), eq(7), eq(vetId));
+    }
+
+    @Test
+    void createRequiresCustomNameForOtherCare() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        CreatePreventiveCareRequest unnamed = new CreatePreventiveCareRequest(
+                "OTHER", " ", null, LocalDate.now().plusDays(7), null, 3);
+        assertThatThrownBy(() -> service.create(horseId, vetId, unnamed))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("tên loại chăm sóc khác");
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+
+        CreatePreventiveCareRequest named = new CreatePreventiveCareRequest(
+                "OTHER", "Kiểm tra răng", "Đánh giá răng hàm", LocalDate.now().plusDays(7), null, 3);
+        PreventiveCareResponse response = service.create(horseId, vetId, named);
+        assertThat(response.careName()).isEqualTo("Kiểm tra răng");
+        verify(jdbc).update(contains("insert into preventive_care_schedules"),
+                any(), eq(horseId), eq("OTHER"), eq("Kiểm tra răng"), eq("Đánh giá răng hàm"),
+                eq(named.dueDate()), isNull(), eq(3), eq(vetId));
     }
 
     @Test
@@ -76,7 +97,7 @@ class PreventiveCareServiceTest {
         UUID id = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
-        LocalDate due = LocalDate.now();
+        LocalDate due = LocalDate.now().minusDays(10);
 
         Map<String, Object> scheduleMap = Map.of(
                 "id", id,
@@ -104,7 +125,9 @@ class PreventiveCareServiceTest {
         // Verify next schedule was inserted
         verify(jdbc).update(contains("insert into preventive_care_schedules"),
                 eq(response.nextScheduleId()), eq(horseId), eq("DEWORMING"),
-                eq("Broad spectrum paste"), eq(90), eq(due), eq(90), eq(5), eq(vetId));
+                isNull(), eq("Broad spectrum paste"), eq(90),
+                eq(req.performedAt().atZoneSameInstant(ZoneId.of("Asia/Bangkok")).toLocalDate()),
+                eq(90), eq(5), eq(vetId));
 
         // Verify current schedule was updated with completion details
         verify(jdbc).update(contains("update preventive_care_schedules set completed_by_user_id=?"),
@@ -123,6 +146,30 @@ class PreventiveCareServiceTest {
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("đã được hoàn thành");
         verify(jdbc, never()).update(contains("insert into preventive_care_schedules"), any(Object[].class));
+    }
+
+    @Test
+    void cancelRejectsScheduleChangedSinceItWasRead() {
+        UUID id = UUID.randomUUID();
+        when(jdbc.queryForList(contains("with (UPDLOCK,HOLDLOCK)"), eq(id)))
+                .thenReturn(List.of(Map.of("id", id)));
+        when(jdbc.update(contains("set cancelled_at=SYSDATETIMEOFFSET()"), eq(id))).thenReturn(0);
+
+        assertThatThrownBy(() -> service.cancel(id))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("đã được xử lý");
+    }
+
+    @Test
+    void completeRejectsFuturePerformedTime() {
+        UUID id = UUID.randomUUID();
+        CompletePreventiveCareRequest request = new CompletePreventiveCareRequest(
+                OffsetDateTime.now().plusHours(2), "");
+
+        assertThatThrownBy(() -> service.complete(id, UUID.randomUUID(), request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ở tương lai");
+        verifyNoInteractions(jdbc);
     }
 
     @Test
@@ -148,7 +195,7 @@ class PreventiveCareServiceTest {
         UUID horseId = UUID.randomUUID();
 
         DuePreventiveCareResponse mockItem = new DuePreventiveCareResponse(
-                schedId, horseId, "H-001", "Thunder", "FARRIER", "Shoeing check",
+                schedId, horseId, "H-001", "Thunder", "FARRIER", null, "Shoeing check",
                 LocalDate.of(2026, 9, 15), 45, 5, true, -5);
 
         when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))

@@ -1048,12 +1048,20 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
 
   const submit = async (e) => {
     e.preventDefault()
+    if (!selectedHorse) {
+      setError('Vui lòng chọn ngựa trước khi tạo lịch tập.')
+      return
+    }
+    if (!phase?.id) {
+      setError('Ngựa chưa có giai đoạn huấn luyện đang hoạt động. Hãy tạo hoặc kích hoạt kế hoạch trước khi xếp lịch.')
+      return
+    }
     setBusy(true); setError('')
     try {
       await api('/api/training-schedules', {
         method: 'POST',
         body: JSON.stringify({
-          trainingPlanPhaseId: selectedPhase,
+          trainingPlanPhaseId: phase.id,
           taskName: form.taskName,
           racetrackId: selectedRacetrack,
           racetrackLaneId: selectedLane,
@@ -1101,6 +1109,9 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
             </select>
           </label>
           {plansError && <div className="notice error full"><X size={17} />{plansError}</div>}
+          {selectedHorse && !plansLoading && !plansError && phases.length === 0 && (
+            <div className="notice error full">Ngựa này chưa có giai đoạn huấn luyện đang hoạt động. Hãy lập hoặc kích hoạt kế hoạch huấn luyện trước khi tạo lịch tập.</div>
+          )}
 
           <label className="field full">
             <span>Sân tập *</span>
@@ -1137,7 +1148,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
 
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
-            <button className="button primary" disabled={busy || horsesLoading || !horses.length || !selectedLane || selectedTrainingDateIsRestDay || highIntensityLocked || (phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'loading')}>
+            <button className="button primary" disabled={busy || horsesLoading || !horses.length || !phase?.id || !selectedLane || selectedTrainingDateIsRestDay || highIntensityLocked || (phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'loading')}>
               <Check size={17} />{busy ? 'Đang lưu…' : 'Tạo lịch huấn luyện'}
             </button>
           </div>

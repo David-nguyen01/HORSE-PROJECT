@@ -95,6 +95,7 @@ BEGIN
         id UNIQUEIDENTIFIER NOT NULL CONSTRAINT pk_preventive_care_schedules PRIMARY KEY,
         horse_id UNIQUEIDENTIFIER NOT NULL,
         care_type VARCHAR(20) NOT NULL,
+        care_name NVARCHAR(120) NULL,
         details NVARCHAR(2000) NULL,
         due_date DATE NOT NULL,
         recurrence_days INT NULL,
@@ -110,7 +111,8 @@ BEGIN
         CONSTRAINT fk_preventive_care_creator FOREIGN KEY (created_by_user_id) REFERENCES dbo.users(id),
         CONSTRAINT fk_preventive_care_completed_by FOREIGN KEY (completed_by_user_id) REFERENCES dbo.users(id),
         CONSTRAINT fk_preventive_care_next FOREIGN KEY (next_schedule_id) REFERENCES dbo.preventive_care_schedules(id),
-        CONSTRAINT ck_preventive_care_type CHECK (care_type IN ('VACCINATION', 'DEWORMING', 'FARRIER')),
+        CONSTRAINT ck_preventive_care_type CHECK (care_type IN ('VACCINATION', 'DEWORMING', 'FARRIER', 'OTHER')),
+        CONSTRAINT ck_preventive_care_other_name CHECK (care_type <> 'OTHER' OR (care_name IS NOT NULL AND LEN(LTRIM(RTRIM(care_name))) > 0)),
         CONSTRAINT ck_preventive_care_recurrence CHECK (recurrence_days IS NULL OR recurrence_days > 0),
         CONSTRAINT ck_preventive_care_reminder CHECK (reminder_lead_days >= 0)
     );

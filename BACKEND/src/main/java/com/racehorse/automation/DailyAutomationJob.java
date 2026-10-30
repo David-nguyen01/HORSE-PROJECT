@@ -23,7 +23,7 @@ public class DailyAutomationJob {
                 insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key)
                 select newid(),ur.user_id,'PREVENTIVE_CARE_DUE',
                        case when s.due_date<? then 'HIGH' else 'NORMAL' end,
-                       N'Nhắc lịch chăm sóc phòng ngừa',concat(N'Lịch ',s.care_type,N' đến hạn ',convert(varchar(10),s.due_date,23)),
+                       N'Nhắc lịch chăm sóc phòng ngừa',concat(N'Lịch ',coalesce(nullif(s.care_name,N''),s.care_type),N' đến hạn ',convert(varchar(10),s.due_date,23)),
                        'PREVENTIVE_CARE',s.id,concat('preventive:',cast(s.id as varchar(36)),':',convert(varchar(10),s.due_date,23),':',cast(ur.user_id as varchar(36)))
                 from preventive_care_schedules s cross join user_roles ur
                 join users u on u.id = ur.user_id

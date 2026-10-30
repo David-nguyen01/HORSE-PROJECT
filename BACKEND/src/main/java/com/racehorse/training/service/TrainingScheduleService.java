@@ -378,6 +378,8 @@ public class TrainingScheduleService {
         if (horse.getStatus() == com.racehorse.horse.entity.HorseStatus.INJURED
                 || "INJURED".equalsIgnoreCase(horse.getHealthStatus()))
             throw new BusinessException("Ngựa đang bị chấn thương, không thể xếp hoặc bắt đầu buổi tập");
+        if ("QUARANTINED".equalsIgnoreCase(horse.getHealthStatus()))
+            throw new BusinessException("Ngựa đang cách ly, không thể xếp hoặc bắt đầu buổi tập");
     }
 
     @Transactional(readOnly = true)

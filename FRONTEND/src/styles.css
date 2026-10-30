@@ -1151,7 +1151,7 @@ body { font-size: 14px; line-height: 1.5; }
 .vet-records-empty { display: grid; justify-items: center; gap: 9px; padding: 40px 22px; text-align: center; }
 .vet-records-empty b { font-size: 17px; }
 .vet-records-empty span { max-width: 520px; font-size: 14px; line-height: 1.5; }
-.vet-preventive-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; border: 0; background: transparent; color: #456352; padding: 5px 0; cursor: pointer; text-align: left; font-size: 14px; }
+.vet-preventive-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; border: 0; background: transparent; color: #456352; padding: 5px 0; text-align: left; font-size: 14px; }
 .vet-preventive-toggle b { display: inline-flex; align-items: center; gap: 8px; color: #1f583d; font-size: 15px; }
 .vet-preventive-toggle .vet-preventive-chevron { color: #1f583d; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .vet-injury-layout > * { min-width: 0; }

@@ -130,6 +130,19 @@ class TrainingPlanServiceTest {
     }
 
     @Test
+    void rejectsPlanningForQuarantinedHorse() {
+        ReflectionTestUtils.setField(horse, "healthStatus", "QUARANTINED");
+        when(horseAccessService.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
+
+        assertThatThrownBy(() -> service.create(actorId,
+                request(List.of(phase("Base", "2026-09-15", "2026-09-30",
+                        List.of(LocalDate.parse("2026-09-21"))))), false, true))
+                .isInstanceOf(com.racehorse.common.exception.BusinessException.class)
+                .hasMessageContaining("đang cách ly");
+        verify(repository, never()).save(any(TrainingPlan.class));
+    }
+
+    @Test
     void createScopesHorseToCurrentTrainer() {
         when(horseAccessService.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
         when(userRepository.findById(actorId)).thenReturn(java.util.Optional.of(trainer));

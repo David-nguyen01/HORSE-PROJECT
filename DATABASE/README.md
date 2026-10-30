@@ -23,9 +23,9 @@ Tài liệu này là đặc tả chuẩn quản trị cơ sở dữ liệu cho d
 
 ## 2. DATABASE STRUCTURE (MODULAR BASELINE)
 
-Thư mục `DATABASE/` có 11 script modular baseline (`00`–`10`) và các bản vá idempotent (`32`–`45`) được `setup-local.ps1` áp dụng tự động theo chuỗi:
+Thư mục `DATABASE/` có 11 script modular baseline (`00`–`10`) và các bản vá idempotent (`32`–`46`) được `setup-local.ps1` áp dụng tự động theo chuỗi:
 
-> **Lưu ý về đánh số script:** Các script đánh số từ `11` đến `31` trong lịch sử dự án đã được tổng hợp và chuẩn hóa vào 11 file modular baseline (`00`–`10`). Các migration từ `32` đến `45` là các bản cập nhật tiếp nối sau giai đoạn chuẩn hóa baseline. Chuỗi thực thi chuẩn xác và đầy đủ là `00`–`10` tiếp đến `32`–`45`.
+> **Lưu ý về đánh số script:** Các script đánh số từ `11` đến `31` trong lịch sử dự án đã được tổng hợp và chuẩn hóa vào 11 file modular baseline (`00`–`10`). Các migration từ `32` đến `46` là các bản cập nhật tiếp nối sau giai đoạn chuẩn hóa baseline. Chuỗi thực thi chuẩn xác và đầy đủ là `00`–`10` tiếp đến `32`–`46`.
 
 ```text
 DATABASE/
@@ -54,6 +54,7 @@ DATABASE/
 ├── 43_medical_follow_up_handover.sql # Ca tái khám trong module_records, chống hai bác sĩ nhận cùng ca
 ├── 44_monthly_medical_checks.sql     # Bổ sung lịch khám tháng sau khi đã có phiếu khám thật
 ├── 45_remove_unexamined_follow_ups.sql # Hủy lịch tái khám được tạo nhầm khi chưa từng khám
+├── 46_cancel_orphaned_medical_follow_ups.sql # Hủy lịch còn mở sau khi phiếu khám cuối đã bị xóa
 ├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
 ├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
 ├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên
@@ -89,7 +90,7 @@ DATABASE/
 6. **`05_health_and_care.sql`**
    - Bảng `dbo.care_routine_definitions`: 5 quy trình chăm sóc tiêu chuẩn hàng ngày.
    - Bảng `dbo.care_tasks`: Các nhiệm vụ chăm sóc thực tế theo ngày dành cho `STABLE_STAFF` (hỗ trợ ghi chú hoàn thành và hình ảnh xác thực với các cột `photo_url`, `photo_bytes`, `photo_content_type`).
-   - Bảng `dbo.preventive_care_schedules`: Lịch tiêm phòng, tẩy giun và chăm sóc móng định kỳ.
+   - Bảng `dbo.preventive_care_schedules`: Lịch tiêm phòng, tẩy giun, chăm sóc móng hoặc loại chăm sóc khác do bác sĩ đặt tên. `47_custom_preventive_care_type.sql` cập nhật database local hiện có mà không xóa lịch cũ.
 7. **`06_telemetry_and_alerts.sql`**
    - Bảng `dbo.horse_metric_thresholds`: Thiết lập ngưỡng nhịp tim và tốc độ cho từng ngựa.
    - Bảng `dbo.telemetry_sessions` & `dbo.telemetry_readings`: Dữ liệu sinh trắc đo khi nghỉ (`RESTING`) hoặc tập luyện.
@@ -125,7 +126,7 @@ powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -UseWindowsAut
 powershell -ExecutionPolicy Bypass -File DATABASE/setup-local.ps1 -SqlServer "localhost,1433" -SqlUsername "sa" -SqlPassword "<mật khẩu SQL Server của bạn>"
 ```
 
-Chỉ dùng `-RecreateDatabase` khi chủ động muốn **xóa toàn bộ dữ liệu cũ**. Các bản vá `32`–`45` hướng tới `racehorse_local`; không chạy chúng trực tiếp trên Azure. Dữ liệu lịch 05:00–11:00 cũ được giữ nguyên khi nâng cấp; lịch tương lai cần được kiểm tra và chuyển thủ công sang slot mới nếu còn dùng.
+Chỉ dùng `-RecreateDatabase` khi chủ động muốn **xóa toàn bộ dữ liệu cũ**. Các bản vá `32`–`46` hướng tới `racehorse_local`; không chạy chúng trực tiếp trên Azure. Dữ liệu lịch 05:00–11:00 cũ được giữ nguyên khi nâng cấp; lịch tương lai cần được kiểm tra và chuyển thủ công sang slot mới nếu còn dùng.
 
 
 ### Bước 2: Kiểm tra cấu hình Backend (`application-local.properties`)

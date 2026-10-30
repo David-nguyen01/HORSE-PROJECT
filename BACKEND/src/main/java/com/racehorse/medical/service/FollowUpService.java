@@ -206,6 +206,41 @@ public class FollowUpService {
         }
     }
 
+    /** Emergency treatment does not transfer the horse or consume another doctor's assigned visit. */
+    public void recordEmergencyExamination(UUID horseId, UUID examinationId,
+                                           LocalDate examinationDate, LocalDate requestedFollowUpDate) {
+        List<UUID> primaryDoctors = jdbc.query("select diagnosing_vet_user_id from horses where id=?",
+                (rs, row) -> rs.getObject(1, UUID.class), horseId);
+        if (primaryDoctors.isEmpty() || primaryDoctors.getFirst() == null) return;
+        UUID primaryDoctor = primaryDoctors.getFirst();
+        LocalDate monthlyDue = examinationDate.plusMonths(1);
+        LocalDate due = requestedFollowUpDate != null && requestedFollowUpDate.isBefore(monthlyDue)
+                ? requestedFollowUpDate : monthlyDue;
+        int updated = jdbc.update("""
+                update module_records set event_date=case when event_date>? then ? else event_date end,
+                    updated_at=SYSDATETIMEOFFSET()
+                where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
+                  and status in ('ASSIGNED','HANDOVER_REQUESTED')
+                """, due, due, horseId);
+        if (updated > 0) return;
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("sourceExaminationId", examinationId.toString());
+        data.put("assignedVeterinarianId", primaryDoctor.toString());
+        data.put("visitType", requestedFollowUpDate != null && requestedFollowUpDate.isBefore(monthlyDue)
+                ? "CLINICAL" : "MONTHLY");
+        try {
+            jdbc.update("""
+                    insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,
+                                               status,event_date,data_json,created_at,updated_at)
+                    values(?,'MEDICAL','MEDICAL_FOLLOW_UP','medical_examinations',?,?,'ASSIGNED',?,?,
+                           SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())
+                    """, UUID.randomUUID(), horseId, primaryDoctor, due, json.writeValueAsString(data));
+        } catch (Exception exception) {
+            if (exception instanceof RuntimeException runtime) throw runtime;
+            throw new IllegalStateException("Không thể lưu lịch tái khám sau cấp cứu", exception);
+        }
+    }
+
     private UUID lockHorseForFollowUp(UUID followUpId) {
         List<UUID> horses = jdbc.query("""
                 select horse_id from module_records

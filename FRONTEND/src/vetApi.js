@@ -167,6 +167,8 @@ export const vetApi = {
       method: 'POST',
       body: JSON.stringify({ notes }),
     }),
+  claimEmergency: (incidentId) =>
+    api(`/api/incidents/${incidentId}/claim-emergency`, { method: 'POST' }),
   dismissIncident: (incidentId, notes = '') =>
     api(`/api/incidents/${incidentId}/dismiss`, {
       method: 'POST',

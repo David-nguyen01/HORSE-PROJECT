@@ -56,6 +56,10 @@ class MedicalExaminationServiceTest {
         existingHorse = mock(Horse.class);
         lenient().when(existingHorse.getIntakeStatus()).thenReturn("STABLED");
         lenient().when(horseAccessService.requireActive(any(UUID.class))).thenReturn(existingHorse);
+        lenient().when(jdbc.query(contains("record_type='INCIDENT_REPORT' and status='ACKNOWLEDGED'"),
+                any(RowMapper.class), any(UUID.class), anyString())).thenReturn(List.of());
+        lenient().when(jdbc.queryForObject(contains("record_type='INCIDENT_REPORT' and status='ACKNOWLEDGED'"),
+                eq(Integer.class), any(UUID.class))).thenReturn(0);
     }
 
     private void assignOriginalVeterinarian(UUID veterinarianId) {
@@ -237,17 +241,19 @@ class MedicalExaminationServiceTest {
     }
 
     @Test
-    void createDoesNotDuplicateLegacyPreventiveSchedule() {
+    void createRejectsEmbeddedPreventiveSchedule() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
-        assignOriginalVeterinarian(vetId);
         CreatePreventiveCareRequest care = new CreatePreventiveCareRequest(
                 "VACCINATION", "Routine vaccine", LocalDate.now().plusDays(7), null, 3);
         CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
                 LocalDate.now(), "Check", "Normal", "Observe", null, null, "FIT",
                 care, List.of(care));
-        service.create(horseId, vetId, req);
-        verify(preventiveCareService, times(1)).create(horseId, vetId, care);
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("phải được tạo riêng");
+        verifyNoInteractions(preventiveCareService);
+        verifyNoInteractions(jdbc);
     }
 
     @Test
@@ -297,10 +303,9 @@ class MedicalExaminationServiceTest {
     }
 
     @Test
-    void createWithPreventiveSchedulesAndAlias() {
+    void createRejectsEmbeddedPreventiveSchedules() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
-        assignOriginalVeterinarian(vetId);
         CreatePreventiveCareRequest sched1 = new CreatePreventiveCareRequest("VACCINATION", "Flu shot", LocalDate.now().plusDays(10), null, 3);
         CreatePreventiveCareRequest sched2 = new CreatePreventiveCareRequest("DEWORMING", "Ivermectin", LocalDate.now().plusDays(20), null, 2);
 
@@ -309,15 +314,11 @@ class MedicalExaminationServiceTest {
                 "Maintain regimen", null, null, "HEALTHY",
                 null, List.of(sched1, sched2));
 
-        when(jdbc.query(contains("select username from users"), any(RowMapper.class), eq(vetId)))
-                .thenReturn(List.of("dr_vet"));
-        MedicalExaminationResponse response = service.create(horseId, vetId, req);
-
-        assertThat(response).isNotNull();
-        assertThat(response.healthStatusAfter()).isEqualTo("FIT");
-        verify(preventiveCareService).create(horseId, vetId, sched1);
-        verify(preventiveCareService).create(horseId, vetId, sched2);
-        verify(jdbc).update(contains("update horses"), eq("FIT"), eq(vetId), any(), eq(horseId));
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("phải được tạo riêng");
+        verifyNoInteractions(preventiveCareService);
+        verifyNoInteractions(jdbc);
     }
 
     @Test
@@ -328,8 +329,12 @@ class MedicalExaminationServiceTest {
 
         when(jdbc.queryForList(contains("select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId)))
                 .thenReturn(List.of(Map.of("horse_id", horseId)));
+        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
         when(jdbc.queryForList(contains("select health_source_id from horses where id=?"), eq(horseId)))
                 .thenReturn(List.of(Map.of("health_source_id", examId)));
+        when(jdbc.queryForObject(contains("select count(*) from module_records"), eq(Integer.class), eq(horseId), eq(examId)))
+                .thenReturn(0);
         // No remaining exams -> resets to FIT
         when(jdbc.queryForList(contains("order by event_date desc, created_at desc"), eq(horseId)))
                 .thenReturn(List.of());
@@ -337,10 +342,30 @@ class MedicalExaminationServiceTest {
         service.delete(examId, actorId);
 
         verify(horseAccessService).requireActive(horseId);
-        verify(jdbc).update(contains("'$.sourceExaminationDeleted',1"), eq(examId.toString()));
+        verify(jdbc).update(contains("status='CANCELLED'"), eq(horseId));
         verify(jdbc).update(contains("record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(examId.toString()));
         verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId));
         verify(jdbc).update(contains("set health_status = 'FIT'"), eq(actorId), eq(horseId));
+    }
+
+    @Test
+    void deletingOneOfSeveralExamsKeepsExistingFollowUpOpen() {
+        UUID examId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("select horse_id from module_records where id=?"), eq(examId)))
+                .thenReturn(List.of(Map.of("horse_id", horseId)));
+        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
+        when(jdbc.queryForObject(contains("select count(*) from module_records"), eq(Integer.class), eq(horseId), eq(examId)))
+                .thenReturn(1);
+        when(jdbc.queryForList(contains("select health_source_id from horses where id=?"), eq(horseId)))
+                .thenReturn(List.of(Map.of("health_source_id", UUID.randomUUID())));
+
+        service.delete(examId, actorId);
+
+        verify(jdbc).update(contains("'$.sourceExaminationDeleted',1"), eq(examId.toString()));
+        verify(jdbc, never()).update(contains("status='CANCELLED'"), eq(horseId));
     }
 
     @Test

@@ -78,10 +78,12 @@ const localDateAfter = (days) => {
 const localToday = () => localDate(new Date())
 
 const PREVENTIVE_TYPES = {
-  VACCINATION: 'Tiêm chủng vắc-xin',
-  DEWORMING: 'Tẩy giun định kỳ',
-  FARRIER: 'Đóng móng & Chăm sóc móng',
+  VACCINATION: 'Tiêm phòng',
+  DEWORMING: 'Tẩy giun',
+  FARRIER: 'Chăm sóc móng',
+  OTHER: 'Chăm sóc khác',
 }
+const preventiveCareName = (care) => care.careName || PREVENTIVE_TYPES[care.careType] || care.careType
 
 const INJURY_SEVERITY = {
   CRITICAL: { label: 'Nguy kịch', color: '#a74842' },
@@ -326,7 +328,7 @@ function VetDashboard({ onNavigate }) {
         vetApi.getMedicalQueueOverview(),
         vetApi.getMyAssignments(),
         vetApi.getMedicalFollowUps(),
-        vetApi.getIncidents({ status: 'REPORTED' }),
+        vetApi.getIncidents(),
         vetApi.getDuePreventiveCare(),
         vetApi.getBarnHealthMap(),
       ])
@@ -343,7 +345,11 @@ function VetDashboard({ onNavigate }) {
       setQueueOverview(overviewRes.status === 'fulfilled' && Array.isArray(overviewRes.value) ? overviewRes.value : [])
       setMyAssignments(assignRes.status === 'fulfilled' && Array.isArray(assignRes.value) ? assignRes.value : [])
       setFollowUps(followUpsRes.status === 'fulfilled' && Array.isArray(followUpsRes.value) ? followUpsRes.value : [])
-      setIncidents(incRes.status === 'fulfilled' ? pageContent(incRes.value) || incRes.value || [] : [])
+      setIncidents(incRes.status === 'fulfilled'
+        ? (pageContent(incRes.value) || incRes.value || []).filter((item) =>
+          item.status === 'REPORTED' || (item.status === 'ACKNOWLEDGED' && item.emergencyVetId))
+            .sort((a, b) => Number(['HIGH', 'CRITICAL'].includes(b.severity)) - Number(['HIGH', 'CRITICAL'].includes(a.severity)))
+        : [])
       const nextWeek = new Date(Date.now() + 7 * 86400000)
       const cutoff = new Date(nextWeek.getTime() - nextWeek.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
       const careList = prevRes.status === 'fulfilled' ? pageContent(prevRes.value) || prevRes.value || [] : []
@@ -438,7 +444,11 @@ function VetDashboard({ onNavigate }) {
   const handleCreateExamFromIncident = async (inc) => {
     setActionBusyId(inc.id)
     try {
-      await vetApi.acknowledgeIncident(inc.id, 'Đã tiếp nhận tạo phiếu khám')
+      if (['HIGH', 'CRITICAL'].includes(inc.severity)) {
+        if (!inc.emergencyVetId) await vetApi.claimEmergency(inc.id)
+      } else {
+        await vetApi.acknowledgeIncident(inc.id, 'Đã tiếp nhận tạo phiếu khám')
+      }
       await loadData()
       onNavigate(`medical-records?horseId=${inc.horseId || ''}`)
     } catch (err) {
@@ -774,12 +784,12 @@ function VetDashboard({ onNavigate }) {
           {/* Section 4: Báo cáo sự cố từ nhân viên chuồng */}
           <section className="card">
             <div className="card-head">
-              <h3>Sự cố cần xem</h3>
-              <span className="record-count">{incidents.length} sự cố mới</span>
+              <h3>Sự cố cần tiếp nhận</h3>
+              <span className="record-count">{incidents.length} sự cố đang mở</span>
             </div>
             {incidents.length > 0 ? (
               <div className="vet-incidents">
-                {incidents.slice(0, 3).map((inc) => (
+                {incidents.slice(0, 5).map((inc) => (
                   <div
                     key={inc.id}
                     className="vet-incident-row"
@@ -792,16 +802,18 @@ function VetDashboard({ onNavigate }) {
                         <span className="vet-incident-horse">• Ngựa: <b>{inc.horseName || inc.horseCode || '—'}</b></span>
                       </div>
                       <p>{inc.description}</p>
+                      {inc.emergencyVetId && <p>Ca cấp cứu do {inc.emergencyVetName || 'bác sĩ khác'} tiếp nhận.</p>}
                     </div>
                     <div className="vet-row-actions">
                       <button
                         type="button"
                         className="button primary"
-                        disabled={actionBusyId === inc.id}
+                        disabled={actionBusyId === inc.id || Boolean(inc.emergencyVetId && inc.emergencyVetId !== getAuth()?.user?.id)}
                         onClick={() => handleCreateExamFromIncident(inc)}
                       >
-                        <FilePlus2 size={15} /> Tiếp nhận & mở hồ sơ
+                        <FilePlus2 size={15} /> {inc.emergencyVetId ? 'Mở hồ sơ ca cấp cứu' : ['HIGH', 'CRITICAL'].includes(inc.severity) ? 'Nhận cấp cứu' : 'Tiếp nhận & mở hồ sơ'}
                       </button>
+                      {!['HIGH', 'CRITICAL'].includes(inc.severity) && <>
                       <button
                         type="button"
                         className="button secondary"
@@ -820,6 +832,7 @@ function VetDashboard({ onNavigate }) {
                       >
                         Bỏ qua
                       </button>
+                      </>}
                     </div>
                   </div>
                 ))}
@@ -849,7 +862,7 @@ function VetDashboard({ onNavigate }) {
                     className="vet-preventive-item"
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '6px' }}>
-                      <b>{item.details || PREVENTIVE_TYPES[item.careType] || item.careType}</b>
+                      <b>{preventiveCareName(item)}{item.details ? ` · ${item.details}` : ''}</b>
                       <button
                         type="button"
                         className="button primary"
@@ -1457,29 +1470,31 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   const [selectedHorseId, setSelectedHorseId] = useState(initialHorseId)
   const [followUpCases, setFollowUpCases] = useState(null)
   const [myMedicalAssignments, setMyMedicalAssignments] = useState(null)
+  const [emergencyClaims, setEmergencyClaims] = useState(null)
   const [followUpLoadError, setFollowUpLoadError] = useState(false)
   const [subTab, setSubTab] = useState(defaultSubTab)
   const [records, setRecords] = useState([])
+  const examDetailRequests = useRef(new Set())
   const [examLoadError, setExamLoadError] = useState(false)
   const [examLoadedHorseId, setExamLoadedHorseId] = useState(null)
   const [injuries, setInjuries] = useState([])
   const [loading, setLoading] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showAddInjuryModal, setShowAddInjuryModal] = useState(false)
-  const [selectedExam, setSelectedExam] = useState(null)
   const [selectedInjury, setSelectedInjury] = useState(null)
   const [updateText, setUpdateText] = useState('')
   const [nextStatus, setNextStatus] = useState('RECOVERING')
-  const [addendumText, setAddendumText] = useState('')
   const [preventiveList, setPreventiveList] = useState([])
+  const [preventiveLoadError, setPreventiveLoadError] = useState(false)
+  const preventiveRequestId = useRef(0)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [completeCareModal, setCompleteCareModal] = useState(null)
   const [showAddPreventiveModal, setShowAddPreventiveModal] = useState(false)
+  const [editingPreventive, setEditingPreventive] = useState(null)
 
   // Sub-tabs & retention limits for preventive care
   const [preventiveTab, setPreventiveTab] = useState('due') // 'due' (Cần làm ngay), 'future' (Kế hoạch dài hạn), 'completed' (Đã xong), 'all'
   const [completedLimit, setCompletedLimit] = useState(5)
-  const [showPreventiveSection, setShowPreventiveSection] = useState(false)
 
   // Examination Pagination & Filter States
   const [examPage, setExamPage] = useState(1)
@@ -1561,13 +1576,21 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   }, [loadHorses])
 
   const loadPreventive = useCallback(async () => {
-    if (!selectedHorseId) return
+    const requestId = ++preventiveRequestId.current
+    if (!selectedHorseId) {
+      setPreventiveList([])
+      return
+    }
+    setPreventiveLoadError(false)
     try {
       const data = await vetApi.getHorsePreventiveCare(selectedHorseId)
+      if (requestId !== preventiveRequestId.current) return
       const list = Array.isArray(data) ? data : pageContent(data) || []
       setPreventiveList(list.filter((item) => !item.cancelledAt))
     } catch {
+      if (requestId !== preventiveRequestId.current) return
       setPreventiveList([])
+      setPreventiveLoadError(true)
     }
   }, [selectedHorseId])
 
@@ -1642,7 +1665,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     setCompleteCareModal({
       id: care.id,
       careType: care.careType,
-      careName: care.details || PREVENTIVE_TYPES[care.careType] || care.careType,
+      careName: preventiveCareName(care),
       horseName: activeHorse?.name || 'Ngựa',
       dueDate: care.dueDate || care.scheduledDate,
       recurrenceDays: care.recurrenceDays,
@@ -1665,7 +1688,6 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
         notes: completeCareModal.notes || 'Đã thực hiện theo chỉ định thú y',
       })
       await loadPreventive()
-      await loadExams()
       setCompleteCareModal(null)
     } catch (err) {
       setCompleteCareModal((prev) => ({
@@ -1680,20 +1702,11 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     if (!selectedHorseId) return
     setLoading(true)
     setExamLoadedHorseId(null)
+    examDetailRequests.current.clear()
     try {
       const data = await vetApi.getHorseMedicalExams(selectedHorseId)
       const list = Array.isArray(data) ? data : pageContent(data) || []
-      // Tối ưu tài nguyên mạng: Chỉ fetch detail cho 5 phiếu mới nhất của trang đầu
-      const initialDetailed = await Promise.all(
-        list.slice(0, 5).map(async (exam) => {
-          try {
-            return await vetApi.getMedicalExamDetail(exam.id)
-          } catch {
-            return exam
-          }
-        })
-      )
-      setRecords([...initialDetailed, ...list.slice(5)])
+      setRecords(list)
       setExamLoadError(false)
       setExamLoadedHorseId(selectedHorseId)
     } catch (err) {
@@ -1708,15 +1721,19 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
 
   const loadFollowUpCases = useCallback(async () => {
     try {
-      const [cases, assignments] = await Promise.all([
+      const [cases, assignments, incidentResponse] = await Promise.all([
         vetApi.getMedicalFollowUps(), vetApi.getMyAssignments(),
+        vetApi.getIncidents().catch(() => []),
       ])
       setFollowUpCases(Array.isArray(cases) ? cases : [])
       setMyMedicalAssignments(Array.isArray(assignments) ? assignments : [])
+      setEmergencyClaims((pageContent(incidentResponse) || incidentResponse || []).filter((item) =>
+        item.status === 'ACKNOWLEDGED' && item.emergencyVetId && !item.emergencyExaminationId))
       setFollowUpLoadError(false)
     } catch {
       setFollowUpCases(null)
       setMyMedicalAssignments(null)
+      setEmergencyClaims(null)
       setFollowUpLoadError(true)
     }
   }, [])
@@ -1750,10 +1767,22 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   useEffect(() => {
     if (subTab === 'exams') {
       loadExams()
-    } else {
+    } else if (subTab === 'injuries') {
       loadInjuries()
     }
   }, [subTab, loadExams, loadInjuries])
+
+  useEffect(() => {
+    if (subTab !== 'exams' || examLoadedHorseId !== selectedHorseId || examLoadError) return
+    displayedRecords.filter((exam) => exam.id && !Array.isArray(exam.addenda)
+      && !exam.detailLoadFailed && !examDetailRequests.current.has(exam.id)).forEach((exam) => {
+      examDetailRequests.current.add(exam.id)
+      vetApi.getMedicalExamDetail(exam.id)
+        .then((detail) => setRecords((current) => current.map((item) => item.id === exam.id ? detail : item)))
+        .catch(() => setRecords((current) => current.map((item) => item.id === exam.id
+          ? { ...item, detailLoadFailed: true } : item)))
+    })
+  }, [displayedRecords, examLoadedHorseId, selectedHorseId, examLoadError, subTab])
 
   const activeHorse = horses.find((h) => h.id === selectedHorseId)
   const activeFollowUp = followUpCases?.find((item) => item.horseId === selectedHorseId)
@@ -1761,31 +1790,26 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
     ? records.find((item) => item.id?.toLowerCase() === activeFollowUp.sourceExaminationId?.toLowerCase())
     : null
   const currentVetId = getAuth()?.user?.id
-  const caseAllowed = activeFollowUp
+  const activeEmergency = emergencyClaims?.find((item) => item.horseId === selectedHorseId)
+  const caseAllowed = activeEmergency
+    ? activeEmergency.emergencyVetId === currentVetId
+    : activeFollowUp
     ? activeFollowUp.status === 'ASSIGNED' && activeFollowUp.veterinarianId === currentVetId
     : activeHorse?.intakeStatus === 'IN_MEDICAL'
       ? myMedicalAssignments?.some((item) => item.horseId === selectedHorseId)
       : ['PENDING_STALL', 'STABLED'].includes(activeHorse?.intakeStatus)
         && activeHorse?.diagnosingVet?.id === currentVetId
   const caseBlocked = followUpCases === null || myMedicalAssignments === null || !caseAllowed
+  const caseBlockReason = followUpCases === null || myMedicalAssignments === null
+    ? 'Chưa kiểm tra được phân công ca khám. Bấm Làm mới để thử lại.'
+    : activeEmergency && activeEmergency.emergencyVetId !== currentVetId
+      ? `Ca cấp cứu đang do ${activeEmergency.emergencyVetName || 'bác sĩ khác'} xử lý.`
+      : activeFollowUp && activeFollowUp.veterinarianId !== currentVetId
+        ? `Ca tái khám đang do ${activeFollowUp.veterinarianName || 'bác sĩ khác'} phụ trách.`
+        : activeFollowUp?.status === 'HANDOVER_REQUESTED'
+          ? 'Ca tái khám đang chờ bác sĩ khác nhận khám thay hoặc bàn giao.'
+          : 'Chỉ bác sĩ được phân công ca khám hiện tại mới có thể lập phiếu khám.'
   const isEligible = isMedicalEligible(activeHorse)
-
-  const handleAddAddendum = async (e) => {
-    e.preventDefault()
-    if (!selectedExam || !addendumText.trim()) return
-    setBusy(true)
-    try {
-      await vetApi.addMedicalExamAddendum(selectedExam.id, { notes: addendumText })
-      setAddendumText('')
-      await loadExams()
-      await loadHorses()
-      setSelectedExam(null)
-    } catch (err) {
-      alert(`Không thể thêm phụ lục: ${err.message}`)
-    } finally {
-      setBusy(false)
-    }
-  }
 
   const handleAddInjuryUpdate = async (e) => {
     e.preventDefault()
@@ -1824,14 +1848,14 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
             >
               <FilePlus2 size={16} /> Tạo phiếu khám mới
             </button>
-          ) : (
+          ) : subTab === 'injuries' ? (
             <button
               className="button primary"
               onClick={() => setShowAddInjuryModal(true)}
             >
               <Plus size={16} /> Ghi nhận chấn thương mới
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -1864,7 +1888,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           </div>
         )}
         <span className="record-count" style={{ marginLeft: 'auto' }}>
-          {subTab === 'exams' ? `${records.length} phiếu khám` : `${injuries.length} vị trí chấn thương`}
+          {subTab === 'exams' ? `${records.length} phiếu khám` : subTab === 'preventive' ? `${preventiveList.length} lịch chăm sóc` : `${injuries.length} vị trí chấn thương`}
         </span>
       </div>
 
@@ -1872,6 +1896,14 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
         <div role="status" className="vet-records-notice vet-records-notice-first">
           <FileText size={20} />
           <div><strong>Chưa có phiếu khám đầu tiên</strong><span>Ngựa này chưa có bệnh án lâm sàng. Lịch khám định kỳ chỉ bắt đầu sau khi bác sĩ lưu phiếu khám thật.</span></div>
+        </div>
+      )}
+      {subTab === 'exams' && activeEmergency && (
+        <div role="status" className="vet-records-notice">
+          <AlertTriangle size={20} />
+          <div><strong>Ca cấp cứu đang mở</strong><span>{activeEmergency.emergencyVetId === currentVetId
+            ? 'Bạn đã tiếp nhận ca này. Lưu phiếu khám để hoàn tất xử lý; bác sĩ phụ trách lâu dài của ngựa không đổi.'
+            : `Bác sĩ ${activeEmergency.emergencyVetName || 'khác'} đang xử lý. Bạn có thể xem hồ sơ.`}</span></div>
         </div>
       )}
       {subTab === 'exams' && activeFollowUp && examLoadedHorseId === selectedHorseId && !examLoadError && records.length > 0 && (
@@ -1883,11 +1915,11 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
               : `Bác sĩ thực hiện: ${activeFollowUp.veterinarianName}`}
               {followUpSourceExam ? ` · Lập từ phiếu khám ${formatVNDate(followUpSourceExam.examinationDate || followUpSourceExam.examDate)}` : ''}
               {activeFollowUp.dueDate < localToday() ? ' · Đã quá hạn' : ''}
-              {caseBlocked ? ' · Hồ sơ chỉ xem' : ''}</span></div>
+              {caseBlocked ? ` · ${caseBlockReason}` : ' · Cần tạo phiếu khám mới để hoàn tất lịch này.'}</span></div>
         </div>
       )}
       {subTab === 'exams' && activeHorse && caseBlocked && !activeFollowUp && !followUpLoadError && (
-        <div role="status" className="vet-records-notice vet-records-notice-readonly">Chỉ bác sĩ phụ trách ca khám mới được tạo phiếu hoặc ghi phụ lục.</div>
+        <div role="status" className="vet-records-notice vet-records-notice-readonly">{caseBlockReason}</div>
       )}
       {subTab === 'exams' && followUpCases === null && (
         <div role={followUpLoadError ? 'alert' : 'status'} className="vet-records-notice vet-records-notice-readonly">
@@ -1903,28 +1935,25 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
         <button role="tab" aria-selected={subTab === 'injuries'} className={`sub-tab-btn ${subTab === 'injuries' ? 'active' : ''}`} onClick={() => setSubTab('injuries')}>
           <MapPin size={17} /> Chấn thương & hồi phục
         </button>
+        <button role="tab" aria-selected={subTab === 'preventive'} className={`sub-tab-btn ${subTab === 'preventive' ? 'active' : ''}`} onClick={() => setSubTab('preventive')}>
+          <Calendar size={17} /> Lịch chăm sóc
+        </button>
       </div>
 
-      {/* VIEW 1: HỒ SƠ KHÁM & ĐIỀU TRỊ */}
-      {subTab === 'exams' && (
+      {/* Lịch chăm sóc được quản lý độc lập với phiếu khám */}
+      {(subTab === 'exams' || subTab === 'preventive') && (
         <div style={{ display: 'grid', gap: '14px' }}>
-          {activeHorse && (
+          {subTab === 'preventive' && activeHorse && (
             <div className="card" style={{ padding: '14px 16px', background: '#fcfdfb', border: '1px solid #d8e4dc' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                <button type="button" className="vet-preventive-toggle"
-                  onClick={() => setShowPreventiveSection((prev) => !prev)}
-                  aria-expanded={showPreventiveSection}
-                >
+                <div className="vet-preventive-toggle">
                   <b>
-                    <Calendar size={18} /> Chăm sóc phòng ngừa
+                    <Calendar size={18} /> Lịch chăm sóc phòng ngừa của ngựa
                   </b>
                   <span>
                     {dueSoonSchedules.length} đến hạn · {futureBackgroundSchedules.length} sắp tới · {completedSchedules.length} hoàn tất
                   </span>
-                  <span className="vet-preventive-chevron">
-                    {showPreventiveSection ? 'Thu gọn' : 'Xem lịch'}
-                  </span>
-                </button>
+                </div>
                 <button
                   type="button"
                   className="button secondary"
@@ -1934,8 +1963,16 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                 </button>
               </div>
 
-              {showPreventiveSection && (
-                <div style={{ marginTop: '12px' }}>
+              <p style={{ margin: '10px 0 0', color: '#5e7269', fontSize: '13px' }}>
+                Tạo, sửa hoặc xác nhận lịch chăm sóc riêng cho ngựa tại đây. Phiếu khám không tự tạo lịch này.
+              </p>
+
+              <div style={{ marginTop: '12px' }}>
+                  {preventiveLoadError && (
+                    <div role="alert" className="vet-records-notice vet-records-notice-readonly">
+                      Không tải được lịch chăm sóc. <button type="button" className="button secondary" onClick={loadPreventive}>Thử lại</button>
+                    </div>
+                  )}
                   {/* Sub-tabs điều hướng */}
                   <div style={{ display: 'flex', gap: '6px', marginBottom: '12px', borderBottom: '1px solid #e2ebe5', paddingBottom: '8px', flexWrap: 'wrap' }}>
                     <button
@@ -2025,57 +2062,58 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                     </div>
                   )}
 
-                  {displayedPreventiveList.length === 0 ? (
+                  {!preventiveLoadError && displayedPreventiveList.length === 0 ? (
                     <div style={{ padding: '16px', textAlign: 'center', color: '#888', fontSize: '12px', background: 'white', borderRadius: '6px', border: '1px dashed #d8e4dc' }}>
-                      {preventiveTab === 'due' && 'Hiện không có lịch tiêm phòng nào cần thực hiện gấp hoặc đến hạn trong vòng 30 ngày.'}
-                      {preventiveTab === 'future' && 'Không có lịch tiêm phòng nào trong kế hoạch định kỳ dài hạn (>30 ngày).'}
-                      {preventiveTab === 'completed' && 'Chưa có lịch sử tiêm phòng / chăm sóc phòng ngừa nào được ghi nhận.'}
-                      {preventiveTab === 'all' && 'Chưa có lịch tiêm phòng hoặc chăm sóc phòng ngừa nào cho ngựa này.'}
+                      {preventiveTab === 'due' && 'Không có lịch chăm sóc đến hạn trong 30 ngày tới.'}
+                      {preventiveTab === 'future' && 'Không có lịch chăm sóc sau 30 ngày.'}
+                      {preventiveTab === 'completed' && 'Chưa có lịch chăm sóc nào hoàn tất.'}
+                      {preventiveTab === 'all' && 'Chưa có lịch chăm sóc phòng ngừa cho ngựa này.'}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '6px' }}>
                       {displayedPreventiveList.map((p) => {
                         const isDone = Boolean(p.completedAt || p.status === 'COMPLETED')
                         return (
-                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '8px 12px', background: 'white', borderRadius: '6px', border: '1px solid #edf0eb' }}>
-                            <div>
-                              <span style={{ fontWeight: 600, color: '#173129' }}>{PREVENTIVE_TYPES[p.careType] || p.careType}</span>
-                              {p.details && <span style={{ color: '#555' }}> · {p.details}</span>}
-                              <span style={{ color: '#888', marginLeft: '6px' }}>(Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)})</span>
-                              {p.recurrenceDays ? (
-                                <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', background: '#eaf1fa', color: '#1e40af', fontWeight: 600 }}>
-                                    Chu kỳ: Mỗi {p.recurrenceDays} ngày
-                                </span>
-                              ) : (
-                                <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', background: '#f3f4f6', color: '#6b7280' }}>
-                                  Mũi đơn
-                                </span>
-                              )}
+                          <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', padding: '12px 14px', background: 'white', borderRadius: '10px', border: '1px solid #dce8df' }}>
+                            <div style={{ flex: '1 1 300px' }}>
+                              <div style={{ fontWeight: 700, fontSize: '14px', color: '#173129' }}>{preventiveCareName(p)}</div>
+                              {p.details && <div style={{ color: '#4c5e55', fontSize: '13px', marginTop: '3px' }}>{p.details}</div>}
+                              <div style={{ color: '#60756a', fontSize: '12px', marginTop: '5px' }}>
+                                Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)} · {p.recurrenceDays ? `Lặp mỗi ${p.recurrenceDays} ngày` : 'Một lần'} · Nhắc trước {p.reminderLeadDays} ngày
+                              </div>
                               {p.completionNotes && isDone && (
-                                <div style={{ fontSize: '11px', color: '#555', marginTop: '2px', fontStyle: 'italic' }}>
-                                  Ghi chú: {p.completionNotes}
+                                <div style={{ fontSize: '12px', color: '#555', marginTop: '5px' }}>
+                                  Kết quả: {p.completionNotes}
                                 </div>
                               )}
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ padding: '2px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
-                                {isDone ? `Đã thực hiện (${formatVNDate(p.completedAt)})` : 'Chờ thực hiện'}
+                            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                              <span style={{ padding: '5px 9px', borderRadius: '6px', fontSize: '12px', fontWeight: 700, background: isDone ? '#e8f5ec' : (p.dueDate < localToday() ? '#feeceb' : '#fff4da'), color: isDone ? '#27714d' : (p.dueDate < localToday() ? '#a74842' : '#986b18') }}>
+                                {isDone ? `Đã thực hiện ${formatVNDate(p.completedAt)}` : p.dueDate < localToday() ? 'Quá hạn' : 'Chờ thực hiện'}
                               </span>
                               {!isDone && (
                                 <>
                                   <button
                                     type="button"
                                     className="button secondary"
-                                    style={{ height: '24px', padding: '0 8px', fontSize: '11px', color: '#1d5a3a', borderColor: '#b5d9c2' }}
+                                    style={{ height: '32px', padding: '0 10px', fontSize: '12px', color: '#1d5a3a', borderColor: '#b5d9c2' }}
                                     onClick={() => promptCompletePreventiveCare(p)}
                                   >
                                     <Check size={12} /> Đã thực hiện
                                   </button>
                                   <button
                                     type="button"
+                                    className="button secondary"
+                                    style={{ height: '32px', padding: '0 10px', fontSize: '12px' }}
+                                    onClick={() => setEditingPreventive(p)}
+                                  >
+                                    Sửa
+                                  </button>
+                                  <button
+                                    type="button"
                                     className="icon-button danger"
-                                    style={{ width: '22px', height: '22px' }}
-                                    title="Xóa lịch phòng ngừa"
+                                    style={{ width: '32px', height: '32px' }}
+                                    title="Hủy lịch phòng ngừa"
                                     onClick={() => promptDeletePreventiveCare(p.id)}
                                   >
                                     <Trash2 size={12} />
@@ -2090,7 +2128,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                       {/* Giới hạn lịch sử hoàn tất để danh sách gọn gàng */}
                       {preventiveTab === 'completed' && completedSchedules.length > 5 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8faf7', borderRadius: '6px', fontSize: '11px', color: '#666' }}>
-                          <span>Hiển thị {Math.min(completedLimit, completedSchedules.length)} / {completedSchedules.length} lịch tiêm hoàn tất gần nhất</span>
+                          <span>Hiển thị {Math.min(completedLimit, completedSchedules.length)} / {completedSchedules.length} lịch hoàn tất gần nhất</span>
                           <button
                             type="button"
                             className="button secondary"
@@ -2103,11 +2141,11 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                       )}
                     </div>
                   )}
-                </div>
-              )}
+              </div>
             </div>
           )}
 
+          {subTab === 'exams' && <>
           {/* THANH CÔNG CỤ QUẢN LÝ PHIẾU KHÁM & DỌN DẸP TÀI NGUYÊN */}
           {!loading && records.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8faf7', padding: '10px 14px', borderRadius: '8px', border: '1px solid #dce5df', flexWrap: 'wrap', gap: '8px' }}>
@@ -2189,14 +2227,6 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <button
-                      className="button secondary"
-                      disabled={caseBlocked}
-                      style={{ height: '34px', fontSize: '11px' }}
-                      onClick={() => setSelectedExam(rec)}
-                    >
-                      <Plus size={13} /> Thêm phụ lục theo dõi
-                    </button>
-                    <button
                       type="button"
                       className="icon-button danger"
                       disabled={caseBlocked}
@@ -2246,10 +2276,21 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                   </div>
                 </div>
 
-                <div className="vet-exam-plan">
-                  <div><b>Đơn thuốc và liều dùng</b><span>{rec.medicationNotes || rec.medications || 'Không kê đơn'}</span></div>
-                  <div><b>Ngày hẹn tái khám</b><span>{(rec.followUpDate || rec.nextExamDate) ? formatVNDate(rec.followUpDate || rec.nextExamDate) : 'Không hẹn riêng'}</span></div>
-                </div>
+                {(rec.medicationNotes || rec.medications || rec.followUpDate || rec.nextExamDate) && (
+                  <div className="vet-exam-plan">
+                    {(rec.medicationNotes || rec.medications) && <div><b>Đơn thuốc và liều dùng</b><span>{rec.medicationNotes || rec.medications}</span></div>}
+                    {(rec.followUpDate || rec.nextExamDate) && <div><b>Ngày hẹn tái khám riêng</b><span>{formatVNDate(rec.followUpDate || rec.nextExamDate)}</span></div>}
+                  </div>
+                )}
+
+                {rec.detailLoadFailed && <div className="vet-records-notice vet-records-notice-readonly" role="alert">
+                  Chưa tải được phụ lục của phiếu này.
+                  <button type="button" className="button secondary" onClick={() => {
+                    examDetailRequests.current.delete(rec.id)
+                    setRecords((current) => current.map((item) => item.id === rec.id
+                      ? { ...item, detailLoadFailed: false } : item))
+                  }}>Thử lại</button>
+                </div>}
 
                 {rec.addenda && rec.addenda.length > 0 && (
                   <div style={{ marginTop: '14px', borderTop: '1px dashed #d5dcd2', paddingTop: '10px' }}>
@@ -2274,62 +2315,6 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                   </div>
                 )}
 
-                {/* Lịch phòng ngừa đã đặt (§7.2) */}
-                {(() => {
-                  const examSchedules = preventiveList.filter((p) => {
-                    if (rec.preventiveScheduleIds && rec.preventiveScheduleIds.length > 0) {
-                      return rec.preventiveScheduleIds.includes(p.id)
-                    }
-                    const examDateStr = rec.examinationDate || rec.examDate
-                    return (p.dueDate && p.dueDate === examDateStr) || (p.createdAt && p.createdAt.slice(0, 10) === examDateStr)
-                  })
-                  if (examSchedules.length === 0) return null
-                  return (
-                    <div style={{ marginTop: '14px', background: '#f4fbf7', border: '1px solid #d2ebd9', borderRadius: '8px', padding: '10px 14px' }}>
-                      <b style={{ fontSize: '12px', color: '#1d5a3a' }}>📅 Lịch phòng ngừa đã đặt trong lần khám này:</b>
-                      <div style={{ marginTop: '8px', display: 'grid', gap: '6px' }}>
-                        {examSchedules.map((p) => {
-                          const isDone = Boolean(p.completedAt || p.status === 'COMPLETED')
-                          return (
-                            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                              <div>
-                                • <b>{PREVENTIVE_TYPES[p.careType] || p.careType}:</b> {p.details || 'Theo phác đồ'} — Dự kiến: {formatVNDate(p.dueDate || p.scheduledDate)}
-                                {p.recurrenceDays ? (
-                                  <span style={{ marginLeft: '6px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', background: '#eaf1fa', color: '#1e40af', fontWeight: 600 }}>
-                                    🔁 Chu kỳ: {p.recurrenceDays} ngày
-                                  </span>
-                                ) : null}
-                                <span style={{ marginLeft: '8px', padding: '1px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, background: isDone ? '#e8f5ec' : '#fff4da', color: isDone ? '#27714d' : '#986b18' }}>
-                                  {isDone ? `✅ Đã thực hiện (${formatVNDate(p.completedAt)})` : '⏳ Chờ thực hiện'}
-                                </span>
-                              </div>
-                              {!isDone && (
-                                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                  <button
-                                    type="button"
-                                    className="button secondary"
-                                    style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#1d5a3a', borderColor: '#b5d9c2' }}
-                                    onClick={() => promptCompletePreventiveCare(p)}
-                                  >
-                                    <Check size={11} /> Đã tiêm
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="button secondary"
-                                    style={{ height: '24px', padding: '0 8px', fontSize: '10px', color: '#a74842' }}
-                                    onClick={() => promptDeletePreventiveCare(p.id)}
-                                  >
-                                    Xóa
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })()}
               </div>
             ))
           )}
@@ -2380,6 +2365,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
               </button>
             </div>
           )}
+          </>}
         </div>
       )}
 
@@ -2498,6 +2484,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       {showCreateModal && (
         <CreateExamModal
           horse={activeHorse}
+          emergencyIncidentId={activeEmergency?.emergencyVetId === currentVetId ? activeEmergency.id : null}
           onClose={() => setShowCreateModal(false)}
           onSaved={() => {
             setShowCreateModal(false)
@@ -2516,7 +2503,18 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           onSaved={() => {
             setShowAddPreventiveModal(false)
             loadPreventive()
-            loadExams()
+          }}
+        />
+      )}
+
+      {editingPreventive && (
+        <CreatePreventiveModal
+          horse={activeHorse}
+          schedule={editingPreventive}
+          onClose={() => setEditingPreventive(null)}
+          onSaved={() => {
+            setEditingPreventive(null)
+            loadPreventive()
           }}
         />
       )}
@@ -2531,36 +2529,6 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
             loadHorses()
           }}
         />
-      )}
-
-      {selectedExam && (
-        <div className="modal-backdrop" onMouseDown={() => setSelectedExam(null)}>
-          <div className="modal" onMouseDown={(e) => e.stopPropagation()} style={{ width: '480px' }}>
-            <div className="modal-head">
-              <div>
-                <p className="eyebrow">PHỤ LỤC BỆNH ÁN</p>
-                <h2>Ghi chú bổ sung</h2>
-              </div>
-              <button className="icon-button" onClick={() => setSelectedExam(null)}><X size={16} /></button>
-            </div>
-            <form onSubmit={handleAddAddendum} className="form-stack">
-              <div className="field">
-                <span>Diễn biến lâm sàng / Phản ứng thuốc bổ sung:</span>
-                <textarea
-                  rows={4}
-                  required
-                  placeholder="Ghi nhận triệu chứng sau 24h, khả năng vận động..."
-                  value={addendumText}
-                  onChange={(e) => setAddendumText(e.target.value)}
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="button secondary" onClick={() => setSelectedExam(null)}>Hủy</button>
-                <button type="submit" className="button primary" disabled={busy}>Lưu phụ lục</button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
 
       {selectedInjury && (
@@ -2659,7 +2627,7 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
             <div className="modal-head">
               <div>
                 <p className="eyebrow">XÁC NHẬN HOÀN TẤT CHĂM SÓC</p>
-                <h3 style={{ margin: 0, color: '#163f33' }}>Ghi nhận đã thực hiện {PREVENTIVE_TYPES[completeCareModal.careType] || ''}</h3>
+                <h3 style={{ margin: 0, color: '#163f33' }}>Xác nhận hoàn thành · {completeCareModal.careName}</h3>
               </div>
               <button
                 className="icon-button"
@@ -2679,11 +2647,11 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                 </div>
                 {completeCareModal.recurrenceDays ? (
                   <div style={{ fontSize: '12px', color: '#1e40af', marginTop: '6px', background: '#eff6ff', padding: '6px 10px', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
-                    🔁 <b>Chu kỳ lặp lại ({completeCareModal.recurrenceDays} ngày):</b> Sau khi xác nhận, hệ thống sẽ tự động tạo lịch tiêm cho đợt kế tiếp sau {completeCareModal.recurrenceDays} ngày.
+                    <b>Chu kỳ {completeCareModal.recurrenceDays} ngày:</b> Sau khi xác nhận, hệ thống sẽ tạo lịch chăm sóc tiếp theo.
                   </div>
                 ) : (
                   <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
-                    • Mũi tiêm đơn (không lặp lại chu kỳ).
+                    Lịch một lần, không tự tạo lịch tiếp theo.
                   </div>
                 )}
               </div>
@@ -2699,10 +2667,10 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
               </div>
 
               <div className="field">
-                <span style={{ fontSize: '12px', fontWeight: 600 }}>Ghi chú sau tiêm / thực hiện</span>
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>Ghi chú sau khi thực hiện</span>
                 <textarea
                   rows={2}
-                  placeholder="Tình trạng ngựa sau tiêm, phản ứng, số lô vắc-xin..."
+                  placeholder="Kết quả thực hiện, tình trạng ngựa hoặc thông tin cần lưu..."
                   value={completeCareModal.notes}
                   onChange={(e) => setCompleteCareModal({ ...completeCareModal, notes: e.target.value })}
                 />
@@ -2741,14 +2709,17 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   )
 }
 
-function CreatePreventiveModal({ horse, onClose, onSaved }) {
+function CreatePreventiveModal({ horse, schedule, onClose, onSaved }) {
+  const existingRecurrence = schedule?.recurrenceDays
+  const knownRecurrences = ['30', '90', '180', '365']
   const [form, setForm] = useState({
-    careType: 'VACCINATION',
-    details: '',
-    dueDate: localDateAfter(7),
-    recurrencePreset: '180',
-    customRecurrenceDays: '',
-    reminderLeadDays: 3,
+    careType: schedule?.careType || '',
+    careName: schedule?.careName || '',
+    details: schedule?.details || '',
+    dueDate: schedule?.dueDate || '',
+    recurrencePreset: existingRecurrence == null ? 'none' : knownRecurrences.includes(String(existingRecurrence)) ? String(existingRecurrence) : 'custom',
+    customRecurrenceDays: existingRecurrence == null ? '' : String(existingRecurrence),
+    reminderLeadDays: schedule?.reminderLeadDays ?? 3,
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -2768,14 +2739,19 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
     setBusy(true)
     setError('')
     try {
+      if (!form.careType) throw new Error('Vui lòng chọn loại chăm sóc.')
+      if (form.careType === 'OTHER' && !form.careName.trim()) throw new Error('Vui lòng nhập tên loại chăm sóc khác.')
       const recurrenceDays = getRecurrenceDays()
-      await vetApi.createPreventiveCare(horse.id, {
+      const payload = {
         careType: form.careType,
-        details: form.details.trim(),
+        careName: form.careType === 'OTHER' ? form.careName.trim() : null,
+        details: form.details.trim() || null,
         dueDate: form.dueDate,
         recurrenceDays: recurrenceDays,
         reminderLeadDays: Number(form.reminderLeadDays) || 0,
-      })
+      }
+      if (schedule) await vetApi.updatePreventiveCare(schedule.id, payload)
+      else await vetApi.createPreventiveCare(horse.id, payload)
       onSaved()
     } catch (err) {
       setError(err.message || 'Lỗi thêm lịch chăm sóc phòng ngừa')
@@ -2790,7 +2766,7 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
         <div className="modal-head">
           <div>
             <p className="eyebrow">CHĂM SÓC PHÒNG NGỪA</p>
-            <h3 style={{ margin: 0, color: '#163f33' }}>Thêm lịch tiêm phòng / chăm sóc · {horse?.name}</h3>
+            <h3 style={{ margin: 0, color: '#163f33' }}>{schedule ? 'Sửa lịch chăm sóc' : 'Tạo lịch chăm sóc'} · {horse?.name}</h3>
           </div>
           <button className="icon-button" onClick={onClose}><X size={16} /></button>
         </div>
@@ -2801,11 +2777,26 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
               value={form.careType}
               onChange={(e) => setForm({ ...form, careType: e.target.value })}
             >
-              <option value="VACCINATION">Tiêm phòng (Vaccination)</option>
-              <option value="DEWORMING">Tẩy giun (Deworming)</option>
-              <option value="FARRIER">Chăm sóc móng (Farrier)</option>
+              <option value="">Chọn loại chăm sóc</option>
+              <option value="VACCINATION">Tiêm phòng</option>
+              <option value="DEWORMING">Tẩy giun</option>
+              <option value="FARRIER">Chăm sóc móng</option>
+              <option value="OTHER">Khác – tự nhập tên</option>
             </select>
           </div>
+
+          {form.careType === 'OTHER' && (
+            <div className="field full">
+              <span>Tên loại chăm sóc khác *</span>
+              <input
+                required
+                maxLength={120}
+                placeholder="Ví dụ: Kiểm tra răng định kỳ"
+                value={form.careName}
+                onChange={(e) => setForm({ ...form, careName: e.target.value })}
+              />
+            </div>
+          )}
 
           <div className="field">
             <span>Ngày dự kiến thực hiện *</span>
@@ -2818,10 +2809,10 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
           </div>
 
           <div className="field full">
-            <span>Tên thuốc / Vắc-xin / Chi tiết *</span>
+            <span>Chi tiết thực hiện (nếu có)</span>
             <input
-              required
-              placeholder="VD: Vắc-xin cúm ngựa Equine Influenza, Uốn ván Tetanus..."
+              maxLength={2000}
+              placeholder="Ví dụ: tên vắc-xin, thuốc, hạng mục kiểm tra hoặc hướng dẫn"
               value={form.details}
               onChange={(e) => setForm({ ...form, details: e.target.value })}
             />
@@ -2833,7 +2824,7 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
               value={form.recurrencePreset}
               onChange={(e) => setForm({ ...form, recurrencePreset: e.target.value })}
             >
-              <option value="none">Không lặp lại (Chỉ 1 lần)</option>
+              <option value="none">Một lần, không tự tạo lịch tiếp</option>
               <option value="30">Mỗi tháng (30 ngày)</option>
               <option value="90">Mỗi quý (90 ngày / 3 tháng)</option>
               <option value="180">Định kỳ 6 tháng (180 ngày)</option>
@@ -2881,7 +2872,7 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
           )}
 
           <div className="full" style={{ fontSize: '11px', color: '#27714d', background: '#f4fbf7', padding: '8px 12px', borderRadius: '6px', border: '1px solid #d2ebd9' }}>
-            ℹ️ Sau khi hoàn thành mũi tiêm, nếu có chu kỳ lặp lại, hệ thống sẽ tự động tạo ngay mũi tiêm tiếp theo và gửi thông báo khi đến hạn.
+            Khi xác nhận đã thực hiện, hệ thống chỉ tạo lịch tiếp theo nếu bạn chọn chu kỳ. Lịch này độc lập với phiếu khám.
           </div>
 
           {error && (
@@ -2893,7 +2884,7 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
             <button type="submit" className="button primary" disabled={busy}>
-              {busy ? 'Đang lưu…' : 'Tạo lịch chăm sóc'}
+              {busy ? 'Đang lưu…' : schedule ? 'Lưu thay đổi' : 'Tạo lịch chăm sóc'}
             </button>
           </div>
         </form>
@@ -2902,7 +2893,7 @@ function CreatePreventiveModal({ horse, onClose, onSaved }) {
   )
 }
 
-function CreateExamModal({ horse, onClose, onSaved }) {
+function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
   const [step, setStep] = useState(1) // 1: Triệu chứng & Sinh trắc, 2: Chẩn đoán & Điều trị, 3: Kết luận & Hệ quả
   const [stepError, setStepError] = useState('')
   const [caseAccess, setCaseAccess] = useState({ loading: true, message: '' })
@@ -2910,6 +2901,10 @@ function CreateExamModal({ horse, onClose, onSaved }) {
     let cancelled = false
     if (!horse?.id) {
       setCaseAccess({ loading: false, message: 'Vui lòng chọn ngựa trước khi tạo phiếu khám.' })
+      return
+    }
+    if (emergencyIncidentId) {
+      setCaseAccess({ loading: false, message: '' })
       return
     }
     vetApi.getMedicalFollowUps().then((cases) => {
@@ -2926,7 +2921,7 @@ function CreateExamModal({ horse, onClose, onSaved }) {
       if (!cancelled) setCaseAccess({ loading: false, message: 'Không kiểm tra được người phụ trách ca tái khám. Vui lòng tải lại trang.' })
     })
     return () => { cancelled = true }
-  }, [horse?.id])
+  }, [horse?.id, emergencyIncidentId])
   const [form, setForm] = useState({
     examinationDate: localToday(),
     symptoms: '',
@@ -2941,31 +2936,7 @@ function CreateExamModal({ horse, onClose, onSaved }) {
     temperatureCelsius: '',
     weightKg: '',
   })
-  const [preventiveSchedules, setPreventiveSchedules] = useState([])
   const [busy, setBusy] = useState(false)
-
-  const addSchedule = () => {
-    setPreventiveSchedules((prev) => [
-      ...prev,
-      {
-        careType: 'VACCINATION',
-        details: '',
-        dueDate: '',
-        recurrenceDays: '180',
-        reminderLeadDays: 3,
-      },
-    ])
-  }
-
-  const updateSchedule = (index, field, value) => {
-    setPreventiveSchedules((prev) =>
-      prev.map((item, i) => (i === index ? { ...item, [field]: value } : item))
-    )
-  }
-
-  const removeSchedule = (index) => {
-    setPreventiveSchedules((prev) => prev.filter((_, i) => i !== index))
-  }
 
   const handleNext = (e) => {
     if (e) e.preventDefault()
@@ -3006,16 +2977,6 @@ function CreateExamModal({ horse, onClose, onSaved }) {
     }
     setBusy(true)
     try {
-      const validSchedules = preventiveSchedules
-        .filter((s) => s.dueDate && s.dueDate.trim())
-        .map((s) => ({
-          careType: s.careType,
-          details: s.details || '',
-          dueDate: s.dueDate,
-          recurrenceDays: s.recurrenceDays && Number(s.recurrenceDays) > 0 ? Number(s.recurrenceDays) : null,
-          reminderLeadDays: Number(s.reminderLeadDays) || 0,
-        }))
-
       await vetApi.createMedicalExam(horse.id, {
         examinationDate: form.examinationDate,
         symptoms: form.symptoms,
@@ -3029,7 +2990,6 @@ function CreateExamModal({ horse, onClose, onSaved }) {
         heightCm: form.heightCm ? parseInt(form.heightCm, 10) : null,
         temperatureCelsius: form.temperatureCelsius ? parseFloat(form.temperatureCelsius) : null,
         weightKg: form.weightKg ? parseFloat(form.weightKg) : null,
-        preventiveSchedules: validSchedules.length > 0 ? validSchedules : null,
       })
       onSaved()
     } catch (err) {
@@ -3323,94 +3283,6 @@ function CreateExamModal({ horse, onClose, onSaved }) {
                   </p>
                 </div>
               )}
-            </div>
-
-            {/* Lên lịch chăm sóc phòng ngừa đi kèm (tùy chọn) */}
-            <div className="full" style={{ border: '1px solid #c8d8d0', borderRadius: '10px', padding: '14px', background: '#f8faf9', marginTop: '6px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: preventiveSchedules.length > 0 ? '12px' : '0' }}>
-                <span style={{ fontWeight: 700, color: '#163f33', fontSize: '13px' }}>
-                  🗓️ Lên lịch tiêm phòng / phòng ngừa kèm theo (tùy chọn)
-                </span>
-                <button
-                  type="button"
-                  className="button secondary"
-                  style={{ padding: '4px 10px', fontSize: '11px' }}
-                  onClick={addSchedule}
-                >
-                  <Plus size={13} /> Thêm lịch tiêm / tẩy giun
-                </button>
-              </div>
-
-              {preventiveSchedules.map((sched, idx) => (
-                <div key={idx} style={{ background: 'white', border: '1px solid #e0e6e2', borderRadius: '8px', padding: '12px', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                    <b style={{ fontSize: '12px', color: '#27714d' }}>Lịch {idx + 1}</b>
-                    <button
-                      type="button"
-                      className="icon-button danger"
-                      style={{ width: '22px', height: '22px' }}
-                      onClick={() => removeSchedule(idx)}
-                      title="Xóa lịch này"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                  <div className="form-grid">
-                    <div className="field">
-                      <span>Loại chăm sóc *</span>
-                      <select
-                        value={sched.careType}
-                        onChange={(e) => updateSchedule(idx, 'careType', e.target.value)}
-                      >
-                        <option value="VACCINATION">Tiêm phòng (Vaccination)</option>
-                        <option value="DEWORMING">Tẩy giun (Deworming)</option>
-                        <option value="FARRIER">Chăm sóc móng (Farrier)</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <span>Ngày dự kiến thực hiện *</span>
-                      <input
-                        type="date"
-                        required
-                        value={sched.dueDate}
-                        onChange={(e) => updateSchedule(idx, 'dueDate', e.target.value)}
-                      />
-                    </div>
-                    <div className="field full">
-                      <span>Tên / Chi tiết / Thuốc / Vắc-xin *</span>
-                      <input
-                        required
-                        placeholder="VD: Vắc-xin cúm ngựa Equine Influenza, Thuốc tẩy giun Ivermectin..."
-                        value={sched.details}
-                        onChange={(e) => updateSchedule(idx, 'details', e.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <span>Chu kỳ lặp lại</span>
-                      <select
-                        value={sched.recurrenceDays ?? ''}
-                        onChange={(e) => updateSchedule(idx, 'recurrenceDays', e.target.value)}
-                      >
-                        <option value="">Không lặp (Chỉ 1 lần)</option>
-                        <option value="30">Mỗi tháng (30 ngày)</option>
-                        <option value="90">Mỗi quý (90 ngày)</option>
-                        <option value="180">Định kỳ 6 tháng (180 ngày)</option>
-                        <option value="365">Định kỳ hàng năm (365 ngày)</option>
-                      </select>
-                    </div>
-                    <div className="field">
-                      <span>Nhắc trước (ngày)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        max="30"
-                        value={sched.reminderLeadDays}
-                        onChange={(e) => updateSchedule(idx, 'reminderLeadDays', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
 
             <div className="modal-actions full" style={{ marginTop: '16px' }}>

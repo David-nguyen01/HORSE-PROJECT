@@ -97,6 +97,7 @@ public class TrainingPlanService {
     public TrainingPlanResponse update(UUID planId, UUID actorId, TrainingPlanRequest request, boolean manager, boolean trainer) {
         TrainingPlan plan = requirePlan(planId);
         Horse horse = horseAccessService.requireTrainingAccess(plan.getHorse().getId(), actorId, manager, trainer, false);
+        if (request.active()) requireFitForPlanning(horse);
         if (!horse.getId().equals(request.horseId())) {
             throw new InvalidInputException("Không thể chuyển kế hoạch sang ngựa khác; hãy dùng chức năng sao chép");
         }
@@ -320,6 +321,8 @@ public class TrainingPlanService {
 
     private void requireFitForPlanning(Horse horse) {
         if (isInjured(horse)) throw new BusinessException("Ngựa đang bị chấn thương, không thể tạo hoặc cập nhật kế hoạch");
+        if ("QUARANTINED".equalsIgnoreCase(horse.getHealthStatus()))
+            throw new BusinessException("Ngựa đang cách ly, không thể tạo hoặc cập nhật kế hoạch");
     }
 
     private void requireDiagnosedForTrainer(UUID horseId, boolean manager, boolean trainer) {

@@ -114,6 +114,12 @@ public class IncidentReportController {
                 new UpdateIncidentStatusRequest("ACKNOWLEDGED", notes), managerOrVet(authentication));
     }
 
+    @PostMapping("/{id}/claim-emergency")
+    @PreAuthorize("hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')")
+    public IncidentReportResponse claimEmergency(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt) {
+        return service.claimEmergency(id, UUID.fromString(jwt.getSubject()));
+    }
+
     @PostMapping("/{id}/dismiss")
     @PreAuthorize("hasRole('CLUB_MANAGER') or (hasRole('VETERINARIAN') and hasAuthority('PERM_MEDICAL_EDIT')) or (hasRole('STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT'))")
     public IncidentReportResponse dismiss(

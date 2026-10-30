@@ -26,6 +26,9 @@ public record IncidentReportResponse(
         String trainingTaskName,
         String groundName,
         Integer laneNumber,
-        java.util.List<String> recipients
+        java.util.List<String> recipients,
+        UUID emergencyVetId,
+        String emergencyVetName,
+        UUID emergencyExaminationId
 ) {
 }

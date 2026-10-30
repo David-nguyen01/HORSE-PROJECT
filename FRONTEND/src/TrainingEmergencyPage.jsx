@@ -56,7 +56,7 @@ export default function TrainingEmergencyPage() {
         method: 'POST',
         body: JSON.stringify({ trainingScheduleId: selected.id, description, recipients })
       })
-      setSuccess('Đã gửi yêu cầu khẩn cấp đến người được chọn.')
+      setSuccess('Đã gửi yêu cầu khẩn cấp đến tất cả bác sĩ thú y và người được chọn.')
       setSelected(null); setDescription(''); setRecipients([])
       setSessions(current => current.filter(session => session.id !== selected.id))
       setSelectedHistoryId(created.id)
@@ -70,7 +70,7 @@ export default function TrainingEmergencyPage() {
       <div>
         <p className="eyebrow">HUẤN LUYỆN · HỖ TRỢ KHẨN CẤP</p>
         <h1>Khẩn cấp</h1>
-        <p>Chọn buổi tập và gửi yêu cầu đến nhân viên chuồng phụ trách, bác sĩ chẩn đoán hoặc cả hai.</p>
+        <p>Chọn buổi tập và gửi yêu cầu đến tất cả bác sĩ thú y. Bạn có thể thông báo thêm cho nhân viên chuồng.</p>
       </div>
       <div className="emergency-heading-icon" aria-hidden="true"><AlertTriangle size={24} /></div>
     </div>
@@ -118,11 +118,11 @@ export default function TrainingEmergencyPage() {
           </div>
           <form className="emergency-form" onSubmit={submit}>
             <fieldset className="emergency-recipients">
-              <legend>Người nhận *</legend>
+              <legend>Người nhận bổ sung (tất cả bác sĩ thú y luôn được thông báo)</legend>
               {recipientOptions.length ? recipientOptions.map(option => <label key={option.key} className={recipients.includes(option.key) ? 'is-checked' : ''}>
                 <input type="checkbox" checked={recipients.includes(option.key)} onChange={() => toggle(option.key)} />
                 <span><strong>{option.title}: {option.person.username}</strong><small>{option.person.email}</small></span>
-              </label>) : <p className="emergency-send-hint">Hồ sơ ngựa chưa có nhân viên chăm sóc hoặc bác sĩ thú y để nhận thông báo.</p>}
+              </label>) : <p className="emergency-send-hint">Không có người nhận bổ sung; mọi bác sĩ thú y vẫn nhận thông báo.</p>}
             </fieldset>
             <label className="field emergency-description">
               <span>Nội dung *</span>
@@ -130,9 +130,9 @@ export default function TrainingEmergencyPage() {
             </label>
             <div className="emergency-form-actions">
               <button type="button" className="button secondary" onClick={clearSelection}>Bỏ chọn</button>
-              <button className={`button primary emergency-send ${busy ? 'is-loading' : ''}`} disabled={busy || !recipients.length || !description.trim()}><Send size={16} />{busy ? 'Đang gửi…' : 'Gửi khẩn cấp'}</button>
+              <button className={`button primary emergency-send ${busy ? 'is-loading' : ''}`} disabled={busy || !description.trim()}><Send size={16} />{busy ? 'Đang gửi…' : 'Gửi khẩn cấp'}</button>
             </div>
-            {!busy && (!recipients.length || !description.trim()) && <small className="emergency-send-hint">Chọn ít nhất một người nhận và nhập nội dung để gửi.</small>}
+            {!busy && !description.trim() && <small className="emergency-send-hint">Nhập nội dung để gửi cho tất cả bác sĩ thú y.</small>}
           </form>
         </> : <div className="emergency-compose-empty">
           <AlertTriangle size={28} aria-hidden="true" />

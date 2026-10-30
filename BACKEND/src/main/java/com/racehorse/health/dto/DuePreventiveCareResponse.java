@@ -9,6 +9,7 @@ public record DuePreventiveCareResponse(
         String horseCode,
         String horseName,
         String careType,
+        String careName,
         String details,
         LocalDate dueDate,
         Integer recurrenceDays,
