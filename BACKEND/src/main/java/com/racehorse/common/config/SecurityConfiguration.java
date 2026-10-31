@@ -55,7 +55,8 @@ public class SecurityConfiguration {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/logout",
-                                "/api/wallet/payos/webhook")
+                                "/api/wallet/payos/webhook",
+                                "/api/wallet/vnpay/ipn")
                         .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2

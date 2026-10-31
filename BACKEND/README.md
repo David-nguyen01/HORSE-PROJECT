@@ -43,15 +43,15 @@ Lưu khóa riêng ở nơi an toàn và dùng lại qua các lần khởi độn
 
 ## Triển khai ví demo lên host
 
-Luồng thanh toán hiện tại là mô phỏng: mã hiển thị không thể quét để chuyển tiền thật; nút xác nhận demo cộng tiền vào ví. Chỉ dùng dữ liệu demo, kể cả khi triển khai công khai. Để chạy trên host:
+Luồng ví mặc định vẫn là mô phỏng: mã hiển thị không thể quét để chuyển tiền thật; nút xác nhận demo cộng tiền vào ví. Có thể chọn VNPAY Sandbox để kiểm thử checkout và IPN (không thu tiền thật). Để chạy trên host:
 
 1. Cấp một địa chỉ HTTPS ổn định cho web và API. Nếu cùng origin, reverse proxy chuyển `/api/**` và `/actuator/health` tới backend, phục vụ frontend tĩnh và chuyển các đường dẫn giao diện như `/wallet` về `index.html`; để `VITE_API_URL` trống khi build frontend. Nếu khác origin, đặt `VITE_API_URL` thành URL API **trước khi build** và đặt `CORS_ALLOWED_ORIGINS` bằng origin của frontend.
-2. Thiết lập biến môi trường backend theo `.env.example`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `PAYOS_GATEWAY=fake`. Không cần khóa PayOS hay tunnel cho bản demo. Không đưa mật khẩu vào biến `VITE_*`.
+2. Thiết lập biến môi trường backend theo `.env.example`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`. Để dùng demo giữ `PAYOS_GATEWAY=fake`; để thử VNPAY đặt `PAYOS_GATEWAY=vnpay`, cấp `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` và `VNPAY_RETURN_URL` qua secret store. Trong VNPAY Merchant Sandbox, cấu hình IPN URL `https://<public-backend-host>/api/wallet/vnpay/ipn`. Không commit merchant secret hoặc đưa chúng vào biến `VITE_*`.
 3. Với database triển khai ngoài local, đánh giá và áp dụng các migration phù hợp lên đúng database đích; script `setup-local.ps1` và `32`–`35` hiện dùng tên `racehorse_local`, **không tự áp dụng lên Azure**. Không chạy script lên Azure chỉ vì deploy code.
 4. Build JAR Java 21, chạy JAR hoặc `Dockerfile` hiện có với biến môi trường của host; build và phục vụ thư mục `FRONTEND/dist` bằng web server tĩnh. Xác nhận `/actuator/health` trả trạng thái khỏe.
-5. Kiểm tra tạo mã demo, xác nhận nạp ví, mua gói cho từng ngựa và tự gia hạn khi đến hạn. Mỗi ngựa có kỳ hạn và gói riêng; gói được đổi có hiệu lực ở kỳ tiếp theo.
+5. Kiểm tra tạo mã demo hoặc VNPAY Sandbox checkout, nạp ví, đăng ký gói cho từng ngựa và tự gia hạn khi đến hạn. Mỗi ngựa có kỳ hạn và gói riêng; gói được đổi có hiệu lực ở kỳ tiếp theo.
 
-`run-local-real.cmd` và webhook PayOS vẫn còn trong mã nguồn cho thí nghiệm riêng; giao diện hiện tại không cung cấp checkout thanh toán thật.
+VNPAY Sandbox checkout được tạo từ backend; VNPAY xác nhận giao dịch qua IPN đã ký trước khi cộng tiền vào ví. Không dùng tài khoản/thẻ Sandbox cho giao dịch thật.
 
 Kiểm tra health endpoint không cần đăng nhập:
 

@@ -6,6 +6,8 @@ The app uses `RACEHORSE_LOCAL_DB_PASSWORD` with the less privileged `racehorse_l
 
 For demo UI testing, set `PAYOS_GATEWAY=fake` (also the default). The owner wallet displays a non-scannable illustration and a **simulated payment success** action. This also runs on a public demo deployment if configured there; it does not collect real money. Only use disposable demo data.
 
-The repository retains a real PayOS gateway and webhook for separate development. The current frontend intentionally provides only the demo checkout; `run-local-real.cmd` does not make the demo UI accept real payments.
+The wallet can also create VNPAY Sandbox checkout links by setting `PAYOS_GATEWAY=vnpay` and supplying `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, and `VNPAY_RETURN_URL` through environment variables. Set `VNPAY_PAYMENT_URL` to the official Sandbox URL or leave its default. Do not put merchant secrets in source control. Configure the merchant's IPN URL as `https://<public-backend-host>/api/wallet/vnpay/ipn`; this endpoint must be publicly reachable over HTTPS for Sandbox payment confirmation. Set `VNPAY_RETURN_URL` to the frontend wallet page. Sandbox checkout uses test transactions only and does not collect real money.
+
+The real PayOS gateway remains available with `PAYOS_GATEWAY=real` and its existing credentials.
 
 After installing the migrations, run backend tests and the frontend build, then test one simulated top-up, per-horse purchase, plan selection for the next cycle, and overdue renewal with the local database.

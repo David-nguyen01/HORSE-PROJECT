@@ -681,7 +681,7 @@ function HorseEditModal({ horse, isOwner, onClose, onSaved }) {
 }
 
 function HorseOwnerPaymentCard({ horse, onPaid }) {
-  const [wallet, setWallet] = useState(null); const [plan, setPlan] = useState('P30')
+  const [wallet, setWallet] = useState(null)
   const [busy, setBusy] = useState(false); const [error, setError] = useState('')
   const refresh = useCallback(() => api('/api/wallet').then(setWallet).catch(err => setError(err.message)), [])
   useEffect(() => { refresh() }, [refresh])
@@ -689,12 +689,10 @@ function HorseOwnerPaymentCard({ horse, onPaid }) {
   const currentPlan = ownPlan?.activePlan
   const todayVN = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
   const paid = ownPlan?.paymentStatus === 'PAID' && ownPlan?.paidUntil >= todayVN
-  const cost = { P30: 100000, P90: 300000, P365: 1100000 }[plan]
   const pay = async () => {
     setBusy(true); setError('')
     try {
-      if (currentPlan) await api(`/api/wallet/horses/${horse.id}/renew`, { method: 'POST' })
-      else await api('/api/wallet/plans', { method: 'POST', body: JSON.stringify({ horseId: horse.id, plan }) })
+      await api(`/api/wallet/horses/${horse.id}/renew`, { method: 'POST' })
       await refresh(); await onPaid()
     } catch (err) { setError(err.message) } finally { setBusy(false) }
   }
@@ -705,12 +703,11 @@ function HorseOwnerPaymentCard({ horse, onPaid }) {
       <div><small>Trạng thái</small><b>{paid ? 'Đã thanh toán' : 'Chờ thanh toán'}</b></div>
       <div><small>Ngày đến hạn</small><b>{ownPlan?.nextDueDate || '—'}</b></div></div>
     {!paid && <div className="horse-payment-actions">
-      {!currentPlan && <select aria-label="Chọn gói cho ngựa" value={plan} onChange={event => setPlan(event.target.value)}>
-        <option value="P30">30 ngày · 100.000 ₫</option><option value="P90">90 ngày · 300.000 ₫</option>
-        <option value="P365">365 ngày · 1.100.000 ₫</option></select>}
-      <button className="button primary" disabled={busy || !wallet || Number(wallet.balanceVnd) < (currentPlan ? Number(ownPlan?.renewalAmountVnd || 0) : cost)} onClick={pay}>
-        {busy ? 'Đang thanh toán…' : currentPlan ? 'Gia hạn cho ngựa' : 'Thanh toán cho ngựa'}</button>
-      <Link className="button secondary" to="/wallet">{Number(wallet?.balanceVnd || 0) < (currentPlan ? Number(ownPlan?.renewalAmountVnd || 0) : cost) ? 'Nạp thêm vào ví' : 'Xem ví'}</Link>
+      {currentPlan
+        ? <button className="button primary" disabled={busy || !wallet || Number(wallet.balanceVnd) < Number(ownPlan?.renewalAmountVnd || 0)} onClick={pay}>
+            {busy ? 'Đang thanh toán…' : 'Gia hạn cho ngựa'}</button>
+        : <Link className="button primary" to="/wallet">Đăng ký gói và đồng ý điều khoản</Link>}
+      <Link className="button secondary" to="/wallet">Nạp tiền / xem ví</Link>
     </div>}
     <Link className="button secondary horse-payment-wallet-link" to="/wallet">Thanh toán · Ví & gói dịch vụ</Link>
     <p className="wallet-hint">Gói của ngựa tự gia hạn vào kỳ tiếp theo khi ví đủ số dư.</p>

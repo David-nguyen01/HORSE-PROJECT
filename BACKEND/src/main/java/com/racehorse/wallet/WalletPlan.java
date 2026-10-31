@@ -3,7 +3,7 @@ package com.racehorse.wallet;
 import java.math.BigDecimal;
 
 public enum WalletPlan {
-    P30(30, 100_000), P90(90, 300_000), P365(365, 1_100_000);
+    P30(30, 5_000_000), P90(90, 15_000_000), P365(365, 60_000_000);
 
     private final int days;
     private final BigDecimal price;

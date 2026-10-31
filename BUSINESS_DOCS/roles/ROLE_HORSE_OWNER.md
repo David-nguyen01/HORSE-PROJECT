@@ -14,7 +14,7 @@
 ### 1.1. Mục Đích & Trách Nhiệm
 `HORSE_OWNER` là đối tượng khách hàng trọng tâm của hệ thống RTMS, sở hữu một hoặc nhiều con ngựa gửi nuôi tại câu lạc bộ:
 - Quản lý tài chính cá nhân, số dư ví điện tử (`wallet`) và thanh toán các gói dịch vụ nuôi dưỡng, chăm sóc, huấn luyện theo từng con ngựa.
-- Nạp tiền vào ví qua cổng thanh toán trực tuyến VietQR/PayOS hoặc kiểm thử mô phỏng.
+- Nạp tiền vào ví qua VNPAY Sandbox hoặc kiểm thử mô phỏng.
 - Theo dõi toàn diện hồ sơ định danh, gia phả 3 đời (`pedigree`), thành tích thi đấu và phân công nhân sự (Huấn luyện viên, Bác sĩ thú y, Nhân viên chăm sóc) cho đàn ngựa của mình.
 - Thực hiện quyền quyết định tối cao trong việc cho phép hoặc từ chối (`APPROVE` / `REJECT`) đề xuất đăng ký tham gia giải đua của Huấn luyện viên trưởng.
 - Giám sát tiến độ bài tập, lịch trình huấn luyện và chỉ số sinh học hồi phục thể lực sau tập (FR07).
@@ -32,7 +32,7 @@
 
 ### 1.3. Điểm Truy Cập Giao Diện & Backend (Entry Points)
 - **Frontend Routes (`App.jsx`):**
-  - `/wallet`: Trang quản lý ví tiền, quét mã nạp tiền PayOS, mua gói và hẹn lịch gia hạn gói dịch vụ (`WalletPage.jsx`).
+  - `/wallet`: Trang quản lý ví tiền, thanh toán VNPAY Sandbox, mua gói và hẹn lịch gia hạn gói dịch vụ (`WalletPage.jsx`).
   - `/horses`, `/horses/:id`: Danh sách và trang chi tiết hồ sơ ngựa thuộc sở hữu của chủ ngựa (`Horses`, `HorseDetail`).
   - `/training-schedule`: Xem lịch huấn luyện đã công bố của đàn ngựa mình (`TrainingSchedulePage.jsx` với chế độ `isOwner={true}`).
   - `/fitness`: Theo dõi chỉ số sẵn sàng đua (`Race Readiness`) và biểu đồ thể lực (`TrainingMetricsPage.jsx`).
@@ -46,7 +46,7 @@
 
 ## 2. Các Tính Năng Vai Trò Thực Hiện (Features Performed)
 
-### HO-001: Quản Lý Ví Điện Tử & Nạp Tiền Qua PayOS (Wallet Top-Up)
+### HO-001: Quản Lý Ví Điện Tử & Nạp Tiền Qua VNPAY Sandbox (Wallet Top-Up)
 - **Mục đích:** Duy trì số dư tài khoản để chi trả phí dịch vụ nuôi nhốt, thức ăn và huấn luyện cho đàn ngựa.
 - **Tiền điều kiện:** Đăng nhập với quyền `HORSE_OWNER`.
 - **Điểm kích hoạt:** Màn hình **Ví của chủ ngựa** (`/wallet`).
@@ -54,11 +54,11 @@
   1. Xem số dư hiện tại (`balanceVnd`), số lượng ngựa đang sở hữu, tổng tiền dự kiến cần cho kỳ gia hạn tiếp theo (`renewalAmountVnd`), và số tiền còn thiếu nếu tất cả cùng đến hạn (`shortage`).
   2. Nạp tiền vào ví: Nhập số tiền nạp (`amountVnd`, tối thiểu 100,000 VND).
   3. Bấm "Tạo lệnh nạp": Gọi `POST /api/wallet/top-ups`.
-  4. Backend tạo đơn nạp (`wallet_top_up_orders`), sinh mã đơn hàng PayOS kèm đường dẫn mã thanh toán QR.
+  4. Backend tạo đơn nạp, sinh URL checkout VNPAY Sandbox để cổng thanh toán hiển thị QR/thông tin test.
   5. Frontend hiển thị mã QR cùng đồng hồ đếm ngược thời gian hết hạn (polling `GET /api/wallet/top-ups/{orderId}` mỗi 4 giây).
   6. **Cơ chế xác nhận thanh toán:**
-     - Môi trường thật: Cổng PayOS gửi tín hiệu Webhook tới `POST /api/wallet/payos/webhook`.
-     - Môi trường kiểm thử / Demo cục bộ: Chủ ngựa bấm "Hoàn tất thanh toán mô phỏng" (`fake-complete` qua `POST /api/wallet/top-ups/{id}/fake-complete`).
+     - VNPAY Sandbox gửi IPN đã ký tới `GET /api/wallet/vnpay/ipn`; chỉ giao dịch được xác thực mới được cộng vào ví.
+     - Demo cục bộ: Chủ ngựa bấm "Mô phỏng thanh toán thành công" (`fake-complete` qua `POST /api/wallet/top-ups/{id}/fake-complete`).
   7. Backend ghi nhận trạng thái `PAID`, cộng trực tiếp `amount_vnd` vào số dư ví của chủ ngựa.
 - **Dữ liệu tác động:** Bảng `dbo.users` (cột `wallet_balance_vnd`), bảng `dbo.wallet_top_up_orders`.
 - **Trạng thái triển khai:** `IMPLEMENTED`.
@@ -71,14 +71,14 @@
 ### HO-002: Đăng Ký & Tự Động Gia Hạn Gói Dịch Vụ Theo Từng Ngựa (Service Plan Purchase & Renewal)
 - **Mục đích:** Mua gói dịch vụ chăm sóc cho từng con ngựa cụ thể từ số dư ví chung.
 - **Các gói dịch vụ tiêu chuẩn (`WalletPlan`):**
-  - `P30`: Gói 30 ngày — Giá `100,000 VND`.
-  - `P90`: Gói 90 ngày — Giá `300,000 VND`.
-  - `P365`: Gói 365 ngày (1 năm) — Giá `1,100,000 VND`.
+  - `P30`: Gói 30 ngày — Giá `5,000,000 VND`.
+  - `P90`: Gói 90 ngày — Giá `15,000,000 VND`.
+  - `P365`: Gói 365 ngày (1 năm) — Giá `60,000,000 VND`.
 - **Quy trình thực hiện:**
   1. **Mua gói lần đầu cho ngựa:**
      - Chủ ngựa chọn con ngựa chưa có gói dịch vụ hoạt động (`activePlan == null`).
-     - Chọn gói (`P30`, `P90`, `P365`), bấm "Thanh toán gói".
-     - Frontend gọi `POST /api/wallet/plans` với `horseId` và `plan`.
+     - Đọc điều khoản dịch vụ và xử lý cấp cứu, đánh dấu đồng ý, chọn gói (`P30`, `P90`, `P365`).
+     - Frontend gọi `POST /api/wallet/plans` với `horseId`, `plan` và `acceptedTerms=true`; backend lưu phiên bản và thời điểm chấp thuận.
      - Backend trừ tiền trong ví, cập nhật `horses.payment_status = 'PAID'`, tính toán hạn sử dụng `paid_until = CURRENT_DATE + N ngày`, gán `service_plan = plan`.
   2. **Lên lịch đổi gói cho kỳ kế tiếp (`Schedule Next Plan`):**
      - Với ngựa đã có gói đang hoạt động, chủ ngựa có thể chọn trước gói áp dụng cho lần gia hạn tới (`PUT /api/wallet/horses/{horseId}/next-plan`).

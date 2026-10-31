@@ -8,6 +8,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Map;
@@ -29,8 +30,10 @@ public class WalletController {
     @PostMapping("/top-ups")
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.OrderView topUp(@AuthenticationPrincipal Jwt jwt,
-                                         @Valid @RequestBody TopUpRequest request) {
-        return service.createTopUp(UUID.fromString(jwt.getSubject()), request.amountVnd());
+                                         @Valid @RequestBody TopUpRequest request,
+                                         HttpServletRequest servletRequest) {
+        return service.createTopUp(UUID.fromString(jwt.getSubject()), request.amountVnd(),
+                servletRequest.getRemoteAddr());
     }
 
     @GetMapping("/top-ups/{orderId}")
@@ -50,14 +53,16 @@ public class WalletController {
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.WalletView purchase(@AuthenticationPrincipal Jwt jwt,
                                              @Valid @RequestBody PlanRequest request) {
-        return service.purchase(UUID.fromString(jwt.getSubject()), request.horseId(), request.plan());
+        return service.purchase(UUID.fromString(jwt.getSubject()), request.horseId(), request.plan(),
+                request.acceptedTerms());
     }
 
     @PutMapping("/horses/{horseId}/next-plan")
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.WalletView scheduleNextPlan(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID horseId, @Valid @RequestBody NextPlanRequest request) {
-        return service.scheduleNextPlan(UUID.fromString(jwt.getSubject()), horseId, request.plan());
+        return service.scheduleNextPlan(UUID.fromString(jwt.getSubject()), horseId, request.plan(),
+                request.acceptedTerms());
     }
 
     @PostMapping("/horses/{horseId}/renew")
@@ -79,7 +84,12 @@ public class WalletController {
         return Map.of("message", "OK");
     }
 
+    @GetMapping("/vnpay/ipn")
+    public Map<String, String> vnpayIpn(@RequestParam Map<String, String> parameters) {
+        return service.acceptVnpayIpn(parameters);
+    }
+
     public record TopUpRequest(@NotNull @Min(100_000) Long amountVnd) { }
-    public record PlanRequest(@NotNull UUID horseId, @NotNull WalletPlan plan) { }
-    public record NextPlanRequest(@NotNull WalletPlan plan) { }
+    public record PlanRequest(@NotNull UUID horseId, @NotNull WalletPlan plan, boolean acceptedTerms) { }
+    public record NextPlanRequest(@NotNull WalletPlan plan, boolean acceptedTerms) { }
 }
