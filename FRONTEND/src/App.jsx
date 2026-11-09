@@ -1,4 +1,4 @@
-import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Activity, AlertTriangle, ArrowLeft, ArchiveRestore, Award, Bell, Calendar, Check, ChevronRight, CircleUserRound, Clock, DollarSign, FileSpreadsheet, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Package, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Utensils, Warehouse, X, Zap } from 'lucide-react'
 import { api, authApi, checkLocalBackend, clearAuth, getAuth, localApiUrl, pageContent, reportingApi, saveAuth } from './api'
@@ -157,7 +157,7 @@ function AppLayout() {
   ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },
     ...(hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER') ? [{ to: '/wallet', label: 'Ví & gói dịch vụ', image: walletIcon }] : []),
-    ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/horses', label: 'Hồ sơ ngựa', image: horseIcon }] : []),
+    ...(hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'STABLE_STAFF', 'VETERINARIAN') ? [{ to: '/horses', label: 'Hồ sơ ngựa', image: horseIcon }] : []),
     ...(hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? [{ to: '/fitness', label: 'Chỉ số huấn luyện', image: trainingIcon }] : []),
     ...(hasAny(user, 'HEAD_TRAINER') ? [{ to: '/training-reception', label: 'Tiếp nhận huấn luyện', icon: Check }] : []),
     ...(hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !isManager ? [{ to: '/training-schedule', label: hasAny(user, 'HEAD_TRAINER') ? 'Lên lịch huấn luyện' : 'Lịch huấn luyện', image: scheduleIcon }] : []),
@@ -194,7 +194,7 @@ function AppLayout() {
       </nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:isVet?<Navigate to="/vet" replace/>:<Dashboard />} /><Route path="wallet" element={hasAny(user,'HORSE_OWNER') ? <WalletPage /> : <Navigate to="/" replace />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="vet" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="vet/:tab" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER') ? <FitnessPage /> : hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingMetricsPage user={user} isOwner={!hasAny(user, 'HEAD_TRAINER')} /> : <Navigate to="/" replace />} /><Route path="training-schedule" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingSchedulePage isOwner={!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')} isHeadTrainer={hasAny(user, 'HEAD_TRAINER')} canEdit={hasAny(user, 'CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="training-reception" element={hasAny(user, 'HEAD_TRAINER') && !hasAny(user, 'CLUB_MANAGER') ? <TrainingReceptionPage /> : <Navigate to="/" replace />} /><Route path="training-emergency" element={hasAny(user,'HEAD_TRAINER') && !hasAny(user,'CLUB_MANAGER') ? <TrainingEmergencyPage /> : <Navigate to="/" replace />} /><Route path="races" element={hasAny(user,'CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER') ? <TrainingRacePage isManager={hasAny(user,'CLUB_MANAGER')} isOwner={hasAny(user,'HORSE_OWNER') && !hasAny(user,'HEAD_TRAINER','CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/finance-reports" element={hasAny(user,'CLUB_MANAGER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="finance" element={<Navigate to="/admin/finance-reports" replace/>}/><Route path="my-reports" element={hasAny(user,'HORSE_OWNER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="admin/inventory-catalog" element={hasAny(user,'CLUB_MANAGER')?<InventoryCatalogPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:isVet?<Navigate to="/vet" replace/>:<Dashboard />} /><Route path="wallet" element={hasAny(user,'HORSE_OWNER') ? <WalletPage /> : <Navigate to="/" replace />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="vet" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="vet/:tab" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER') ? <FitnessPage /> : hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingMetricsPage user={user} isOwner={!hasAny(user, 'HEAD_TRAINER')} /> : <Navigate to="/" replace />} /><Route path="training-schedule" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingSchedulePage isOwner={!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')} isHeadTrainer={hasAny(user, 'HEAD_TRAINER')} canEdit={hasAny(user, 'CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="training-reception" element={hasAny(user, 'HEAD_TRAINER') && !hasAny(user, 'CLUB_MANAGER') ? <TrainingReceptionPage /> : <Navigate to="/" replace />} /><Route path="training-emergency" element={hasAny(user,'HEAD_TRAINER') && !hasAny(user,'CLUB_MANAGER') ? <TrainingEmergencyPage /> : <Navigate to="/" replace />} /><Route path="races" element={hasAny(user,'CLUB_MANAGER','HEAD_TRAINER','HORSE_OWNER') ? <TrainingRacePage isManager={hasAny(user,'CLUB_MANAGER')} isOwner={hasAny(user,'HORSE_OWNER') && !hasAny(user,'HEAD_TRAINER','CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/finance-reports" element={hasAny(user,'CLUB_MANAGER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="finance" element={<Navigate to="/admin/finance-reports" replace/>}/><Route path="my-reports" element={hasAny(user,'HORSE_OWNER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="admin/inventory-catalog" element={hasAny(user,'CLUB_MANAGER')?<InventoryCatalogPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
   </div>
 }
@@ -304,7 +304,7 @@ function NotificationBell() {
 function Dashboard() {
   const { user } = useAuth(); const [horses, setHorses] = useState([]); const [loading, setLoading] = useState(true)
   useEffect(() => {
-    if (!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN')) { setLoading(false); return }
+    if (!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF')) { setLoading(false); return }
     const path = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER') ? '/api/horses/mine?size=100' : '/api/horses?size=100'
     api(path).then((data) => setHorses(pageContent(data))).catch(() => {}).finally(() => setLoading(false))
   }, [user])
@@ -353,7 +353,7 @@ function Horses() {
     const path = hasAny(user, 'HORSE_OWNER') && !canEdit ? `/api/horses/mine?${params}` : `/api/horses?${params}`
     api(path).then((data) => setHorses(pageContent(data))).catch(() => setHorses([])).finally(() => setLoading(false))
   }, [query, status, user, canEdit])
-  useEffect(() => { if (hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN')) load(); else setLoading(false) }, [load, user])
+  useEffect(() => { if (hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF')) load(); else setLoading(false) }, [load, user])
   return <><PageHeading eyebrow="FR01 · HỒ SƠ GỐC" title="Danh mục ngựa" description="Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành." action={canAdd && <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Thêm ngựa</button>} /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên, mã hoặc số chip…" /></label><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div><section className="card table-card">{loading ? <Empty title="Đang tải dữ liệu…" text="Vui lòng chờ trong giây lát." /> : horses.length ? <div className="horse-list">{horses.map((h) => <HorseRow key={h.id} horse={h} />)}</div> : <Empty title="Không tìm thấy hồ sơ" text="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." />}</section>{showCreate && <HorseModal isOwner={isOwner} onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); load() }} />}</>
 }
 
@@ -500,6 +500,9 @@ function OwnershipModal({ horse, onClose, onSaved }) {
 function Modal({ title, onClose, children }) { return <div className="modal-backdrop" onMouseDown={onClose}><div className="modal" onMouseDown={(e) => e.stopPropagation()}><div className="modal-head"><div><p className="eyebrow">RACEHORSE CLUB</p><h2>{title}</h2></div><button className="icon-button" onClick={onClose}><X /></button></div>{children}</div></div> }
 
 function HorseDetail() {
+  const avatarInput = useRef(null)
+  const [avatarMessage, setAvatarMessage] = useState('')
+  const [photoProposals, setPhotoProposals] = useState([])
   const { id } = useParams(); const { user } = useAuth(); const navigate = useNavigate(); const location = useLocation(); const canEdit = hasAny(user, 'CLUB_MANAGER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !canEdit; const isManager = hasAny(user, 'CLUB_MANAGER');
   const [horse, setHorse] = useState(null); const [pedigree, setPedigree] = useState(null); const [history, setHistory] = useState(null); const [evaluations, setEvaluations] = useState([]); const [medicalHealth, setMedicalHealth] = useState(null); const [restingHeartRateBpm, setRestingHeartRateBpm] = useState(null); const [weightKg, setWeightKg] = useState(null); const [error, setError] = useState(''); const [showTransfer, setShowTransfer] = useState(false); const [showEdit, setShowEdit] = useState(false); const [file, setFile] = useState(null); const [uploading, setUploading] = useState(false)
   const [emergencies, setEmergencies] = useState([]); const [emergencyError, setEmergencyError] = useState(''); const [selectedEmergencyId, setSelectedEmergencyId] = useState(null)
@@ -531,10 +534,9 @@ function HorseDetail() {
       setMedicalHealth(health.status === 'fulfilled' ? health.value : null)
       setRestingHeartRateBpm(readiness.status === 'fulfilled' ? readiness.value.restingHeartRateBpm : null)
       setWeightKg(readiness.status === 'fulfilled' ? readiness.value.latestWeightKg : null)
-      if (isManager) {
-        try { setFile(await api(`/api/horses/${id}/main-file`)) }
-        catch (fileError) { if (fileError.status === 404) setFile(null); else throw fileError }
-      }
+      try { setFile(await api(`/api/horses/${id}/main-file`)) }
+      catch (fileError) { if (fileError.status === 404) setFile(null); else throw fileError }
+      if (isManager) setPhotoProposals(pageContent(await api(`/api/horses/${id}/main-file/proposals`)))
     } catch (e) { setError(e.message) }
   }, [id, isManager])
   useEffect(() => { load() }, [load])
@@ -554,11 +556,53 @@ function HorseDetail() {
     }
   };
   const uploadMainFile = async event => {
-    const picked = event.target.files?.[0]; if (!picked) return
+    const input = event.currentTarget
+    const picked = input.files?.[0]; if (!picked) return
     const body = new FormData(); body.append('file', picked); setUploading(true)
     try { await api(`/api/horses/${id}/main-file`, { method: 'PUT', body }); await load() }
     catch (e) { setError(e.message) }
-    finally { setUploading(false); event.target.value = '' }
+    finally { setUploading(false); input.value = '' }
+  }
+  const uploadAvatar = async event => {
+    const input = event.currentTarget
+    const picked = input.files?.[0]
+    if (!picked) return
+    setError('')
+    setAvatarMessage('')
+    if (!picked.type.startsWith('image/')) {
+      setError('Vui lòng chọn một file hình ảnh cho avatar ngựa.')
+      input.value = ''
+      return
+    }
+    const body = new FormData()
+    body.append('file', picked)
+    setUploading(true)
+    try {
+      await api(`/api/horses/${id}/main-file`, {
+        method: 'PUT', body,
+      })
+      await load()
+      setAvatarMessage('Đã cập nhật ảnh đại diện ngựa.')
+    } catch (error) {
+      setError(error.message || 'Không thể tải ảnh lên. Vui lòng thử lại.')
+    } finally {
+      setUploading(false)
+      input.value = ''
+    }
+  }
+  const reviewPhotoProposal = async (proposalId, approve) => {
+    setError('')
+    setAvatarMessage('')
+    setUploading(true)
+    try {
+      await api(`/api/horses/${id}/main-file/proposals/${proposalId}/${approve ? 'approve' : 'reject'}`, { method: 'POST' })
+      await load()
+      setAvatarMessage(approve ? 'Đã duyệt và cập nhật ảnh đại diện.' : 'Đã từ chối ảnh đề xuất.')
+    } catch (error) {
+      setError(error.message || 'Không thể xử lý ảnh đề xuất.')
+    } finally {
+      setUploading(false)
+    }
   }
   const removeMainFile = async () => {
     if (!window.confirm('Xóa file hồ sơ chính hiện tại?')) return
@@ -573,7 +617,29 @@ function HorseDetail() {
   if (error && !horse) return <><button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={17} /> Quay lại</button><Empty title="Không thể mở hồ sơ" text={error} /></>
   if (!horse) return <LoadingScreen />
   return <><button className="back-link" onClick={() => navigate('/horses')}><ArrowLeft size={17} /> Danh mục ngựa</button>{error && <div className="notice error"><X size={17} />{error}</div>}
-    <section className="horse-hero card"><div className="profile-media">{isManager && file?.contentType?.startsWith('image/') ? <img src={file.secureUrl} alt={horse.name} /> : <div className="horse-monogram">{initials(horse.name)}</div>}</div><div className="horse-title"><p className="eyebrow">{horse.code}</p><h1>{horse.name}</h1><div><Status value={horse.status} /><span>{horse.breed}</span><span>{GENDER_LABELS[horse.gender]}</span></div></div><div className="hero-actions">{(isManager || isOwner) && <button type="button" className="button secondary" onClick={() => setShowEdit(true)}>Sửa hồ sơ</button>}{isManager && <><label className="button secondary"><Upload size={17} />{uploading ? 'Đang tải…' : file ? 'Thay file' : 'Tải file'}<input hidden type="file" accept="image/*,.pdf,.docx" onChange={uploadMainFile} disabled={uploading} /></label>{file && <a className="button secondary" href={file.secureUrl} target="_blank" rel="noreferrer"><FileText size={17} /> Mở file</a>}{file && <button className="icon-button danger" title="Xóa file" onClick={removeMainFile}><Trash2 size={18} /></button>}</>}</div></section>
+    <section className="horse-hero card"><div className="horse-profile-avatar">
+        <div className="profile-media">{file?.contentType?.startsWith('image/') ? <img src={file.secureUrl} alt={horse.name} /> : <div className="horse-monogram">{initials(horse.name)}</div>}</div>
+        {(isManager || isOwner) && <>
+          <button type="button" className="horse-avatar-upload" onClick={() => avatarInput.current?.click()} disabled={uploading} aria-label="Tải ảnh đại diện ngựa">
+            <Upload size={15} />{uploading ? 'Đang tải…' : 'Tải ảnh'}
+          </button>
+          <input ref={avatarInput} hidden type="file" accept="image/*" onChange={uploadAvatar} disabled={uploading} />
+        </>}
+      </div><div className="horse-title"><p className="eyebrow">{horse.code}</p><h1>{horse.name}</h1><div><Status value={horse.status} /><span>{horse.breed}</span><span>{GENDER_LABELS[horse.gender]}</span></div></div><div className="hero-actions">{(isManager || isOwner) && <button type="button" className="button secondary" onClick={() => setShowEdit(true)}>Sửa hồ sơ</button>}{isManager && <><label className="button secondary"><Upload size={17} />{uploading ? 'Đang tải…' : file ? 'Thay file' : 'Tải file'}<input hidden type="file" accept="image/*,.pdf,.docx" onChange={uploadMainFile} disabled={uploading} /></label>{file && <a className="button secondary" href={file.secureUrl} target="_blank" rel="noreferrer"><FileText size={17} /> Mở file</a>}{file && <button className="icon-button danger" title="Xóa file" onClick={removeMainFile}><Trash2 size={18} /></button>}</>}</div></section>
+    {avatarMessage && <div className="notice" role="status">{avatarMessage}</div>}
+    {isManager && photoProposals.length > 0 && <section className="card horse-avatar-proposals">
+      <h2>Ảnh / file hồ sơ chờ duyệt</h2>
+      {photoProposals.map(proposal => <article className="horse-avatar-proposal" key={proposal.id}>
+        {proposal.contentType?.startsWith('image/') && <img src={proposal.secureUrl} alt="Ảnh đại diện do chủ ngựa đề xuất" />}
+        <div><strong>{proposal.originalFilename}</strong><p>Người gửi: {proposal.uploadedBy?.username || 'Chủ ngựa'}</p>
+          <a href={proposal.secureUrl} target="_blank" rel="noreferrer">Xem file đề xuất</a>
+        </div>
+        <div className="hero-actions">
+          <button type="button" className="button primary" disabled={uploading} onClick={() => reviewPhotoProposal(proposal.id, true)}>Duyệt</button>
+          <button type="button" className="button secondary" disabled={uploading} onClick={() => reviewPhotoProposal(proposal.id, false)}>Từ chối</button>
+        </div>
+      </article>)}
+    </section>}
     <div className="detail-grid"><section className="card"><CardHead title="Thông tin định danh" /><dl className="info-grid"><Info label="Số chip / hộ chiếu" value={horse.microchipPassportNumber} /><Info label="Ngày sinh" value={formatDate(horse.birthDate)} /><Info label="Màu sắc / nhận dạng" value={horse.colorMarkings} /><Info label="Vị trí chuồng" value={horse.stableLocation} /><Info label="Trạng thái sức khỏe" value={HEALTH_STATUS_LABELS[medicalHealth?.status] || medicalHealth?.status || 'Chưa ghi nhận'} /><Info label="Nhịp tim nghỉ" value={restingHeartRateBpm == null ? 'Chưa ghi nhận' : `${restingHeartRateBpm} BPM`} /><Info label="Cân nặng" value={weightKg == null ? 'Chưa ghi nhận' : `${weightKg} kg`} /><Info label="Dịch vụ chăm sóc" value={<div style={{display:'inline-flex',alignItems:'center',gap:'8px',flexWrap:'wrap'}}><span>{horse.paymentStatus === 'PAID' ? '✓ Đã thanh toán' : horse.serviceOverride ? `⭐ Bảo lãnh (${horse.overrideReason || 'CLB bảo lãnh'})` : '⚠️ Chưa thanh toán phí'}</span>{isManager && horse.serviceOverride && <button type="button" className="button secondary" style={{padding:'2px 8px',fontSize:'10px',color:'#b3261e',borderColor:'#f3c2be'}} onClick={()=>toggleServiceOverride(false)}>Hủy bảo lãnh</button>}{isManager && horse.paymentStatus !== 'PAID' && !horse.serviceOverride && <button type="button" className="button secondary" style={{padding:'2px 8px',fontSize:'10px',color:'#205c3e',borderColor:'#b5d9c2'}} onClick={()=>toggleServiceOverride(true)}>Duyệt bảo lãnh</button>}</div>} /><Info label="Cập nhật" value={horse.updatedAt ? new Date(horse.updatedAt).toLocaleString('vi-VN') : '—'} /></dl></section><section className="card"><CardHead title="Chủ sở hữu & phụ trách" action={canEdit && <button type="button" className="button secondary" style={{padding:'3px 10px',fontSize:'12px'}} onClick={()=>setShowTransfer(true)}>Chuyển nhượng / Gán chủ</button>} />{horse.owners?.length ? horse.owners.map(owner => <PersonCard key={owner.id} label="Chủ sở hữu" person={owner} />) : <Empty title="Chưa liên kết" text="Chưa có chủ sở hữu." />}<div className="horse-people"><PersonCard label="Huấn luyện viên" person={horse.currentTrainer} /><PersonCard label="Nhân viên chăm sóc" person={horse.caretaker} /><PersonCard label="Bác sĩ thú y" person={horse.diagnosingVet} /></div></section><section className="card"><CardHead title="Phả hệ 3 thế hệ" /><Pedigree node={pedigree?.horse} /></section><section className="card"><CardHead title="Thành tích" /><div className="race-totals"><div><Award /><strong>{history?.totalWins || 0}</strong><span>Chiến thắng</span></div><div><Gauge /><strong>{history?.totalRaces || 0}</strong><span>Cuộc đua</span></div></div>{history?.results?.slice(0, 4).map((r) => <div className="race-row" key={r.id}><span>{r.finishPosition}</span><div><b>{r.raceName}</b><small>{formatDate(r.raceDate)} · {r.racecourse}</small></div></div>)}</section><section className="card training-history-card"><CardHead title="Đánh giá buổi tập" />{evaluations.length ? evaluations.map((evaluation) => <div className="training-history-row" key={evaluation.id}><span className={`fitness-dot ${evaluation.fitnessStatus.toLowerCase()}`} /><div><b>{formatDate(evaluation.sessionDate)} · {evaluation.durationMinutes} phút</b><small>{evaluation.distanceMeters} m · {evaluation.averageSpeedKmh} km/h</small><p>{evaluation.trainerNotes}</p>{evaluation.videoUrl && <a href={evaluation.videoUrl} target="_blank" rel="noreferrer">Xem video</a>}</div><dl><div><dt>Hồi phục</dt><dd>{evaluation.heartRateRecoveryBpm} BPM</dd></div></dl></div>) : <Empty title="Chưa có đánh giá" text="Bản ghi FR07 đã hoàn tất sẽ xuất hiện tại đây." />}</section></div>
     {isOwner && <HorseOwnerPaymentCard horse={horse} onPaid={load} />}
     {isOwner && <section className="card horse-emergency-history" style={{ marginTop: 18, padding: 20 }}>

@@ -1,6 +1,8 @@
 package com.racehorse.media.service;
 
 import com.racehorse.auth.entity.UserAccount;
+import com.racehorse.auth.entity.Role;
+import com.racehorse.common.exception.BusinessException;
 import com.racehorse.auth.repository.UserAccountRepository;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.entity.Horse;
@@ -59,6 +61,12 @@ public class HorseProfileFileService {
             MultipartFile multipartFile) {
         Horse horse = horseAccessService.requireExisting(horseId);
         UserAccount actor = findUser(actorId);
+        if (actor.getRoles().contains(Role.HORSE_OWNER)) {
+            horse = horseAccessService.requireOwned(horseId, actorId);
+            if (validator.validate(multipartFile).category() != ProfileFileCategory.IMAGE) {
+                throw new BusinessException("Chủ ngựa chỉ được thay ảnh đại diện bằng file hình ảnh");
+            }
+        }
         UploadedProfileFile uploaded = upload(horseId, multipartFile);
         try {
             repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE)
