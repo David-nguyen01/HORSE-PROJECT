@@ -29,7 +29,10 @@ public class DatabaseCompatibilityConfiguration {
         public static String cleanSql(String sql) {
             if (sql == null) return null;
             // Strip SQL Server table hints like WITH (UPDLOCK,HOLDLOCK) or WITH (UPDLOCK) or WITH (HOLDLOCK)
-            return sql.replaceAll("(?i)\\s+with\\s*\\([a-zA-Z0-9_,\\s]*(?:updlock|holdlock)[a-zA-Z0-9_,\\s]*\\)", "");
+            sql = sql.replaceAll("(?i)\\s+with\\s*\\([a-zA-Z0-9_,\\s]*(?:updlock|holdlock)[a-zA-Z0-9_,\\s]*\\)", "");
+            // PostgreSQL requires parentheses around parameters in OFFSET/FETCH: OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY
+            sql = sql.replaceAll("(?i)\\boffset\\s*\\?\\s*rows\\s+fetch\\s+next\\s*\\?\\s*rows\\s+only", "OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY");
+            return sql;
         }
 
         @Override
@@ -93,3 +96,4 @@ public class DatabaseCompatibilityConfiguration {
         }
     }
 }
+

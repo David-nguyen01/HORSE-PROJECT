@@ -30,7 +30,7 @@ public class AdminManagementService {
         if(query!=null&&!query.isBlank()){sql.append(" and (u.username like ? or u.email like ?)");args.add("%"+query.trim()+"%");args.add("%"+query.trim()+"%");}
         if(role!=null){sql.append(" and exists(select 1 from user_roles r where r.user_id=u.id and r.role=?)");args.add(role.name());}
         if(enabled!=null){sql.append(" and u.enabled=?");args.add(enabled);}
-        sql.append(" order by u.username,u.id offset ? rows fetch next ? rows only");args.add((long)page*size);args.add(size);
+        sql.append(" order by u.username,u.id offset (?) rows fetch next (?) rows only");args.add((long)page*size);args.add(size);
         return jdbc.query(sql.toString(),(rs,n)->{
             UUID id=rs.getObject("id",UUID.class);
             Map<String,Object> row=new LinkedHashMap<>();row.put("id",id);row.put("username",rs.getString("username"));row.put("email",rs.getString("email"));row.put("enabled",rs.getBoolean("enabled"));
@@ -100,7 +100,7 @@ public class AdminManagementService {
     @Transactional(readOnly=true)
     public List<Map<String,Object>> archivedHorses(String query,int page,int size){
         pageCheck(page,size);String pattern="%"+(query==null?"":query.trim())+"%";
-        return jdbc.query("select id,code,name,breed,status,archived_at from horses where archived_at is not null and (name like ? or code like ?) order by archived_at desc,id offset ? rows fetch next ? rows only",(rs,n)->{
+        return jdbc.query("select id,code,name,breed,status,archived_at from horses where archived_at is not null and (name like ? or code like ?) order by archived_at desc,id offset (?) rows fetch next (?) rows only",(rs,n)->{
             Map<String,Object> r=new LinkedHashMap<>();r.put("id",rs.getObject("id",UUID.class));r.put("code",rs.getString("code"));r.put("name",rs.getString("name"));r.put("breed",rs.getString("breed"));r.put("status",rs.getString("status"));r.put("archivedAt",rs.getObject("archived_at",java.time.OffsetDateTime.class));return r;
         },pattern,pattern,(long)page*size,size);
     }
