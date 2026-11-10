@@ -1,22 +1,43 @@
-// The deployed UI is shared, but every member runs their own backend and SQL Server.
-// Never use a build-time tunnel URL in production: it would route everyone to one PC.
-const API_URL = import.meta.env.PROD
-  ? 'http://127.0.0.1:8080'
-  : (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
+export function getApiUrl() {
+  if (typeof window !== 'undefined') {
+    const custom = (localStorage.getItem('racehorse.api_url') || '').trim()
+    if (custom) return custom.replace(/\/$/, '')
+  }
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '')
+  if (envUrl) return envUrl
+  return 'http://127.0.0.1:8080'
+}
+
+export function setCustomApiUrl(url) {
+  if (typeof window !== 'undefined') {
+    const trimmed = (url || '').trim().replace(/\/$/, '')
+    if (trimmed) {
+      localStorage.setItem('racehorse.api_url', trimmed)
+    } else {
+      localStorage.removeItem('racehorse.api_url')
+    }
+  }
+}
+
 const STORAGE_KEY = 'racehorse.auth'
 
-export const localApiUrl = API_URL || 'http://127.0.0.1:8080'
+export const localApiUrl = getApiUrl()
 
 export async function apiFetch(path, options = {}) {
+  const baseUrl = getApiUrl()
+  const isLoopback = baseUrl.includes('127.0.0.1') || baseUrl.includes('localhost')
   try {
-    return await fetch(`${API_URL}${path}`, {
+    return await fetch(`${baseUrl}${path}`, {
       cache: 'no-store',
       ...options,
-      ...(import.meta.env.PROD ? { targetAddressSpace: 'loopback' } : {}),
+      ...(isLoopback ? { targetAddressSpace: 'loopback' } : {}),
     })
   } catch (error) {
     if (error instanceof TypeError) {
-      throw new Error('Không kết nối được backend trên máy này. Hãy chạy SQL Server và backend tại 127.0.0.1:8080, sau đó cho phép trình duyệt truy cập mạng cục bộ.')
+      if (isLoopback) {
+        throw new Error(`Không kết nối được backend cục bộ tại ${baseUrl}. Hãy chạy backend tại 127.0.0.1:8080 hoặc cấu hình URL máy chủ Render.`)
+      }
+      throw new Error(`Không thể kết nối đến máy chủ backend tại ${baseUrl}. Vui lòng kiểm tra lại dịch vụ Render (có thể đang khởi động sau thời gian sleep) hoặc kiểm tra mạng.`)
     }
     throw error
   }
@@ -28,14 +49,14 @@ export async function checkLocalBackend() {
     response = await apiFetch('/actuator/health', { signal: AbortSignal.timeout(15000) })
   } catch (error) {
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new Error('Hết thời gian kiểm tra. Hãy mở trang bằng Chrome/Edge và cho phép truy cập mạng cục bộ, rồi thử lại.')
+      throw new Error('Hết thời gian kiểm tra. Render gói miễn phí có thể cần 30-50s để khởi động lại, vui lòng thử lại sau.')
     }
     throw error
   }
   const contentType = response.headers.get('content-type') || ''
   if (!response.ok || !contentType.includes('json')) throw new Error('Địa chỉ API chưa trả về trạng thái backend hợp lệ.')
   const health = await response.json()
-  if (health.status !== 'UP') throw new Error('Backend đang chạy nhưng chưa sẵn sàng. Hãy kiểm tra kết nối SQL Server.')
+  if (health.status !== 'UP') throw new Error('Backend đang chạy nhưng chưa sẵn sàng. Hãy kiểm tra kết nối cơ sở dữ liệu.')
   return health
 }
 
