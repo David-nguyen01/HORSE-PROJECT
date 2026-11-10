@@ -1,0 +1,9 @@
+FRONTEND/node_modules/
+FRONTEND/dist/
+BACKEND/target/
+.git/
+.idea/
+.vscode/
+*.iml
+*.log
+.env
