@@ -33,11 +33,11 @@ public class PaidHorseAssignmentService {
     public PaidHorse assignTrainer(UUID horseId, UUID trainerId) {
         int changed = jdbc.update("update horses set current_trainer_id=?,updated_at=SYSDATETIMEOFFSET(),"
                         + "version=version+1 where id=? and archived_at is null "
-                        + "and (service_override=1 or (payment_status='PAID' and (paid_until is null or paid_until>=?))) "
+                        + "and (cast(service_override as varchar(5)) in ('1', 'true', 't') or (payment_status='PAID' and (paid_until is null or paid_until>=?))) "
                         + "and current_trainer_id is null "
                         + "and exists(select 1 from user_roles ur "
                         + "join users u on u.id=ur.user_id where ur.user_id=? "
-                        + "and ur.role='HEAD_TRAINER' and u.enabled=1)",
+                        + "and ur.role='HEAD_TRAINER' and cast(u.enabled as varchar(5)) in ('1', 'true', 't'))",
                 trainerId, horseId, LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh")), trainerId);
         if (changed == 0) throw new BusinessException(
                 "Ngựa chưa đủ điều kiện tiếp nhận hoặc đã có huấn luyện viên phụ trách");

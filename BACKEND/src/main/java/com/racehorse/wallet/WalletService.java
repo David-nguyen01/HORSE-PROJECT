@@ -408,7 +408,7 @@ public class WalletService {
 
     private Map<String, Object> owner(UUID ownerId, boolean lock) {
         String sql = "select id,wallet_balance_vnd,active_service_plan,service_plan_started_on,service_next_due_date "
-                + "from users " + (lock ? "with (UPDLOCK,HOLDLOCK) " : "") + "where id=? and enabled=1 "
+                + "from users " + (lock ? "with (UPDLOCK,HOLDLOCK) " : "") + "where id=? and cast(enabled as varchar(5)) in ('1', 'true', 't') "
                 + "and exists(select 1 from user_roles where user_id=users.id and role='HORSE_OWNER')";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, ownerId);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy ví của chủ ngựa");
@@ -476,7 +476,7 @@ public class WalletService {
         jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,"
                         + "related_entity_type,related_entity_id,deduplication_key) "
                         + "select newid(),ur.user_id,?,'HIGH',?,?, ?,?,concat(?,':',cast(ur.user_id as varchar(36))) "
-                        + "from user_roles ur join users u on u.id=ur.user_id where ur.role='CLUB_MANAGER' and u.enabled=1 "
+                        + "from user_roles ur join users u on u.id=ur.user_id where ur.role='CLUB_MANAGER' and cast(u.enabled as varchar(5)) in ('1', 'true', 't') "
                         + "and not exists(select 1 from notifications n where n.deduplication_key="
                         + "concat(?,':',cast(ur.user_id as varchar(36))))",
                 type, title, title, relatedType, relatedId, key, key);

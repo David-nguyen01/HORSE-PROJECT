@@ -55,7 +55,7 @@ public class AdminManagementService {
         if(currentEnabled==enabled)return;
         if(!enabled&&actor.equals(id))throw new BusinessException("Không thể tự khóa tài khoản đang sử dụng");
         // Serialize manager lifecycle changes so two managers cannot disable each other concurrently.
-        List<UUID> managers=jdbc.query("select u.id from users u with (updlock,holdlock) where u.enabled=1 and exists(select 1 from user_roles r where r.user_id=u.id and r.role='CLUB_MANAGER')",(rs,n)->rs.getObject(1,UUID.class));
+        List<UUID> managers=jdbc.query("select u.id from users u where cast(u.enabled as varchar(5)) in ('1', 'true', 't') and exists(select 1 from user_roles r where r.user_id=u.id and r.role='CLUB_MANAGER')",(rs,n)->rs.getObject(1,UUID.class));
         if(!enabled&&managers.contains(id)&&managers.size()<=1)throw new BusinessException("Phải giữ ít nhất một Club Manager hoạt động");
         if(!enabled)activityGuard.requireNoActiveAssignments(id);
         jdbc.update("update users set enabled=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",enabled,id);

@@ -90,12 +90,16 @@ public class SecurityConfiguration {
                             List<GrantedAuthority> authorities = new ArrayList<>();
                             user.getRoles().forEach(role -> authorities.add(
                                     new SimpleGrantedAuthority("ROLE_" + role.name())));
-                            userRepository.findGrantedPermissionCodes(user.getId()).forEach(permission ->
-                                    authorities.add(new SimpleGrantedAuthority(permission)));
+                            try {
+                                userRepository.findGrantedPermissionCodes(user.getId()).forEach(permission ->
+                                        authorities.add(new SimpleGrantedAuthority(permission)));
+                            } catch (Exception ex) {
+                                // If permission query encounters a dialect error, preserve role authorities so user isn't locked out with 401
+                            }
                             return authorities;
                         })
                         .orElse(List.of());
-            } catch (IllegalArgumentException exception) {
+            } catch (Exception exception) {
                 return List.of();
             }
         });

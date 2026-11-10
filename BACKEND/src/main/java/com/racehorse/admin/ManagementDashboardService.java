@@ -18,7 +18,7 @@ public class ManagementDashboardService {
         return Map.of("month",current.toString(),"compareTo",previous.toString(),"currency","VND",
                 "current",metrics(current),"previous",metrics(previous),
                 "activeHorses",jdbc.queryForObject("select count(*) from horses where archived_at is null",Integer.class),
-                "activeAccounts",jdbc.queryForObject("select count(*) from users where enabled=1",Integer.class));
+                "activeAccounts",jdbc.queryForObject("select count(*) from users where cast(enabled as varchar(5)) in ('1', 'true', 't')",Integer.class));
     }
     private YearMonth parseMonth(String value){try{YearMonth m=YearMonth.parse(value);if(m.getYear()<2000||m.getYear()>2100)throw new IllegalArgumentException();return m;}catch(Exception e){throw new BusinessException("Tháng phải có dạng YYYY-MM, trong khoảng 2000–2100");}}
     private Map<String,Object> metrics(YearMonth month){
