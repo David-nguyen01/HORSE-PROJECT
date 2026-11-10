@@ -8,8 +8,12 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -17,6 +21,7 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({UnauthorizedException.class, AuthenticationException.class})
     ResponseEntity<ApiErrorResponse> handleUnauthorized(
@@ -89,6 +94,22 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, "JSON hoặc giá trị enum không hợp lệ: " + exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    ResponseEntity<ApiErrorResponse> handleMissingParameter(
+            MissingServletRequestParameterException exception,
+            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST,
+                "Thiếu tham số: " + exception.getParameterName(), request, Map.of());
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ResponseEntity<ApiErrorResponse> handleInvalidParameter(
+            MethodArgumentTypeMismatchException exception,
+            HttpServletRequest request) {
+        return build(HttpStatus.BAD_REQUEST,
+                "Giá trị tham số không hợp lệ: " + exception.getName(), request, Map.of());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     ResponseEntity<ApiErrorResponse> handleUploadTooLarge(
             MaxUploadSizeExceededException exception,
@@ -104,10 +125,10 @@ public class GlobalExceptionHandler {
     ResponseEntity<ApiErrorResponse> handleGeneral(
             Exception exception,
             HttpServletRequest request) {
-        exception.printStackTrace();
+        log.error("Unhandled request error at {}", request.getRequestURI(), exception);
         return build(
                 HttpStatus.INTERNAL_SERVER_ERROR,
-                exception.getClass().getSimpleName() + ": " + exception.getMessage(),
+                "Hệ thống gặp lỗi khi xử lý yêu cầu. Vui lòng thử lại sau.",
                 request,
                 Map.of());
     }

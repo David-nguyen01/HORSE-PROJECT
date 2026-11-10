@@ -242,11 +242,11 @@ public class InventoryService {
     @Transactional(readOnly = true)
     public List<InventoryUsageResponse> listUsage(int limit) {
         if (limit < 1 || limit > 100) throw new BusinessException("Giới hạn lịch sử xuất dùng không hợp lệ");
-        return jdbc.query("select top (?) m.id,m.horse_id,m.data_json,m.created_at,ft.id finance_id "
+        return jdbc.query("select m.id,m.horse_id,m.data_json,m.created_at,ft.id finance_id "
                         + "from module_records m left join financial_transactions ft "
                         + "on ft.source_entity_type='INVENTORY_USAGE' and ft.source_entity_id=m.id "
                         + "where m.module_code='INVENTORY' and m.record_type='STOCK_USAGE' "
-                        + "order by m.created_at desc,m.id desc", (rs, row) -> {
+                        + "order by m.created_at desc,m.id desc offset 0 rows fetch next (?) rows only", (rs, row) -> {
                     JsonNode data = read(rs.getString("data_json"));
                     String stable = data.path("stableId").asText(null);
                     return new InventoryUsageResponse(rs.getObject("id", UUID.class),

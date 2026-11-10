@@ -56,4 +56,14 @@ class DatabaseCompatibilityConfigurationTest {
         assertThat(sql).contains("to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'");
         assertThat(sql).contains("cast(? as varchar(36))");
     }
+
+    @Test
+    void postgresPreservesSimpleRowLockAndSqlServerKeepsItsHint() {
+        String original = "select id from horses with (UPDLOCK,HOLDLOCK) where id=?";
+
+        assertThat(cleanSql(original, true))
+                .isEqualTo("select id from dbo.horses where id=? FOR UPDATE");
+        assertThat(cleanSql(original, false))
+                .isEqualTo("select id from dbo.horses with (UPDLOCK,HOLDLOCK) where id=?");
+    }
 }

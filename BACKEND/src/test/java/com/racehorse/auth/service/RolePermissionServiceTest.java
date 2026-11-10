@@ -57,7 +57,7 @@ class RolePermissionServiceTest {
 
     @Test
     void update_inventoryClaimPermission_succeeds() {
-        when(jdbc.update(contains("merge role_permissions"), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(jdbc.update(contains("update role_permissions"), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         UpdateRolePermissionRequest request = new UpdateRolePermissionRequest("INVENTORY", "CLAIM", true);
@@ -71,7 +71,7 @@ class RolePermissionServiceTest {
 
     @Test
     void update_systemViewPermission_succeeds() {
-        when(jdbc.update(contains("merge role_permissions"), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        when(jdbc.update(contains("update role_permissions"), any(), any(), any(), any(), any(), any()))
                 .thenReturn(1);
 
         UpdateRolePermissionRequest request = new UpdateRolePermissionRequest("SYSTEM", "VIEW", true);
@@ -92,5 +92,20 @@ class RolePermissionServiceTest {
                 .hasMessageContaining("không được backend hỗ trợ");
 
         verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void update_insertsPermissionWhenItIsMissing() {
+        when(jdbc.update(contains("update role_permissions"), any(), any(), any(), any(), any(), any()))
+                .thenReturn(0);
+        when(jdbc.update(contains("insert into role_permissions"), any(), any(), any(), any(), any(), any()))
+                .thenReturn(1);
+
+        RolePermissionResponse response = service.update(
+                actor, Role.VETERINARIAN, new UpdateRolePermissionRequest("MEDICAL", "CLAIM", true));
+
+        assertThat(response.granted()).isTrue();
+        verify(jdbc).update(contains("insert into role_permissions"),
+                eq("VETERINARIAN"), eq("MEDICAL"), eq("CLAIM"), eq(true), eq(actor), any());
     }
 }

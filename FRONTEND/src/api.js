@@ -49,7 +49,8 @@ export async function apiFetch(path, options = {}) {
 export async function checkLocalBackend() {
   let response
   try {
-    response = await apiFetch('/actuator/health', { signal: AbortSignal.timeout(15000) })
+    const timeoutMs = getApiUrl().endsWith('.onrender.com') ? 75000 : 15000
+    response = await apiFetch('/actuator/health', { signal: AbortSignal.timeout(timeoutMs) })
   } catch (error) {
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       throw new Error('Hết thời gian kiểm tra. Render gói miễn phí có thể cần 30-50s để khởi động lại, vui lòng thử lại sau.')

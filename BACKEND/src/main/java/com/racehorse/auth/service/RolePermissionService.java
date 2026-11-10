@@ -42,7 +42,7 @@ public class RolePermissionService {
                 ), permissions(module_code,action_code) as (
                     select module_code, action_code from modules cross join actions
                 )
-                select r.code,p.module_code,p.action_code,coalesce(rp.granted,0)
+                select r.code,p.module_code,p.action_code,rp.granted
                 from roles r cross join permissions p
                 left join role_permissions rp on rp.role_code=r.code
                     and rp.module_code=p.module_code and rp.action_code=p.action_code
@@ -60,16 +60,18 @@ public class RolePermissionService {
         if (!SUPPORTED_ACTIONS.getOrDefault(module, Set.of()).contains(action)) {
             throw new BusinessException("Quyền này không được backend hỗ trợ cho phân hệ đã chọn");
         }
+        OffsetDateTime changedAt = OffsetDateTime.now();
         int changed = jdbc.update("""
-                merge role_permissions as target
-                using (select ? role_code,? module_code,? action_code) source
-                on target.role_code=source.role_code and target.module_code=source.module_code and target.action_code=source.action_code
-                when matched then update set granted=?,changed_by_user_id=?,changed_at=?
-                when not matched then insert(role_code,module_code,action_code,granted,changed_by_user_id,changed_at)
-                    values(source.role_code,source.module_code,source.action_code,?,?,?);
-                """, role.name(), module, action, request.granted(), actorId, OffsetDateTime.now(),
-                request.granted(), actorId, OffsetDateTime.now());
-        if (changed == 0) throw new BusinessException("Không tìm thấy role hoặc quyền cần sửa");
+                update role_permissions
+                set granted=?, changed_by_user_id=?, changed_at=?
+                where role_code=? and module_code=? and action_code=?
+                """, request.granted(), actorId, changedAt, role.name(), module, action);
+        if (changed == 0) {
+            jdbc.update("""
+                    insert into role_permissions(role_code,module_code,action_code,granted,changed_by_user_id,changed_at)
+                    values(?,?,?,?,?,?)
+                    """, role.name(), module, action, request.granted(), actorId, changedAt);
+        }
         return new RolePermissionResponse(role.name(), module, action, request.granted());
     }
 }

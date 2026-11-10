@@ -52,6 +52,8 @@ public class DatabaseCompatibilityConfiguration {
 
         public static String cleanSql(String sql, boolean postgresql) {
             if (sql == null) return null;
+            boolean lockRequested = postgresql
+                    && Pattern.compile("(?i)\\bwith\\s*\\([^)]*\\bupdlock\\b[^)]*\\)").matcher(sql).find();
             if (postgresql) {
                 sql = sql.replaceAll("(?i)\\bSYSDATETIMEOFFSET\\s*\\(\\s*\\)", "CURRENT_TIMESTAMP");
                 sql = sql.replaceAll("(?i)\\bNEWID\\s*\\(\\s*\\)", "gen_random_uuid()");
@@ -79,9 +81,9 @@ public class DatabaseCompatibilityConfiguration {
                 sql = sql.replaceAll(
                         "(?i)\\b(is_active|is_primary_contact|service_override|granted|injured|enabled|closes_next_day)\\s*=\\s*0\\b",
                         "$1=false");
+                // PostgreSQL uses row locks after SELECT, not SQL Server table hints.
+                sql = sql.replaceAll("(?i)\\s+with\\s*\\([a-zA-Z0-9_,\\s]*(?:updlock|holdlock)[a-zA-Z0-9_,\\s]*\\)", "");
             }
-            // Strip SQL Server table hints like WITH (UPDLOCK,HOLDLOCK) or WITH (UPDLOCK) or WITH (HOLDLOCK)
-            sql = sql.replaceAll("(?i)\\s+with\\s*\\([a-zA-Z0-9_,\\s]*(?:updlock|holdlock)[a-zA-Z0-9_,\\s]*\\)", "");
             // PostgreSQL requires parentheses around parameters in OFFSET/FETCH: OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY
             sql = sql.replaceAll("(?i)\\boffset\\s*\\(?\\s*\\?\\s*\\)?\\s*rows\\s+fetch\\s+next\\s*\\(?\\s*\\?\\s*\\)?\\s*rows\\s+only", "OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY");
             // Automatically prefix known tables with dbo. if no schema is specified
@@ -97,7 +99,11 @@ public class DatabaseCompatibilityConfiguration {
                 }
             }
             matcher.appendTail(sb);
-            return sb.toString();
+            String result = sb.toString();
+            if (lockRequested && result.matches("(?is)^\\s*select\\s+(?:id\\b|\\*).*")) {
+                result = result.stripTrailing() + " FOR UPDATE";
+            }
+            return result;
         }
 
         private static String rewriteTopOne(String sql) {
