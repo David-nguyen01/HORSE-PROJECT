@@ -5,6 +5,9 @@ export function getApiUrl() {
   }
   const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '')
   if (envUrl) return envUrl
+  if (typeof window !== 'undefined' && window.location.hostname === 'horse-project-phi.vercel.app') {
+    return 'https://horse-project-4qa4.onrender.com'
+  }
   return 'http://127.0.0.1:8080'
 }
 

@@ -417,8 +417,7 @@ public class WalletService {
 
     private Map<String, Object> orderRow(UUID id, UUID ownerId, boolean lock) {
         String sql = "select id,user_id,status,data_json,payos_order_code,payos_expected_amount_vnd,"
-                + "datediff_big(second,convert(datetimeoffset,'1970-01-01T00:00:00+00:00'),"
-                + "switchoffset(payos_expires_at,'+00:00')) payos_expires_epoch "
+                + "payos_expires_at "
                 + "from module_records " + (lock ? "with (UPDLOCK,HOLDLOCK) " : "")
                 + "where id=? and module_code='SYSTEM' and record_type='PAYOS_TOPUP'"
                 + (ownerId == null ? "" : " and user_id=?");
@@ -437,7 +436,8 @@ public class WalletService {
         row.put("data_json", rs.getString("data_json"));
         row.put("payos_order_code", rs.getLong("payos_order_code"));
         row.put("payos_expected_amount_vnd", rs.getBigDecimal("payos_expected_amount_vnd"));
-        row.put("payos_expires_at", Instant.ofEpochSecond(rs.getLong("payos_expires_epoch")));
+        java.sql.Timestamp expiresAt = rs.getTimestamp("payos_expires_at");
+        row.put("payos_expires_at", expiresAt == null ? null : expiresAt.toInstant());
         return row;
     }
 

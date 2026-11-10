@@ -26,12 +26,13 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     @Query("""
             select u from UserAccount u
-            where (:query is null
-                   or lower(u.username) like lower(concat('%', :query, '%'))
-                   or lower(u.email) like lower(concat('%', :query, '%')))
+            where (:matchAll = true
+                   or lower(u.username) like :pattern
+                   or lower(u.email) like :pattern)
             """
             )
-    Page<UserAccount> search(@Param("query") String query, Pageable pageable);
+    Page<UserAccount> search(@Param("matchAll") boolean matchAll,
+                             @Param("pattern") String pattern, Pageable pageable);
 
     @Query(value = """
             select concat('PERM_', rp.module_code, '_', rp.action_code)

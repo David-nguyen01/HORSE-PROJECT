@@ -102,8 +102,9 @@ public class UserManagementService {
 
     @Transactional(readOnly = true)
     public Page<UserResponse> search(String query, Pageable pageable) {
-        String normalized = query == null || query.isBlank() ? null : query.trim();
-        return userRepository.search(normalized, pageable).map(this::toResponse);
+        boolean matchAll = query == null || query.isBlank();
+        String pattern = matchAll ? "%" : "%" + query.trim().toLowerCase(Locale.ROOT) + "%";
+        return userRepository.search(matchAll, pattern, pageable).map(this::toResponse);
     }
 
     private UserResponse createAccount(

@@ -114,15 +114,14 @@ public class MedicalQueueService {
     public List<QueueStatusItem> getQueueOverview() {
         return jdbc.query("""
                 select h.id, h.code, h.name, h.intake_status,
-                       assignment.user_id as veterinarian_id, u.username as veterinarian_name
+                       u.id as veterinarian_id, u.username as veterinarian_name
                 from horses h
-                outer apply (
+                left join users u on u.id = (
                     select top 1 mr.user_id from module_records mr
                     where mr.horse_id=h.id and mr.module_code='MEDICAL'
                       and mr.record_type='MEDICAL_ASSIGNMENT' and mr.status='ACTIVE'
                     order by mr.created_at desc
-                ) assignment
-                left join users u on u.id=assignment.user_id
+                )
                 where h.archived_at is null
                   and h.intake_status in ('WAITING_FOR_VET','IN_MEDICAL')
                   and (h.intake_status='IN_MEDICAL' or h.service_override=1

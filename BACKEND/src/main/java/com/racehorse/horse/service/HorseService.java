@@ -157,24 +157,25 @@ public class HorseService {
 
     @Transactional(readOnly = true)
     public Page<HorseResponse> search(String query, HorseStatus status, boolean paidOnly, Pageable pageable) {
-        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
+        String pattern = searchPattern(query);
+        boolean matchAll = query == null || query.isBlank();
         return (paidOnly
-                ? horseRepository.searchPaidOnly(normalizedQuery, status, serviceToday(), pageable)
-                : horseRepository.search(normalizedQuery, status, pageable))
+                ? horseRepository.searchPaidOnly(matchAll, pattern, status, serviceToday(), pageable)
+                : horseRepository.search(matchAll, pattern, status, pageable))
                 .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<HorseResponse> searchForTrainer(String query, HorseStatus status, UUID trainerId, Pageable pageable) {
-        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
-        return horseRepository.searchForTrainer(normalizedQuery, status, trainerId, pageable)
+        String pattern = searchPattern(query);
+        return horseRepository.searchForTrainer(query == null || query.isBlank(), pattern, status, trainerId, pageable)
                 .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<HorseResponse> searchForVeterinarian(String query, HorseStatus status, Pageable pageable) {
-        String normalizedQuery = query == null || query.isBlank() ? null : query.trim();
-        return horseRepository.searchForVeterinarian(normalizedQuery, status, serviceToday(), pageable)
+        String pattern = searchPattern(query);
+        return horseRepository.searchForVeterinarian(query == null || query.isBlank(), pattern, status, serviceToday(), pageable)
                 .map(this::toResponse);
     }
 
@@ -187,6 +188,12 @@ public class HorseService {
 
     private LocalDate serviceToday() {
         return LocalDate.now(clock.withZone(ZoneId.of("Asia/Ho_Chi_Minh")));
+    }
+
+    private String searchPattern(String query) {
+        return query == null || query.isBlank()
+                ? "%"
+                : "%" + query.trim().toLowerCase(java.util.Locale.ROOT) + "%";
     }
 
     private boolean isServiceVisible(Horse horse) {

@@ -36,24 +36,26 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
     @Query("""
             select h from Horse h
             where h.archivedAt is null
-              and (:query is null
-                   or lower(h.code) like lower(concat('%', :query, '%'))
-                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:matchAll = true
+                   or lower(h.code) like :pattern
+                   or lower(h.name) like :pattern)
               and (:status is null or h.status = :status)
             """)
     Page<Horse> search(
-            @Param("query") String query,
+            @Param("matchAll") boolean matchAll,
+            @Param("pattern") String pattern,
             @Param("status") HorseStatus status,
             Pageable pageable);
 
     @Query("""
             select h from Horse h
             where h.archivedAt is null and h.currentTrainer.id = :trainerId
-              and (:query is null or lower(h.code) like lower(concat('%', :query, '%'))
-                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:matchAll = true or lower(h.code) like :pattern
+                   or lower(h.name) like :pattern)
               and (:status is null or h.status = :status)
             """)
-    Page<Horse> searchForTrainer(@Param("query") String query, @Param("status") HorseStatus status,
+    Page<Horse> searchForTrainer(@Param("matchAll") boolean matchAll, @Param("pattern") String pattern,
+                                @Param("status") HorseStatus status,
                                 @Param("trainerId") UUID trainerId, Pageable pageable);
 
     @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer", "caretaker", "diagnosingVet"})
@@ -74,11 +76,12 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
               and h.intakeStatus in ('WAITING_FOR_VET', 'IN_MEDICAL', 'PENDING_STALL', 'STABLED')
               and (h.serviceOverride = true or (h.paymentStatus = 'PAID'
                    and (h.paidUntil is null or h.paidUntil >= :today)))
-              and (:query is null or lower(h.code) like lower(concat('%', :query, '%'))
-                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:matchAll = true or lower(h.code) like :pattern
+                   or lower(h.name) like :pattern)
               and (:status is null or h.status = :status)
             """)
-    Page<Horse> searchForVeterinarian(@Param("query") String query, @Param("status") HorseStatus status,
+    Page<Horse> searchForVeterinarian(@Param("matchAll") boolean matchAll, @Param("pattern") String pattern,
+                                     @Param("status") HorseStatus status,
                                      @Param("today") LocalDate today, Pageable pageable);
 
     @EntityGraph(attributePaths = {"sire", "dam", "currentTrainer"})
@@ -98,13 +101,14 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
               and (h.serviceOverride = true
                    or (h.paymentStatus = 'PAID'
                        and (h.paidUntil is null or h.paidUntil >= :today)))
-              and (:query is null
-                   or lower(h.code) like lower(concat('%', :query, '%'))
-                   or lower(h.name) like lower(concat('%', :query, '%')))
+              and (:matchAll = true
+                   or lower(h.code) like :pattern
+                   or lower(h.name) like :pattern)
               and (:status is null or h.status = :status)
             """)
     Page<Horse> searchPaidOnly(
-            @Param("query") String query,
+            @Param("matchAll") boolean matchAll,
+            @Param("pattern") String pattern,
             @Param("status") HorseStatus status,
             @Param("today") LocalDate today,
             Pageable pageable);

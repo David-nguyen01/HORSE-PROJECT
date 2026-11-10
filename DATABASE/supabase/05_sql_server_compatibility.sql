@@ -1,62 +1,44 @@
--- Compatibility functions for PostgreSQL (Supabase) to support SQL Server queries
--- Run this in Supabase SQL Editor if you are migrating from SQL Server
+-- PostgreSQL equivalents used by legacy JDBC queries.
+-- Keep these functions in the private dbo schema; the backend search_path is dbo,public.
 
-CREATE OR REPLACE FUNCTION dbo.sysdatetimeoffset() 
-RETURNS timestamptz 
-LANGUAGE sql STABLE AS $$
-    SELECT clock_timestamp();
+CREATE OR REPLACE FUNCTION dbo.json_value(json_text text, json_path text)
+RETURNS text
+LANGUAGE sql IMMUTABLE STRICT
+SET search_path = pg_catalog
+AS $$
+    SELECT json_text::jsonb #>> string_to_array(substr(json_path, 3), '.');
 $$;
 
-CREATE OR REPLACE FUNCTION public.sysdatetimeoffset() 
-RETURNS timestamptz 
-LANGUAGE sql STABLE AS $$
-    SELECT clock_timestamp();
+-- SQL Server JSON_MODIFY in lax mode removes a property when the new value is NULL.
+-- The application passes JSON field values as strings.
+CREATE OR REPLACE FUNCTION dbo.json_modify(json_text text, json_path text, new_value text)
+RETURNS text
+LANGUAGE sql IMMUTABLE
+SET search_path = pg_catalog
+AS $$
+    SELECT CASE
+        WHEN json_text IS NULL OR json_path IS NULL THEN NULL
+        WHEN new_value IS NULL THEN
+            (json_text::jsonb #- string_to_array(substr(json_path, 3), '.'))::text
+        ELSE
+            jsonb_set(json_text::jsonb,
+                      string_to_array(substr(json_path, 3), '.'),
+                      to_jsonb(new_value),
+                      true)::text
+    END;
 $$;
 
-CREATE OR REPLACE FUNCTION dbo.json_value(json_text text, json_path text) 
-RETURNS text 
-LANGUAGE plpgsql IMMUTABLE AS $$
-DECLARE
-    clean_key text;
-BEGIN
-    IF json_text IS NULL OR json_path IS NULL THEN
-        RETURN NULL;
-    END IF;
-    clean_key := regexp_replace(json_path, '^\$\.', '');
-    RETURN (json_text::jsonb ->> clean_key);
-EXCEPTION WHEN OTHERS THEN
-    RETURN NULL;
-END;
+CREATE OR REPLACE FUNCTION dbo.dateadd(datepart text, amount integer, value date)
+RETURNS date
+LANGUAGE sql IMMUTABLE STRICT
+SET search_path = pg_catalog
+AS $$
+    SELECT CASE lower(datepart)
+        WHEN 'day' THEN value + amount
+        ELSE NULL
+    END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.json_value(json_text text, json_path text) 
-RETURNS text 
-LANGUAGE plpgsql IMMUTABLE AS $$
-BEGIN
-    RETURN dbo.json_value(json_text, json_path);
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION dbo.dateadd(datepart text, num integer, d timestamptz)
-RETURNS timestamptz
-LANGUAGE plpgsql IMMUTABLE AS $$
-BEGIN
-    CASE lower(datepart)
-        WHEN 'day', 'd', 'dd' THEN RETURN d + (num || ' days')::interval;
-        WHEN 'month', 'm', 'mm' THEN RETURN d + (num || ' months')::interval;
-        WHEN 'year', 'yy', 'yyyy' THEN RETURN d + (num || ' years')::interval;
-        WHEN 'hour', 'hh' THEN RETURN d + (num || ' hours')::interval;
-        WHEN 'minute', 'mi', 'n' THEN RETURN d + (num || ' minutes')::interval;
-        ELSE RETURN d + (num || ' days')::interval;
-    END CASE;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION public.dateadd(datepart text, num integer, d timestamptz)
-RETURNS timestamptz
-LANGUAGE plpgsql IMMUTABLE AS $$
-BEGIN
-    RETURN dbo.dateadd(datepart, num, d);
-END;
-$$;
-
+REVOKE ALL ON FUNCTION dbo.json_value(text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION dbo.json_modify(text, text, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION dbo.dateadd(text, integer, date) FROM PUBLIC;
