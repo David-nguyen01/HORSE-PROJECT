@@ -10,6 +10,9 @@ import org.springframework.jdbc.core.RowMapper;
 import javax.sql.DataSource;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Configuration
 public class DatabaseCompatibilityConfiguration {
@@ -22,6 +25,21 @@ public class DatabaseCompatibilityConfiguration {
 
     public static class CompatibleJdbcTemplate extends JdbcTemplate {
 
+        private static final Set<String> DBO_TABLES = Set.of(
+            "alert_events", "audit_logs", "care_routine_definitions", "care_tasks",
+            "financial_transactions", "horse_metric_thresholds", "horse_ownerships",
+            "horse_profile_files", "horses", "login_sessions", "module_records",
+            "notifications", "owner_reports", "preventive_care_schedules", "race_events",
+            "race_results", "racetrack_lanes", "racetracks", "role_permissions",
+            "stables", "stored_files", "telemetry_readings", "telemetry_sessions",
+            "training_evaluations", "training_locks", "training_plan_phases",
+            "training_plans", "training_schedules", "trial_run_bookings", "user_roles", "users"
+        );
+
+        private static final Pattern TABLE_REF_PATTERN = Pattern.compile(
+            "(?i)\\b(from|into|update|join)\\s+([a-zA-Z0-9_]+)"
+        );
+
         public CompatibleJdbcTemplate(DataSource dataSource) {
             super(dataSource);
         }
@@ -31,8 +49,21 @@ public class DatabaseCompatibilityConfiguration {
             // Strip SQL Server table hints like WITH (UPDLOCK,HOLDLOCK) or WITH (UPDLOCK) or WITH (HOLDLOCK)
             sql = sql.replaceAll("(?i)\\s+with\\s*\\([a-zA-Z0-9_,\\s]*(?:updlock|holdlock)[a-zA-Z0-9_,\\s]*\\)", "");
             // PostgreSQL requires parentheses around parameters in OFFSET/FETCH: OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY
-            sql = sql.replaceAll("(?i)\\boffset\\s*\\?\\s*rows\\s+fetch\\s+next\\s*\\?\\s*rows\\s+only", "OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY");
-            return sql;
+            sql = sql.replaceAll("(?i)\\boffset\\s*\\(?\\s*\\?\\s*\\)?\\s*rows\\s+fetch\\s+next\\s*\\(?\\s*\\?\\s*\\)?\\s*rows\\s+only", "OFFSET (?) ROWS FETCH NEXT (?) ROWS ONLY");
+            // Automatically prefix known tables with dbo. if no schema is specified
+            Matcher matcher = TABLE_REF_PATTERN.matcher(sql);
+            StringBuilder sb = new StringBuilder();
+            while (matcher.find()) {
+                String keyword = matcher.group(1);
+                String tableName = matcher.group(2);
+                if (DBO_TABLES.contains(tableName.toLowerCase())) {
+                    matcher.appendReplacement(sb, keyword + " dbo." + tableName);
+                } else {
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(matcher.group(0)));
+                }
+            }
+            matcher.appendTail(sb);
+            return sb.toString();
         }
 
         @Override

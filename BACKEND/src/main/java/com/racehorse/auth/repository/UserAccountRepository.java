@@ -35,8 +35,8 @@ public interface UserAccountRepository extends JpaRepository<UserAccount, UUID> 
 
     @Query(value = """
             select concat('PERM_', rp.module_code, '_', rp.action_code)
-            from user_roles ur
-            join role_permissions rp on rp.role_code = ur.role and cast(rp.granted as varchar(5)) in ('1', 'true', 't')
+            from dbo.user_roles ur
+            join dbo.role_permissions rp on rp.role_code = ur.role and cast(rp.granted as varchar(5)) in ('1', 'true', 't')
             where ur.user_id = :userId
             """, nativeQuery = true)
     List<String> findGrantedPermissionCodes(@Param("userId") UUID userId);
