@@ -435,10 +435,8 @@ function Horses() {
         }))
         withPhotos.push(...batch)
         if (request !== loadRequest.current) return
-        setHorses([...withPhotos, ...list.slice(withPhotos.length)])
-        setLoading(false)
       }
-      if (!list.length) setHorses([])
+      setHorses(withPhotos)
     } catch {
       if (request === loadRequest.current) setHorses([])
     } finally {
@@ -743,32 +741,32 @@ function HorseDetail() {
   }, [id, isOwner])
   const load = useCallback(async () => {
     try {
-      const [hRes, pRes, rRes, eRes] = await Promise.allSettled([
+      setError('')
+      const [hRes, pRes, rRes, eRes, health, readiness, photo] = await Promise.allSettled([
         api(`/api/horses/${id}`),
         api(`/api/horses/${id}/pedigree`),
         api(`/api/horses/${id}/race-results`),
-        api(`/api/horses/${id}/training-evaluations?size=20`)
+        api(`/api/horses/${id}/training-evaluations?size=20`),
+        api(`/api/horses/${id}/health-status`),
+        api(`/api/horses/${id}/race-readiness`),
+        api(`/api/horses/${id}/main-file`),
       ])
       if (hRes.status !== 'fulfilled') {
         throw new Error(hRes.reason?.message || 'Không thể tải thông tin ngựa')
       }
-      setHorse(hRes.value)
       setPedigree(pRes.status === 'fulfilled' ? pRes.value : null)
       setHistory(rRes.status === 'fulfilled' ? rRes.value : null)
       setEvaluations(eRes.status === 'fulfilled' ? pageContent(eRes.value) : [])
-      const [health, readiness] = await Promise.allSettled([
-        api(`/api/horses/${id}/health-status`),
-        api(`/api/horses/${id}/race-readiness`),
-      ])
       setMedicalHealth(health.status === 'fulfilled' ? health.value : null)
       setRestingHeartRateBpm(readiness.status === 'fulfilled' ? readiness.value.restingHeartRateBpm : null)
       setWeightKg(readiness.status === 'fulfilled' ? readiness.value.latestWeightKg : null)
-      try { setFile(await api(`/api/horses/${id}/main-file`)) }
-      catch (fileError) { if (fileError.status === 404) setFile(null); else throw fileError }
+      setFile(photo.status === 'fulfilled' ? photo.value : null)
+      if (photo.status === 'rejected' && photo.reason.status !== 404) setError(photo.reason.message)
+      setHorse(hRes.value)
       if (isManager) setPhotoProposals(pageContent(await api(`/api/horses/${id}/main-file/proposals`)))
     } catch (e) { setError(e.message) }
   }, [id, isManager])
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setHorse(null); setFile(null); load() }, [load])
   const toggleServiceOverride = async (enable) => {
     if (!enable && !window.confirm(`Bạn có chắc muốn HỦY BẢO LÃNH dịch vụ của ngựa "${horse.name}"?`)) return;
     try {
