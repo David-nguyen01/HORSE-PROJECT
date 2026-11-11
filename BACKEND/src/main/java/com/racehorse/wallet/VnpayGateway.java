@@ -29,9 +29,11 @@ final class VnpayGateway implements PayosGateway {
 
     VnpayGateway(String terminalId, String hashSecret, String paymentUrl, String returnUrl, Clock clock) {
         URI uri = URI.create(paymentUrl);
+        String host = uri.getHost();
         if (!"https".equalsIgnoreCase(uri.getScheme())
-                || !"sandbox.vnpayment.vn".equalsIgnoreCase(uri.getHost())) {
-            throw new IllegalStateException("Chỉ hỗ trợ URL VNPAY Sandbox qua HTTPS");
+                || host == null
+                || (!"sandbox.vnpayment.vn".equalsIgnoreCase(host) && !"pay.vnpay.vn".equalsIgnoreCase(host))) {
+            throw new IllegalStateException("Chỉ hỗ trợ URL VNPAY qua HTTPS (sandbox.vnpayment.vn hoặc pay.vnpay.vn)");
         }
         this.terminalId = terminalId;
         this.hashSecret = hashSecret;

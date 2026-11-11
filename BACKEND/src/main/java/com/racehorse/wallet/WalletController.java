@@ -1,14 +1,13 @@
 package com.racehorse.wallet;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Map;
@@ -33,7 +32,7 @@ public class WalletController {
                                          @Valid @RequestBody TopUpRequest request,
                                          HttpServletRequest servletRequest) {
         return service.createTopUp(UUID.fromString(jwt.getSubject()), request.amountVnd(),
-                servletRequest.getRemoteAddr());
+                clientIp(servletRequest));
     }
 
     @GetMapping("/top-ups/{orderId}")
@@ -71,13 +70,6 @@ public class WalletController {
         return service.renewHorseNow(UUID.fromString(jwt.getSubject()), horseId);
     }
 
-    @PostMapping("/top-ups/{orderId}/fake-complete")
-    @PreAuthorize("hasRole('HORSE_OWNER')")
-    @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void fakeComplete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID orderId) {
-        service.completeFake(UUID.fromString(jwt.getSubject()), orderId);
-    }
-
     @PostMapping("/payos/webhook")
     public Map<String, String> webhook(@RequestBody JsonNode body) {
         service.acceptWebhook(body);
@@ -87,6 +79,22 @@ public class WalletController {
     @GetMapping("/vnpay/ipn")
     public Map<String, String> vnpayIpn(@RequestParam Map<String, String> parameters) {
         return service.acceptVnpayIpn(parameters);
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String header = request.getHeader("X-Forwarded-For");
+        if (header != null && !header.isBlank()) {
+            String ip = header.split(",")[0].trim();
+            if (!ip.isBlank()) return normalizeIp(ip);
+        }
+        return normalizeIp(request.getRemoteAddr());
+    }
+
+    private String normalizeIp(String ip) {
+        if (ip == null || ip.isBlank() || "0:0:0:0:0:0:0:1".equals(ip) || "::1".equals(ip)) {
+            return "127.0.0.1";
+        }
+        return ip;
     }
 
     public record TopUpRequest(@NotNull @Min(100_000) Long amountVnd) { }

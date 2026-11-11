@@ -1,13 +1,54 @@
-# Local wallet and PayOS setup
+# Local and Production VNPAY Wallet Setup
 
-The wallet schema is installed by `DATABASE/24_payos_wallet_schema.sql`, followed by `DATABASE/25_horse_specific_service_plans.sql` for per-horse subscriptions. Neither adds tables. Review and run these against the **local** `racehorse` database with an account that has `ALTER` rights. Windows integrated SQL authentication worked on this machine. The rollback file for migration 24 refuses to discard wallets or payment records that contain data. Do not run these scripts against the shared Azure database without separate approval.
+The wallet schema is installed by `DATABASE/08_compact_records.sql` and `DATABASE/01_core_auth.sql`.
+VNPAY is the only supported payment gateway for the Racehorse RTMS platform. The Fake (simulated) payment gateway has been removed from the platform architecture.
 
-The app uses `RACEHORSE_LOCAL_DB_PASSWORD` with the less privileged `racehorse_local_app` login. Restart Codex or the terminal after changing Windows User variables.
+## 1. Gateway Mode Configuration
 
-For demo UI testing, set `PAYOS_GATEWAY=fake` (also the default). The owner wallet displays a non-scannable illustration and a **simulated payment success** action. This also runs on a public demo deployment if configured there; it does not collect real money. Only use disposable demo data.
+The application defaults to `PAYOS_GATEWAY=vnpay`. There is no automatic fallback to simulated mode.
+If VNPAY credentials are not configured, the system safely disables top-up operations and returns clear, actionable configuration errors without creating broken orders or simulating payment success.
 
-The wallet can also create VNPAY Sandbox checkout links by setting `PAYOS_GATEWAY=vnpay` and supplying `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, and `VNPAY_RETURN_URL` through environment variables. Set `VNPAY_PAYMENT_URL` to the official Sandbox URL or leave its default. Do not put merchant secrets in source control. Configure the merchant's IPN URL as `https://<public-backend-host>/api/wallet/vnpay/ipn`; this endpoint must be publicly reachable over HTTPS for Sandbox payment confirmation. Set `VNPAY_RETURN_URL` to the frontend wallet page. Sandbox checkout uses test transactions only and does not collect real money.
+## 2. Local Sandbox Setup
 
-The real PayOS gateway remains available with `PAYOS_GATEWAY=real` and its existing credentials.
+To test VNPAY Sandbox locally:
 
-After installing the migrations, run backend tests and the frontend build, then test one simulated top-up, per-horse purchase, plan selection for the next cycle, and overdue renewal with the local database.
+1. Register a test merchant account at [sandbox.vnpayment.vn](https://sandbox.vnpayment.vn).
+2. Set the following environment variables (in your terminal or Windows User environment):
+   - `PAYOS_GATEWAY=vnpay`
+   - `VNPAY_TMN_CODE=<your_sandbox_terminal_id>`
+   - `VNPAY_HASH_SECRET=<your_sandbox_hash_secret>`
+   - `VNPAY_PAYMENT_URL=https://sandbox.vnpayment.vn/paymentv2/vpcpay.html`
+   - `VNPAY_RETURN_URL=http://localhost:5173/wallet`
+
+### Local IPN Testing with a Public Tunnel
+Because VNPAY's sandbox server requires a publicly accessible HTTPS endpoint to deliver payment confirmation IPNs, you can expose your local backend (port 8080) using a secure tunnel:
+
+```bash
+# Example with ngrok
+ngrok http 8080
+
+# Or Cloudflare Tunnel
+cloudflared tunnel --url http://localhost:8080
+```
+
+Configure your VNPAY Sandbox Merchant IPN URL in the merchant portal:
+`https://<your-tunnel-subdomain>/api/wallet/vnpay/ipn`
+
+When you perform a test payment with a VNPAY Sandbox test card, VNPAY calls this IPN, validates HMAC-SHA512 checksums, and automatically credits the owner's wallet.
+
+## 3. Production (Render) Setup
+
+On production (e.g., Render hosting `https://horse-project-4qa4.onrender.com`):
+
+1. Open the Render Dashboard -> Environment Variables.
+2. Configure the following variables:
+   - `PAYOS_GATEWAY=vnpay`
+   - `VNPAY_TMN_CODE=<production_terminal_id>`
+   - `VNPAY_HASH_SECRET=<production_hash_secret>`
+   - `VNPAY_PAYMENT_URL=https://pay.vnpay.vn/vpcpay.html`
+   - `VNPAY_RETURN_URL=https://horse-project-phi.vercel.app/wallet` (or production frontend URL)
+3. Register the production IPN URL in VNPAY Merchant Portal:
+   `https://horse-project-4qa4.onrender.com/api/wallet/vnpay/ipn`
+4. Trigger a service redeploy/restart on Render after saving the environment variables.
+
+Never commit merchant secrets or hash keys to Git.

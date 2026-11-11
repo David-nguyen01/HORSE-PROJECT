@@ -66,7 +66,7 @@ public class WalletService {
         BigDecimal renewal = horses.stream().map(HorsePlanView::renewalAmountVnd)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new WalletView((BigDecimal) row.get("wallet_balance_vnd"), horses, renewal,
-                gateway.isFake(), gateway.isVnpay());
+                false, gateway.isVnpay());
     }
 
     private List<HorsePlanView> horses(UUID ownerId) {
@@ -98,10 +98,13 @@ public class WalletService {
     public OrderView createTopUp(UUID ownerId, long amountVnd, String ipAddress) {
         if (amountVnd < MIN_TOP_UP.longValue())
             throw new InvalidInputException("Số tiền nạp tối thiểu là 100.000 VND");
+        if (!gateway.isVnpay()) {
+            throw new BusinessException("Cổng thanh toán VNPAY chưa được kích hoạt trên hệ thống.");
+        }
         owner(ownerId, false);
         long code = 100_000_000L + random.nextLong(900_000_000L);
         UUID id = UUID.randomUUID();
-        Instant expires = clock.instant().plus(gateway.isVnpay() ? 15 : 3, ChronoUnit.MINUTES);
+        Instant expires = clock.instant().plus(15, ChronoUnit.MINUTES);
         String description = Long.toString(code);
         jdbc.update("insert into module_records(id,module_code,record_type,user_id,status,event_date,data_json,"
                         + "payos_order_code,payos_expected_amount_vnd,payos_expires_at) "
@@ -109,34 +112,20 @@ public class WalletService {
                 id, ownerId, today(), code, BigDecimal.valueOf(amountVnd), OffsetDateTime.ofInstant(expires, ZoneOffset.UTC));
         PayosGateway.Link link = gateway.create(code, amountVnd, description, expires, ipAddress);
         jdbc.update("update module_records set data_json=?,updated_at=SYSDATETIMEOFFSET() where id=?",
-                json.writeValueAsString(Map.of("paymentLinkId", link.paymentLinkId(),
+                json.writeValueAsString(Map.of("paymentLinkId", link.paymentLinkId() == null ? "" : link.paymentLinkId(),
                         "checkoutUrl", link.checkoutUrl() == null ? "" : link.checkoutUrl(),
-                        "qrCode", link.qrCode() == null ? "" : link.qrCode(),
-                        "fakeGateway", gateway.isFake())), id);
+                        "qrCode", link.qrCode() == null ? "" : link.qrCode())), id);
         return new OrderView(id, code, BigDecimal.valueOf(amountVnd), "PENDING", expires,
-                link.checkoutUrl(), link.qrCode(), gateway.isFake(), gateway.isVnpay());
+                link.checkoutUrl(), link.qrCode(), false, gateway.isVnpay());
     }
 
     @Transactional
     public OrderView order(UUID ownerId, UUID orderId) {
         Map<String, Object> row = orderRow(orderId, ownerId, false);
         JsonNode details = json.readTree((String) row.get("data_json"));
-        boolean fakeOrder = details.path("fakeGateway").asBoolean(false)
-                || details.path("paymentLinkId").asText("").startsWith("fake-");
         if ("PENDING".equals(row.get("status")) && clock.instant().isAfter(expiry(row))) {
-            if (!fakeOrder && !gateway.isFake() && !gateway.isVnpay()) {
-                PayosGateway.Status remote = gateway.getStatus(((Number) row.get("payos_order_code")).longValue());
-                if ("PAID".equals(remote.status())) {
-                    complete(orderId, remote.amountVnd(), false);
-                } else {
-                    jdbc.update("update module_records set status=?,updated_at=SYSDATETIMEOFFSET() "
-                            + "where id=? and status='PENDING'",
-                            "CANCELLED".equals(remote.status()) ? "CANCELLED" : "EXPIRED", orderId);
-                }
-            } else {
-                jdbc.update("update module_records set status='EXPIRED',updated_at=SYSDATETIMEOFFSET() "
-                        + "where id=? and status='PENDING'", orderId);
-            }
+            jdbc.update("update module_records set status='EXPIRED',updated_at=SYSDATETIMEOFFSET() "
+                    + "where id=? and status='PENDING'", orderId);
             row = orderRow(orderId, ownerId, false);
         }
         String checkoutUrl = details.path("checkoutUrl").asText("");
@@ -144,12 +133,12 @@ public class WalletService {
         return new OrderView(orderId, ((Number) row.get("payos_order_code")).longValue(),
                 (BigDecimal) row.get("payos_expected_amount_vnd"), (String) row.get("status"),
                 expiry(row), checkoutUrl.isBlank() ? null : checkoutUrl,
-                qrCode.isBlank() ? null : qrCode, fakeOrder, gateway.isVnpay());
+                qrCode.isBlank() ? null : qrCode, false, gateway.isVnpay());
     }
 
     @Transactional
     public void acceptWebhook(JsonNode body) {
-        if (gateway.isFake() || !gateway.verifyWebhook(body))
+        if (!gateway.verifyWebhook(body))
             throw new InvalidInputException("Webhook PayOS không hợp lệ");
         JsonNode data = body.path("data");
         if (!body.path("success").asBoolean(false) || !"00".equals(body.path("code").asText())
@@ -165,43 +154,58 @@ public class WalletService {
                     "Webhook " + paymentProviderName() + " đã ký nhưng không có đơn local: " + code);
             return;
         }
-        complete(ids.getFirst(), data.path("amount").asLong(-1), false);
+        complete(ids.getFirst(), data.path("amount").asLong(-1));
     }
 
     @Transactional
     public Map<String, String> acceptVnpayIpn(Map<String, String> parameters) {
         if (!gateway.isVnpay() || !gateway.verifyVnpay(parameters))
             return Map.of("RspCode", "97", "Message", "Invalid signature");
-        if (!"00".equals(parameters.get("vnp_ResponseCode"))
-                || !"00".equals(parameters.get("vnp_TransactionStatus")))
-            return Map.of("RspCode", "00", "Message", "Confirm Success");
         try {
             long orderCode = Long.parseLong(parameters.getOrDefault("vnp_TxnRef", ""));
             long amountRaw = Long.parseLong(parameters.getOrDefault("vnp_Amount", ""));
             if (amountRaw <= 0 || amountRaw % 100 != 0)
                 return Map.of("RspCode", "04", "Message", "Invalid amount");
-            List<UUID> ids = jdbc.query("select id from module_records where payos_order_code=? "
-                            + "and module_code='SYSTEM' and record_type='PAYOS_TOPUP'",
-                    (rs, n) -> rs.getObject(1, UUID.class), orderCode);
-            if (ids.isEmpty()) return Map.of("RspCode", "01", "Message", "Order not found");
-            complete(ids.getFirst(), amountRaw / 100, false);
+            long receivedVnd = amountRaw / 100;
+
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "select id, status, payos_expected_amount_vnd from module_records "
+                            + "where payos_order_code=? and module_code='SYSTEM' and record_type='PAYOS_TOPUP'",
+                    orderCode);
+            if (rows.isEmpty()) return Map.of("RspCode", "01", "Message", "Order not found");
+
+            Map<String, Object> order = rows.getFirst();
+            UUID orderId = (UUID) order.get("id");
+            String currentStatus = (String) order.get("status");
+
+            if ("PAID".equals(currentStatus)) {
+                return Map.of("RspCode", "02", "Message", "Order already confirmed");
+            }
+
+            BigDecimal expected = (BigDecimal) order.get("payos_expected_amount_vnd");
+            if (expected.compareTo(BigDecimal.valueOf(receivedVnd)) != 0) {
+                notifyManagers("wallet-mismatch:" + orderId, "PAYMENT_REVIEW",
+                        "Cần đối soát số tiền đơn nạp ví VNPAY", orderId);
+                audit(null, "PAYMENT_REVIEW", orderId,
+                        "VNPAY báo số tiền khác đơn: nhận " + receivedVnd + ", mong đợi " + expected);
+                return Map.of("RspCode", "04", "Message", "Invalid amount");
+            }
+
+            if (!"00".equals(parameters.get("vnp_ResponseCode"))
+                    || !"00".equals(parameters.get("vnp_TransactionStatus"))) {
+                jdbc.update("update module_records set status='FAILED',updated_at=SYSDATETIMEOFFSET() "
+                        + "where id=? and status='PENDING'", orderId);
+                return Map.of("RspCode", "00", "Message", "Confirm Success");
+            }
+
+            complete(orderId, receivedVnd);
             return Map.of("RspCode", "00", "Message", "Confirm Success");
         } catch (NumberFormatException exception) {
             return Map.of("RspCode", "04", "Message", "Invalid request data");
         }
     }
 
-    @Transactional
-    public void completeFake(UUID ownerId, UUID orderId) {
-        if (!gateway.isFake()) throw new ResourceNotFoundException("Không tìm thấy thao tác này");
-        Map<String, Object> row = orderRow(orderId, ownerId, false);
-        JsonNode details = json.readTree((String) row.get("data_json"));
-        if (!details.path("fakeGateway").asBoolean(false))
-            throw new ResourceNotFoundException("Không tìm thấy đơn mô phỏng");
-        complete(orderId, ((BigDecimal) row.get("payos_expected_amount_vnd")).longValueExact(), true);
-    }
-
-    private void complete(UUID orderId, long receivedVnd, boolean fake) {
+    private void complete(UUID orderId, long receivedVnd) {
         Map<String, Object> order = orderRow(orderId, null, true);
         String status = (String) order.get("status");
         if ("PAID".equals(status)) return;
@@ -219,7 +223,6 @@ public class WalletService {
                     "Cần đối soát đơn nạp ví hết hạn", orderId);
             audit(null, "PAYMENT_REVIEW", orderId,
                     paymentProviderName() + " báo thanh toán cho đơn hết hạn; ví chưa được cộng");
-            if (fake) throw new BusinessException("Đơn nạp ví đã hết hạn");
             if ("PENDING".equals(status))
                 jdbc.update("update module_records set status='EXPIRED',updated_at=SYSDATETIMEOFFSET() where id=?", orderId);
             return;
@@ -228,7 +231,7 @@ public class WalletService {
         jdbc.update("update users set wallet_balance_vnd=wallet_balance_vnd+?,version=version+1,"
                 + "updated_at=SYSDATETIMEOFFSET() where id=?", expected, ownerId);
         ledger(ownerId, "REVENUE", "WALLET_TOPUP", expected, orderId,
-                fake ? "Nạp ví mô phỏng" : "Nạp ví qua " + paymentProviderName());
+                "Nạp ví qua " + paymentProviderName());
         jdbc.update("update module_records set status='PAID',updated_at=SYSDATETIMEOFFSET() where id=?", orderId);
         notifyUser(ownerId, "wallet-topup:" + orderId, "WALLET_TOPUP",
                 "Nạp ví thành công", "Ví đã được cộng " + expected.toPlainString() + " VND", orderId);

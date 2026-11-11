@@ -11,9 +11,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.TreeMap;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class VnpayGatewayTest {
     private final VnpayGateway gateway = new VnpayGateway(
@@ -37,5 +35,28 @@ class VnpayGatewayTest {
 
         parameters.put("vnp_Amount", "500000001");
         assertFalse(gateway.verifyVnpay(parameters));
+    }
+
+    @Test
+    void acceptsProductionVnpayHost() {
+        VnpayGateway prodGateway = new VnpayGateway(
+                "PROD1234", "prod-secret-123456",
+                "https://pay.vnpay.vn/vpcpay.html", "https://example.com/wallet",
+                Clock.systemUTC());
+        assertTrue(prodGateway.isVnpay());
+        assertFalse(prodGateway.isFake());
+    }
+
+    @Test
+    void rejectsInsecureOrUnauthorizedHost() {
+        assertThrows(IllegalStateException.class, () -> new VnpayGateway(
+                "TEST1234", "secret",
+                "http://sandbox.vnpayment.vn/paymentv2/vpcpay.html", "https://example.com/wallet",
+                Clock.systemUTC()));
+
+        assertThrows(IllegalStateException.class, () -> new VnpayGateway(
+                "TEST1234", "secret",
+                "https://malicious-phishing.com/vpcpay.html", "https://example.com/wallet",
+                Clock.systemUTC()));
     }
 }
