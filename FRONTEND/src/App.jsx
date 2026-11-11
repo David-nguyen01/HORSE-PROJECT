@@ -81,6 +81,36 @@ function AuthShell({ mode }) {
   const [currentApiUrl, setCurrentApiUrl] = useState(getApiUrl())
   const [showConfig, setShowConfig] = useState(false)
   const [inputUrl, setInputUrl] = useState(getApiUrl())
+  const [apiPanelOpen, setApiPanelOpen] = useState(false)
+  const apiPanelRef = useRef(null)
+  const apiTriggerRef = useRef(null)
+
+  useEffect(() => {
+    if (!apiPanelOpen) return
+    const handleClickOutside = (e) => {
+      if (
+        apiPanelRef.current &&
+        !apiPanelRef.current.contains(e.target) &&
+        apiTriggerRef.current &&
+        !apiTriggerRef.current.contains(e.target)
+      ) {
+        setApiPanelOpen(false)
+      }
+    }
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setApiPanelOpen(false)
+        apiTriggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', handleClickOutside)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handleClickOutside)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [apiPanelOpen])
+
   const testConnection = async () => {
     setConnection({ checking: true, message: '', ready: false })
     try {
@@ -104,62 +134,123 @@ function AuthShell({ mode }) {
     } catch (err) { setError(err.message) } finally { setBusy(false) }
   }
   return <main className="auth-page">
+    <button
+      ref={apiTriggerRef}
+      type="button"
+      className={`auth-api-trigger ${apiPanelOpen ? 'active' : ''}`}
+      onClick={() => setApiPanelOpen((prev) => !prev)}
+      aria-label="Cấu hình kết nối API"
+      aria-expanded={apiPanelOpen}
+      aria-haspopup="dialog"
+      title="Cấu hình kết nối API"
+    >
+      API
+    </button>
     <section className="auth-story">
       <div className="auth-brand"><span className="brand-mark"><Activity size={24} /></span><span>STRIDE</span></div>
       <div className="story-copy"><p className="eyebrow light">RACEHORSE CLUB SYSTEM</p><h1>Mỗi bước chạy.<br /><em>Một dấu ấn.</em></h1><p>Nền tảng vận hành tập trung cho đội ngũ huấn luyện, chăm sóc và quản lý ngựa đua chuyên nghiệp.</p></div>
       <div className="story-stats"><div><strong>01</strong><span>Hồ sơ thống nhất</span></div><div><strong>05</strong><span>Vai trò chuyên biệt</span></div><div><strong>24/7</strong><span>Theo dõi vận hành</span></div></div>
     </section>
     <section className="auth-panel"><div className="auth-card">
-      <p className="eyebrow">CỔNG ĐIỀU HÀNH</p><h2>{isLogin ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}</h2><p className="muted">{isLogin ? 'Đăng nhập để tiếp tục quản lý câu lạc bộ.' : 'Chọn đúng vai trò để bắt đầu sử dụng hệ thống.'}</p>
-      <div className="local-api-panel">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <strong>{currentApiUrl.includes('127.0.0.1') || currentApiUrl.includes('localhost') ? 'Máy chủ cục bộ (Local)' : 'Máy chủ đám mây (Cloud)'}</strong>
-            <span>API: {currentApiUrl}</span>
+      {apiPanelOpen && (
+        <div
+          ref={apiPanelRef}
+          className="auth-api-floating-panel"
+          role="dialog"
+          aria-modal="false"
+          aria-label="Cấu hình kết nối API"
+        >
+          <div className="auth-api-panel-header">
+            <span className="auth-api-panel-title">Cấu hình kết nối API</span>
+            <button
+              type="button"
+              className="auth-api-close-btn"
+              onClick={() => setApiPanelOpen(false)}
+              aria-label="Đóng cấu hình API"
+              title="Đóng (Esc)"
+            >
+              <X size={15} />
+            </button>
           </div>
-          <button type="button" onClick={() => setShowConfig(!showConfig)} style={{ marginLeft: 8 }}>
-            {showConfig ? 'Đóng' : 'Đổi URL'}
-          </button>
+
+          <div className="auth-api-panel-body">
+            <div className="auth-api-row-status">
+              <div className="auth-api-info">
+                <span className="auth-api-badge">
+                  {currentApiUrl.includes('127.0.0.1') || currentApiUrl.includes('localhost') ? 'Máy chủ cục bộ (Local)' : 'Máy chủ đám mây (Cloud)'}
+                </span>
+                <span className="auth-api-url" title={currentApiUrl}>API: {currentApiUrl}</span>
+              </div>
+              <button
+                type="button"
+                className="auth-api-btn-link"
+                onClick={() => setShowConfig(!showConfig)}
+              >
+                {showConfig ? 'Hủy' : 'Đổi URL'}
+              </button>
+            </div>
+
+            {showConfig && (
+              <div className="auth-api-config-box">
+                <input
+                  type="text"
+                  value={inputUrl}
+                  onChange={(e) => setInputUrl(e.target.value)}
+                  placeholder="https://xxx.onrender.com"
+                  className="auth-api-input"
+                  autoFocus
+                />
+                <div className="auth-api-config-actions">
+                  <button
+                    type="button"
+                    className="auth-api-btn-save"
+                    onClick={() => {
+                      setCustomApiUrl(inputUrl)
+                      const updated = getApiUrl()
+                      setCurrentApiUrl(updated)
+                      setShowConfig(false)
+                      testConnection()
+                    }}
+                  >
+                    Lưu
+                  </button>
+                  <button
+                    type="button"
+                    className="auth-api-btn-default"
+                    onClick={() => {
+                      setCustomApiUrl('')
+                      const updated = getApiUrl()
+                      setInputUrl(updated)
+                      setCurrentApiUrl(updated)
+                      setShowConfig(false)
+                      testConnection()
+                    }}
+                  >
+                    Mặc định
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="auth-api-btn-test"
+              onClick={testConnection}
+              disabled={connection.checking}
+            >
+              {connection.checking ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}
+            </button>
+
+            {connection.message && (
+              <p className={`auth-api-msg ${connection.ready ? 'local-api-ok' : 'local-api-error'}`}>
+                {connection.message}
+              </p>
+            )}
+          </div>
         </div>
-        {showConfig && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 4 }}>
-            <input
-              type="text"
-              value={inputUrl}
-              onChange={(e) => setInputUrl(e.target.value)}
-              placeholder="https://xxx.onrender.com"
-              style={{ flex: 1, padding: '5px 8px', fontSize: '12px', borderRadius: '6px', border: '1px solid #b7d4bf' }}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                setCustomApiUrl(inputUrl)
-                const updated = getApiUrl()
-                setCurrentApiUrl(updated)
-                setShowConfig(false)
-                testConnection()
-              }}
-            >
-              Lưu
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCustomApiUrl('')
-                const updated = getApiUrl()
-                setInputUrl(updated)
-                setCurrentApiUrl(updated)
-                setShowConfig(false)
-                testConnection()
-              }}
-            >
-              Mặc định
-            </button>
-          </div>
-        )}
-        <button type="button" onClick={testConnection} disabled={connection.checking}>{connection.checking ? 'Đang kiểm tra…' : 'Kiểm tra kết nối'}</button>
-        {connection.message && <p className={connection.ready ? 'local-api-ok' : 'local-api-error'}>{connection.message}</p>}
-      </div>
+      )}
+
+      <p className="eyebrow">CỔNG ĐIỀU HÀNH</p><h2>{isLogin ? 'Chào mừng trở lại' : 'Tạo tài khoản mới'}</h2><p className="muted">{isLogin ? 'Đăng nhập để tiếp tục quản lý câu lạc bộ.' : 'Chọn đúng vai trò để bắt đầu sử dụng hệ thống.'}</p>
       {location.state?.registered && <div className="notice success"><Check size={17} /> Đăng ký thành công. Bạn có thể đăng nhập.</div>}
       {error && <div className="notice error"><X size={17} /> {error}</div>}
       <form onSubmit={submit} className="form-stack">
