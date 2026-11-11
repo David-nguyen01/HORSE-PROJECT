@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from './api'
+import HorseAvatar from './HorseAvatar'
 
 export default function TrainingReceptionPage() {
   const [horses, setHorses] = useState([])
@@ -36,7 +37,7 @@ export default function TrainingReceptionPage() {
       {loading ? <div className="training-reception-empty">Đang tải danh sách…</div>
         : horses.length === 0 ? <div className="training-reception-empty">Hiện không có ngựa chờ tiếp nhận.</div>
         : <div className="training-reception-rows">{horses.map(horse => <article className="training-reception-row" key={horse.horseId}>
-          <div className="training-reception-horse"><span className="training-reception-avatar" aria-hidden="true">{horse.name?.trim().charAt(0).toUpperCase() || 'N'}</span>
+          <div className="training-reception-horse"><HorseAvatar horse={horse} />
             <div><b>{horse.name}</b><small>{horse.code}</small></div></div>
           <div className="training-reception-checks"><span>Đã thanh toán</span></div>
           <button className="button primary" disabled={busyId === horse.horseId} onClick={() => receive(horse)}>

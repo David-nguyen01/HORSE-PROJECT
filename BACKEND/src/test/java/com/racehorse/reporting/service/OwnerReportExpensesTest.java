@@ -31,9 +31,11 @@ class OwnerReportExpensesTest {
         var sql = org.mockito.ArgumentCaptor.forClass(String.class);
         verify(jdbc, times(4)).query(sql.capture(), any(RowMapper.class), any(Object[].class));
         assertThat(sql.getAllValues()).anySatisfy(query -> assertThat(query)
-                .contains("horse_ownerships ho", "ho.owner_id=?", "h.archived_at is null"));
+                .contains("horse_ownerships ho", "ho.owner_id=?")
+                .doesNotContain("h.archived_at is null"));
         assertThat(sql.getAllValues()).anySatisfy(query -> assertThat(query)
-                .contains("left join horses h", "ft.wallet_owner_user_id=?"));
+                .contains("left join horses h", "ft.wallet_owner_user_id=?",
+                        "coalesce(ft.horse_id,m.horse_id) is not null", "ft.transaction_type='EXPENSE'"));
         assertThat(sql.getAllValues()).anySatisfy(query -> assertThat(query)
                 .contains("PRIZE_REVENUE", "ho.owner_id=?"));
         assertThat(sql.getAllValues()).anySatisfy(query -> assertThat(query)

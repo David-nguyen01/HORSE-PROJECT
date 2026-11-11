@@ -8,9 +8,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.JsonNode;
 
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -24,6 +27,14 @@ public class WalletController {
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.WalletView wallet(@AuthenticationPrincipal Jwt jwt) {
         return service.wallet(UUID.fromString(jwt.getSubject()));
+    }
+
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('HORSE_OWNER')")
+    public List<WalletService.PaymentHistoryItem> paymentHistory(@AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") int offset) {
+        if (offset < 0) throw new com.racehorse.common.exception.InvalidInputException("Vị trí lịch sử không hợp lệ");
+        return service.paymentHistory(UUID.fromString(jwt.getSubject()), offset, 20);
     }
 
     @PostMapping("/top-ups")
@@ -79,6 +90,22 @@ public class WalletController {
     @GetMapping("/vnpay/ipn")
     public Map<String, String> vnpayIpn(@RequestParam Map<String, String> parameters) {
         return service.acceptVnpayIpn(parameters);
+    }
+
+    @GetMapping("/vnpay/return")
+    public ResponseEntity<String> vnpayReturn(@RequestParam Map<String, String> parameters) {
+        Map<String, String> result = service.acceptVnpayIpn(parameters);
+        boolean paid = "00".equals(parameters.get("vnp_ResponseCode"))
+                && ("00".equals(result.get("RspCode")) || "02".equals(result.get("RspCode")));
+        String title = paid ? "Thanh toán Sandbox thành công" : "Thanh toán Sandbox chưa hoàn tất";
+        String detail = paid ? "Ví đã được cập nhật. Bạn có thể quay lại ứng dụng để xem số dư."
+                : "Giao dịch chưa được xác nhận. Vui lòng quay lại ứng dụng và kiểm tra đơn thanh toán.";
+        String html = "<!doctype html><html lang=\"vi\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+                + "<title>VNPAY Sandbox</title></head><body style=\"font-family:system-ui;max-width:480px;"
+                + "margin:12vh auto;padding:24px;color:#173d32\"><h1>" + title + "</h1><p>" + detail
+                + "</p><small>Đây là giao dịch thử nghiệm trên VNPAY Sandbox.</small></body></html>";
+        return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 
     private String clientIp(HttpServletRequest request) {

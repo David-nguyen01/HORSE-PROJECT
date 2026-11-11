@@ -56,7 +56,7 @@ export function FinanceReportsPage() {
   const [ownerTo, setOwnerTo] = useState(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()))
 
   return (
-    <div className="finance-reports-container">
+    <div className={`finance-reports-container${isOwner ? ' owner-finance-reports' : ''}`}>
       <div className="page-heading">
         <div>
           <p className="eyebrow">{isOwner ? 'CHỦ SỞ HỮU NGỰA' : 'QUẢN TRỊ CÂU LẠC BỘ'}</p>
@@ -159,14 +159,14 @@ function OwnerMonthlyExpenses({ from, to }) {
     }
   })
 
-  return <section className="card" style={{ padding: 20, marginBottom: 18 }}>
+  return <section className="card owner-monthly-expenses" style={{ padding: 20, marginBottom: 18 }}>
     <div><h2 style={{ margin: 0 }}>Chi tiêu theo tháng</h2><p className="muted">Phí gói, gia hạn và các khoản chi đã ghi nhận cho từng ngựa.</p></div>
     {from && to && from > to && <div className="notice error">Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.</div>}
     {error && <div className="notice error">{error}</div>}
     {loading ? <p>Đang tải chi tiêu…</p> : <>
-      <p style={{ fontSize: 18, fontWeight: 700 }}>Tổng chi trong kỳ: {money(overview?.totalExpense)}</p>
+      <p className="owner-expense-total" style={{ fontSize: 18, fontWeight: 700 }}>Tổng chi trong kỳ: {money(overview?.totalExpense)}</p>
       <p className="muted">Tiền thưởng đã ghi nhận: {money(overview?.totalPrizeRevenue)}. Kết quả thắng đua được liệt kê riêng và không tự cộng vào doanh thu.</p>
-      {byMonth.length ? byMonth.map(group => <div key={group.month} style={{ marginTop: 18 }}>
+      {byMonth.length ? byMonth.map(group => <div key={group.month} className="owner-expense-month" style={{ marginTop: 18 }}>
         <h3 style={{ marginBottom: 8 }}>Tháng {group.month.slice(5)}/{group.month.slice(0, 4)} · Chi {money(group.total)} · Thưởng đã ghi nhận {money(group.prizeTotal)}</h3>
         {group.horses.map(horse => <details key={horse.id} className="card" style={{ padding: 14, marginTop: 10 }}>
           <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{horse.name} · {horse.code} — Chi {money(horse.expenses.reduce((sum, item) => sum + Number(item.amount || 0), 0))}</summary>

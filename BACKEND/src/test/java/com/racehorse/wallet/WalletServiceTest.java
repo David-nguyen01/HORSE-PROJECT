@@ -1,13 +1,39 @@
 package com.racehorse.wallet;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class WalletServiceTest {
+    @Test
+    void paymentHistoryIsScopedToTheCurrentWalletOwner() {
+        JdbcTemplate jdbc = mock(JdbcTemplate.class);
+        WalletService service = new WalletService(jdbc, mock(ObjectMapper.class),
+                mock(PayosGateway.class), Clock.systemUTC(), "Asia/Ho_Chi_Minh");
+        UUID ownerId = UUID.randomUUID();
+        when(jdbc.query(anyString(), any(RowMapper.class), eq(ownerId), eq(20), eq(20)))
+                .thenReturn(List.of());
+
+        assertTrue(service.paymentHistory(ownerId, 20, 20).isEmpty());
+
+        var sql = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).query(sql.capture(), any(RowMapper.class), eq(ownerId), eq(20), eq(20));
+        assertTrue(sql.getValue().contains("wallet_owner_user_id=?"));
+        assertTrue(sql.getValue().contains("source_entity_type='WALLET'"));
+    }
+
     @Test
     void overdueFeeStartsOnDayTwoAndRisesOnDayFour() {
         BigDecimal price = BigDecimal.valueOf(5_000_000);

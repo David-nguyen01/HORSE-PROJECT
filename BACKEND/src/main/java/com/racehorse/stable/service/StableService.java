@@ -846,7 +846,8 @@ public class StableService {
 
         boolean isInjured = "INJURED".equalsIgnoreCase(healthStatus)
                 || "INJURED".equalsIgnoreCase(horseStatus)
-                || "QUARANTINED".equalsIgnoreCase(healthStatus);
+                || "QUARANTINED".equalsIgnoreCase(healthStatus)
+                || "MONITOR".equalsIgnoreCase(healthStatus);
         Integer lockCount = jdbc != null ? jdbc.queryForObject(
                 "select count(*) from training_locks where horse_id=? and released_at is null",
                 Integer.class, horseId) : 0;
@@ -924,7 +925,8 @@ public class StableService {
         List<RoutineBackfillItem> details = new ArrayList<>();
 
         for (Map<String, Object> row : stabledHorses) {
-            UUID hId = (UUID) row.get("id");
+            // SQL Server's JDBC driver may expose UNIQUEIDENTIFIER as String in queryForList.
+            UUID hId = UUID.fromString(row.get("id").toString());
             String code = (String) row.get("code");
             String name = (String) row.get("name");
             String stableLoc = (String) row.get("stable_location");
@@ -934,7 +936,10 @@ public class StableService {
             int routines = ((Number) row.get("routine_count")).intValue();
 
             boolean hasLock = locks > 0;
-            boolean isInjured = "INJURED".equalsIgnoreCase(health) || "QUARANTINED".equalsIgnoreCase(health);
+            boolean isInjured = "INJURED".equalsIgnoreCase(health)
+                    || "QUARANTINED".equalsIgnoreCase(health)
+                    || "MONITOR".equalsIgnoreCase(health)
+                    || "INJURED".equalsIgnoreCase((String) row.get("horse_status"));
 
             if (!"STABLED".equalsIgnoreCase(intakeStatus) || stableLoc.equalsIgnoreCase("Khu chuồng trại")) {
                 excluded++;

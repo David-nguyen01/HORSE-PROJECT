@@ -2033,6 +2033,7 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
   const [executing, setExecuting] = useState(false)
   const [error, setError] = useState('')
   const [successResult, setSuccessResult] = useState(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -2049,7 +2050,7 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
         if (active) setLoading(false)
       })
     return () => { active = false }
-  }, [])
+  }, [retryCount])
 
   const handleExecute = async () => {
     setExecuting(true)
@@ -2094,6 +2095,13 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
 
           {loading ? (
             <div className="empty" style={{ padding: '36px' }}>Đang kiểm tra dữ liệu ngựa và lịch sinh hoạt hiện có…</div>
+          ) : !preview ? (
+            <div className="empty" style={{ padding: '36px' }}>
+              <p>Chưa thể kiểm tra lịch sinh hoạt của ngựa trong chuồng.</p>
+              <button type="button" className="button secondary" onClick={() => setRetryCount((count) => count + 1)}>
+                Thử lại
+              </button>
+            </div>
           ) : (
             <>
               {/* SUMMARY STATS */}
@@ -2167,7 +2175,7 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
             <button type="button" className="button secondary" onClick={onClose} disabled={executing}>Đóng</button>
             <button
               className="button primary"
-              disabled={executing || loading || eligibleCount === 0 || !!successResult}
+              disabled={executing || loading || !preview || eligibleCount === 0 || !!successResult}
               onClick={handleExecute}
             >
               {executing ? 'Đang khởi tạo…' : `Khởi tạo lịch mặc định (${eligibleCount} ngựa)`}

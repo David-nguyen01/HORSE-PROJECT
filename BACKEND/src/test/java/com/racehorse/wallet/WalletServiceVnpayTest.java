@@ -133,7 +133,7 @@ class WalletServiceVnpayTest {
 
         UUID orderId = UUID.randomUUID();
         when(jdbc.queryForList(anyString(), eq(123456L))).thenReturn(List.of(
-                Map.of("id", orderId, "status", "PENDING", "payos_expected_amount_vnd", BigDecimal.valueOf(100_000))
+                Map.of("id", orderId.toString(), "status", "PENDING", "payos_expected_amount_vnd", BigDecimal.valueOf(100_000))
         ));
 
         Map<String, String> params = Map.of(
@@ -158,7 +158,7 @@ class WalletServiceVnpayTest {
         UUID userId = UUID.randomUUID();
 
         when(jdbc.queryForList(anyString(), eq(123456L))).thenReturn(List.of(
-                Map.of("id", orderId, "status", "PENDING", "payos_expected_amount_vnd", BigDecimal.valueOf(100_000))
+                Map.of("id", orderId.toString(), "status", "PENDING", "payos_expected_amount_vnd", BigDecimal.valueOf(100_000))
         ));
 
         // Mock orderRow for complete()

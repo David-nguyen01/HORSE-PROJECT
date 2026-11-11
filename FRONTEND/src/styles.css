@@ -836,13 +836,13 @@ a { color: inherit; text-decoration: none; }
 
 /* Keep each weekly summary session on one horizontal row at every viewport. */
 .training-week-summary .training-schedule-grid {
-  grid-template-columns: 90px minmax(130px, 1.2fr) minmax(125px, 1.1fr) 85px minmax(135px, 1.2fr) 100px 95px minmax(280px, auto);
+  grid-template-columns: 90px minmax(130px, 1.2fr) minmax(125px, 1.1fr) 85px minmax(135px, 1.2fr) 100px minmax(110px, max-content) max-content;
   min-width: 1180px;
 }
 @media (max-width: 900px) {
   .training-week-summary .schedule-grid-header { display: grid; }
   .training-week-summary .schedule-grid-row {
-    grid-template-columns: 90px minmax(130px, 1.2fr) minmax(125px, 1.1fr) 85px minmax(135px, 1.2fr) 100px 95px minmax(280px, auto);
+    grid-template-columns: 90px minmax(130px, 1.2fr) minmax(125px, 1.1fr) 85px minmax(135px, 1.2fr) 100px minmax(110px, max-content) max-content;
     min-width: 1180px;
     row-gap: 0;
     column-gap: 14px;
@@ -957,12 +957,16 @@ a { color: inherit; text-decoration: none; }
 .wallet-demo-code i{width:10px;height:10px;background:#fff}
 .wallet-demo-code i.filled{background:#183b2f}
 .wallet-horse-list{display:grid;gap:12px;margin-top:16px}
-.wallet-horse{display:grid;grid-template-columns:minmax(130px,1.2fr) repeat(4,minmax(105px,1fr)) minmax(185px,1.5fr);gap:12px;align-items:center;padding:16px;border:1px solid #dce5dd;border-radius:12px;background:#fff}
+.wallet-horse{display:grid;grid-template-columns:minmax(130px,1.2fr) repeat(4,minmax(105px,1fr)) minmax(325px,2fr);gap:12px;align-items:center;padding:16px;border:1px solid #dce5dd;border-radius:12px;background:#fff}
 .wallet-horse>div{display:grid;gap:3px}.wallet-horse small{font-size:11px;color:#60736a}.wallet-horse a{color:#193d2e;text-decoration:none}
 .wallet-horse-action{display:flex!important;gap:8px!important;align-items:center}.wallet-horse-action select{min-width:0;width:100%;padding:9px;border:1px solid #dce5dd;border-radius:8px}.wallet-horse-action button{white-space:nowrap}
+.wallet-plan-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0}.wallet-plan-card{display:flex;flex-direction:column;min-width:0;padding:24px;border-radius:20px;background:#143e32;color:#fff}.wallet-plan-card-kicker{font-size:10px;font-weight:700;letter-spacing:.16em;color:#bce5b2}.wallet-plan-card h3{font:700 23px 'Playfair Display';margin:12px 0 8px;color:#fff}.wallet-plan-card-price{font-size:26px;font-weight:700;margin:0;white-space:nowrap}.wallet-plan-card-price small{font-size:12px;font-weight:400;color:#d8e8df}.wallet-plan-card ul{display:grid;gap:12px;list-style:none;padding:0;margin:24px 0}.wallet-plan-card li{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.4}.wallet-plan-card li span{color:#c9f47d;font-weight:700}.wallet-plan-card-action{display:block;margin-top:auto;padding:11px 14px;border-radius:999px;background:#fff;color:#143e32;text-align:center;font-size:13px;font-weight:700;text-decoration:none}.wallet-plan-card-action:hover{background:#c9f47d}.wallet-horse-action{min-width:0}.wallet-horse-action select{flex:1 0 150px;min-width:150px;width:auto;max-width:none;background:#fff;color:#143e32}.wallet-horse-action button{flex:0 0 auto}
+@media(max-width:1100px){.wallet-plan-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.wallet-plan-cards{grid-template-columns:1fr}}
 .wallet-shortage{grid-column:1/-1;color:#a9422f!important}
+.wallet-history{margin-top:18px}.wallet-history h2{margin-bottom:6px}.wallet-history-list{margin-top:18px;border:1px solid var(--line);border-radius:12px;overflow:hidden}.wallet-history-item{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:16px 18px;border-top:1px solid var(--line)}.wallet-history-item:first-child{border-top:0}.wallet-history-detail{display:grid;gap:4px;min-width:0}.wallet-history-detail b{color:var(--green);font-size:14px}.wallet-history-detail span{font-size:13px;overflow-wrap:anywhere}.wallet-history-detail small{color:var(--muted);font-size:12px}.wallet-history-item strong{white-space:nowrap;font-size:15px}.wallet-history-credit{color:#23744f}.wallet-history-debit{color:#a9422f}.wallet-history-empty{margin:20px 0;color:var(--muted);font-size:13px}.wallet-history-more{margin-top:16px}
 @media(max-width:1100px){.wallet-horse{grid-template-columns:repeat(2,minmax(0,1fr))}.wallet-horse-action,.wallet-shortage{grid-column:1/-1}}
-@media(max-width:600px){.wallet-horse{grid-template-columns:1fr}.wallet-horse-action{display:grid!important;grid-column:1}.wallet-shortage{grid-column:1}}
+@media(max-width:600px){.wallet-horse{grid-template-columns:1fr}.wallet-horse-action{display:grid!important;grid-column:1}.wallet-shortage{grid-column:1}.wallet-history-item{align-items:flex-start;flex-direction:column;gap:10px}}
 .horse-people{display:grid;gap:10px}.horse-person{display:flex;align-items:center;gap:10px;border:1px solid #e0e8e1;border-radius:10px;padding:10px;margin-top:8px}.horse-person>div{display:grid;gap:2px}
 .horse-payment-card{margin-top:18px;min-width:0;overflow:hidden}.horse-payment-card .card-head{min-width:0}.horse-payment-card .card-head h3{min-width:0;overflow-wrap:anywhere}.horse-payment-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:0 22px}.horse-payment-facts>div{display:grid;gap:4px;min-width:0}.horse-payment-facts b{min-width:0;overflow-wrap:anywhere}.horse-payment-facts small{color:#64766d}.horse-payment-actions{display:flex;gap:10px;flex-wrap:wrap;margin:16px 22px 0}.horse-payment-actions select{padding:9px;border:1px solid #dce5dd;border-radius:8px;max-width:100%}.horse-payment-wallet-link{display:inline-flex;max-width:calc(100% - 44px);white-space:normal;text-align:center;margin:16px 22px 0}.horse-payment-card>.wallet-hint{margin:14px 22px 20px}
 .sidebar nav .nav-image{width:19px;height:19px;flex:0 0 19px;object-fit:contain;filter:brightness(0) invert(.75)}.sidebar nav a.active .nav-image{filter:brightness(0)}
@@ -1310,3 +1314,51 @@ body { font-size: 14px; line-height: 1.5; }
     grid-template-columns: 1fr;
   }
 }
+/* Horse catalog cards */
+.horse-catalog { padding: 22px; }
+.horse-profile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+.horse-profile-card { position: relative; isolation: isolate; min-height: 290px; display: flex; flex-direction: column; align-items: center; overflow: hidden; border: 1px solid #dbe8dd; border-radius: 20px; background: #fff; text-align: center; box-shadow: 0 12px 26px rgba(22, 64, 47, .07); transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.horse-profile-card:hover { transform: translateY(-5px); border-color: #91b9a1; box-shadow: 0 20px 38px rgba(22, 64, 47, .14); }
+.horse-profile-card:focus-visible { outline: 3px solid #5caa77; outline-offset: 3px; }
+.horse-profile-cover { position: absolute; z-index: -1; inset: 0 0 auto; height: 98px; background: linear-gradient(125deg, #164b38, #43936b 60%, #c8ee83); transition: height .35s ease; }
+.horse-profile-card:nth-child(3n + 2) .horse-profile-cover { background: linear-gradient(125deg, #315e58, #8bb18e 60%, #dceeb4); }
+.horse-profile-card:nth-child(3n) .horse-profile-cover { background: linear-gradient(125deg, #5a5e3d, #9aaf66 60%, #d4edab); }
+.horse-profile-card:hover .horse-profile-cover { height: 100%; background: linear-gradient(145deg, #174c39, #2f7654); }
+.horse-profile-photo { display: block; width: 108px; height: 108px; margin: 42px 0 0; border: 5px solid #fff; border-radius: 50%; object-fit: cover; object-position: center; box-shadow: 0 8px 20px rgba(14, 54, 38, .2); transition: transform .35s ease; }
+.horse-profile-card:hover .horse-profile-photo { transform: scale(1.08); }
+.horse-profile-info { display: grid; gap: 7px; min-width: 0; padding: 16px 12px 0; }
+.horse-profile-info b { color: #173b2e; font-size: 20px; line-height: 1.2; overflow-wrap: anywhere; }
+.horse-profile-info span { color: #6e8173; font-size: 13px; overflow-wrap: anywhere; }
+.horse-profile-detail { display: inline-flex; align-items: center; gap: 4px; margin: auto 0 21px; padding: 9px 16px; border-radius: 9px; background: #1e654a; color: #fff; font-size: 12px; font-weight: 700; transition: background .2s ease; }
+.horse-profile-card:hover .horse-profile-info b, .horse-profile-card:hover .horse-profile-info span { color: #fff; }
+.horse-profile-card:hover .horse-profile-detail { background: #fff; color: #18543a; }
+
+/* Trainer creation forms */
+.training-create-modal { width: min(760px, 100%); padding: 0; border: 1px solid #dce9de; background: #fff; }
+.training-create-modal .modal-head { position: sticky; z-index: 2; top: 0; align-items: center; margin: 0; padding: 24px 28px 21px; border-bottom: 1px solid #dce9de; background: linear-gradient(110deg, #f4faf1, #fff); }
+.training-create-modal .modal-head h2 { margin: 4px 0 0; color: #153b2d; }
+.training-create-modal > .form-grid { padding: 25px 28px 28px; gap: 18px; }
+.training-create-modal .field { min-width: 0; }
+.training-create-modal .field > span { color: #355949; font-size: 12px; font-weight: 700; }
+.training-create-modal .field input, .training-create-modal .field select { min-height: 44px; border-radius: 10px; border-color: #d5e4d7; background: #fcfefb; }
+.training-create-modal .field input:focus, .training-create-modal .field select:focus { border-color: #48946d; box-shadow: 0 0 0 3px rgba(72, 148, 109, .13); }
+.training-create-phase { border: 1px solid #d7e5da; border-radius: 14px; background: #f8fbf7; box-shadow: none; }
+.training-create-phase .card-head { border-bottom: 1px solid #e0ebe1; margin-bottom: 16px; }
+.training-create-phase .card-head b { color: #1c6545; font-size: 15px; }
+.training-create-modal .modal-actions { position: sticky; bottom: -28px; margin-top: 8px; padding: 17px 0 0; border-top: 1px solid #e1ebe2; background: #fff; }
+
+/* Customer reports */
+.owner-finance-reports { gap: 18px; }
+.owner-finance-reports > .page-heading { padding: 26px 30px; border: 1px solid #d9e7dc; border-radius: 18px; background: linear-gradient(115deg, #eff8ed, #fff 72%); }
+.owner-finance-reports > .page-heading h1 { color: #173d2e; }
+.owner-finance-reports > .finance-filter-panel { margin-bottom: 0 !important; border-radius: 16px; box-shadow: 0 8px 25px rgba(27, 70, 47, .05); }
+.owner-monthly-expenses { margin-bottom: 0 !important; padding: 26px !important; border: 1px solid #dce9dd; border-radius: 18px; }
+.owner-monthly-expenses > div:first-child { padding-bottom: 14px; border-bottom: 1px solid #e5eee5; }
+.owner-monthly-expenses h2 { color: #173d2e; }
+.owner-monthly-expenses .owner-expense-total { display: inline-block; margin: 20px 0 8px; padding: 14px 18px; border: 1px solid #cae5cd; border-radius: 12px; background: #ecf8ec; color: #215b3c; }
+.owner-expense-month { padding: 18px; border: 1px solid #e1eae1; border-radius: 14px; background: #fafcf9; }
+.owner-expense-month h3 { color: #244f3b; font-size: 15px; line-height: 1.5; }
+.owner-expense-month details.card { border: 1px solid #dce7dd; border-radius: 11px; box-shadow: none; }
+.owner-expense-month details.card summary { color: #204e38; line-height: 1.5; }
+.owner-expense-month details.card[open] { border-color: #9fc8a8; background: #fff; }
+@media (max-width: 600px) { .horse-catalog { padding: 14px; } .horse-profile-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; } .horse-profile-card { min-height: 260px; } .horse-profile-photo { width: 92px; height: 92px; } .horse-profile-info b { font-size: 17px; } .training-create-modal .modal-head { padding: 20px; } .training-create-modal > .form-grid { padding: 20px; grid-template-columns: 1fr; } .training-create-modal .modal-actions { bottom: -20px; } .owner-finance-reports > .page-heading, .owner-monthly-expenses { padding: 20px !important; } .owner-expense-month { padding: 12px; } }

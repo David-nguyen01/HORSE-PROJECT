@@ -80,7 +80,8 @@ $baselineScripts = @(
     "44_monthly_medical_checks.sql",
     "45_remove_unexamined_follow_ups.sql",
     "46_cancel_orphaned_medical_follow_ups.sql",
-    "47_custom_preventive_care_type.sql"
+    "47_custom_preventive_care_type.sql",
+    "48_horse_intake_caretaker.sql"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -121,4 +122,3 @@ if ($IncludeSync) {
 }
 
 Write-Host "Database racehorse_local is ready." -ForegroundColor Green
-

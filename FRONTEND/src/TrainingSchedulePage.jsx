@@ -397,21 +397,6 @@ export default function TrainingSchedulePage({ isOwner = false, isHeadTrainer = 
                             {startingScheduleId === s.id ? 'Đang bắt đầu...' : 'Bắt đầu huấn luyện'}
                           </button>
                         )}
-                        {allowEdit && status !== 'CANCELLED' && (
-                          <button className="button secondary" onClick={() => setEditingSchedule(s)}>
-                            <Edit2 size={13} /> Chỉnh sửa
-                          </button>
-                        )}
-                        {isHeadTrainer && status === 'COMPLETED' && !s.evaluation && (
-                          <button className="button secondary" onClick={() => setEvaluatingSchedule(s)}>
-                            <Check size={13} /> Đánh giá
-                          </button>
-                        )}
-                        {isHeadTrainer && status === 'COMPLETED' && s.evaluation && (
-                          <button className="button secondary" onClick={() => setEvaluatingSchedule(s)}>
-                            <Edit2 size={13} /> Sửa đánh giá
-                          </button>
-                        )}
                       </span>
                     </div>
                   )
@@ -486,6 +471,13 @@ export default function TrainingSchedulePage({ isOwner = false, isHeadTrainer = 
           onSaved={() => { setShowCreateSchedule(false); reload() }}
         />
       )}
+      {editingSchedule && (
+        <EditScheduleModal
+          schedule={editingSchedule}
+          onClose={() => setEditingSchedule(null)}
+          onSaved={() => { setEditingSchedule(null); reload() }}
+        />
+      )}
 
       {evaluatingSchedule && (
         <EvaluationModal
@@ -500,9 +492,9 @@ export default function TrainingSchedulePage({ isOwner = false, isHeadTrainer = 
           isOwner={isOwner}
           isHeadTrainer={isHeadTrainer}
           canEdit={allowEdit}
+          onEdit={schedule => { setViewingSchedule(null); setEditingSchedule(schedule) }}
           canMarkReady={canEdit && !isHeadTrainer}
           onClose={() => setViewingSchedule(null)}
-          onChanged={() => { setViewingSchedule(null); reload() }}
           onReload={reload}
           onEvaluate={schedule => { setViewingSchedule(null); setEvaluatingSchedule(schedule) }}
         />
@@ -738,7 +730,7 @@ function CreatePlanModal({ horses, horsesLoading, onClose, onSaved }) {
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal" style={{ maxWidth: '760px' }} onMouseDown={event => event.stopPropagation()}>
+      <div className="modal training-create-modal" style={{ maxWidth: '760px' }} onMouseDown={event => event.stopPropagation()}>
         <div className="modal-head">
           <div><p className="eyebrow">KẾ HOẠCH HUẤN LUYỆN</p><h2>Tạo lịch mới</h2></div>
           <button className="icon-button" onClick={onClose}><X /></button>
@@ -777,7 +769,7 @@ function CreatePlanModal({ horses, horsesLoading, onClose, onSaved }) {
             {plansError && <small>{plansError}</small>}
           </label>
           {!copyPlanId && <div className="full" style={{ display: 'grid', gap: '12px' }}>
-            {form.phases.map((phase, index) => <div key={index} className="card" style={{ padding: '14px' }}>
+            {form.phases.map((phase, index) => <div key={index} className="card training-create-phase" style={{ padding: '14px' }}>
               <div className="card-head" style={{ padding: '0 0 12px' }}>
                 <b>Giai đoạn {index + 1}</b>
                 {form.phases.length > 1 && <button type="button" className="button secondary" onClick={() => setForm(current => ({ ...current, phases: current.phases.filter((_, phaseIndex) => phaseIndex !== index) }))}>Xóa</button>}
@@ -822,11 +814,10 @@ function ScheduleCard({ schedule: s, onView }) {
   )
 }
 
-function ScheduleDetailModal({ schedule: initial, isOwner, isHeadTrainer, canEdit, canMarkReady, onClose, onChanged, onReload, onEvaluate }) {
+function ScheduleDetailModal({ schedule: initial, isOwner, isHeadTrainer, canEdit, onEdit, canMarkReady, onClose, onReload, onEvaluate }) {
   const [schedule, setSchedule] = useState(initial)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [editing, setEditing] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
 
   useEffect(() => {
@@ -878,14 +869,9 @@ function ScheduleDetailModal({ schedule: initial, isOwner, isHeadTrainer, canEdi
             {schedule.evaluation?.videoUrl && <><dt>Video</dt><dd><a href={schedule.evaluation.videoUrl} target="_blank" rel="noreferrer">Xem video buổi tập</a></dd></>}
           </dl>
         )}
-        {!loading && canEdit && !isOwner && !isCancelled && <div className="modal-actions">
-          <button type="button" className="button secondary" onClick={() => setEditing(true)}><Edit2 size={15} /> Sửa</button>
-        </div>}
-        {!loading && isHeadTrainer && !isOwner && isCompleted && !schedule.evaluation && <div className="modal-actions">
-          <button type="button" className="button primary" onClick={() => onEvaluate(schedule)}><Check size={15} /> Đánh giá</button>
-        </div>}
-        {!loading && isHeadTrainer && !isOwner && isCompleted && schedule.evaluation && <div className="modal-actions">
-          <button type="button" className="button secondary" onClick={() => onEvaluate(schedule)}><Edit2 size={15} /> Sửa đánh giá</button>
+        {!loading && !error && !isOwner && !isCancelled && <div className="modal-actions">
+          {canEdit && <button type="button" className="button secondary" onClick={() => onEdit(schedule)}><Edit2 size={15} /> Chỉnh sửa</button>}
+          {isHeadTrainer && isCompleted && <button type="button" className="button primary" onClick={() => onEvaluate(schedule)}><Check size={15} /> {schedule.evaluation ? 'Sửa đánh giá' : 'Đánh giá'}</button>}
         </div>}
         {!loading && isHeadTrainer && !isOwner && <div className="modal-actions">
           <button type="button" className="button primary training-start-button" disabled={transitioning || lifecycle !== 'READY' || isCancelled} onClick={() => transition('start')}>Bắt đầu huấn luyện</button>
@@ -894,7 +880,6 @@ function ScheduleDetailModal({ schedule: initial, isOwner, isHeadTrainer, canEdi
         {!loading && canMarkReady && !isOwner && !isCancelled && lifecycle === 'PREPARING' && <div className="modal-actions">
           <button type="button" className="button primary" disabled={transitioning} onClick={() => transition('ready')}>Xác nhận sẵn sàng</button>
         </div>}
-        {editing && <EditScheduleModal schedule={schedule} onClose={() => setEditing(false)} onSaved={onChanged} />}
       </div>
     </div>
   )
@@ -961,7 +946,6 @@ function EditScheduleModal({ schedule, onClose, onSaved }) {
       {error && <div className="notice error full">{error}</div>}
       <label className="field full"><span>Tên bài tập *</span><input required maxLength="300" value={form.taskName} onChange={event => setForm(value => ({ ...value, taskName: event.target.value }))} /></label>
       <label className="field"><span>Ngày tập *</span><input required type="date" min={schedule.trainingDate < todayVN() ? schedule.phase?.startDate : schedule.phase?.startDate > todayVN() ? schedule.phase.startDate : todayVN()} max={schedule.phase?.endDate} value={form.trainingDate} onChange={event => { setForm(value => ({ ...value, trainingDate: event.target.value })); setLaneId('') }} /></label>
-      <div className="evaluation-note">Khung giờ mặc định: 05:00 - 11:00</div>
       <label className="field"><span>Sân tập *</span><select required value={trackId} onChange={event => { setTrackId(event.target.value); setLaneId('') }}><option value="">Chọn sân tập</option>{tracks.map(track => <option key={track.id} value={track.id}>{track.name}</option>)}</select></label>
       <label className="field full"><span>Làn còn trống *</span><select required value={laneId} disabled={loading || !lanes.length} onChange={event => setLaneId(event.target.value)}><option value="">{loading ? 'Đang tải làn...' : 'Chọn làn'}</option>{lanes.map(lane => <option key={lane.laneId} value={lane.laneId}>Làn {lane.laneNumber}</option>)}</select></label>
       <div className="evaluation-note full">Buổi tập diễn ra trong khung 05:00 - 11:00. Nhân viên chăm sóc được thông báo theo hồ sơ ngựa.</div>
@@ -1103,7 +1087,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="modal" style={{ maxWidth: '560px' }} onMouseDown={e => e.stopPropagation()}>
+      <div className="modal training-create-modal" style={{ maxWidth: '560px' }} onMouseDown={e => e.stopPropagation()}>
         <div className="modal-head">
           <div>
             <p className="eyebrow">LÊN LỊCH HUẤN LUYỆN</p>
@@ -1164,7 +1148,6 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
             <span>Ngày tập *</span>
             <input required type="date" min={phase?.startDate > todayVN() ? phase.startDate : todayVN()} max={phase?.endDate} value={form.trainingDate} onChange={e => setForm({ ...form, trainingDate: e.target.value })} />
           </label>
-          <div className="evaluation-note">Khung giờ mặc định: 05:00 - 11:00</div>
           <label className="field">
             <span>Làn còn trống *</span>
             <select required value={selectedLane} disabled={!selectedRacetrack || !form.trainingDate || availabilityLoading || !availability.length} onChange={e => setSelectedLane(e.target.value)}>

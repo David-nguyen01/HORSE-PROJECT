@@ -13,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -47,6 +48,29 @@ class StableServiceTest {
         assertThat(stable.name()).isEqualTo("Barn Alpha");
         verify(jdbc).update(contains("insert into stables"), any(), eq("Barn Alpha"), eq("North Wing"));
         verify(jdbc, times(2)).update(contains("insert into module_records"), any(), eq(actor), anyString());
+    }
+
+    @Test
+    void backfillPreviewAcceptsSqlServerStringHorseIdAndClassifiesMonitorAsRestricted() {
+        UUID horseId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("from horses h"))).thenReturn(List.of(Map.of(
+                "id", horseId.toString(),
+                "code", "H-01",
+                "name", "Horse One",
+                "stable_location", "Barn A",
+                "health_status", "MONITOR",
+                "horse_status", "ACTIVE",
+                "intake_status", "STABLED",
+                "active_locks", 0,
+                "routine_count", 0
+        )));
+
+        StableService.RoutineBackfillPreview preview = service.previewRoutineBackfill();
+
+        assertThat(preview.totalStabledHorses()).isEqualTo(1);
+        assertThat(preview.eligibleRestrictedCount()).isEqualTo(1);
+        assertThat(preview.details().getFirst().horseId()).isEqualTo(horseId);
+        assertThat(preview.details().getFirst().targetTemplate()).isEqualTo("TEMPLATE_STALL_REST");
     }
 
     @Test

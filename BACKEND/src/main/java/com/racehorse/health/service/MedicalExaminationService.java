@@ -117,7 +117,9 @@ public class MedicalExaminationService {
                     throw new ResourceNotFoundException("Không tìm thấy file đính kèm: " + fileId);
                 }
                 Map<String, Object> file = files.getFirst();
-                UUID uploaderId = (UUID) file.get("uploaded_by_user_id");
+                // queryForList may expose SQL Server UNIQUEIDENTIFIER columns as strings.
+                Object uploadedBy = file.get("uploaded_by_user_id");
+                UUID uploaderId = uploadedBy == null ? null : UUID.fromString(uploadedBy.toString());
                 if (!Objects.equals(uploaderId, veterinarianId)) {
                     throw new BusinessException("Không có quyền sử dụng file đính kèm không thuộc sở hữu của bạn: " + fileId);
                 }

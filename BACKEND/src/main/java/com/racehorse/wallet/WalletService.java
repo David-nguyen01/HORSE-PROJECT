@@ -58,6 +58,22 @@ public class WalletService {
     public record PlanQuote(String plan, BigDecimal priceVnd, BigDecimal unusedCreditVnd,
                             BigDecimal lateFeeVnd, BigDecimal walletBalanceVnd,
                             BigDecimal additionalTopUpNeededVnd) { }
+    public record PaymentHistoryItem(UUID id, OffsetDateTime createdAt, String category,
+                                     String description, BigDecimal amountVnd, String transactionType) { }
+
+    @Transactional(readOnly = true)
+    public List<PaymentHistoryItem> paymentHistory(UUID ownerId, int offset, int limit) {
+        return jdbc.query("select id,created_at,category,description,amount,transaction_type "
+                        + "from financial_transactions "
+                        + "where wallet_owner_user_id=? and source_entity_type='WALLET' "
+                        + "and category in ('WALLET_TOPUP','SERVICE_FEE','LATE_FEE') "
+                        + "order by created_at desc,id desc offset ? rows fetch next ? rows only",
+                (rs, index) -> new PaymentHistoryItem(rs.getObject("id", UUID.class),
+                        rs.getObject("created_at", OffsetDateTime.class), rs.getString("category"),
+                        rs.getString("description"), rs.getBigDecimal("amount"),
+                        rs.getString("transaction_type")),
+                ownerId, offset, limit);
+    }
 
     @Transactional(readOnly = true)
     public WalletView wallet(UUID ownerId) {
@@ -175,7 +191,7 @@ public class WalletService {
             if (rows.isEmpty()) return Map.of("RspCode", "01", "Message", "Order not found");
 
             Map<String, Object> order = rows.getFirst();
-            UUID orderId = (UUID) order.get("id");
+            UUID orderId = UUID.fromString(order.get("id").toString());
             String currentStatus = (String) order.get("status");
 
             if ("PAID".equals(currentStatus)) {

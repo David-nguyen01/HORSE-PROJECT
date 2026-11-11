@@ -46,12 +46,15 @@ class HorseIntakeServiceTest {
     void staffAdmitsGuaranteedHorseWithoutChangingPayment() {
         horse.setPaymentStatus("UNPAID");
         horse.setServiceOverride(true);
-        when(jdbc.update(contains("set intake_status='WAITING_FOR_VET'"), eq(horseId))).thenReturn(1);
+        when(jdbc.update(contains("set caretaker_user_id=?,intake_status='WAITING_FOR_VET'"),
+                eq(staffId), eq(horseId))).thenReturn(1);
 
         var result = service.admitToWaitingRoom(horseId, staffId);
 
         assertThat(result.paymentStatus()).isEqualTo("UNPAID");
         assertThat(result.intakeStatus()).isEqualTo("WAITING_FOR_VET");
+        verify(jdbc).update(contains("set caretaker_user_id=?,intake_status='WAITING_FOR_VET'"),
+                eq(staffId), eq(horseId));
         verify(jdbc).update(contains("WAITING_ROOM_ADMISSION"), any(UUID.class), eq(horseId), eq(staffId));
     }
 
@@ -70,7 +73,8 @@ class HorseIntakeServiceTest {
         UserAccount first = mock(UserAccount.class);
         UserAccount second = mock(UserAccount.class);
         when(users.findByRoles(List.of(Role.VETERINARIAN))).thenReturn(List.of(first, second));
-        when(jdbc.update(contains("set intake_status='WAITING_FOR_VET'"), eq(horseId))).thenReturn(1);
+        when(jdbc.update(contains("set caretaker_user_id=?,intake_status='WAITING_FOR_VET'"),
+                eq(staffId), eq(horseId))).thenReturn(1);
 
         new HorseIntakeService(jdbc, access, users, notifications).admitToWaitingRoom(horseId, staffId);
 

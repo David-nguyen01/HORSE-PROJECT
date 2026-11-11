@@ -439,7 +439,7 @@ class MedicalExaminationServiceTest {
         when(jdbc.queryForList(contains("from stored_files where id = ?"), eq(fileId)))
                 .thenReturn(List.of(Map.of(
                         "id", fileId,
-                        "uploaded_by_user_id", vetId,
+                        "uploaded_by_user_id", vetId.toString(),
                         "resource_type", "image",
                         "original_filename", "xray_hock.jpg",
                         "file_size", 102400L,
@@ -481,7 +481,7 @@ class MedicalExaminationServiceTest {
         when(jdbc.queryForList(contains("from stored_files where id = ?"), eq(fileId)))
                 .thenReturn(List.of(Map.of(
                         "id", fileId,
-                        "uploaded_by_user_id", otherUserId,
+                        "uploaded_by_user_id", otherUserId.toString(),
                         "resource_type", "image",
                         "original_filename", "other.jpg",
                         "file_size", 1024L,

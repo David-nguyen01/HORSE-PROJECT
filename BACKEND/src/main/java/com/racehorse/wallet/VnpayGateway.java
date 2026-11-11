@@ -35,6 +35,16 @@ final class VnpayGateway implements PayosGateway {
                 || (!"sandbox.vnpayment.vn".equalsIgnoreCase(host) && !"pay.vnpay.vn".equalsIgnoreCase(host))) {
             throw new IllegalStateException("Chỉ hỗ trợ URL VNPAY qua HTTPS (sandbox.vnpayment.vn hoặc pay.vnpay.vn)");
         }
+        URI callback;
+        try {
+            callback = URI.create(returnUrl);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalStateException("VNPAY_RETURN_URL không phải URL hợp lệ. Chỉ nhập địa chỉ, không thêm dấu = ở đầu.", exception);
+        }
+        if (callback.getHost() == null || !("https".equalsIgnoreCase(callback.getScheme())
+                || "http".equalsIgnoreCase(callback.getScheme()))) {
+            throw new IllegalStateException("VNPAY_RETURN_URL không phải URL hợp lệ. Chỉ nhập địa chỉ, không thêm dấu = ở đầu.");
+        }
         this.terminalId = terminalId;
         this.hashSecret = hashSecret;
         this.paymentUrl = paymentUrl;

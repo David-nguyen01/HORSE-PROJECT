@@ -114,7 +114,7 @@ class CareTaskServiceTest {
         service.completeTask(taskId, staffId, completeReq);
 
         verify(jdbc).update(
-                contains("UPDATE dbo.care_tasks"),
+                contains("photo_bytes = CONVERT(VARBINARY(MAX), ?)"),
                 eq(false), eq(staffId), eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"),
                 eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId), eq(false), eq(staffId)
         );

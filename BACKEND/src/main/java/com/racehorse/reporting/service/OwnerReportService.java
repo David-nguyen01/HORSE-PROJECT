@@ -224,9 +224,9 @@ public class OwnerReportService {
     public ExpenseOverview myExpenses(UUID ownerId, LocalDate from, LocalDate to) {
         if (from != null && to != null && from.isAfter(to))
             throw new BusinessException("Khoảng báo cáo không hợp lệ");
-        List<HorseItem> horses = jdbc.query("select h.id,h.code,h.name from horses h "
+        List<HorseItem> horses = jdbc.query("select distinct h.id,h.code,h.name from horses h "
                         + "join horse_ownerships ho on ho.horse_id=h.id "
-                        + "where ho.owner_id=? and h.archived_at is null order by h.name",
+                        + "where ho.owner_id=? order by h.name",
                 (rs, row) -> new HorseItem(rs.getObject("id", UUID.class),
                         rs.getString("code"), rs.getString("name")), ownerId);
         StringBuilder sql = new StringBuilder("""
@@ -239,7 +239,7 @@ public class OwnerReportService {
                 left join horses h on h.id=coalesce(ft.horse_id,m.horse_id)
                 where ft.transaction_type='EXPENSE' and (
                     (ft.source_entity_type='WALLET' and ft.wallet_owner_user_id=?
-                     and ft.category in ('SERVICE_FEE','LATE_FEE'))
+                     and coalesce(ft.horse_id,m.horse_id) is not null)
                     or ((ft.source_entity_type is null or ft.source_entity_type<>'WALLET')
                         and exists(select 1 from horse_ownerships ho
                                    where ho.horse_id=h.id and ho.owner_id=?))

@@ -214,7 +214,7 @@ public class CareTaskService {
                     completed_by_name = ?,
                     completion_notes = ?,
                     photo_url = ?,
-                    photo_bytes = ?,
+                    photo_bytes = CONVERT(VARBINARY(MAX), ?),
                     photo_content_type = ?,
                     updated_at = SYSDATETIMEOFFSET()
                 WHERE id = ? AND status = 'PENDING'

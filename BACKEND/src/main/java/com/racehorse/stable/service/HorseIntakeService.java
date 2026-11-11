@@ -77,9 +77,9 @@ public class HorseIntakeService {
         if (!"PENDING_WAITING_ROOM".equals(horse.getIntakeStatus())) {
             throw new BusinessException("Ngựa không ở bước chờ nhân viên đưa vào phòng chờ khám");
         }
-        int changed = jdbc.update("update horses set intake_status='WAITING_FOR_VET', "
+        int changed = jdbc.update("update horses set caretaker_user_id=?,intake_status='WAITING_FOR_VET', "
                         + "updated_at=SYSDATETIMEOFFSET(),version=version+1 "
-                        + "where id=? and intake_status='PENDING_WAITING_ROOM'", horseId);
+                        + "where id=? and intake_status='PENDING_WAITING_ROOM'", staffId, horseId);
         if (changed != 1) throw new BusinessException("Ngựa đã được tiếp nhận bởi nhân viên khác");
         jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,data_json) "
                         + "values(?,'STABLE_CARE','WAITING_ROOM_ADMISSION','api',?,?,'ACTIVE','{}')",

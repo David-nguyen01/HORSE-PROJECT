@@ -59,4 +59,11 @@ class VnpayGatewayTest {
                 "https://malicious-phishing.com/vpcpay.html", "https://example.com/wallet",
                 Clock.systemUTC()));
     }
+
+    @Test
+    void rejectsReturnUrlWithAccidentalLeadingEquals() {
+        assertThrows(IllegalStateException.class, () -> new VnpayGateway(
+                "TEST1234", "secret", "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html",
+                "=https://example.com/api/wallet/vnpay/return", Clock.systemUTC()));
+    }
 }

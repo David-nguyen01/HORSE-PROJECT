@@ -12,6 +12,16 @@ const plans = [
 ]
 const planName = code => plans.find(item => item.code === code)?.name || 'Chưa có gói'
 const planPrice = code => plans.find(item => item.code === code)?.price || 0
+const historyLabels = { WALLET_TOPUP: 'Nạp ví', SERVICE_FEE: 'Thanh toán gói', LATE_FEE: 'Phí trả chậm' }
+const historyDate = value => value ? new Intl.DateTimeFormat('vi-VN', {
+  timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric',
+  hour: '2-digit', minute: '2-digit'
+}).format(new Date(value)) : '—'
+const planDetails = {
+  P30: ['Thời hạn 1 tháng', 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo'],
+  P90: ['Thời hạn 3 tháng', 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo'],
+  P365: ['Thời hạn 12 tháng', 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo'],
+}
 
 export default function WalletPage() {
   const location = useLocation()
@@ -24,12 +34,31 @@ export default function WalletPage() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [seconds, setSeconds] = useState(0)
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+  const [hasMoreHistory, setHasMoreHistory] = useState(false)
+
+  const loadHistory = useCallback(async (offset = 0) => {
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const rows = await api(`/api/wallet/history?offset=${offset}`)
+      setHistory(current => offset === 0 ? rows : [...current, ...rows])
+      setHasMoreHistory(rows.length === 20)
+    } catch (err) {
+      setHistoryError(err.message)
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
 
   const refresh = useCallback(async () => {
     const data = await api('/api/wallet')
     setWallet(data)
+    await loadHistory(0)
     window.dispatchEvent(new Event('wallet-updated'))
-  }, [])
+  }, [loadHistory])
 
   useEffect(() => { refresh().catch(err => setError(err.message)) }, [refresh])
 
@@ -150,8 +179,17 @@ export default function WalletPage() {
         <input type="checkbox" checked={acceptedTerms} onChange={event => setAcceptedTerms(event.target.checked)} />
         Tôi đã đọc và đồng ý với Điều khoản dịch vụ và xử lý cấp cứu cho ngựa.
       </label>
+      <div className="wallet-plan-cards" aria-label="Các gói dịch vụ">
+        {plans.map(plan => <article className="wallet-plan-card" key={plan.code}>
+          <span className="wallet-plan-card-kicker">GÓI DỊCH VỤ</span>
+          <h3>{plan.name}</h3>
+          <p className="wallet-plan-card-price">{money(plan.price)}<small> / ngựa</small></p>
+          <ul>{planDetails[plan.code].map(detail => <li key={detail}><span aria-hidden="true">✓</span>{detail}</li>)}</ul>
+          <a className="wallet-plan-card-action" href="#wallet-horses">Chọn cho ngựa của bạn</a>
+        </article>)}
+      </div>
       {!horses.length && <p>Chưa có ngựa. <Link to="/horses">Thêm hồ sơ ngựa</Link> để chọn gói.</p>}
-      <div className="wallet-horse-list">{horses.map(horse => {
+      <div className="wallet-horse-list" id="wallet-horses">{horses.map(horse => {
         const selected = selectedPlans[horse.horseId] || horse.nextPlan || horse.activePlan || 'P30'
         const paid = horse.paymentStatus === 'PAID' && horse.paidUntil && horse.paidUntil >= todayVN()
         return <article className="wallet-horse" key={horse.horseId}>
@@ -162,7 +200,7 @@ export default function WalletPage() {
           <div><small>Gói kỳ tiếp theo</small><b>{planName(horse.nextPlan || horse.activePlan)}</b></div>
           <div className="wallet-horse-action"><select aria-label={`Gói cho ${horse.name}`} value={selected}
               onChange={event => setSelectedPlans(current => ({ ...current, [horse.horseId]: event.target.value }))}>
-              {plans.map(plan => <option key={plan.code} value={plan.code}>{plan.name} · {money(plan.price)}</option>)}</select>
+              {plans.map(plan => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</select>
             <button className="button primary" disabled={busy || !acceptedTerms || (!horse.activePlan && Number(wallet.balanceVnd) < planPrice(selected))}
               onClick={() => choosePlan(horse, selected)}>{horse.activePlan ? 'Đặt gói kỳ tới' : 'Thanh toán cho ngựa'}</button>
             {horse.activePlan && !paid && <button className="button secondary" disabled={busy || Number(wallet.balanceVnd) < Number(horse.renewalAmountVnd)}
@@ -171,6 +209,29 @@ export default function WalletPage() {
             <small className="wallet-shortage">Cần nạp thêm {money(planPrice(selected) - Number(wallet.balanceVnd))} để mua gói này.</small>}
         </article>
       })}</div>
+    </section>
+    <section className="card wallet-panel wallet-history" aria-label="Lịch sử thanh toán">
+      <p className="eyebrow">GIAO DỊCH VÍ</p><h2>Lịch sử thanh toán</h2>
+      <p className="wallet-hint">Các khoản nạp ví và thanh toán gói đã được ghi nhận, mới nhất trước.</p>
+      {historyError && <div className="notice error" role="alert">Không tải được lịch sử thanh toán: {historyError}</div>}
+      {!history.length && !historyLoading && !historyError && <p className="wallet-history-empty">Chưa có giao dịch thanh toán nào.</p>}
+      {history.length > 0 && <div className="wallet-history-list">
+        {history.map(item => <div className="wallet-history-item" key={item.id}>
+          <div className="wallet-history-detail">
+            <b>{historyLabels[item.category] || item.category}</b>
+            <span>{item.description}</span>
+            <small>{historyDate(item.createdAt)}</small>
+          </div>
+          <strong className={item.transactionType === 'REVENUE' ? 'wallet-history-credit' : 'wallet-history-debit'}>
+            {item.transactionType === 'REVENUE' ? '+' : '−'}{money(item.amountVnd)}
+          </strong>
+        </div>)}
+      </div>}
+      {historyLoading && <p className="wallet-history-empty" role="status">Đang tải lịch sử…</p>}
+      {!historyLoading && !historyError && hasMoreHistory && <button type="button" className="button secondary wallet-history-more"
+        onClick={() => loadHistory(history.length)}>Xem thêm</button>}
+      {!historyLoading && historyError && <button type="button" className="button secondary wallet-history-more"
+        onClick={() => loadHistory(history.length)}>Thử lại</button>}
     </section>
   </div>
 }
