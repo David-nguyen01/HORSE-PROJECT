@@ -25,6 +25,7 @@ public record HorseResponse(
         List<OwnerSummary> owners,
         String stableLocation,
         HorseStatus status,
+        String healthStatus,
         Instant archivedAt,
         Instant createdAt,
         Instant updatedAt,
@@ -34,6 +35,19 @@ public record HorseResponse(
         String overrideReason,
         LocalDate paidUntil
 ) {
+    public HorseResponse(
+            UUID id, String code, String name, String microchipPassportNumber, LocalDate birthDate,
+            HorseGender gender, String colorMarkings, String breed, ParentSummary sire, ParentSummary dam,
+            UserSummary currentTrainer, UserSummary caretaker, UserSummary diagnosingVet,
+            List<OwnerSummary> owners, String stableLocation, HorseStatus status, Instant archivedAt,
+            Instant createdAt, Instant updatedAt, String paymentStatus, String intakeStatus,
+            Boolean serviceOverride, String overrideReason, LocalDate paidUntil) {
+        this(id, code, name, microchipPassportNumber, birthDate, gender, colorMarkings, breed, sire, dam,
+                currentTrainer, caretaker, diagnosingVet, owners, stableLocation, status, null,
+                archivedAt, createdAt, updatedAt, paymentStatus, intakeStatus, serviceOverride,
+                overrideReason, paidUntil);
+    }
+
     public record ParentSummary(UUID id, String code, String name) {
     }
 

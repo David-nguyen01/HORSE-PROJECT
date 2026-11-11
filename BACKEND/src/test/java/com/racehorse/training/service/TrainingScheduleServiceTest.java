@@ -392,4 +392,48 @@ class TrainingScheduleServiceTest {
                 TRAINING_DATE.atTime(6, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant(),
                 TRAINING_DATE.atTime(7, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant(), trainer);
     }
+
+    @Test
+    void mine_withNullDates_queriesAllRecordsWithoutDateBoundaries() {
+        UUID caretakerId = UUID.randomUUID();
+        when(repository.findForCaretaker(caretakerId)).thenReturn(List.of());
+
+        List<?> results = service.mine(caretakerId, null, null);
+
+        assertThat(results).isEmpty();
+        verify(repository).findForCaretaker(caretakerId);
+    }
+
+    @Test
+    void mine_withSpecificDate_queriesWithDateBoundaries() {
+        UUID caretakerId = UUID.randomUUID();
+        when(repository.findForCaretaker(eq(caretakerId), any(Instant.class), any(Instant.class))).thenReturn(List.of());
+
+        List<?> results = service.mine(caretakerId, TRAINING_DATE, TRAINING_DATE);
+
+        assertThat(results).isEmpty();
+        verify(repository).findForCaretaker(eq(caretakerId), any(Instant.class), any(Instant.class));
+    }
+
+    @Test
+    void forDiagnosingVet_withNullDates_queriesCurrentClubDay() {
+        UUID vetId = UUID.randomUUID();
+        when(repository.findForDiagnosingVet(eq(vetId), any(Instant.class), any(Instant.class))).thenReturn(List.of());
+
+        List<?> results = service.forDiagnosingVet(vetId, null, null);
+
+        assertThat(results).isEmpty();
+        verify(repository).findForDiagnosingVet(eq(vetId), any(Instant.class), any(Instant.class));
+    }
+
+    @Test
+    void forDiagnosingVet_withSpecificDate_queriesWithDateBoundaries() {
+        UUID vetId = UUID.randomUUID();
+        when(repository.findForDiagnosingVet(eq(vetId), any(Instant.class), any(Instant.class))).thenReturn(List.of());
+
+        List<?> results = service.forDiagnosingVet(vetId, TRAINING_DATE, TRAINING_DATE);
+
+        assertThat(results).isEmpty();
+        verify(repository).findForDiagnosingVet(eq(vetId), any(Instant.class), any(Instant.class));
+    }
 }

@@ -121,8 +121,8 @@ public class TrainingScheduleController {
             @AuthenticationPrincipal Jwt jwt, Authentication authentication,
             @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return hasRole(authentication, "VETERINARIAN")
-                ? service.forDiagnosingVet(userId(jwt), from, to) : service.mine(userId(jwt), from, to);
+        return hasRole(authentication, "STABLE_STAFF")
+                ? service.mine(userId(jwt), from, to) : service.forDiagnosingVet(userId(jwt), from, to);
     }
 
     private UUID userId(Jwt jwt) { return UUID.fromString(jwt.getSubject()); }

@@ -138,17 +138,133 @@ class StableServiceTest {
     }
 
     @Test
-    void deleteDailyRoutineSetsStatusInactive() {
+    void staffCannotAddRoutineWhenHorseIsInjured() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("INJURED");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "GROOMING", LocalTime.of(8, 0), LocalTime.of(9, 0), "Morning grooming");
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, true, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("chế độ điều trị chấn thương");
+
+        verify(jdbc, never()).update(contains("insert into module_records"), any(), any(), any(), any());
+    }
+
+    @Test
+    void staffCannotAddRoutineWhenHorseHasActiveTrainingLock() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+
+        when(jdbc.queryForObject(contains("from training_locks where horse_id=? and released_at is null"), eq(Integer.class), eq(horseId)))
+                .thenReturn(1);
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "GROOMING", LocalTime.of(8, 0), LocalTime.of(9, 0), "Morning grooming");
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, true, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("chế độ điều trị chấn thương hoặc có lệnh khóa y tế");
+    }
+
+    @Test
+    void staffCannotUpdateRoutineWhenHorseIsInjured() {
         UUID routineId = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("INJURED");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
 
         when(jdbc.query(contains("where id=? and module_code='STABLE_CARE' and record_type='HORSE_DAILY_ROUTINE'"), any(RowMapper.class), eq(routineId)))
                 .thenReturn(List.of(new StableService.DailyRoutineView(
                         routineId, horseId, "REST", LocalTime.of(12, 0), LocalTime.of(13, 30), "Rest", true)));
 
-        service.deleteDailyRoutine(routineId);
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "GROOMING", LocalTime.of(14, 0), LocalTime.of(15, 0), "Afternoon grooming");
 
-        verify(jdbc).update(contains("update module_records set status='INACTIVE'"), eq(routineId));
+        assertThatThrownBy(() -> service.updateDailyRoutine(routineId, actor, true, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("chế độ điều trị chấn thương");
+
+        verify(jdbc, never()).update(contains("update module_records set data_json=?"), anyString(), eq(routineId));
+    }
+
+    @Test
+    void mutationGuardCannotBeBypassedWhenHorseIsInjured() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("INJURED");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "GROOMING", LocalTime.of(8, 0), LocalTime.of(9, 0), "Attempted mutation on injured horse");
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, false, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("chế độ điều trị chấn thương");
+
+        verify(jdbc, never()).update(contains("insert into module_records"), any(), eq(horseId), eq(actor), anyString());
+    }
+
+    @Test
+    void mutationGuardCannotBeBypassedWhenHorseIsTraining() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+        when(jdbc.queryForObject(contains("from training_locks"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.queryForObject(contains("from horses where id=? and (health_source_type='TRAINING_EMERGENCY'"), eq(Integer.class), eq(horseId))).thenReturn(0);
+
+        when(jdbc.query(contains("from training_schedules s"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of(new StableService.TrainingScheduleSummary(
+                        UUID.randomUUID(), "Sprint Drill", "Turf Track", "MEDIUM",
+                        java.time.OffsetDateTime.now(), java.time.OffsetDateTime.now().plusHours(1), "IN_PROGRESS")));
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "FEEDING", LocalTime.of(8, 0), LocalTime.of(9, 0), "Attempted mutation on training horse");
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, false, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ngựa đang trong lịch trình huấn luyện");
+
+        verify(jdbc, never()).update(contains("insert into module_records"), any(), eq(horseId), eq(actor), anyString());
+    }
+
+    @Test
+    void updateDailyRoutineUpdatesJsonAndTimestamp() {
+        UUID routineId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+        when(jdbc.queryForObject(contains("from training_locks"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.queryForObject(contains("from horses where id=? and (health_source_type='TRAINING_EMERGENCY'"), eq(Integer.class), eq(horseId))).thenReturn(0);
+
+        when(jdbc.query(contains("where id=? and module_code='STABLE_CARE' and record_type='HORSE_DAILY_ROUTINE'"), any(RowMapper.class), eq(routineId)))
+                .thenReturn(List.of(new StableService.DailyRoutineView(
+                        routineId, horseId, "REST", LocalTime.of(12, 0), LocalTime.of(13, 30), "Rest", true)));
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "GROOMING", LocalTime.of(14, 0), LocalTime.of(15, 0), "Afternoon grooming");
+
+        var result = service.updateDailyRoutine(routineId, actor, request);
+
+        assertThat(result.id()).isEqualTo(routineId);
+        assertThat(result.activityType()).isEqualTo("GROOMING");
+        assertThat(result.startTime()).isEqualTo(LocalTime.of(14, 0));
+        assertThat(result.endTime()).isEqualTo(LocalTime.of(15, 0));
+        verify(jdbc).update(contains("update module_records set data_json=?"), anyString(), eq(routineId));
     }
 
     @Test
@@ -196,6 +312,45 @@ class StableServiceTest {
         verify(jdbc).queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId));
         verify(jdbc).update(contains("insert into module_records"), any(), eq(horseId), eq(actor), any(), anyString());
         verify(jdbc).update(contains("update horses set stable_location=?"), eq("Barn Alpha / S-01"), eq(horseId));
+    }
+
+    @Test
+    void assignReturnsPhotoUrlWhenProfileFileExists() {
+        UUID stableId = UUID.randomUUID();
+        UUID stallId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+
+        Horse horse = mock(Horse.class);
+        when(horse.getName()).thenReturn("Thunder");
+        when(horse.getCode()).thenReturn("H-001");
+        when(horseAccess.requireServiceEligible(horseId)).thenReturn(horse);
+        when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
+        when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
+
+        when(jdbc.query(contains("select id,name,location,is_active from stables where id=?"), any(RowMapper.class), eq(stableId)))
+                .thenReturn(List.of(new StableService.StableView(stableId, "Barn Alpha", "North", true, List.of(
+                        new StableService.StallView(stallId, "S-01", true, null)
+                ))));
+
+        when(jdbc.queryForObject(contains("select id from module_records with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stallId)))
+                .thenReturn(stallId);
+        when(jdbc.queryForObject(contains("select id from stables with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stableId)))
+                .thenReturn(stableId);
+        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
+
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+                .thenReturn(1);
+        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+                .thenReturn(0);
+
+        when(jdbc.query(contains("from horse_profile_files"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of("https://res.cloudinary.com/test/image/upload/v1/horses/thunder.jpg"));
+
+        StableService.AssignmentView result = service.assign(stableId, stallId, horseId, actor);
+
+        assertThat(result.photoUrl()).isEqualTo("https://res.cloudinary.com/test/image/upload/v1/horses/thunder.jpg");
     }
 
     @Test
@@ -527,5 +682,120 @@ class StableServiceTest {
 
         // Verifies horse location updated
         verify(jdbc).update(contains("update horses set stable_location=?"), eq("Barn Beta / B-02"), eq(horseId));
+    }
+
+    @Test
+    void isHorseCurrentlyTrainingReturnsTrueWhenScheduleFound() {
+        UUID horseId = UUID.randomUUID();
+        when(jdbc.query(contains("from training_schedules s"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of(new StableService.TrainingScheduleSummary(
+                        UUID.randomUUID(), "Morning Gallop", "Main Track", "HIGH",
+                        java.time.OffsetDateTime.now(), java.time.OffsetDateTime.now().plusHours(1), "READY")));
+
+        assertThat(service.isHorseCurrentlyTraining(horseId)).isTrue();
+    }
+
+    @Test
+    void isHorseCurrentlyTrainingReturnsFalseWhenNoScheduleFound() {
+        UUID horseId = UUID.randomUUID();
+        when(jdbc.query(contains("from training_schedules s"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of());
+
+        assertThat(service.isHorseCurrentlyTraining(horseId)).isFalse();
+    }
+
+    @Test
+    void addDailyRoutineByStaffBlockedWhenHorseCurrentlyTraining() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+        when(jdbc.queryForObject(contains("from training_locks"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.queryForObject(contains("from horses where id=? and (health_source_type='TRAINING_EMERGENCY'"), eq(Integer.class), eq(horseId))).thenReturn(0);
+
+        when(jdbc.query(contains("from training_schedules s"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of(new StableService.TrainingScheduleSummary(
+                        UUID.randomUUID(), "Sprint Drill", "Turf Track", "MEDIUM",
+                        java.time.OffsetDateTime.now(), java.time.OffsetDateTime.now().plusHours(1), "IN_PROGRESS")));
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "FEEDING", LocalTime.of(8, 0), LocalTime.of(9, 0), "Grain breakfast");
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, true, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ngựa đang trong lịch trình huấn luyện");
+    }
+
+    @Test
+    void updateDailyRoutineByStaffBlockedWhenHorseCurrentlyTraining() {
+        UUID routineId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+        when(jdbc.query(contains("from module_records"), any(RowMapper.class), eq(routineId)))
+                .thenReturn(List.of(new StableService.DailyRoutineView(
+                        routineId, horseId, "FEEDING", LocalTime.of(7, 0), LocalTime.of(8, 0), null, true)));
+        when(jdbc.queryForObject(contains("from training_locks"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.queryForObject(contains("from horses where id=? and (health_source_type='TRAINING_EMERGENCY'"), eq(Integer.class), eq(horseId))).thenReturn(0);
+
+        when(jdbc.query(contains("from training_schedules s"), any(RowMapper.class), eq(horseId)))
+                .thenReturn(List.of(new StableService.TrainingScheduleSummary(
+                        UUID.randomUUID(), "Sprint Drill", "Turf Track", "MEDIUM",
+                        java.time.OffsetDateTime.now(), java.time.OffsetDateTime.now().plusHours(1), "PREPARING")));
+
+        StableService.DailyRoutineRequest request = new StableService.DailyRoutineRequest(
+                "FEEDING", LocalTime.of(8, 0), LocalTime.of(9, 0), "Updated breakfast");
+
+        assertThatThrownBy(() -> service.updateDailyRoutine(routineId, actor, true, request))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Ngựa đang trong lịch trình huấn luyện");
+    }
+
+    @Test
+    void routineWithOtherActivityTypeRequiresCustomContent() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+
+        StableService.DailyRoutineRequest blankNotesRequest = new StableService.DailyRoutineRequest(
+                "OTHER", LocalTime.of(14, 0), LocalTime.of(15, 0), "   ");
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, true, blankNotesRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Vui lòng nhập nội dung cho hoạt động khác");
+
+        StableService.DailyRoutineRequest nullNotesRequest = new StableService.DailyRoutineRequest(
+                "OTHER", LocalTime.of(14, 0), LocalTime.of(15, 0), null);
+
+        assertThatThrownBy(() -> service.addDailyRoutine(horseId, actor, true, nullNotesRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Vui lòng nhập nội dung cho hoạt động khác");
+    }
+
+    @Test
+    void routineWithOtherActivityTypeWithCustomContentSucceeds() {
+        UUID horseId = UUID.randomUUID();
+        UUID actor = UUID.randomUUID();
+        Horse horse = mock(Horse.class);
+        when(horse.getHealthStatus()).thenReturn("FIT");
+        when(horseAccess.requireActive(horseId)).thenReturn(horse);
+        when(jdbc.queryForObject(contains("from training_locks"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.queryForObject(contains("from horses where id=? and (health_source_type='TRAINING_EMERGENCY'"), eq(Integer.class), eq(horseId))).thenReturn(0);
+        when(jdbc.query(contains("from training_schedules s"), any(RowMapper.class), eq(horseId))).thenReturn(List.of());
+
+        StableService.DailyRoutineRequest validRequest = new StableService.DailyRoutineRequest(
+                "OTHER", LocalTime.of(14, 0), LocalTime.of(15, 0), "Tập bơi hồ thủy liệu");
+
+        StableService.DailyRoutineView result = service.addDailyRoutine(horseId, actor, true, validRequest);
+
+        assertThat(result).isNotNull();
+        assertThat(result.activityType()).isEqualTo("OTHER");
+        assertThat(result.notes()).isEqualTo("Tập bơi hồ thủy liệu");
+        verify(jdbc).update(contains("insert into module_records"), eq(result.id()), eq(horseId), eq(actor), contains("Tập bơi hồ thủy liệu"));
     }
 }

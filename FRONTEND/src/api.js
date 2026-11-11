@@ -175,7 +175,6 @@ export const stableCareApi = {
   getRoutines: (horseId) => api(`/api/stables/horses/${horseId}/daily-routines`),
   addRoutine: (horseId, payload) => api(`/api/stables/horses/${horseId}/daily-routines`, { method: 'POST', body: JSON.stringify(payload) }),
   updateRoutine: (id, payload) => api(`/api/stables/daily-routines/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  deleteRoutine: (id) => api(`/api/stables/daily-routines/${id}`, { method: 'DELETE' }),
 
   // Intake & Stall Assignment / Transfer
   getPendingWaitingRoom: () => api('/api/horse-intake/waiting-room/pending'),
@@ -247,6 +246,30 @@ export const stableCareApi = {
     return api(`/api/training-schedules/mine${q.toString() ? `?${q}` : ''}`)
   },
   markTrainingReady: (scheduleId) => api(`/api/training-schedules/${scheduleId}/ready`, { method: 'PATCH' }),
+  // Care Routine Definitions (Task Catalog)
+  getActiveCareRoutines: () => api('/api/care-routine-definitions/active'),
+  getReserveCareRoutines: () => api('/api/care-routine-definitions/reserve'),
+  getCareRoutine: (id) => api(`/api/care-routine-definitions/${id}`),
+  createCareRoutine: (payload) => api('/api/care-routine-definitions', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCareRoutine: (id, payload) => api(`/api/care-routine-definitions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  transferCareRoutine: (id, active) => api(`/api/care-routine-definitions/${id}/transfer`, { method: 'POST', body: JSON.stringify({ active }) }),
+  moveCareRoutineToActive: (id) => api(`/api/care-routine-definitions/${id}/move-to-active`, { method: 'POST' }),
+  moveCareRoutineToReserve: (id) => api(`/api/care-routine-definitions/${id}/move-to-reserve`, { method: 'POST' }),
+  deleteCareRoutine: (id) => api(`/api/care-routine-definitions/${id}`, { method: 'DELETE' }),
+  reorderCareRoutines: (orderedIds) => api('/api/care-routine-definitions/reorder', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
+}
+
+export const careRoutineApi = {
+  getActive: () => api('/api/care-routine-definitions/active'),
+  getReserve: () => api('/api/care-routine-definitions/reserve'),
+  get: (id) => api(`/api/care-routine-definitions/${id}`),
+  create: (payload) => api('/api/care-routine-definitions', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => api(`/api/care-routine-definitions/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  transfer: (id, active) => api(`/api/care-routine-definitions/${id}/transfer`, { method: 'POST', body: JSON.stringify({ active }) }),
+  moveToActive: (id) => api(`/api/care-routine-definitions/${id}/move-to-active`, { method: 'POST' }),
+  moveToReserve: (id) => api(`/api/care-routine-definitions/${id}/move-to-reserve`, { method: 'POST' }),
+  delete: (id) => api(`/api/care-routine-definitions/${id}`, { method: 'DELETE' }),
+  reorder: (orderedIds) => api('/api/care-routine-definitions/reorder', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
 }
 
 export const inventoryApi = stableCareApi

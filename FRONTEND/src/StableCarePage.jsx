@@ -11,10 +11,12 @@ import {
   Eye,
   FileText,
   Home,
+  Info,
   MapPin,
   Package,
   Plus,
   RotateCcw,
+  RotateCw,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -23,10 +25,17 @@ import {
   UserCheck,
   Utensils,
   X,
+  Pencil,
 } from 'lucide-react'
-import { api, getAuth, pageContent, stableCareApi } from './api'
+import { api, careRoutineApi, getAuth, pageContent, stableCareApi } from './api'
+import { horseIcon } from './navIcons'
+import { handleImageFallback } from './imageFallback'
+import { isTrainingScheduleActiveForDay } from './trainingRules'
 
 const TASK_TYPE_LABELS = {
+  STABLE_CLEANING: 'Vệ sinh chuồng trại',
+  FACILITY_CHECK: 'Kiểm tra cơ sở vật chất',
+  HEALTH_CHECK: 'Kiểm tra thể trạng',
   MUCKING_OUT: 'Dọn phân chuồng',
   FEEDING: 'Cho ăn / Nước uống',
   BATHING: 'Tắm rửa vệ sinh',
@@ -63,12 +72,33 @@ const SEVERITY_LABELS = {
   LOW: 'Nhẹ / Theo dõi',
 }
 
+const formatTimeHHmm = (val) => {
+  if (!val) return ''
+  const str = String(val).trim()
+  const m = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/)
+  if (m) {
+    return `${m[1].padStart(2, '0')}:${m[2]}`
+  }
+  return str
+}
+
 const HEALTH_STATUS_MAP = {
   ACTIVE: { label: 'Khỏe mạnh', cls: 'active' },
+  FIT: { label: 'Khỏe mạnh', cls: 'active' },
+  HEALTHY: { label: 'Khỏe mạnh', cls: 'active' },
   INJURED: { label: 'Chấn thương', cls: 'injured' },
+  QUARANTINED: { label: 'Đang cách ly', cls: 'injured' },
   RESTING: { label: 'Nghỉ ngơi', cls: 'resting' },
   RECOVERING: { label: 'Hồi phục', cls: 'resting' },
   RETIRED: { label: 'Đã giải nghệ', cls: 'retired' },
+  SICK: { label: 'Đang điều trị', cls: 'injured' },
+  RESTRICTED: { label: 'Hạn chế y tế', cls: 'injured' },
+}
+
+const formatHorseHealthStatus = (val) => {
+  if (!val) return 'Khỏe mạnh'
+  const key = String(val).trim().toUpperCase()
+  return HEALTH_STATUS_MAP[key]?.label || key
 }
 
 const INVENTORY_CATEGORY_LABELS = {
@@ -127,6 +157,23 @@ const formatVNDateTime = (val) => {
   }
 }
 
+const formatTimeRange = (start, end) => {
+  if (!start && !end) return '—'
+  const fmt = (val) => {
+    if (!val) return ''
+    try {
+      const d = new Date(val)
+      if (isNaN(d.getTime())) return String(val)
+      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+    } catch {
+      return String(val)
+    }
+  }
+  const s = fmt(start)
+  const e = fmt(end)
+  return s && e ? `${s} - ${e}` : (s || e)
+}
+
 const today = () => new Date().toISOString().slice(0, 10)
 
 const PAGE_META = {
@@ -179,6 +226,7 @@ export default function StableCarePage() {
   const isStaff = userRoles.includes('STABLE_STAFF')
   const isVet = userRoles.includes('VETERINARIAN') && !isManager && !isTrainer && !isStaff
   const canEditRoutine = isManager || isTrainer
+  const canManageDailyRoutine = isStaff
   const canApproveInventory = isManager
 
   useEffect(() => {
@@ -246,7 +294,7 @@ export default function StableCarePage() {
         <>
           {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canEdit={canEditRoutine} />}
           {activeTab === 'training' && <TrainingPreparationView isStaff={isStaff} />}
-          {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} isStaff={isStaff} />}
+          {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} canManageDailyRoutine={canManageDailyRoutine} isStaff={isStaff} />}
           {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} canApplyTemplate={isStaff || isVet || isManager || isTrainer} isStaff={isStaff} />}
           {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canUpdateStatus={isManager || isStaff} />}
           {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
@@ -259,7 +307,7 @@ export default function StableCarePage() {
 // =========================================================================
 // 1. FR13: STABLES & DAILY ROUTINES
 // =========================================================================
-function StablesView({ canEditRoutine, isStaff }) {
+function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff }) {
   const [searchParams] = useSearchParams()
   const targetHorseId = searchParams.get('horseId')
   const [stables, setStables] = useState([])
@@ -269,6 +317,10 @@ function StablesView({ canEditRoutine, isStaff }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showAddRoutine, setShowAddRoutine] = useState(false)
+  const [showRoutineModal, setShowRoutineModal] = useState(false)
+  const [editingRoutine, setEditingRoutine] = useState(null)
+  const [routineNotice, setRoutineNotice] = useState('')
+  const [routineError, setRoutineError] = useState('')
   const [showBackfillModal, setShowBackfillModal] = useState(false)
 
   // Intake & Transfer states
@@ -297,27 +349,9 @@ function StablesView({ canEditRoutine, isStaff }) {
     loadPendingCounts()
   }, [loadPendingCounts])
 
-  const loadStables = useCallback(async () => {
-    setLoading(true)
-    setError('')
-    try {
-      const data = await stableCareApi.getStables(false)
-      setStables(data || [])
-      if (data?.length && !selectedStableId) {
-        setSelectedStableId(data[0].id)
-      }
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedStableId])
-
-  useEffect(() => {
-    loadStables()
-  }, [loadStables])
-
-  const activeStable = stables.find((s) => s.id === selectedStableId) || stables[0]
+  const selectedHorseRef = useRef(selectedHorse)
+  selectedHorseRef.current = selectedHorse
+  const isFetchingRef = useRef(false)
 
   const loadRoutines = useCallback(async (horseId) => {
     if (!horseId) {
@@ -332,6 +366,79 @@ function StablesView({ canEditRoutine, isStaff }) {
     }
   }, [])
 
+  const loadStables = useCallback(async () => {
+    if (isFetchingRef.current) return
+    isFetchingRef.current = true
+    setLoading(true)
+    setError('')
+    try {
+      const data = await stableCareApi.getStables(false)
+      const stablesList = data || []
+      setStables(stablesList)
+      if (stablesList.length && !selectedStableId) {
+        setSelectedStableId(stablesList[0].id)
+      }
+
+      // Synchronize currently selected horse with latest matching stall assignment
+      const currentSelected = selectedHorseRef.current
+      if (currentSelected?.id) {
+        let matchingStall = null
+        for (const s of stablesList) {
+          const found = (s.stalls || []).find((st) => st.currentAssignment?.horseId === currentSelected.id)
+          if (found) {
+            matchingStall = found
+            break
+          }
+        }
+
+        if (matchingStall?.currentAssignment) {
+          const updatedHorse = {
+            id: matchingStall.currentAssignment.horseId,
+            code: matchingStall.currentAssignment.horseCode,
+            name: matchingStall.currentAssignment.horseName,
+            stallId: matchingStall.id,
+            stallCode: matchingStall.code,
+            healthStatus: matchingStall.currentAssignment.horseHealthStatus,
+            assignedFrom: matchingStall.currentAssignment.assignedFrom,
+            trainingLocked: matchingStall.currentAssignment.trainingLocked,
+            trainingLockReason: matchingStall.currentAssignment.trainingLockReason,
+            emergencyActive: matchingStall.currentAssignment.emergencyActive,
+            photoUrl: matchingStall.currentAssignment.photoUrl || null,
+            isTrainingActive: Boolean(matchingStall.currentAssignment.isTrainingActive),
+            trainingSchedule: matchingStall.currentAssignment.trainingSchedule || null,
+          }
+          setSelectedHorse(updatedHorse)
+          loadRoutines(updatedHorse.id)
+        } else {
+          // Selected horse or its stall assignment no longer exists
+          setSelectedHorse(null)
+          setRoutines([])
+          setRoutineNotice('')
+          setRoutineError('')
+        }
+      }
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      isFetchingRef.current = false
+      setLoading(false)
+    }
+  }, [selectedStableId, loadRoutines])
+
+  const handleRefresh = useCallback(async () => {
+    if (loading || isFetchingRef.current) return
+    await Promise.all([
+      loadStables(),
+      loadPendingCounts(),
+    ])
+  }, [loading, loadStables, loadPendingCounts])
+
+  useEffect(() => {
+    loadStables()
+  }, [loadStables])
+
+  const activeStable = stables.find((s) => s.id === selectedStableId) || stables[0]
+
   const handleSelectStall = useCallback((stall) => {
     if (stall.currentAssignment) {
       const horse = {
@@ -345,12 +452,19 @@ function StablesView({ canEditRoutine, isStaff }) {
         trainingLocked: stall.currentAssignment.trainingLocked,
         trainingLockReason: stall.currentAssignment.trainingLockReason,
         emergencyActive: stall.currentAssignment.emergencyActive,
+        photoUrl: stall.currentAssignment.photoUrl || null,
+        isTrainingActive: Boolean(stall.currentAssignment.isTrainingActive),
+        trainingSchedule: stall.currentAssignment.trainingSchedule || null,
       }
       setSelectedHorse(horse)
+      setRoutineNotice('')
+      setRoutineError('')
       loadRoutines(horse.id)
     } else {
       setSelectedHorse(null)
       setRoutines([])
+      setRoutineNotice('')
+      setRoutineError('')
     }
   }, [loadRoutines])
 
@@ -367,15 +481,6 @@ function StablesView({ canEditRoutine, isStaff }) {
     }
   }, [targetHorseId, stables, handleSelectStall])
 
-  const handleDeleteRoutine = async (routineId) => {
-    if (!window.confirm('Xóa hoạt động sinh hoạt này?')) return
-    try {
-      await stableCareApi.deleteRoutine(routineId)
-      if (selectedHorse) loadRoutines(selectedHorse.id)
-    } catch (e) {
-      alert(e.message)
-    }
-  }
 
   const handleTransferDone = (newStableId) => {
     setShowTransferModal(false)
@@ -398,6 +503,21 @@ function StablesView({ canEditRoutine, isStaff }) {
   const occupiedCount = allStalls.filter((s) => s.currentAssignment).length
   const vacantCount = allStalls.length - occupiedCount
 
+  const isMedicallyRestricted = Boolean(
+    selectedHorse && (
+      selectedHorse.emergencyActive ||
+      selectedHorse.healthStatus === 'INJURED' ||
+      selectedHorse.trainingLocked
+    )
+  )
+  const isTrainingActive = Boolean(
+    selectedHorse && !isMedicallyRestricted && (
+      (selectedHorse.trainingSchedule && isTrainingScheduleActiveForDay(selectedHorse.trainingSchedule, today())) ||
+      (selectedHorse.isTrainingActive && (!selectedHorse.trainingSchedule || isTrainingScheduleActiveForDay(selectedHorse.trainingSchedule, today())))
+    )
+  )
+  const trainingSchedule = (isTrainingActive && selectedHorse?.trainingSchedule) ? selectedHorse.trainingSchedule : null
+
   return (
     <div>
       {/* Action Header for Intake & Stables Management */}
@@ -411,6 +531,16 @@ function StablesView({ canEditRoutine, isStaff }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            className="button secondary"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minHeight: '36px' }}
+            onClick={handleRefresh}
+            disabled={loading}
+            title="Làm mới sơ đồ ô chuồng và trạng thái ngựa"
+          >
+            <RotateCw size={15} /> {loading ? 'Đang tải…' : 'Làm mới'}
+          </button>
           <button
             className="button primary"
             style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', minHeight: '36px' }}
@@ -482,7 +612,7 @@ function StablesView({ canEditRoutine, isStaff }) {
         ))}
       </div>
 
-      <div className="dashboard-grid">
+      <div className="dashboard-grid stables-dashboard-grid">
         {/* Left: Stall grid */}
         <section className="card" style={{ padding: '20px' }}>
           <div className="card-head" style={{ padding: '0 0 16px' }}>
@@ -535,6 +665,15 @@ function StablesView({ canEditRoutine, isStaff }) {
                               <AlertTriangle size={10} /> Chấn thương
                             </span>
                           )}
+                          {assigned.isTrainingActive && (!assigned.trainingSchedule || isTrainingScheduleActiveForDay(assigned.trainingSchedule, today())) && !assigned.trainingLocked && !assigned.emergencyActive && assigned.horseHealthStatus !== 'INJURED' && (
+                            <span
+                              className="status training"
+                              style={{ backgroundColor: '#e6f4ff', color: '#0958d9', borderColor: '#91caff', display: 'inline-flex', alignItems: 'center', gap: '3px', fontSize: '9px', padding: '1px 5px', borderRadius: '4px' }}
+                              title={assigned.trainingSchedule?.taskName || 'Đang theo lịch huấn luyện hôm nay'}
+                            >
+                              <Clock size={10} /> Đang tập
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="muted" style={{ fontSize: '10px' }}>Trống</span>
@@ -542,8 +681,28 @@ function StablesView({ canEditRoutine, isStaff }) {
                     </div>
                     {assigned ? (
                       <div>
-                        <div className="stall-horse-name">{assigned.horseName}</div>
-                        <div className="stall-horse-code">{assigned.horseCode}</div>
+                        <div className="stall-horse-body">
+                          <div className="stall-horse-avatar-wrap">
+                            {assigned.photoUrl ? (
+                              <img
+                                src={assigned.photoUrl}
+                                alt={assigned.horseName}
+                                className="stall-horse-avatar-img"
+                                onError={(e) => handleImageFallback(e, 'flex')}
+                              />
+                            ) : null}
+                            <div
+                              className="stall-horse-avatar-fallback"
+                              style={{ display: assigned.photoUrl ? 'none' : 'flex' }}
+                            >
+                              <img src={horseIcon} alt="" className="stall-horse-icon-fallback" />
+                            </div>
+                          </div>
+                          <div className="stall-horse-info">
+                            <div className="stall-horse-name">{assigned.horseName}</div>
+                            <div className="stall-horse-code">{assigned.horseCode}</div>
+                          </div>
+                        </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                           <span className="muted" style={{ fontSize: '10px' }}>Ô: <b>{stall.code}</b></span>
                           <button
@@ -598,9 +757,10 @@ function StablesView({ canEditRoutine, isStaff }) {
         <section className="card" style={{ padding: '20px' }}>
           <div className="card-head" style={{ padding: '0 0 14px', flexWrap: 'wrap', gap: '8px' }}>
             <h3>Lịch sinh hoạt hằng ngày</h3>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {canEditRoutine && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {canManageDailyRoutine && (
                 <button
+                  type="button"
                   className="button secondary"
                   style={{ minHeight: '34px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                   title="Kiểm tra và khởi tạo lịch sinh hoạt mặc định theo thể trạng cho các ngựa trong chuồng"
@@ -609,8 +769,47 @@ function StablesView({ canEditRoutine, isStaff }) {
                   <RotateCcw size={13} /> Khởi tạo lịch mặc định
                 </button>
               )}
-              {canEditRoutine && selectedHorse && (
-                <button className="button primary" style={{ minHeight: '34px', fontSize: '11px' }} onClick={() => setShowAddRoutine(true)}>
+              {canManageDailyRoutine && selectedHorse && (
+                <button
+                  type="button"
+                  className="button primary"
+                  style={{ minHeight: '34px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                  title={
+                    isMedicallyRestricted
+                      ? 'Không thể thay đổi lịch sinh hoạt khi ngựa đang chấn thương hoặc hạn chế y tế'
+                      : isTrainingActive
+                      ? 'Ngựa đang trong lịch trình huấn luyện hôm nay. Không thể chỉnh sửa lịch sinh hoạt mặc định.'
+                      : 'Thay đổi lịch sinh hoạt của ngựa'
+                  }
+                  disabled={isMedicallyRestricted || isTrainingActive}
+                  onClick={() => {
+                    if (isMedicallyRestricted || isTrainingActive) return
+                    setEditingRoutine(routines.length > 0 ? routines[0] : null)
+                    setShowRoutineModal(true)
+                  }}
+                >
+                  <Calendar size={13} /> Thay đổi lịch sinh hoạt
+                </button>
+              )}
+              {canManageDailyRoutine && selectedHorse && (
+                <button
+                  type="button"
+                  className="button secondary"
+                  style={{ minHeight: '34px', fontSize: '11px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                  title={
+                    isMedicallyRestricted
+                      ? 'Không thể thêm lịch sinh hoạt khi ngựa đang chấn thương hoặc hạn chế y tế'
+                      : isTrainingActive
+                      ? 'Ngựa đang trong lịch trình huấn luyện hôm nay. Không thể chỉnh sửa lịch sinh hoạt mặc định.'
+                      : 'Thêm hoạt động sinh hoạt'
+                  }
+                  disabled={isMedicallyRestricted || isTrainingActive}
+                  onClick={() => {
+                    if (isMedicallyRestricted || isTrainingActive) return
+                    setEditingRoutine(null)
+                    setShowRoutineModal(true)
+                  }}
+                >
                   <Plus size={14} /> Thêm hoạt động
                 </button>
               )}
@@ -625,6 +824,16 @@ function StablesView({ canEditRoutine, isStaff }) {
             </div>
           ) : (
             <div>
+              {routineNotice && (
+                <div className="notice success full" style={{ margin: '0 0 12px', fontSize: '12px' }}>
+                  {routineNotice}
+                </div>
+              )}
+              {routineError && (
+                <div className="notice error full" style={{ margin: '0 0 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <X size={14} /> {routineError}
+                </div>
+              )}
               <div style={{ marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--line)' }}>
                 <b style={{ fontSize: '14px', color: '#15352c' }}>{selectedHorse.name}</b>
                 <div style={{ fontSize: '11px', color: 'var(--muted)', marginTop: '2px' }}>
@@ -641,6 +850,12 @@ function StablesView({ canEditRoutine, isStaff }) {
                   <div style={{ marginTop: '8px', padding: '6px 10px', background: '#fff2e8', border: '1px solid #ffbb96', borderRadius: '6px', fontSize: '11px', color: '#d4380d', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <AlertTriangle size={14} style={{ flexShrink: 0 }} />
                     <span><b>Cảnh báo chấn thương:</b> Ngựa đang trong chế độ theo dõi y tế / chấn thương. Không thực hiện bài tập nặng.</span>
+                  </div>
+                )}
+                {isTrainingActive && !isMedicallyRestricted && (
+                  <div style={{ marginTop: '8px', padding: '6px 10px', background: '#e6f4ff', border: '1px solid #91caff', borderRadius: '6px', fontSize: '11px', color: '#0958d9', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={14} style={{ flexShrink: 0 }} />
+                    <span><b>Trạng thái:</b> Ngựa đang có lịch trình huấn luyện hôm nay. Lịch sinh hoạt mặc định được tạm ẩn.</span>
                   </div>
                 )}
                 {isStaff && (
@@ -670,39 +885,108 @@ function StablesView({ canEditRoutine, isStaff }) {
                 </div>
               </div>
 
-              {!routines.length ? (
-                selectedHorse.healthStatus === 'INJURED' || selectedHorse.trainingLocked ? (
-                  <div className="notice" style={{ backgroundColor: '#fff7e6', borderColor: '#ffd591', color: '#d46b08', padding: '16px', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <ShieldAlert size={20} style={{ color: '#fa8c16', flexShrink: 0, marginTop: '2px' }} />
-                      <div>
-                        <b style={{ fontSize: '13px', display: 'block', marginBottom: '4px' }}>Chế độ tĩnh tại chuồng (Stall Rest / Theo dõi y tế)</b>
-                        <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#873800' }}>
-                          Ngựa hiện đang bị hạn chế vận động theo chỉ định y tế hoặc có lệnh khóa huấn luyện. Chưa có lịch sinh hoạt ngoài chuồng được phân công. Vui lòng duy trì chăm sóc tại ô chuồng và tuân thủ y lệnh của bác sĩ thú y.
-                        </p>
-                      </div>
+              {/* 3-State Presentation: State C (Medical hold) > State B (Training schedule) > State A (Default routine) */}
+              {isMedicallyRestricted ? (
+                <div className="notice" style={{ backgroundColor: '#fff7e6', borderColor: '#ffd591', color: '#d46b08', padding: '16px', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <ShieldAlert size={20} style={{ color: '#fa8c16', flexShrink: 0, marginTop: '2px' }} />
+                    <div>
+                      <b style={{ fontSize: '13px', display: 'block', marginBottom: '4px' }}>Chế độ tĩnh tại chuồng (Stall Rest / Theo dõi y tế)</b>
+                      <p style={{ margin: 0, fontSize: '12px', lineHeight: 1.5, color: '#873800' }}>
+                        {selectedHorse.trainingLockReason
+                          ? `Lý do: ${selectedHorse.trainingLockReason}. Ngựa đang có lệnh khóa huấn luyện hoặc chế độ theo dõi y tế đặc biệt. Toàn bộ hoạt động ngoài chuồng và tập luyện tạm dừng. Vui lòng chăm sóc tại chỗ theo y lệnh bác sĩ thú y.`
+                          : 'Ngựa hiện đang bị hạn chế vận động theo chỉ định y tế hoặc có lệnh khóa huấn luyện. Chưa có lịch sinh hoạt ngoài chuồng được phân công. Vui lòng duy trì chăm sóc tại ô chuồng và tuân thủ y lệnh của bác sĩ thú y.'}
+                      </p>
                     </div>
                   </div>
-                ) : (
-                  <div className="empty" style={{ minHeight: '100px', padding: '16px' }}>
-                    <span>Chưa có lịch sinh hoạt nào được thiết lập cho ngựa này.</span>
+                </div>
+              ) : isTrainingActive ? (
+                <div style={{ background: '#f0f5ff', border: '1px solid #adc6ff', borderRadius: '8px', padding: '16px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        background: trainingSchedule?.sessionStatus === 'IN_PROGRESS' ? '#0958d9' : '#1677ff',
+                        color: '#ffffff'
+                      }}>
+                        {trainingSchedule?.sessionStatus === 'IN_PROGRESS' ? 'Đang huấn luyện' : (trainingSchedule?.sessionStatus === 'READY' ? 'Sẵn sàng ra sân' : 'Đang chuẩn bị')}
+                      </span>
+                      <b style={{ fontSize: '13px', color: '#1d39c4' }}>Đang theo Lịch Huấn luyện hôm nay</b>
+                    </div>
+                    {trainingSchedule?.workloadIntensity && (
+                      <span style={{ fontSize: '11px', color: '#595959', background: '#ffffff', padding: '2px 8px', borderRadius: '4px', border: '1px solid #d9d9d9' }}>
+                        Cường độ: <b>{trainingSchedule.workloadIntensity === 'HIGH' ? 'Cao' : (trainingSchedule.workloadIntensity === 'MEDIUM' ? 'Trung bình' : 'Nhẹ')}</b>
+                      </span>
+                    )}
                   </div>
-                )
+
+                  <div style={{ background: '#ffffff', borderRadius: '6px', padding: '12px', border: '1px solid #d6e4ff', marginBottom: '10px' }}>
+                    <div style={{ fontSize: '14px', fontWeight: 600, color: '#1d39c4', marginBottom: '6px' }}>
+                      {trainingSchedule?.taskName || 'Bài tập huấn luyện'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#595959', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={13} style={{ color: '#1677ff' }} />
+                        <span>Thời gian: <b>{formatTimeRange(trainingSchedule?.scheduledStart, trainingSchedule?.scheduledEnd)}</b></span>
+                      </div>
+                      {trainingSchedule?.racetrackName && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <MapPin size={13} style={{ color: '#1677ff' }} />
+                          <span>Đường chạy: <b>{trainingSchedule.racetrackName}</b></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '11px', color: '#595959', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Clock size={12} style={{ color: '#8c8c8c' }} />
+                    <span>Lịch sinh hoạt mặc định được tạm ẩn trong thời gian tập luyện và sẽ tự động hiển thị lại khi buổi tập kết thúc.</span>
+                  </div>
+                </div>
+              ) : !routines.length ? (
+                <div className="empty" style={{ minHeight: '100px', padding: '16px' }}>
+                  <span>Chưa có lịch sinh hoạt nào được thiết lập cho ngựa này.</span>
+                </div>
               ) : (
                 <div className="routine-list">
                   {routines.map((r) => (
                     <div className="routine-item" key={r.id}>
                       <span className="routine-time">
-                        <Clock size={13} /> {r.startTime} - {r.endTime}
+                        <Clock size={13} /> {formatTimeHHmm(r.startTime)} - {formatTimeHHmm(r.endTime)}
                       </span>
                       <div>
-                        <b style={{ fontSize: '12px', color: '#173129' }}>{ROUTINE_ACTIVITY_LABELS[r.activityType] || r.activityType}</b>
-                        {r.notes && <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{r.notes}</div>}
+                        <b style={{ fontSize: '12px', color: '#173129' }}>
+                          {r.activityType === 'OTHER' && r.notes ? r.notes : (ROUTINE_ACTIVITY_LABELS[r.activityType] || r.activityType)}
+                        </b>
+                        {r.activityType === 'OTHER' ? (
+                          <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>Hoạt động khác</div>
+                        ) : (
+                          r.notes && <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{r.notes}</div>
+                        )}
                       </div>
-                      {canEditRoutine && (
-                        <button className="icon-button danger" style={{ width: '28px', height: '28px' }} onClick={() => handleDeleteRoutine(r.id)}>
-                          <Trash2 size={14} />
-                        </button>
+                      {canManageDailyRoutine && (
+                        <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
+                          <button
+                            type="button"
+                            className="icon-button"
+                            style={{ width: '28px', height: '28px', color: '#2f765e' }}
+                            title={isMedicallyRestricted ? 'Không thể chỉnh sửa khi ngựa đang bị hạn chế y tế' : (isTrainingActive ? 'Không thể chỉnh sửa khi ngựa đang trong lịch huấn luyện hôm nay' : 'Chỉnh sửa hoạt động này')}
+                            disabled={isMedicallyRestricted || isTrainingActive}
+                            onClick={() => {
+                              if (isMedicallyRestricted || isTrainingActive) return
+                              setEditingRoutine(r)
+                              setShowRoutineModal(true)
+                            }}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -713,12 +997,20 @@ function StablesView({ canEditRoutine, isStaff }) {
         </section>
       </div>
 
-      {showAddRoutine && selectedHorse && (
-        <AddRoutineModal
+      {showRoutineModal && selectedHorse && (
+        <RoutineModal
           horse={selectedHorse}
-          onClose={() => setShowAddRoutine(false)}
-          onSaved={() => {
-            setShowAddRoutine(false)
+          routines={routines}
+          initialRoutine={editingRoutine}
+          onClose={() => {
+            setShowRoutineModal(false)
+            setEditingRoutine(null)
+          }}
+          onSaved={(msg) => {
+            setShowRoutineModal(false)
+            setEditingRoutine(null)
+            if (msg) setRoutineNotice(msg)
+            setRoutineError('')
             loadRoutines(selectedHorse.id)
           }}
         />
@@ -855,13 +1147,13 @@ function HorseIntakeModal({ stables, onClose, onAssigned }) {
     if (horseHealth === 'QUARANTINED' && hasNonQuarantined) {
       return {
         level: 'error',
-        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly (QUARANTINED). Không thể xếp chung khu chuồng với các ngựa khỏe mạnh khác.',
+        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly. Không thể xếp chung khu chuồng với các ngựa khỏe mạnh khác.',
       }
     }
     if (horseHealth !== 'QUARANTINED' && hasQuarantined) {
       return {
         level: 'error',
-        text: 'Cảnh báo y tế: Khu chuồng này đang có ngựa cách ly (QUARANTINED). Không thể xếp ngựa khỏe mạnh vào khu vực này.',
+        text: 'Cảnh báo y tế: Khu chuồng này đang có ngựa cách ly. Không thể xếp ngựa khỏe mạnh vào khu vực này.',
       }
     }
     return null
@@ -1009,7 +1301,7 @@ function HorseIntakeModal({ stables, onClose, onAssigned }) {
                       <b style={{ fontSize: '13px', color: '#0f172a' }}>Phân bổ chuồng cho ngựa: {allocatingHorse.name} ({allocatingHorse.code})</b>
                       <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px', display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <span>Bác sĩ phụ trách: <b>BS. {allocatingHorse.diagnosingVetName || 'Đã duyệt khám'}</b></span>
-                        <span>· Thể trạng: <b>{allocatingHorse.healthStatus || 'FIT'}</b></span>
+                        <span>· Thể trạng: <b>{formatHorseHealthStatus(allocatingHorse.healthStatus)}</b></span>
                       </div>
                     </div>
                     <button className="icon-button" style={{ width: '24px', height: '24px' }} onClick={() => setAllocatingHorse(null)}>
@@ -1100,7 +1392,7 @@ function HorseIntakeModal({ stables, onClose, onAssigned }) {
                         </span>
                         <span>
                           <span className={`status ${HEALTH_STATUS_MAP[h.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px' }}>
-                            {HEALTH_STATUS_MAP[h.healthStatus]?.label || h.healthStatus || 'FIT'}
+                            {formatHorseHealthStatus(h.healthStatus)}
                           </span>
                         </span>
                         <div>
@@ -1178,13 +1470,13 @@ function TransferStallModal({ horse, currentStable, stables, onClose, onTransfer
     if (horseHealth === 'QUARANTINED' && hasNonQuarantined) {
       return {
         level: 'error',
-        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly (QUARANTINED). Không thể chuyển vào khu chuồng đang có ngựa bình thường!',
+        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly. Không thể chuyển vào khu chuồng đang có ngựa bình thường!',
       }
     }
     if (horseHealth !== 'QUARANTINED' && hasQuarantined) {
       return {
         level: 'error',
-        text: 'Cảnh báo y tế: Khu chuồng đích đang có ngựa cách ly (QUARANTINED). Không thể chuyển ngựa vào khu vực này!',
+        text: 'Cảnh báo y tế: Khu chuồng đích đang có ngựa cách ly. Không thể chuyển ngựa vào khu vực này!',
       }
     }
     return null
@@ -1251,7 +1543,7 @@ function TransferStallModal({ horse, currentStable, stables, onClose, onTransfer
             <div>
               <span className="muted" style={{ display: 'block', fontSize: '10px' }}>THỂ TRẠNG HIỆN TẠI</span>
               <span className={`status ${HEALTH_STATUS_MAP[horse.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px', marginTop: '2px', display: 'inline-block' }}>
-                {HEALTH_STATUS_MAP[horse.healthStatus]?.label || horse.healthStatus || 'FIT'}
+                {formatHorseHealthStatus(horse.healthStatus)}
               </span>
             </div>
           </div>
@@ -1389,13 +1681,13 @@ function AssignSingleStallModal({ stall, stable, onClose, onAssigned }) {
     if (horseHealth === 'QUARANTINED' && hasNonQuarantined) {
       return {
         level: 'error',
-        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly (QUARANTINED). Không thể xếp chung khu chuồng với ngựa bình thường.',
+        text: 'Cảnh báo y tế: Ngựa này đang trong diện cách ly. Không thể xếp chung khu chuồng với ngựa bình thường.',
       }
     }
     if (horseHealth !== 'QUARANTINED' && hasQuarantined) {
       return {
         level: 'error',
-        text: 'Cảnh báo y tế: Khu chuồng này đang có ngựa cách ly (QUARANTINED). Không thể xếp ngựa khỏe mạnh vào đây.',
+        text: 'Cảnh báo y tế: Khu chuồng này đang có ngựa cách ly. Không thể xếp ngựa khỏe mạnh vào đây.',
       }
     }
     return null
@@ -1466,7 +1758,7 @@ function AssignSingleStallModal({ stall, stable, onClose, onAssigned }) {
                 >
                   {clearedHorses.map((h) => (
                     <option key={h.horseId} value={h.horseId}>
-                      {h.name} ({h.code}) — {h.healthStatus || 'FIT'} [BS. {h.diagnosingVetName || 'Đã duyệt'}]
+                      {h.name} ({h.code}) — {formatHorseHealthStatus(h.healthStatus)} [BS. {h.diagnosingVetName || 'Đã duyệt'}]
                     </option>
                   ))}
                 </select>
@@ -1484,7 +1776,7 @@ function AssignSingleStallModal({ stall, stable, onClose, onAssigned }) {
                     </span>
                     <span>
                       Thể trạng: <b className={`status ${HEALTH_STATUS_MAP[selectedHorse.healthStatus]?.cls || 'active'}`} style={{ fontSize: '10px' }}>
-                        {HEALTH_STATUS_MAP[selectedHorse.healthStatus]?.label || selectedHorse.healthStatus || 'FIT'}
+                        {formatHorseHealthStatus(selectedHorse.healthStatus)}
                       </b>
                     </span>
                   </div>
@@ -1513,26 +1805,117 @@ function AssignSingleStallModal({ stall, stable, onClose, onAssigned }) {
   )
 }
 
-function AddRoutineModal({ horse, onClose, onSaved }) {
-  const isRestricted = horse.healthStatus === 'INJURED' || horse.trainingLocked || horse.emergencyActive
-  const [form, setForm] = useState({
-    activityType: isRestricted ? 'STALL_REST' : 'TURNOUT',
-    startTime: '07:00',
-    endTime: '08:30',
-    notes: '',
+function RoutineModal({ horse, routines = [], initialRoutine = null, onClose, onSaved }) {
+  const isMedicallyRestricted = Boolean(
+    horse && (horse.healthStatus === 'INJURED' || horse.trainingLocked || horse.emergencyActive)
+  )
+  const isTrainingActive = Boolean(
+    horse && !isMedicallyRestricted && (
+      (horse.trainingSchedule && isTrainingScheduleActiveForDay(horse.trainingSchedule, today())) ||
+      (horse.isTrainingActive && (!horse.trainingSchedule || isTrainingScheduleActiveForDay(horse.trainingSchedule, today())))
+    )
+  )
+  const isRestricted = isMedicallyRestricted || isTrainingActive
+  const [selectedRoutineId, setSelectedRoutineId] = useState(initialRoutine ? initialRoutine.id : (routines.length > 0 ? routines[0].id : 'NEW'))
+  const isEditing = selectedRoutineId !== 'NEW'
+
+  const activeRoutine = useMemo(() => {
+    if (!isEditing) return null
+    return routines.find((r) => r.id === selectedRoutineId) || initialRoutine || null
+  }, [isEditing, routines, selectedRoutineId, initialRoutine])
+
+  const [form, setForm] = useState(() => {
+    if (activeRoutine) {
+      const isOther = activeRoutine.activityType === 'OTHER'
+      return {
+        activityType: activeRoutine.activityType,
+        startTime: formatTimeHHmm(activeRoutine.startTime || '07:00'),
+        endTime: formatTimeHHmm(activeRoutine.endTime || '08:30'),
+        notes: isOther ? '' : (activeRoutine.notes || ''),
+        customActivity: isOther ? (activeRoutine.notes || '') : '',
+      }
+    }
+    return {
+      activityType: isRestricted ? 'STALL_REST' : 'TURNOUT',
+      startTime: '07:00',
+      endTime: '08:30',
+      notes: '',
+      customActivity: '',
+    }
   })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
+  const handleSelectRoutine = (id) => {
+    setSelectedRoutineId(id)
+    setError('')
+    if (id === 'NEW') {
+      setForm({
+        activityType: isRestricted ? 'STALL_REST' : 'TURNOUT',
+        startTime: '07:00',
+        endTime: '08:30',
+        notes: '',
+        customActivity: '',
+      })
+    } else {
+      const target = routines.find((r) => r.id === id)
+      if (target) {
+        const isOther = target.activityType === 'OTHER'
+        setForm({
+          activityType: target.activityType,
+          startTime: formatTimeHHmm(target.startTime || '07:00'),
+          endTime: formatTimeHHmm(target.endTime || '08:30'),
+          notes: isOther ? '' : (target.notes || ''),
+          customActivity: isOther ? (target.notes || '') : '',
+        })
+      }
+    }
+  }
+
   const submit = async (e) => {
     e.preventDefault()
+    if (isMedicallyRestricted) {
+      setError('Ngựa đang trong chế độ hạn chế y tế / chấn thương. Không thể lưu thay đổi lịch sinh hoạt.')
+      return
+    }
+    if (isTrainingActive) {
+      setError('Ngựa đang trong lịch trình huấn luyện hôm nay. Không thể chỉnh sửa lịch sinh hoạt mặc định.')
+      return
+    }
+    const cleanStart = formatTimeHHmm(form.startTime)
+    const cleanEnd = formatTimeHHmm(form.endTime)
+    if (!cleanStart || !cleanEnd) {
+      setError('Giờ bắt đầu và kết thúc là bắt buộc.')
+      return
+    }
+    if (cleanStart >= cleanEnd) {
+      setError('Giờ bắt đầu phải nhỏ hơn giờ kết thúc.')
+      return
+    }
+    if (form.activityType === 'OTHER' && !form.customActivity?.trim()) {
+      setError('Vui lòng nhập nội dung cho hoạt động khác.')
+      return
+    }
+
+    const payload = {
+      activityType: form.activityType,
+      startTime: cleanStart,
+      endTime: cleanEnd,
+      notes: form.activityType === 'OTHER' ? form.customActivity.trim() : (form.notes?.trim() || null),
+    }
+
     setBusy(true)
     setError('')
     try {
-      await stableCareApi.addRoutine(horse.id, form)
-      onSaved()
+      if (isEditing && activeRoutine) {
+        await stableCareApi.updateRoutine(activeRoutine.id, payload)
+        onSaved('Cập nhật hoạt động sinh hoạt thành công.')
+      } else {
+        await stableCareApi.addRoutine(horse.id, payload)
+        onSaved('Thêm hoạt động sinh hoạt mới thành công.')
+      }
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Không thể lưu lịch sinh hoạt.')
     } finally {
       setBusy(false)
     }
@@ -1544,21 +1927,48 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
         <div className="modal-head">
           <div>
             <p className="eyebrow">LỊCH TRÌNH SINH HOẠT</p>
-            <h2>Thêm hoạt động cho {horse.name}</h2>
+            <h2>{isEditing ? `Thay đổi lịch sinh hoạt: ${horse.name}` : `Thêm hoạt động cho ${horse.name}`}</h2>
           </div>
-          <button className="icon-button" onClick={onClose}><X /></button>
+          <button type="button" className="icon-button" onClick={onClose}><X /></button>
         </div>
         <form className="form-grid" onSubmit={submit}>
           {error && <div className="notice error full"><X size={16} />{error}</div>}
           {isRestricted && (
             <div className="notice warning full" style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-              <span><b>Lưu ý an toàn:</b> Ngựa đang trong chế độ hạn chế y tế / chấn thương. Không xếp lịch thả bãi dạo tự do (TURNOUT).</span>
+              <span><b>Lưu ý an toàn:</b> Ngựa đang trong chế độ hạn chế y tế / chấn thương. Không thể lưu thay đổi lịch sinh hoạt.</span>
             </div>
           )}
+
+          {routines.length > 0 && (
+            <label className="field full">
+              <span>Hoạt động cần điều chỉnh</span>
+              <select
+                value={selectedRoutineId}
+                onChange={(e) => handleSelectRoutine(e.target.value)}
+                disabled={isRestricted}
+                style={{ fontWeight: 600, borderColor: isEditing ? '#2f765e' : undefined }}
+              >
+                <option value="NEW">+ Thêm hoạt động sinh hoạt mới</option>
+                {routines.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {formatTimeHHmm(r.startTime)} - {formatTimeHHmm(r.endTime)} · {r.activityType === 'OTHER' && r.notes ? r.notes : (ROUTINE_ACTIVITY_LABELS[r.activityType] || r.activityType)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <label className="field full">
             <span>Loại hoạt động sinh hoạt *</span>
-            <select value={form.activityType} onChange={(e) => setForm({ ...form, activityType: e.target.value })}>
+            <select
+              value={form.activityType}
+              onChange={(e) => {
+                const nextType = e.target.value
+                setForm({ ...form, activityType: nextType })
+              }}
+              disabled={isRestricted}
+            >
               <option value="TURNOUT" disabled={isRestricted}>Giờ thả bãi cỏ (Turnout) {isRestricted ? '(Bị cấm do y tế)' : ''}</option>
               <option value="GROOMING">Chải lông & Vệ sinh (Grooming)</option>
               <option value="REST">Thời gian nghỉ ngơi (Rest)</option>
@@ -1569,21 +1979,46 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
               <option value="OTHER">Hoạt động khác</option>
             </select>
           </label>
+
+          {form.activityType === 'OTHER' ? (
+            <label className="field full">
+              <span>Nội dung hoạt động khác *</span>
+              <input
+                required
+                value={form.customActivity}
+                onChange={(e) => setForm({ ...form, customActivity: e.target.value })}
+                placeholder="Nhập tên / mô tả hoạt động sinh hoạt khác (ví dụ: Tập bơi hồ thủy liệu, Khám răng...)"
+                disabled={isRestricted}
+              />
+            </label>
+          ) : (
+            <label className="field full">
+              <span>Ghi chú hướng dẫn</span>
+              <input
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                placeholder="Ví dụ: Thả bãi paddock số 2, đeo đai bảo vệ chân"
+                disabled={isRestricted}
+              />
+            </label>
+          )}
+
           <label className="field">
             <span>Giờ bắt đầu *</span>
-            <input required type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+            <input required type="time" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} disabled={isRestricted} />
           </label>
           <label className="field">
             <span>Giờ kết thúc *</span>
-            <input required type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+            <input required type="time" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} disabled={isRestricted} />
           </label>
-          <label className="field full">
-            <span>Ghi chú hướng dẫn</span>
-            <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Ví dụ: Thả bãi paddock số 2, đeo đai bảo vệ chân" />
-          </label>
-          <div className="modal-actions full">
-            <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
-            <button className="button primary" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu hoạt động'}</button>
+
+          <div className="modal-actions full" style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button type="button" className="button secondary" onClick={onClose} disabled={busy}>Hủy</button>
+              <button type="submit" className="button primary" disabled={busy || isRestricted}>
+                {busy ? 'Đang lưu…' : isEditing ? 'Lưu thay đổi' : 'Thêm hoạt động'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -1591,6 +2026,7 @@ function AddRoutineModal({ horse, onClose, onSaved }) {
   )
 }
 
+const AddRoutineModal = RoutineModal
 function RoutineBackfillModal({ onClose, onExecuted }) {
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -1713,7 +2149,7 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
                         </div>
                         <div>
                           <b style={{ color: isRestricted ? '#d97706' : '#166534' }}>
-                            {isRestricted ? 'Tĩnh dưỡng tại chuồng (Stall Rest)' : 'Lịch thường nhật (Healthy)'}
+                            {isRestricted ? 'Tĩnh dưỡng tại chuồng' : 'Lịch sinh hoạt thường nhật'}
                           </b>
                           <small className="muted" style={{ display: 'block', fontSize: '10px' }}>
                             {isRestricted ? 'Theo dõi y tế / hạn chế vận động ngoài chuồng' : 'Đủ điều kiện thả bãi & vận động dạo nhẹ'}
@@ -1746,10 +2182,65 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
 // =========================================================================
 // 1b. TRAINING PREPARATION / READINESS (STABLE STAFF)
 // =========================================================================
+export function isActionableTrainingSchedule(schedule) {
+  if (!schedule) return false
+  const status = (schedule.status || schedule.sessionStatus || '').trim().toUpperCase()
+  return status === 'PREPARING' || status === 'READY'
+}
+
+export function filterTrainingSchedules(schedules, statusFilter = 'ALL') {
+  if (!Array.isArray(schedules)) return []
+  const actionable = schedules.filter(isActionableTrainingSchedule)
+  if (!statusFilter || statusFilter === 'ALL') return actionable
+  return actionable.filter((s) => s.status === statusFilter)
+}
+
+export function computeTrainingScheduleCounts(schedules) {
+  const list = Array.isArray(schedules) ? schedules.filter(isActionableTrainingSchedule) : []
+  return {
+    all: list.length,
+    preparing: list.filter((s) => s.status === 'PREPARING').length,
+    ready: list.filter((s) => s.status === 'READY').length,
+  }
+}
+
+export function formatScheduleTime(item) {
+  if (!item) return '05:00 - 11:00'
+  if (item.operatingWindowStart && item.operatingWindowEnd) {
+    return `${formatTimeHHmm(item.operatingWindowStart)} - ${formatTimeHHmm(item.operatingWindowEnd)}`
+  }
+  if (item.startTime && item.endTime) {
+    return `${formatTimeHHmm(item.startTime)} - ${formatTimeHHmm(item.endTime)}`
+  }
+  if (item.scheduledStart && item.scheduledEnd) {
+    return formatTimeRange(item.scheduledStart, item.scheduledEnd)
+  }
+  return '05:00 - 11:00'
+}
+
+export function buildTrainingScheduleQueryParams(appliedDate) {
+  if (!appliedDate) return {}
+  return { from: appliedDate, to: appliedDate }
+}
+
+export function getTrainingEmptyStateMessage(appliedDate, formatVNDateFn = formatVNDate) {
+  if (appliedDate) {
+    return {
+      title: `Không có buổi tập nào trong ngày ${formatVNDateFn(appliedDate)}`,
+      subtitle: 'Hiện tại chưa có lịch huấn luyện nào cho ngựa do bạn phụ trách cần chuẩn bị trong ngày này.',
+    }
+  }
+  return {
+    title: 'Không có buổi tập nào cần chuẩn bị',
+    subtitle: 'Hiện tại chưa có lịch huấn luyện nào cho ngựa do bạn phụ trách cần chuẩn bị.',
+  }
+}
+
 function TrainingPreparationView({ isStaff }) {
   const [searchParams] = useSearchParams()
   const highlightScheduleId = searchParams.get('scheduleId')
-  const [selectedDate, setSelectedDate] = useState(today())
+  const [appliedDate, setAppliedDate] = useState(null)
+  const [draftDate, setDraftDate] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [schedules, setSchedules] = useState([])
   const [loading, setLoading] = useState(false)
@@ -1761,7 +2252,8 @@ function TrainingPreparationView({ isStaff }) {
     setLoading(true)
     setError('')
     try {
-      const data = await stableCareApi.getMyTrainingSchedules({ from: selectedDate, to: selectedDate })
+      const params = buildTrainingScheduleQueryParams(appliedDate)
+      const data = await stableCareApi.getMyTrainingSchedules(params)
       setSchedules(Array.isArray(data) ? data : [])
     } catch (err) {
       setError(err.message || 'Không thể tải lịch huấn luyện cần chuẩn bị.')
@@ -1769,11 +2261,22 @@ function TrainingPreparationView({ isStaff }) {
     } finally {
       setLoading(false)
     }
-  }, [selectedDate])
+  }, [appliedDate])
 
   useEffect(() => {
     loadSchedules()
   }, [loadSchedules])
+
+  const handleApplyDate = () => {
+    if (draftDate) {
+      setAppliedDate(draftDate)
+    }
+  }
+
+  const handleClearDateFilter = () => {
+    setDraftDate('')
+    setAppliedDate(null)
+  }
 
   const handleMarkReady = async (scheduleId) => {
     setActionLoadingId(scheduleId)
@@ -1790,13 +2293,9 @@ function TrainingPreparationView({ isStaff }) {
     }
   }
 
-  const filtered = useMemo(() => {
-    if (statusFilter === 'ALL') return schedules
-    return schedules.filter((s) => s.status === statusFilter)
-  }, [schedules, statusFilter])
-
-  const preparingCount = useMemo(() => schedules.filter((s) => s.status === 'PREPARING').length, [schedules])
-  const readyCount = useMemo(() => schedules.filter((s) => s.status === 'READY').length, [schedules])
+  const filtered = useMemo(() => filterTrainingSchedules(schedules, statusFilter), [schedules, statusFilter])
+  const counts = useMemo(() => computeTrainingScheduleCounts(schedules), [schedules])
+  const emptyState = useMemo(() => getTrainingEmptyStateMessage(appliedDate, formatVNDate), [appliedDate])
 
   const STATUS_CONFIG = {
     PREPARING: { label: 'Đang chuẩn bị', color: '#d46b08', bg: '#fffbe6', border: '#ffe58f' },
@@ -1818,19 +2317,48 @@ function TrainingPreparationView({ isStaff }) {
   return (
     <div className="flow4-view">
       <div className="toolbar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <label htmlFor="prep-date" style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>Ngày tập:</label>
           <input
             id="prep-date"
             type="date"
             className="input"
-            style={{ width: '160px', padding: '6px 10px', fontSize: '13px' }}
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            style={{ width: '150px', padding: '6px 10px', fontSize: '13px' }}
+            value={draftDate}
+            onChange={(e) => setDraftDate(e.target.value)}
           />
-          <button type="button" className="button secondary" style={{ minHeight: '34px', fontSize: '12px' }} onClick={() => setSelectedDate(today())}>
+          <button
+            type="button"
+            className="button secondary"
+            style={{ minHeight: '34px', fontSize: '12px' }}
+            onClick={() => setDraftDate(today())}
+          >
             Hôm nay
           </button>
+          <button
+            type="button"
+            className="button primary"
+            style={{ minHeight: '34px', fontSize: '12px', fontWeight: 600 }}
+            disabled={!draftDate}
+            onClick={handleApplyDate}
+          >
+            Xác nhận
+          </button>
+          {appliedDate && (
+            <button
+              type="button"
+              className="button secondary"
+              style={{ minHeight: '34px', fontSize: '12px' }}
+              onClick={handleClearDateFilter}
+            >
+              Xem tất cả
+            </button>
+          )}
+          {appliedDate && (
+            <span style={{ fontSize: '12px', color: '#27704e', fontWeight: 500, marginLeft: '4px' }}>
+              Đang lọc: {formatVNDate(appliedDate)}
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -1840,7 +2368,7 @@ function TrainingPreparationView({ isStaff }) {
             style={{ minHeight: '32px', fontSize: '12px' }}
             onClick={() => setStatusFilter('ALL')}
           >
-            Tất cả ({schedules.length})
+            Tất cả ({counts.all})
           </button>
           <button
             type="button"
@@ -1848,7 +2376,7 @@ function TrainingPreparationView({ isStaff }) {
             style={{ minHeight: '32px', fontSize: '12px' }}
             onClick={() => setStatusFilter('PREPARING')}
           >
-            Cần chuẩn bị ({preparingCount})
+            Cần chuẩn bị ({counts.preparing})
           </button>
           <button
             type="button"
@@ -1856,7 +2384,7 @@ function TrainingPreparationView({ isStaff }) {
             style={{ minHeight: '32px', fontSize: '12px' }}
             onClick={() => setStatusFilter('READY')}
           >
-            Đã sẵn sàng ({readyCount})
+            Đã sẵn sàng ({counts.ready})
           </button>
         </div>
       </div>
@@ -1880,8 +2408,8 @@ function TrainingPreparationView({ isStaff }) {
       ) : filtered.length === 0 ? (
         <div className="empty" style={{ minHeight: '180px', padding: '32px 18px' }}>
           <Clock size={32} style={{ color: 'var(--muted)', opacity: 0.6, marginBottom: '8px' }} />
-          <b>Không có buổi tập nào trong ngày {formatVNDate(selectedDate)}</b>
-          <span>Hiện tại chưa có lịch huấn luyện nào cho ngựa do bạn phụ trách cần chuẩn bị trong ngày này.</span>
+          <b>{emptyState.title}</b>
+          <span>{emptyState.subtitle}</span>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '16px' }}>
@@ -1938,7 +2466,7 @@ function TrainingPreparationView({ isStaff }) {
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Clock size={13} />
-                      <span>{formatVNDate(item.sessionDate)} · {item.startTime || '06:00'} - {item.endTime || '07:00'}</span>
+                      <span>{formatVNDate(item.trainingDate || item.sessionDate || (item.scheduledStart ? String(item.scheduledStart).slice(0, 10) : ''))} · {formatScheduleTime(item)}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <MapPin size={13} />
@@ -3190,6 +3718,30 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [viewingPhotoTask, setViewingPhotoTask] = useState(null)
 
+  // Active care routine catalog managed by Club Manager
+  const [activeCatalog, setActiveCatalog] = useState([])
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
+  const [showCatalogModal, setShowCatalogModal] = useState(false)
+
+  const loadActiveCatalog = useCallback(async () => {
+    setCatalogLoading(true)
+    setCatalogError('')
+    try {
+      const data = await careRoutineApi.getActive()
+      setActiveCatalog(Array.isArray(data) ? data : [])
+    } catch (err) {
+      setCatalogError(err?.message || 'Không thể tải danh mục quy trình chăm sóc hiện hành.')
+      setActiveCatalog([])
+    } finally {
+      setCatalogLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadActiveCatalog()
+  }, [loadActiveCatalog])
+
   // Real operational attention metrics
   const [attention, setAttention] = useState({
     incidents: [],
@@ -3360,6 +3912,69 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
         </div>
       ) : null}
 
+      {/* THÔNG BÁO QUẢN LÝ QUY TRÌNH CHUỒNG TỪ CLUB MANAGER */}
+      <div
+        className="stable-catalog-notice"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+          padding: '10px 14px',
+          marginBottom: '12px',
+          background: '#f8faf9',
+          border: '1px solid #e2e8e5',
+          borderRadius: '8px',
+          fontSize: '12px',
+          color: '#476355',
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <Info size={16} style={{ color: '#2b7850', flexShrink: 0 }} />
+          <span>
+            Danh sách nhiệm vụ chăm sóc chuồng được quản lý và cập nhật bởi Club Manager. Nhân viên Stable thực hiện theo danh sách hiện hành.
+          </span>
+          {activeCatalog.length > 0 && !catalogLoading && (
+            <button
+              type="button"
+              className="button secondary"
+              style={{
+                padding: '2px 8px',
+                fontSize: '11px',
+                minHeight: '22px',
+                borderRadius: '10px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              onClick={() => setShowCatalogModal(true)}
+              title="Xem chi tiết các quy trình chăm sóc tiêu chuẩn đang áp dụng"
+            >
+              <Eye size={12} /> {activeCatalog.length} quy trình đang áp dụng
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {catalogLoading ? (
+            <span style={{ fontSize: '11px', color: '#889990' }}>Đang đồng bộ danh mục…</span>
+          ) : catalogError ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ color: '#ce4f47', fontSize: '11px' }}>Lỗi đồng bộ danh mục</span>
+              <button
+                type="button"
+                className="button secondary"
+                style={{ padding: '2px 8px', fontSize: '11px', minHeight: '24px' }}
+                onClick={loadActiveCatalog}
+                title="Thử lại tải danh mục quy trình"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
       {/* THANH ĐIỀU HƯỚNG & LỌC NHIỆM VỤ */}
       <div className="toolbar card" style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
@@ -3436,7 +4051,21 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
               {activeFilter === 'OVERDUE' && ' · Đang lọc: Quá hạn'}
             </p>
           </div>
-          <span className="record-count">{displayedTasks.length} / {totalCount} nhiệm vụ</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              type="button"
+              className="button secondary"
+              style={{ padding: '4px 10px', fontSize: '12px', minHeight: '30px', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+              onClick={() => {
+                loadTasks()
+                loadActiveCatalog()
+              }}
+              title="Làm mới danh sách nhiệm vụ và danh mục quy trình"
+            >
+              <RotateCw size={13} /> Làm mới
+            </button>
+            <span className="record-count">{displayedTasks.length} / {totalCount} nhiệm vụ</span>
+          </div>
         </div>
 
         {loading ? (
@@ -3514,6 +4143,12 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
                       {task.completedByName && <span>Thực hiện bởi: <b>{task.completedByName}</b></span>}
                     </div>
 
+                    {task.description && (
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#4b6357' }}>
+                        {task.description}
+                      </p>
+                    )}
+
                     {task.completionNotes && (
                       <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#385549', background: '#f5f7f3', padding: '6px 10px', borderRadius: '6px' }}>
                         Ghi chú hoàn thành: {task.completionNotes}
@@ -3573,6 +4208,85 @@ function CareTasksView({ isStaff, isManager, currentUserId, canEdit }) {
           }}
         />
       )}
+
+      {showCatalogModal && (
+        <ActiveRoutineCatalogModal
+          catalog={activeCatalog}
+          onClose={() => setShowCatalogModal(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function ActiveRoutineCatalogModal({ catalog, onClose }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={onClose}>
+      <div className="modal" style={{ maxWidth: '680px', width: '90%' }} onMouseDown={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">DANH MỤC QUY TRÌNH CHUỒNG HIỆN HÀNH</p>
+            <h2>Quy trình chăm sóc đang áp dụng</h2>
+          </div>
+          <button className="icon-button" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <div style={{ marginTop: '12px' }}>
+          <p style={{ fontSize: '12px', color: 'var(--muted)', margin: '0 0 12px' }}>
+            Danh sách dưới đây là các quy trình chuẩn do <b>Club Manager</b> quản lý và thiết lập áp dụng. Hệ thống tự động sinh nhiệm vụ thực hiện trong ca mỗi ngày từ danh mục này. (Chế độ xem chỉ đọc dành cho Stable).
+          </p>
+
+          {!catalog || catalog.length === 0 ? (
+            <div className="empty" style={{ padding: '24px' }}>
+              Chưa có quy trình chăm sóc nào trong danh mục đang áp dụng.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: '8px', maxHeight: '420px', overflowY: 'auto' }}>
+              {catalog.map((item, idx) => (
+                <div
+                  key={item.id || idx}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #e5eae6',
+                    background: '#fcfdfc',
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#1f533f', background: '#e5f3eb', padding: '1px 6px', borderRadius: '4px' }}>
+                        {item.scheduledTime ? item.scheduledTime.slice(0, 5) : '—'}
+                      </span>
+                      <b style={{ fontSize: '13px', color: '#13392d' }}>{item.title}</b>
+                      <span className="badge-tag" style={{ background: '#eef1eb', fontSize: '10px' }}>
+                        {TASK_TYPE_LABELS[item.taskType] || item.taskType}
+                      </span>
+                      <span className="badge-tag" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '10px' }}>
+                        {item.scope === 'HORSE' ? 'Từng cá thể ngựa' : 'Khu vực chung / Chuồng trại'}
+                      </span>
+                    </div>
+                    {item.description && (
+                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#556d61' }}>
+                        {item.description}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <button type="button" className="button primary" onClick={onClose} style={{ fontSize: '12px' }}>
+              Đóng
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

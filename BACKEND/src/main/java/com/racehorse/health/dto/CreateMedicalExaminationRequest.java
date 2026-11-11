@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 public record CreateMedicalExaminationRequest(
         @NotNull @PastOrPresent LocalDate examinationDate,
@@ -23,8 +24,34 @@ public record CreateMedicalExaminationRequest(
         Integer bodyLengthCm,
         BigDecimal temperatureCelsius,
         Integer heightCm,
-        BigDecimal weightKg
+        BigDecimal weightKg,
+        List<UUID> attachmentFileIds
 ) {
+    public CreateMedicalExaminationRequest {
+        if (attachmentFileIds == null) {
+            attachmentFileIds = List.of();
+        }
+    }
+
+    public CreateMedicalExaminationRequest(
+            LocalDate examinationDate,
+            String symptoms,
+            String diagnosis,
+            String treatmentProtocol,
+            String medicationNotes,
+            LocalDate followUpDate,
+            String healthStatusAfter,
+            CreatePreventiveCareRequest preventiveCareSchedule,
+            List<CreatePreventiveCareRequest> preventiveSchedules,
+            Integer heartRateBpm,
+            Integer bodyLengthCm,
+            BigDecimal temperatureCelsius,
+            Integer heightCm,
+            BigDecimal weightKg
+    ) {
+        this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, preventiveCareSchedule, preventiveSchedules, heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg, List.of());
+    }
+
     public CreateMedicalExaminationRequest(
             LocalDate examinationDate,
             String symptoms,
@@ -63,5 +90,4 @@ public record CreateMedicalExaminationRequest(
     ) {
         this(examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes, followUpDate, healthStatusAfter, preventiveCareSchedule, preventiveSchedules, null, null, null, null, null);
     }
-}
-
+}

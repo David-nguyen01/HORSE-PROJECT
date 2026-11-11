@@ -60,7 +60,7 @@ class BarnHealthServiceTest {
             return null;
         }).when(jdbc).query(contains("training_locks"), any(RowCallbackHandler.class));
 
-        // 2. Horses query
+        // 2. Horses query (with active photo_url)
         doAnswer(inv -> {
             RowCallbackHandler rch = inv.getArgument(1);
             ResultSet rs = mock(ResultSet.class);
@@ -70,6 +70,7 @@ class BarnHealthServiceTest {
             when(rs.getString("gender")).thenReturn("STALLION");
             when(rs.getString("health_status")).thenReturn("INJURED");
             when(rs.getString("stable_location")).thenReturn("Barn A / Stall 1");
+            when(rs.getString("photo_url")).thenReturn("https://res.cloudinary.com/test/image/upload/v1/horses/champion.jpg");
             rch.processRow(rs);
             return null;
         }).when(jdbc).query(contains("from horses"), any(RowCallbackHandler.class));
@@ -124,6 +125,7 @@ class BarnHealthServiceTest {
         assertThat(stall.code()).isEqualTo("S-01");
         assertThat(stall.horse()).isNotNull();
         assertThat(stall.horse().healthStatus()).isEqualTo("INJURED");
+        assertThat(stall.horse().photoUrl()).isEqualTo("https://res.cloudinary.com/test/image/upload/v1/horses/champion.jpg");
         assertThat(stall.horse().trainingLock()).isNotNull();
         assertThat(stall.horse().trainingLock().isLocked()).isTrue();
         assertThat(stall.horse().trainingLock().reason()).isEqualTo("Tendon injury");

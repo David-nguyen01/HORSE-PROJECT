@@ -420,6 +420,9 @@ public class TrainingScheduleService {
 
     @Transactional(readOnly = true)
     public List<TrainingScheduleResponse> mine(UUID id, LocalDate from, LocalDate to) {
+        if (from == null && to == null) {
+            return repository.findForCaretaker(id).stream().map(this::toResponse).toList();
+        }
         DateRange range = range(from, to);
         return repository.findForCaretaker(id, range.from(), range.to()).stream().map(this::toResponse).toList();
     }

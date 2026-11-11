@@ -20,6 +20,7 @@ import {
   HeartPulse,
   History,
   Home,
+  Image as ImageIcon,
   Info,
   Lock,
   MapPin,
@@ -43,6 +44,8 @@ import {
 } from 'lucide-react'
 import { api, getAuth, pageContent } from './api'
 import { vetApi } from './vetApi'
+import { horseIcon } from './navIcons'
+import { handleImageFallback } from './imageFallback'
 import HorseBodyModel3D from './components/horse3d/HorseBodyModel3D'
 
 const HEALTH_STATUS_MAP = {
@@ -955,7 +958,7 @@ function BarnHealthMapView({ onNavigate, initialHorseId }) {
           (s.stalls || []).forEach((st) => {
             if (st.horse) {
               const horseId = st.horse.horseId
-              hMap[horseId] = { ...hMap[horseId], healthStatus: st.horse.healthStatus, id: horseId }
+              hMap[horseId] = { ...hMap[horseId], healthStatus: st.horse.healthStatus, id: horseId, photoUrl: st.horse.photoUrl || hMap[horseId]?.photoUrl }
               if (st.horse.trainingLock?.isLocked) lMap[horseId] = st.horse.trainingLock
             }
           })
@@ -1050,6 +1053,7 @@ function BarnHealthMapView({ onNavigate, initialHorseId }) {
         intakeStatus: rawHorse.intakeStatus,
         diagnosingVet: rawHorse.diagnosingVet,
         serviceOverride: rawHorse.serviceOverride || false,
+        photoUrl: rawHorse.photoUrl || stall.currentAssignment.photoUrl || null,
       }
       setSelectedHorse(combined)
 
@@ -1284,8 +1288,28 @@ function BarnHealthMapView({ onNavigate, initialHorseId }) {
 
                     {assigned ? (
                       <div>
-                        <div className="stall-horse-name">{horse?.name || assigned.horseName}</div>
-                        <div className="stall-horse-code">Mã: {horse?.code || assigned.horseCode} · {horse?.breed || '—'}</div>
+                        <div className="stall-horse-body">
+                          <div className="stall-horse-avatar-wrap">
+                            {(horse?.photoUrl || assigned.photoUrl) ? (
+                              <img
+                                src={horse?.photoUrl || assigned.photoUrl}
+                                alt={horse?.name || assigned.horseName}
+                                className="stall-horse-avatar-img"
+                                onError={(e) => handleImageFallback(e, 'flex')}
+                              />
+                            ) : null}
+                            <div
+                              className="stall-horse-avatar-fallback"
+                              style={{ display: (horse?.photoUrl || assigned.photoUrl) ? 'none' : 'flex' }}
+                            >
+                              <img src={horseIcon} alt="" className="stall-horse-icon-fallback" />
+                            </div>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div className="stall-horse-name" style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>{horse?.name || assigned.horseName}</div>
+                            <div className="stall-horse-code">Mã: {horse?.code || assigned.horseCode} · {horse?.breed || '—'}</div>
+                          </div>
+                        </div>
                         {isLocked && (
                           <div style={{ marginTop: '6px' }}>
                             <span className="payment-badge unpaid" title="Đang có lệnh khóa huấn luyện y tế">
@@ -1328,14 +1352,32 @@ function BarnHealthMapView({ onNavigate, initialHorseId }) {
               <button className="icon-button" onClick={() => setSelectedHorse(null)}><X size={16} /></button>
             </div>
 
-            <div style={{ background: '#f5f7f3', padding: '14px', borderRadius: '12px', marginBottom: '16px' }}>
-              <h4 style={{ margin: '0 0 4px', fontSize: '17px', color: '#133e31' }}>{selectedHorse.name} ({selectedHorse.code})</h4>
-              <p style={{ margin: 0, fontSize: '12px', color: '#5e7269' }}>
-                Ô chuồng: <b>{selectedHorse.stallCode}</b> | <b>{cleanStableName(activeStable)}</b>
-              </p>
-              <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#5e7269' }}>
-                Giống: <b>{selectedHorse.breed || '—'}</b>
-              </p>
+            <div style={{ background: '#f5f7f3', padding: '14px', borderRadius: '12px', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div className="stall-horse-avatar-wrap" style={{ width: '52px', height: '52px', borderRadius: '10px' }}>
+                {selectedHorse.photoUrl ? (
+                  <img
+                    src={selectedHorse.photoUrl}
+                    alt={selectedHorse.name}
+                    className="stall-horse-avatar-img"
+                    onError={(e) => handleImageFallback(e, 'flex')}
+                  />
+                ) : null}
+                <div
+                  className="stall-horse-avatar-fallback"
+                  style={{ display: selectedHorse.photoUrl ? 'none' : 'flex' }}
+                >
+                  <img src={horseIcon} alt="" className="stall-horse-icon-fallback" style={{ width: '30px', height: '30px' }} />
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <h4 style={{ margin: '0 0 4px', fontSize: '17px', color: '#133e31' }}>{selectedHorse.name} ({selectedHorse.code})</h4>
+                <p style={{ margin: 0, fontSize: '12px', color: '#5e7269' }}>
+                  Ô chuồng: <b>{selectedHorse.stallCode}</b> | <b>{cleanStableName(activeStable)}</b>
+                </p>
+                <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#5e7269' }}>
+                  Giống: <b>{selectedHorse.breed || '—'}</b>
+                </p>
+              </div>
             </div>
 
             {/* Thông tin lâm sàng chỉ xem */}
@@ -1468,6 +1510,29 @@ function AutomatedLocksNotice({ onNavigate }) {
 function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
   const [horses, setHorses] = useState([])
   const [selectedHorseId, setSelectedHorseId] = useState(initialHorseId)
+  const [medicalPhotoUrl, setMedicalPhotoUrl] = useState(null)
+
+  useEffect(() => {
+    if (!selectedHorseId) {
+      setMedicalPhotoUrl(null)
+      return
+    }
+    let active = true
+    api(`/api/horses/${selectedHorseId}/main-file`)
+      .then((file) => {
+        if (active) {
+          if (file?.secureUrl && file?.contentType?.startsWith('image/')) {
+            setMedicalPhotoUrl(file.secureUrl)
+          } else {
+            setMedicalPhotoUrl(null)
+          }
+        }
+      })
+      .catch(() => {
+        if (active) setMedicalPhotoUrl(null)
+      })
+    return () => { active = false }
+  }, [selectedHorseId])
   const [followUpCases, setFollowUpCases] = useState(null)
   const [myMedicalAssignments, setMyMedicalAssignments] = useState(null)
   const [emergencyClaims, setEmergencyClaims] = useState(null)
@@ -1873,7 +1938,23 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
           }))}
         />
         {activeHorse && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="stall-horse-avatar-wrap" style={{ width: '36px', height: '36px', borderRadius: '8px' }}>
+              {medicalPhotoUrl ? (
+                <img
+                  src={medicalPhotoUrl}
+                  alt={activeHorse.name}
+                  className="stall-horse-avatar-img"
+                  onError={(e) => handleImageFallback(e, 'flex')}
+                />
+              ) : null}
+              <div
+                className="stall-horse-avatar-fallback"
+                style={{ display: medicalPhotoUrl ? 'none' : 'flex' }}
+              >
+                <img src={horseIcon} alt="" className="stall-horse-icon-fallback" style={{ width: '20px', height: '20px' }} />
+              </div>
+            </div>
             <span style={{
               padding: '3px 8px',
               borderRadius: '6px',
@@ -2273,6 +2354,27 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
                   <div>
                     <dt style={{ fontSize: '11px', color: '#687971', fontWeight: 600 }}>Phác đồ điều trị:</dt>
                     <dd style={{ margin: '4px 0 0', fontSize: '13px' }}>{rec.treatmentProtocol || rec.treatmentPlan || '—'}</dd>
+                    {rec.attachments && rec.attachments.length > 0 && (
+                      <div className="medical-exam-attachments" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
+                        {rec.attachments.map((att, attIdx) => (
+                          <a
+                            key={att.fileId || attIdx}
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ display: 'block', borderRadius: '6px', overflow: 'hidden', border: '1px solid #d5dcd2', width: '56px', height: '56px', position: 'relative' }}
+                            title={att.filename || 'Xem hình ảnh'}
+                          >
+                            <img
+                              src={att.url}
+                              alt={att.filename || 'Hình ảnh đính kèm'}
+                              onError={handleImageFallback}
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -2937,6 +3039,96 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
     weightKg: '',
   })
   const [busy, setBusy] = useState(false)
+  const [attachments, setAttachments] = useState([])
+  const [attachmentError, setAttachmentError] = useState('')
+  const uploadingCount = attachments.filter((a) => a.uploading).length
+
+  useEffect(() => {
+    return () => {
+      attachments.forEach((a) => {
+        if (a.previewUrl) {
+          try { URL.revokeObjectURL(a.previewUrl) } catch (_) {}
+        }
+      })
+    }
+  }, [attachments])
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files || [])
+    if (!files.length) return
+    setAttachmentError('')
+    e.target.value = ''
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        setAttachmentError(`Tệp "${file.name}" không phải hình ảnh hợp lệ (chấp nhận JPG, PNG, WEBP, GIF, BMP, TIFF).`)
+        continue
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setAttachmentError(`Dung lượng ảnh "${file.name}" vượt quá giới hạn 10MB.`)
+        continue
+      }
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      const previewUrl = URL.createObjectURL(file)
+
+      setAttachments((prev) => [
+        ...prev,
+        {
+          id: tempId,
+          file,
+          previewUrl,
+          filename: file.name,
+          fileSize: file.size,
+          uploading: true,
+          error: null,
+          fileId: null,
+          url: null,
+        },
+      ])
+
+      try {
+        const uploaded = await vetApi.uploadAttachment(file, 'medical-treatment')
+        setAttachments((prev) =>
+          prev.map((item) =>
+            item.id === tempId
+              ? {
+                  ...item,
+                  uploading: false,
+                  fileId: uploaded.id,
+                  url: uploaded.secureUrl || previewUrl,
+                  filename: uploaded.originalFilename || file.name,
+                  fileSize: uploaded.fileSize || file.size,
+                }
+              : item
+          )
+        )
+      } catch (err) {
+        setAttachments((prev) =>
+          prev.map((item) =>
+            item.id === tempId
+              ? {
+                  ...item,
+                  uploading: false,
+                  error: err.message || 'Lỗi tải ảnh lên',
+                }
+              : item
+          )
+        )
+        setAttachmentError(`Tải ảnh "${file.name}" thất bại: ${err.message || 'Lỗi tải lên'}`)
+      }
+    }
+  }
+
+  const removeAttachment = (id) => {
+    setAttachments((prev) => {
+      const target = prev.find((item) => item.id === id)
+      if (target?.previewUrl) {
+        try { URL.revokeObjectURL(target.previewUrl) } catch (_) {}
+      }
+      return prev.filter((item) => item.id !== id)
+    })
+  }
 
   const handleNext = (e) => {
     if (e) e.preventDefault()
@@ -2964,6 +3156,10 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
         setStepError('Ngày tái khám phải sau ngày khám.')
         return
       }
+      if (uploadingCount > 0) {
+        setStepError('Đang tải hình ảnh đính kèm lên Cloudinary, vui lòng đợi hoàn tất.')
+        return
+      }
       setStep(3)
     }
   }
@@ -2975,8 +3171,16 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
       setStepError('Vui lòng chọn thể trạng sau khám trước khi lưu phiếu.')
       return
     }
+    if (uploadingCount > 0) {
+      setStepError('Đang tải hình ảnh đính kèm lên Cloudinary, vui lòng đợi hoàn tất trước khi lưu phiếu.')
+      return
+    }
     setBusy(true)
     try {
+      const attachmentFileIds = attachments
+        .filter((a) => a.fileId && !a.uploading && !a.error)
+        .map((a) => a.fileId)
+
       await vetApi.createMedicalExam(horse.id, {
         examinationDate: form.examinationDate,
         symptoms: form.symptoms,
@@ -2990,6 +3194,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
         heightCm: form.heightCm ? parseInt(form.heightCm, 10) : null,
         temperatureCelsius: form.temperatureCelsius ? parseFloat(form.temperatureCelsius) : null,
         weightKg: form.weightKg ? parseFloat(form.weightKg) : null,
+        attachmentFileIds,
       })
       onSaved()
     } catch (err) {
@@ -3187,6 +3392,117 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
                 value={form.treatmentProtocol}
                 onChange={(e) => setForm({ ...form, treatmentProtocol: e.target.value })}
               />
+            </div>
+            <div className="field full medical-attachments-section" style={{ marginTop: '4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <span style={{ fontWeight: 600, fontSize: '13px', color: '#163f33', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ImageIcon size={15} color="#27714d" />
+                  Ảnh đính kèm phác đồ điều trị (tùy chọn)
+                </span>
+                <label className="button secondary" style={{ cursor: 'pointer', padding: '4px 10px', fontSize: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Upload size={13} />
+                  <span>Chọn ảnh...</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                    disabled={busy || uploadingCount > 0}
+                  />
+                </label>
+              </div>
+
+              <div style={{ fontSize: '11px', color: '#687971', marginBottom: '8px' }}>
+                Hỗ trợ tải lên nhiều hình ảnh (JPG, PNG, WEBP, GIF, BMP, TIFF — tối đa 10MB/ảnh).
+              </div>
+
+              {attachmentError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '6px 10px', borderRadius: '6px', fontSize: '12px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertTriangle size={14} /> {attachmentError}
+                </div>
+              )}
+
+              {attachments.length > 0 && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px', marginTop: '6px' }}>
+                  {attachments.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        position: 'relative',
+                        border: '1px solid #d4e3d9',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        background: '#f8faf8',
+                        padding: '6px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        fontSize: '11px',
+                      }}
+                    >
+                      <div style={{ width: '100%', height: '80px', borderRadius: '4px', overflow: 'hidden', background: '#e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                        {item.previewUrl || item.url ? (
+                          <img
+                            src={item.previewUrl || item.url}
+                            alt={item.filename}
+                            onError={handleImageFallback}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <ImageIcon size={28} color="#9ca3af" />
+                        )}
+                        {item.uploading && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '10px', gap: '4px' }}>
+                            <RefreshCw size={16} className="spin" />
+                            <span>Đang tải...</span>
+                          </div>
+                        )}
+                        {item.error && (
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(239,68,68,0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '10px', padding: '4px', textAlign: 'center' }}>
+                            <span>Lỗi tải</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div style={{ width: '100%', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'center' }} title={item.filename}>
+                        {item.filename}
+                      </div>
+
+                      {item.fileSize && (
+                        <span style={{ fontSize: '10px', color: '#6b7280' }}>
+                          {(item.fileSize / 1024).toFixed(0)} KB
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => removeAttachment(item.id)}
+                        disabled={busy}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          background: 'rgba(0,0,0,0.6)',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: '20px',
+                          height: '20px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                        title="Xóa ảnh"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="field full">
               <span>Kê đơn thuốc & Liều lượng (tùy chọn)</span>
@@ -4148,6 +4464,7 @@ export function HorseProfileModal({ horseId, onClose, onNavigate }) {
   const [currentLock, setCurrentLock] = useState(null)
   const [trainingPlans, setTrainingPlans] = useState([])
   const [weights, setWeights] = useState([])
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState(null)
   const [loading, setLoading] = useState(false)
 
   // ESC key listener to dismiss modal
@@ -4192,6 +4509,7 @@ export function HorseProfileModal({ horseId, onClose, onNavigate }) {
         lockRes,
         plansRes,
         weightsRes,
+        fileRes,
       ] = await Promise.allSettled([
         vetApi.getHorse(selectedHorseId),
         vetApi.getHorseHealthStatus(selectedHorseId),
@@ -4201,6 +4519,7 @@ export function HorseProfileModal({ horseId, onClose, onNavigate }) {
         vetApi.getCurrentTrainingLock(selectedHorseId),
         vetApi.getHorseTrainingPlans(selectedHorseId),
         vetApi.getHorseWeights(selectedHorseId),
+        api('/api/horses/' + selectedHorseId + '/main-file'),
       ])
 
       if (horseRes.status === 'fulfilled') setHorse(horseRes.value)
@@ -4225,6 +4544,11 @@ export function HorseProfileModal({ horseId, onClose, onNavigate }) {
       if (weightsRes.status === 'fulfilled') {
         const wList = Array.isArray(weightsRes.value) ? weightsRes.value : pageContent(weightsRes.value) || []
         setWeights(wList)
+      }
+      if (fileRes.status === 'fulfilled' && fileRes.value?.secureUrl && fileRes.value?.contentType?.startsWith('image/')) {
+        setProfilePhotoUrl(fileRes.value.secureUrl)
+      } else {
+        setProfilePhotoUrl(null)
       }
     } catch (err) {
       console.error('Lỗi tải hồ sơ ngựa:', err)
@@ -4328,18 +4652,36 @@ export function HorseProfileModal({ horseId, onClose, onNavigate }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
             <div
               style={{
-                width: '44px',
-                height: '44px',
+                width: '48px',
+                height: '48px',
                 borderRadius: '50%',
+                overflow: 'hidden',
                 background: '#e8f5ec',
-                color: '#27714d',
                 display: 'grid',
                 placeItems: 'center',
-                fontSize: '20px',
                 boxShadow: '0 2px 8px rgba(39, 113, 77, 0.15)',
+                flexShrink: 0,
+                border: '1px solid rgba(0,0,0,0.08)',
               }}
             >
-              🏇
+              {profilePhotoUrl ? (
+                <img
+                  src={profilePhotoUrl}
+                  alt={horse?.name || ''}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={(e) => handleImageFallback(e, 'grid')}
+                />
+              ) : null}
+              <div
+                style={{
+                  display: profilePhotoUrl ? 'none' : 'grid',
+                  placeItems: 'center',
+                  width: '100%',
+                  height: '100%',
+                }}
+              >
+                <img src={horseIcon} alt="" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+              </div>
             </div>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

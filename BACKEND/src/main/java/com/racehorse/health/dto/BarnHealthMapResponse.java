@@ -40,8 +40,21 @@ public record BarnHealthMapResponse(
             String gender,
             String healthStatus,
             String stableLocation,
-            TrainingLockView trainingLock
-    ) {}
+            TrainingLockView trainingLock,
+            String photoUrl
+    ) {
+        public HorseView(
+                UUID horseId,
+                String code,
+                String name,
+                String gender,
+                String healthStatus,
+                String stableLocation,
+                TrainingLockView trainingLock
+        ) {
+            this(horseId, code, name, gender, healthStatus, stableLocation, trainingLock, null);
+        }
+    }
 
     public record TrainingLockView(
             boolean isLocked,

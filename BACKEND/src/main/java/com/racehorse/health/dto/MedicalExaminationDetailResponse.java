@@ -27,8 +27,44 @@ public record MedicalExaminationDetailResponse(
         Integer bodyLengthCm,
         BigDecimal temperatureCelsius,
         Integer heightCm,
-        BigDecimal weightKg
+        BigDecimal weightKg,
+        List<MedicalAttachmentResponse> attachments
 ) {
+    public MedicalExaminationDetailResponse {
+        if (attachments == null) {
+            attachments = List.of();
+        }
+    }
+
+    public MedicalExaminationDetailResponse(
+            UUID id,
+            UUID horseId,
+            String horseCode,
+            String horseName,
+            UUID veterinarianId,
+            String veterinarianName,
+            LocalDate examinationDate,
+            String symptoms,
+            String diagnosis,
+            String treatmentProtocol,
+            String medicationNotes,
+            LocalDate followUpDate,
+            String healthStatusAfter,
+            OffsetDateTime createdAt,
+            List<AddendumView> addenda,
+            List<UUID> preventiveScheduleIds,
+            Integer heartRateBpm,
+            Integer bodyLengthCm,
+            BigDecimal temperatureCelsius,
+            Integer heightCm,
+            BigDecimal weightKg
+    ) {
+        this(id, horseId, horseCode, horseName, veterinarianId, veterinarianName,
+                examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes,
+                followUpDate, healthStatusAfter, createdAt, addenda, preventiveScheduleIds,
+                heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg, List.of());
+    }
+
     public MedicalExaminationDetailResponse(
             UUID id,
             UUID horseId,
@@ -50,7 +86,7 @@ public record MedicalExaminationDetailResponse(
         this(id, horseId, horseCode, horseName, veterinarianId, veterinarianName,
                 examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes,
                 followUpDate, healthStatusAfter, createdAt, addenda, preventiveScheduleIds,
-                null, null, null, null, null);
+                null, null, null, null, null, List.of());
     }
 
     public MedicalExaminationDetailResponse(
@@ -73,7 +109,7 @@ public record MedicalExaminationDetailResponse(
         this(id, horseId, horseCode, horseName, veterinarianId, veterinarianName,
                 examinationDate, symptoms, diagnosis, treatmentProtocol, medicationNotes,
                 followUpDate, healthStatusAfter, createdAt, addenda, List.of(),
-                null, null, null, null, null);
+                null, null, null, null, null, List.of());
     }
 
     public record AddendumView(
@@ -84,5 +120,4 @@ public record MedicalExaminationDetailResponse(
             String healthStatusAfter,
             OffsetDateTime createdAt
     ) {}
-}
-
+}

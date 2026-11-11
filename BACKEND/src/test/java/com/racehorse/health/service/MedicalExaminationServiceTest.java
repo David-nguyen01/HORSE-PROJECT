@@ -428,4 +428,125 @@ class MedicalExaminationServiceTest {
         verify(jdbc).update(contains("update horses set weight_kg=?"),
                 eq(new java.math.BigDecimal("480.5")), any(), eq(vetId), anyString(), eq(horseId));
     }
+
+    @Test
+    void createWithAttachmentsPersistsAndReturnsAttachments() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
+        UUID fileId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("from stored_files where id = ?"), eq(fileId)))
+                .thenReturn(List.of(Map.of(
+                        "id", fileId,
+                        "uploaded_by_user_id", vetId,
+                        "resource_type", "image",
+                        "original_filename", "xray_hock.jpg",
+                        "file_size", 102400L,
+                        "content_type", "image/jpeg",
+                        "secure_url", "https://res.cloudinary.com/demo/image/upload/xray_hock.jpg"
+                )));
+        when(jdbc.query(contains("select username from users"), any(RowMapper.class), eq(vetId)))
+                .thenReturn(List.of("dr_vet"));
+
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Lameness", "Spavin",
+                "Rest and NSAIDs", "Daily dosage",
+                LocalDate.now().plusDays(7), "MONITOR",
+                null, List.of(),
+                null, null, null, null, null,
+                List.of(fileId));
+
+        MedicalExaminationResponse response = service.create(horseId, vetId, req);
+
+        assertThat(response).isNotNull();
+        assertThat(response.attachments()).hasSize(1);
+        assertThat(response.attachments().get(0).fileId()).isEqualTo(fileId);
+        assertThat(response.attachments().get(0).url()).isEqualTo("https://res.cloudinary.com/demo/image/upload/xray_hock.jpg");
+        assertThat(response.attachments().get(0).filename()).isEqualTo("xray_hock.jpg");
+
+        verify(jdbc).update(contains("insert into module_records"),
+                any(UUID.class), eq(horseId), eq(vetId), eq(req.examinationDate()),
+                contains("xray_hock.jpg"));
+    }
+
+    @Test
+    void createRejectsAttachmentOwnedByAnotherUser() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
+        UUID fileId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("from stored_files where id = ?"), eq(fileId)))
+                .thenReturn(List.of(Map.of(
+                        "id", fileId,
+                        "uploaded_by_user_id", otherUserId,
+                        "resource_type", "image",
+                        "original_filename", "other.jpg",
+                        "file_size", 1024L,
+                        "content_type", "image/jpeg",
+                        "secure_url", "https://res.cloudinary.com/demo/other.jpg"
+                )));
+
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Lameness", "Spavin",
+                "Rest", null, null, "MONITOR",
+                null, List.of(), null, null, null, null, null,
+                List.of(fileId));
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Không có quyền sử dụng file đính kèm");
+    }
+
+    @Test
+    void createRejectsNonExistentAttachment() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
+        UUID fileId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("from stored_files where id = ?"), eq(fileId)))
+                .thenReturn(List.of());
+
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Lameness", "Spavin",
+                "Rest", null, null, "MONITOR",
+                null, List.of(), null, null, null, null, null,
+                List.of(fileId));
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Không tìm thấy file đính kèm");
+    }
+
+    @Test
+    void createRejectsNonImageAttachment() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        assignOriginalVeterinarian(vetId);
+        UUID fileId = UUID.randomUUID();
+
+        when(jdbc.queryForList(contains("from stored_files where id = ?"), eq(fileId)))
+                .thenReturn(List.of(Map.of(
+                        "id", fileId,
+                        "uploaded_by_user_id", vetId,
+                        "resource_type", "raw",
+                        "original_filename", "document.pdf",
+                        "file_size", 2048L,
+                        "content_type", "application/pdf",
+                        "secure_url", "https://res.cloudinary.com/demo/doc.pdf"
+                )));
+
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now(), "Lameness", "Spavin",
+                "Rest", null, null, "MONITOR",
+                null, List.of(), null, null, null, null, null,
+                List.of(fileId));
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("File đính kèm phải là hình ảnh");
+    }
 }

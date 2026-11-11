@@ -167,7 +167,7 @@ a { color: inherit; text-decoration: none; }
 .flow4-tab-btn.active{background:var(--green);color:white;box-shadow:0 4px 14px rgba(18,63,50,.18)}
 .flow4-tab-btn.active .tab-badge{background:var(--lime);color:var(--green)}
 .tab-badge{padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700;background:#dfe4da;color:#3f554c}
-.stall-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px;margin-top:14px}
+.stall-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:14px}
 .stall-card{padding:16px;border:1px solid var(--line);border-radius:13px;background:white;cursor:pointer;display:flex;flex-direction:column;gap:8px;transition:.18s;position:relative}
 .stall-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(33,61,49,.06)}
 .stall-card.occupied{border-left:5px solid var(--green)}
@@ -1186,3 +1186,127 @@ body { font-size: 14px; line-height: 1.5; }
 .horse-avatar-proposal strong { overflow-wrap: anywhere; }
 .horse-avatar-proposal p { margin: 6px 0; }
 .horse-avatar-proposal .hero-actions { margin-left: auto; flex-wrap: wrap; }
+
+
+/* Horse registration optional photo & stall card avatar styles */
+.horse-reg-photo-wrap {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.horse-reg-photo-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 18px 14px;
+  border: 2px dashed #b7cbbf;
+  border-radius: 12px;
+  background: #f8faf8;
+  color: #27714d;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+.horse-reg-photo-dropzone:hover {
+  border-color: #27714d;
+  background: #f0f7f3;
+}
+.horse-reg-photo-dropzone small {
+  color: #63786d;
+  font-size: 11px;
+}
+.horse-reg-preview-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border: 1px solid #d5e2d9;
+  border-radius: 12px;
+  background: #f8faf8;
+}
+.horse-reg-preview-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid #c2d4c7;
+  flex-shrink: 0;
+}
+.horse-reg-preview-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+.horse-reg-preview-meta strong {
+  font-size: 13px;
+  color: #17382d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.horse-reg-preview-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.stall-horse-body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.stall-horse-avatar-wrap {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f0f5f2;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d1ded6;
+  position: relative;
+}
+.stall-horse-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.stall-horse-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #edf5f0;
+}
+.stall-horse-icon-fallback {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  opacity: 0.8;
+}
+
+/* Stables View Polish: natural sizing, eliminated bottom empty space & responsive wrapping */
+.stables-dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .stables-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 520px) {
+  .stall-grid {
+    grid-template-columns: 1fr;
+  }
+}

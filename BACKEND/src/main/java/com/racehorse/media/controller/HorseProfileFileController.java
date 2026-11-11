@@ -45,7 +45,7 @@ public class HorseProfileFileController {
     }
 
     @PutMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("(hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')) or (hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER'))")
+    @PreAuthorize("(hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')) or (hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER'))")
     HorseProfileFileResponse replace(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
@@ -54,7 +54,7 @@ public class HorseProfileFileController {
     }
 
     @DeleteMapping
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     ResponseEntity<Void> delete(@PathVariable UUID horseId) {
         service.deleteActive(horseId);
         return ResponseEntity.noContent().build();
@@ -72,13 +72,13 @@ public class HorseProfileFileController {
     }
 
     @GetMapping("/proposals")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_APPROVE') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_APPROVE') and hasRole('CLUB_MANAGER')")
     List<HorseProfileFileResponse> pendingProposals(@PathVariable UUID horseId) {
         return service.pendingProposals(horseId);
     }
 
     @PostMapping("/proposals/{proposalId}/approve")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     HorseProfileFileResponse approve(
             @PathVariable UUID horseId,
             @PathVariable UUID proposalId,
@@ -87,7 +87,7 @@ public class HorseProfileFileController {
     }
 
     @PostMapping("/proposals/{proposalId}/reject")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasAnyRole('CLUB_MANAGER','HEAD_TRAINER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     ResponseEntity<Void> reject(
             @PathVariable UUID horseId,
             @PathVariable UUID proposalId,

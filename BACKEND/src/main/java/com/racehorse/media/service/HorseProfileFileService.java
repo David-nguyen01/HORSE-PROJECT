@@ -61,7 +61,7 @@ public class HorseProfileFileService {
             MultipartFile multipartFile) {
         Horse horse = horseAccessService.requireExisting(horseId);
         UserAccount actor = findUser(actorId);
-        if (actor.getRoles().contains(Role.HORSE_OWNER)) {
+        if (!actor.getRoles().contains(Role.CLUB_MANAGER) && actor.getRoles().contains(Role.HORSE_OWNER)) {
             horse = horseAccessService.requireOwned(horseId, actorId);
             if (validator.validate(multipartFile).category() != ProfileFileCategory.IMAGE) {
                 throw new BusinessException("Chủ ngựa chỉ được thay ảnh đại diện bằng file hình ảnh");

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArchiveRestore, ArrowRight, Boxes, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronUp, DollarSign, Download, Filter, HeartPulse, KeyRound, Lock, LogOut, Monitor, Package, Pencil, Plus, RotateCcw, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Smartphone, Tag, Trash2, Unlock, UserPlus, Utensils, Warehouse, X, XCircle } from 'lucide-react'
 import { api, apiFetch, inventoryApi, stableCareApi } from './api'
+import { horseIcon } from './navIcons'
+import { handleImageFallback } from './imageFallback'
 
 const initials = (name = '') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'RC'
 
@@ -897,17 +899,37 @@ export function StablesPage(){
                         </div>
                         {assign ? (
                           <div className="stall-horse-info">
-                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'4px'}}>
-                              <b>🐴 {horse ? horse.name : (assign.horseName || 'Ngựa đã phân bổ')}</b>
-                              {isPaid ? (
-                                <span className="badge-payment paid" title="Đã thanh toán phí dịch vụ">✓ Đã trả phí</span>
-                              ) : isOverride ? (
-                                <span className="badge-payment override" title={horse?.overrideReason || "Được Club Manager bảo lãnh"}>⭐ Bảo lãnh</span>
-                              ) : (
-                                <span className="badge-payment unpaid" title="Chưa thanh toán phí dịch vụ">⚠️ Chưa phí</span>
-                              )}
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '4px' }}>
+                              <div className="stall-horse-avatar-wrap" style={{ width: '36px', height: '36px', borderRadius: '6px' }}>
+                                {(assign.photoUrl || horse?.photoUrl) ? (
+                                  <img
+                                    src={assign.photoUrl || horse?.photoUrl}
+                                    alt={horse ? horse.name : assign.horseName}
+                                    className="stall-horse-avatar-img"
+                                    onError={(e) => handleImageFallback(e, 'flex')}
+                                  />
+                                ) : null}
+                                <div
+                                  className="stall-horse-avatar-fallback"
+                                  style={{ display: (assign.photoUrl || horse?.photoUrl) ? 'none' : 'flex' }}
+                                >
+                                  <img src={horseIcon} alt="" className="stall-horse-icon-fallback" style={{ width: '20px', height: '20px' }} />
+                                </div>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:'4px'}}>
+                                  <b style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{horse ? horse.name : (assign.horseName || 'Ngựa đã phân bổ')}</b>
+                                  {isPaid ? (
+                                    <span className="badge-payment paid" title="Đã thanh toán phí dịch vụ">✓ Đã trả phí</span>
+                                  ) : isOverride ? (
+                                    <span className="badge-payment override" title={horse?.overrideReason || "Được Club Manager bảo lãnh"}>⭐ Bảo lãnh</span>
+                                  ) : (
+                                    <span className="badge-payment unpaid" title="Chưa thanh toán phí dịch vụ">⚠️ Chưa phí</span>
+                                  )}
+                                </div>
+                                <small>Mã: {horse ? horse.code : (assign.horseCode || assign.horseId?.slice(0,8))}</small>
+                              </div>
                             </div>
-                            <small>Mã: {horse ? horse.code : (assign.horseCode || assign.horseId?.slice(0,8))}</small>
                             <small>Từ ngày: {new Date(assign.assignedFrom).toLocaleDateString('vi-VN')}</small>
                           </div>
                         ) : (
@@ -2144,3 +2166,5 @@ function EditInventoryItemModal({ item, onClose, onSaved }) {
     </Dialog>
   )
 }
+
+export { default as TaskCatalogPage } from './TaskCatalogPage'

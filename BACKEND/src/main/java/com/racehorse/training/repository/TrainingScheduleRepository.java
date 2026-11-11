@@ -68,10 +68,40 @@ public interface TrainingScheduleRepository extends JpaRepository<TrainingSchedu
     List<TrainingSchedule> findPublishedBetween(@Param("from") Instant from, @Param("to") Instant to);
 
     @EntityGraph(attributePaths = {"phase", "horse", "racetrack", "createdBy"})
-    @Query("select s from TrainingSchedule s where s.horse.caretaker.id=:userId and s.publishedAt is not null and s.cancelledAt is null and s.scheduledStart < :toExclusive and s.scheduledEnd > :fromInclusive order by s.scheduledStart")
+    @Query("""
+            select s from TrainingSchedule s
+            where s.horse.caretaker.id = :userId
+              and s.publishedAt is not null
+              and s.cancelledAt is null
+              and s.completedAt is null
+              and (s.sessionStatus is null or s.sessionStatus in ('PREPARING', 'READY'))
+            order by s.scheduledStart
+            """)
+    List<TrainingSchedule> findForCaretaker(@Param("userId") UUID userId);
+
+    @EntityGraph(attributePaths = {"phase", "horse", "racetrack", "createdBy"})
+    @Query("""
+            select s from TrainingSchedule s
+            where s.horse.caretaker.id = :userId
+              and s.publishedAt is not null
+              and s.cancelledAt is null
+              and s.completedAt is null
+              and (s.sessionStatus is null or s.sessionStatus in ('PREPARING', 'READY'))
+              and (:fromInclusive is null or s.scheduledEnd > :fromInclusive)
+              and (:toExclusive is null or s.scheduledStart < :toExclusive)
+            order by s.scheduledStart
+            """)
     List<TrainingSchedule> findForCaretaker(@Param("userId") UUID userId, @Param("fromInclusive") Instant fromInclusive, @Param("toExclusive") Instant toExclusive);
 
     @EntityGraph(attributePaths = {"phase", "horse", "racetrack", "createdBy"})
-    @Query("select s from TrainingSchedule s where s.horse.diagnosingVet.id=:userId and s.publishedAt is not null and s.cancelledAt is null and s.scheduledStart < :toExclusive and s.scheduledEnd > :fromInclusive order by s.scheduledStart")
+    @Query("""
+            select s from TrainingSchedule s
+            where s.horse.diagnosingVet.id = :userId
+              and s.publishedAt is not null
+              and s.cancelledAt is null
+              and (:fromInclusive is null or s.scheduledEnd > :fromInclusive)
+              and (:toExclusive is null or s.scheduledStart < :toExclusive)
+            order by s.scheduledStart
+            """)
     List<TrainingSchedule> findForDiagnosingVet(@Param("userId") UUID userId, @Param("fromInclusive") Instant fromInclusive, @Param("toExclusive") Instant toExclusive);
 }

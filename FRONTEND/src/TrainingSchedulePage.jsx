@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Calendar, Check, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, X } from 'lucide-react'
 import { api, pageContent } from './api'
-import { fitnessStatusFromBpm, isInjuredHorse, restDaysIssue } from './trainingRules'
+import { fitnessStatusFromBpm, isInjuredHorse, restDaysIssue, isHorseFitForTraining, getHorseIneligibilityReason } from './trainingRules'
 import { decodeUnicodeEscapes } from './decodeUnicodeEscapes'
 
 /**
@@ -303,7 +303,11 @@ export default function TrainingSchedulePage({ isOwner = false, isHeadTrainer = 
         </span>
         <select value={filterHorse} onChange={(e) => { setSchedules([]); setPlans([]); setFilterHorse(e.target.value) }} style={{ marginLeft: 'auto' }} disabled={horsesLoading}>
           <option value="">{horsesLoading ? 'Đang tải ngựa...' : isOwner ? 'Ngựa của tôi đã có huấn luyện viên' : 'Tất cả ngựa'}</option>
-          {horses.map(h => <option key={h.id} value={h.id}>{h.code} · {h.name}</option>)}
+          {horses.map(h => {
+            const fit = isHorseFitForTraining(h)
+            const tag = !fit ? ` [${getHorseIneligibilityReason(h)}]` : ''
+            return <option key={h.id} value={h.id}>{h.code} · {h.name}{tag}</option>
+          })}
         </select>
         {!horsesLoading && horses.length === 0 && <span>{isOwner ? 'Chưa có ngựa nào của bạn được phân công huấn luyện viên.' : 'Không có ngựa đang hoạt động.'}</span>}
       </div>
@@ -695,6 +699,9 @@ function CreatePlanModal({ horses, horsesLoading, onClose, onSaved }) {
     setError('')
     try {
       const selectedHorse = horses.find(horse => horse.id === form.horseId)
+      if (!isHorseFitForTraining(selectedHorse)) {
+        throw new Error(`Ngựa không đủ điều kiện lập kế hoạch huấn luyện: ${getHorseIneligibilityReason(selectedHorse)}. Ngựa phải hoàn tất khám và có trạng thái FIT.`)
+      }
       if (copyPlanId) {
         const result = await api(`/api/training-plans/${copyPlanId}/copy`, {
           method: 'POST',
@@ -743,9 +750,22 @@ function CreatePlanModal({ horses, horsesLoading, onClose, onSaved }) {
             <select required value={form.horseId} disabled={horsesLoading || horses.length === 0}
               onChange={event => setForm(current => ({ ...current, horseId: event.target.value }))}>
               <option value="">{horsesLoading ? 'Đang tải ngựa…' : horses.length ? '-- Chọn ngựa --' : 'Không có ngựa đang hoạt động'}</option>
-              {horses.map(horse => <option key={horse.id} value={horse.id}>{horse.code} · {horse.name}</option>)}
+              {horses.map(horse => {
+                const fit = isHorseFitForTraining(horse)
+                const reason = !fit ? getHorseIneligibilityReason(horse) : ''
+                return (
+                  <option key={horse.id} value={horse.id} disabled={!fit}>
+                    {horse.code} · {horse.name}{!fit ? ` (Không đủ ĐK: ${reason})` : ''}
+                  </option>
+                )
+              })}
             </select>
           </label>
+          {form.horseId && !isHorseFitForTraining(horses.find(h => h.id === form.horseId)) && (
+            <p className="notice error full">
+              Ngựa không đủ điều kiện lập kế hoạch huấn luyện ({getHorseIneligibilityReason(horses.find(h => h.id === form.horseId))}). Ngựa phải hoàn tất khám và có trạng thái FIT.
+            </p>
+          )}
           <label className="field full"><span>Tên kế hoạch *</span><input required maxLength={200} value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} /></label>
           <label className="field full">
             <span>Sao chép kế hoạch hiện có (không bắt buộc)</span>
@@ -778,7 +798,7 @@ function CreatePlanModal({ horses, horsesLoading, onClose, onSaved }) {
           {isInjuredHorse(horses.find(horse => horse.id === form.horseId)) && <p className="notice error full">Ngựa đang bị chấn thương nên không thể tạo hoặc sao chép kế hoạch huấn luyện.</p>}
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
-            <button className="button primary" disabled={busy || horsesLoading || horses.length === 0 || (!copyPlanId && form.phases.some(phase => !phase.restDays?.length)) || isInjuredHorse(horses.find(horse => horse.id === form.horseId))}><Check size={17} />{busy ? 'Đang lưu…' : copyPlanId ? 'Sao chép kế hoạch' : 'Lưu kế hoạch'}</button>
+            <button className="button primary" disabled={busy || horsesLoading || horses.length === 0 || !isHorseFitForTraining(horses.find(horse => horse.id === form.horseId)) || (!copyPlanId && form.phases.some(phase => !phase.restDays?.length))}><Check size={17} />{busy ? 'Đang lưu…' : copyPlanId ? 'Sao chép kế hoạch' : 'Lưu kế hoạch'}</button>
           </div>
         </form>
       </div>
@@ -1052,6 +1072,11 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
       setError('Vui lòng chọn ngựa trước khi tạo lịch tập.')
       return
     }
+    const selectedHorseObj = horses.find(h => h.id === selectedHorse)
+    if (!isHorseFitForTraining(selectedHorseObj)) {
+      setError(`Ngựa không đủ điều kiện tạo buổi tập: ${getHorseIneligibilityReason(selectedHorseObj)}. Ngựa phải hoàn tất khám và có trạng thái FIT.`)
+      return
+    }
     if (!phase?.id) {
       setError('Ngựa chưa có giai đoạn huấn luyện đang hoạt động. Hãy tạo hoặc kích hoạt kế hoạch trước khi xếp lịch.')
       return
@@ -1093,9 +1118,22 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
             <span>Chọn ngựa *</span>
             <select required value={selectedHorse} disabled={horsesLoading || horses.length === 0} onChange={e => { setSelectedHorse(e.target.value); setSelectedPhase('') }}>
               <option value="">{horsesLoading ? 'Đang tải ngựa…' : horses.length ? '-- Chọn ngựa --' : 'Không có ngựa đang hoạt động'}</option>
-              {horses.map(h => <option key={h.id} value={h.id}>{h.code} · {h.name}</option>)}
+              {horses.map(h => {
+                const fit = isHorseFitForTraining(h)
+                const reason = !fit ? getHorseIneligibilityReason(h) : ''
+                return (
+                  <option key={h.id} value={h.id} disabled={!fit}>
+                    {h.code} · {h.name}{!fit ? ` (Không đủ ĐK: ${reason})` : ''}
+                  </option>
+                )
+              })}
             </select>
           </label>
+          {selectedHorse && !isHorseFitForTraining(horses.find(h => h.id === selectedHorse)) && (
+            <div className="notice error full">
+              Ngựa không đủ điều kiện tạo buổi tập: {getHorseIneligibilityReason(horses.find(h => h.id === selectedHorse))}. Ngựa phải hoàn tất khám và có trạng thái FIT.
+            </div>
+          )}
 
           <label className="field full">
             <span>Giai đoạn huấn luyện *</span>
@@ -1148,7 +1186,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
 
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
-            <button className="button primary" disabled={busy || horsesLoading || !horses.length || !phase?.id || !selectedLane || selectedTrainingDateIsRestDay || highIntensityLocked || (phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'loading')}>
+            <button className="button primary" disabled={busy || horsesLoading || !horses.length || !isHorseFitForTraining(horses.find(h => h.id === selectedHorse)) || !phase?.id || !selectedLane || selectedTrainingDateIsRestDay || highIntensityLocked || (phase?.workloadIntensity === 'HIGH' && lockStatus.state === 'loading')}>
               <Check size={17} />{busy ? 'Đang lưu…' : 'Tạo lịch huấn luyện'}
             </button>
           </div>

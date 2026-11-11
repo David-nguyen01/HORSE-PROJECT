@@ -409,6 +409,18 @@ class HorseServiceTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    @Test
+    void toResponseIncludesInternalHealthStatus() {
+        Horse horse = horseEntity("H-FIT-001");
+        ReflectionTestUtils.setField(horse, "healthStatus", "FIT");
+        HorseResponse response = new HorseMapper().toResponse(horse);
+        assertThat(response.healthStatus()).isEqualTo("FIT");
+
+        ReflectionTestUtils.setField(horse, "healthStatus", "INJURED");
+        HorseResponse injuredResponse = new HorseMapper().toResponse(horse);
+        assertThat(injuredResponse.healthStatus()).isEqualTo("INJURED");
+    }
+
     private CreateHorseRequest request(String code, HorseStatus status) {
         return new CreateHorseRequest(
                 code,

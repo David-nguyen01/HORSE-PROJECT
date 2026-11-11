@@ -15,10 +15,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.sql.ResultSet;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
 public class StableService {
+    private static final Logger log = LoggerFactory.getLogger(StableService.class);
     private final JdbcTemplate jdbc;
     private final HorseAccessService horseAccess;
     private final ObjectMapper json;
@@ -232,7 +237,8 @@ public class StableService {
                 stable.name() + " / " + stall.code(), horseId);
         createDefaultDailyRoutineIfAbsent(horseId, horse, actor);
         return new AssignmentView(assignmentId, stableId, stable.name(), stallId, stall.code(), horseId,
-                horse.getName(), horse.getCode(), actor, now, null, true);
+                horse.getName(), horse.getCode(), actor, now, null, true,
+                null, false, null, false, findActivePhotoUrl(horseId));
     }
 
     @Transactional
@@ -363,7 +369,8 @@ public class StableService {
         return new AssignmentView(newAssignmentId, targetStableId, targetStable.name(), targetStallId, targetStall.code(),
                 horseId, horse.getName(), horse.getCode(), actor, now, null, true,
                 currentAssignment.horseHealthStatus(), currentAssignment.trainingLocked(),
-                currentAssignment.trainingLockReason(), currentAssignment.emergencyActive());
+                currentAssignment.trainingLockReason(), currentAssignment.emergencyActive(),
+                currentAssignment.photoUrl() != null ? currentAssignment.photoUrl() : findActivePhotoUrl(horseId));
     }
 
     private void validateHealthCompatibility(UUID targetStableId, UUID horseId, String horseHealthStatus) {
@@ -404,7 +411,8 @@ public class StableService {
         jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
                 current.horseId());
         return new AssignmentView(current.id(), current.stableId(), current.stableName(), current.stallId(),
-                current.stallCode(), current.horseId(), current.horseName(), current.horseCode(), current.assignedBy(), current.assignedFrom(), now, false);
+                current.stallCode(), current.horseId(), current.horseName(), current.horseCode(), current.assignedBy(), current.assignedFrom(), now, false,
+                current.horseHealthStatus(), current.trainingLocked(), current.trainingLockReason(), current.emergencyActive(), current.photoUrl());
     }
 
     private StableView buildStable(UUID id, String name, String location, boolean active) {
@@ -423,11 +431,13 @@ public class StableService {
         List<AssignmentView> rows = jdbc.query("select top 1 m.id,m.horse_id,m.user_id,m.data_json,h.name horse_name,h.code horse_code, "
                         + "h.health_status, h.status horse_status, h.health_source_type, "
                         + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
-                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason "
+                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason, "
+                        + "(select top 1 hpf.secure_url from horse_profile_files hpf where hpf.horse_id=h.id and hpf.status='ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc) as photo_url "
                         + "from module_records m left join horses h on h.id=m.horse_id "
                         + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
                         + "and JSON_VALUE(m.data_json,'$.stallId')=? order by m.created_at desc",
                 (rs, row) -> {
+                    UUID horseId = rs.getObject("horse_id", UUID.class);
                     String healthStatus = rs.getString("health_status");
                     String healthSourceType = rs.getString("health_source_type");
                     String horseStatus = rs.getString("horse_status");
@@ -437,11 +447,15 @@ public class StableService {
                     boolean emergencyActive = "INJURED".equalsIgnoreCase(healthStatus)
                             || "INJURED".equalsIgnoreCase(horseStatus)
                             || "TRAINING_EMERGENCY".equalsIgnoreCase(healthSourceType);
-                    return assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
+                    String photoUrl = rs.getString("photo_url");
+                    TrainingScheduleSummary trainingSchedule = findActiveTrainingSchedule(horseId);
+                    boolean isTrainingActive = trainingSchedule != null;
+                    return assignment(rs.getObject("id", UUID.class), horseId,
                             rs.getString("horse_name"), rs.getString("horse_code"),
                             rs.getObject("user_id", UUID.class), rs.getString("data_json"), stableId, stableName, true,
                             healthStatus != null && !healthStatus.isBlank() ? healthStatus : "ACTIVE",
-                            trainingLocked, lockReason, emergencyActive);
+                            trainingLocked, lockReason, emergencyActive, photoUrl,
+                            isTrainingActive, trainingSchedule);
                 },
                 stallId.toString());
         return rows.isEmpty() ? null : rows.getFirst();
@@ -451,7 +465,8 @@ public class StableService {
         List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name,h.name horse_name,h.code horse_code, "
                         + "h.health_status, h.status horse_status, h.health_source_type, "
                         + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
-                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason "
+                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason, "
+                        + "(select top 1 hpf.secure_url from horse_profile_files hpf where hpf.horse_id=h.id and hpf.status='ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc) as photo_url "
                         + "from module_records m with (UPDLOCK, HOLDLOCK) join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
                         + "left join horses h on h.id=m.horse_id "
                         + "where m.id=? and m.record_type='STALL_ASSIGNMENT'",
@@ -465,13 +480,14 @@ public class StableService {
                     boolean emergencyActive = "INJURED".equalsIgnoreCase(healthStatus)
                             || "INJURED".equalsIgnoreCase(horseStatus)
                             || "TRAINING_EMERGENCY".equalsIgnoreCase(healthSourceType);
+                    String photoUrl = rs.getString("photo_url");
                     return assignment(rs.getObject("id", UUID.class), rs.getObject("horse_id", UUID.class),
                             rs.getString("horse_name"), rs.getString("horse_code"),
                             rs.getObject("user_id", UUID.class), rs.getString("data_json"),
                             UUID.fromString(read(rs.getString("data_json")).path("stableId").asText()),
                             rs.getString("stable_name"), "ACTIVE".equals(rs.getString("status")),
                             healthStatus != null && !healthStatus.isBlank() ? healthStatus : "ACTIVE",
-                            trainingLocked, lockReason, emergencyActive);
+                            trainingLocked, lockReason, emergencyActive, photoUrl);
                 }, id);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy phân bổ chuồng: " + id);
         return rows.getFirst();
@@ -479,19 +495,44 @@ public class StableService {
 
     private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
                                       UUID stableId, String stableName, boolean active) {
-        return assignment(id, horseId, horseName, horseCode, actor, jsonValue, stableId, stableName, active, null, false, null, false);
+        return assignment(id, horseId, horseName, horseCode, actor, jsonValue, stableId, stableName, active, null, false, null, false, null);
     }
 
     private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
                                       UUID stableId, String stableName, boolean active,
                                       String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive) {
+        return assignment(id, horseId, horseName, horseCode, actor, jsonValue, stableId, stableName, active, horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive, null);
+    }
+
+    private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
+                                      UUID stableId, String stableName, boolean active,
+                                      String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive,
+                                      String photoUrl) {
+        return assignment(id, horseId, horseName, horseCode, actor, jsonValue, stableId, stableName, active,
+                horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive, photoUrl, false, null);
+    }
+
+    private AssignmentView assignment(UUID id, UUID horseId, String horseName, String horseCode, UUID actor, String jsonValue,
+                                      UUID stableId, String stableName, boolean active,
+                                      String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive,
+                                      String photoUrl, boolean isTrainingActive, TrainingScheduleSummary trainingSchedule) {
         JsonNode node = read(jsonValue);
         String until = node.path("assignedUntil").isNull() ? null : node.path("assignedUntil").asText(null);
         return new AssignmentView(id, stableId, stableName, UUID.fromString(node.path("stallId").asText()),
                 node.path("stallCode").asText(), horseId, horseName, horseCode, actor,
                 OffsetDateTime.parse(node.path("assignedFrom").asText()),
                 until == null || until.isBlank() ? null : OffsetDateTime.parse(until), active,
-                horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive);
+                horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive, photoUrl,
+                isTrainingActive, trainingSchedule);
+    }
+
+    private String findActivePhotoUrl(UUID horseId) {
+        if (horseId == null) return null;
+        List<String> list = jdbc.query(
+                "select top 1 secure_url from horse_profile_files where horse_id=? and status='ACTIVE' and content_type like 'image/%' order by created_at desc",
+                (rs, rowNum) -> rs.getString("secure_url"),
+                horseId);
+        return list.isEmpty() ? null : list.getFirst();
     }
 
     private void addStallInternal(UUID stableId, UUID actor, String code) {
@@ -563,10 +604,11 @@ public class StableService {
     }
 
     @Transactional
-    public DailyRoutineView addDailyRoutine(UUID horseId, UUID actor, DailyRoutineRequest request) {
+    public DailyRoutineView addDailyRoutine(UUID horseId, UUID actor, boolean isStaff, DailyRoutineRequest request) {
         Horse horse = horseAccess.requireActive(horseId);
         validateRoutine(request);
         validateRoutineAllowedForHorse(horseId, horse, request);
+        validateStaffMutationAllowed(horseId, horse);
         UUID routineId = UUID.randomUUID();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("activityType", request.activityType().trim().toUpperCase(Locale.ROOT));
@@ -583,11 +625,12 @@ public class StableService {
     }
 
     @Transactional
-    public DailyRoutineView updateDailyRoutine(UUID routineId, UUID actor, DailyRoutineRequest request) {
+    public DailyRoutineView updateDailyRoutine(UUID routineId, UUID actor, boolean isStaff, DailyRoutineRequest request) {
         validateRoutine(request);
         DailyRoutineView existing = getDailyRoutine(routineId);
         Horse horse = horseAccess.requireActive(existing.horseId());
         validateRoutineAllowedForHorse(existing.horseId(), horse, request);
+        validateStaffMutationAllowed(existing.horseId(), horse);
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("activityType", request.activityType().trim().toUpperCase(Locale.ROOT));
         data.put("startTime", request.startTime().toString());
@@ -601,13 +644,130 @@ public class StableService {
                 request.startTime(), request.endTime(), trimToNull(request.notes()), true);
     }
 
+
     @Transactional
-    public void deleteDailyRoutine(UUID routineId) {
-        getDailyRoutine(routineId);
-        jdbc.update("update module_records set status='INACTIVE', updated_at=SYSDATETIMEOFFSET() where id=?", routineId);
+    public DailyRoutineView addDailyRoutine(UUID horseId, UUID actor, DailyRoutineRequest request) {
+        return addDailyRoutine(horseId, actor, true, request);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
+    public DailyRoutineView updateDailyRoutine(UUID routineId, UUID actor, DailyRoutineRequest request) {
+        return updateDailyRoutine(routineId, actor, true, request);
+    }
+
+    private void validateStaffMutationAllowed(UUID horseId, Horse horse) {
+        boolean isInjured = horse != null && (
+                "INJURED".equalsIgnoreCase(horse.getHealthStatus())
+                || (horse.getStatus() != null && "INJURED".equalsIgnoreCase(horse.getStatus().name()))
+        );
+        if (isInjured || hasActiveTrainingLock(horseId) || hasActiveEmergency(horseId)) {
+            throw new BusinessException("Ngựa đang trong chế độ điều trị chấn thương hoặc có lệnh khóa y tế. Nhân viên chuồng không được tạo hoặc thay đổi lịch sinh hoạt.");
+        }
+        if (isHorseCurrentlyTraining(horseId)) {
+            throw new BusinessException("Ngựa đang trong lịch trình huấn luyện. Nhân viên chuồng không được tạo hoặc thay đổi lịch sinh hoạt mặc định.");
+        }
+    }
+
+    private boolean hasActiveTrainingLock(UUID horseId) {
+        if (jdbc == null) return false;
+        try {
+            Integer count = jdbc.queryForObject(
+                    "select count(*) from training_locks where horse_id=? and released_at is null",
+                    Integer.class, horseId);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean hasActiveEmergency(UUID horseId) {
+        if (jdbc == null) return false;
+        try {
+            Integer count = jdbc.queryForObject(
+                    "select count(*) from horses where id=? and (health_source_type='TRAINING_EMERGENCY' or health_status='INJURED' or status='INJURED')",
+                    Integer.class, horseId);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private OffsetDateTime readOffsetDateTime(ResultSet rs, String col) {
+        try {
+            OffsetDateTime odt = rs.getObject(col, OffsetDateTime.class);
+            if (odt != null) return odt;
+        } catch (Exception ignored) {
+        }
+        try {
+            java.sql.Timestamp ts = rs.getTimestamp(col);
+            if (ts != null) {
+                return ts.toInstant().atZone(ZoneId.of("Asia/Bangkok")).toOffsetDateTime();
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    public TrainingScheduleSummary findActiveTrainingSchedule(UUID horseId) {
+        if (jdbc == null || horseId == null) return null;
+        try {
+            List<TrainingScheduleSummary> list = jdbc.query("""
+                    select top 1
+                        s.id,
+                        s.task_name,
+                        r.name as racetrack_name,
+                        s.workload_intensity,
+                        s.scheduled_start,
+                        s.scheduled_end,
+                        s.session_status
+                    from training_schedules s
+                    join training_plan_phases ph on ph.id = s.training_plan_phase_id
+                    join training_plans tp on tp.id = ph.training_plan_id
+                    left join racetracks r on r.id = s.racetrack_id
+                    where s.horse_id = ?
+                      and s.cancelled_at is null
+                      and (
+                        (s.session_status = 'IN_PROGRESS'
+                         and cast(s.scheduled_start at time zone 'SE Asia Standard Time' as date) = cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date))
+                        or (
+                          tp.is_active = 1
+                          and cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date) between ph.start_date and ph.end_date
+                          and s.published_at is not null
+                          and s.session_status in ('PREPARING', 'READY')
+                          and cast(s.scheduled_start at time zone 'SE Asia Standard Time' as date) = cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date)
+                        )
+                      )
+                    order by
+                      case when s.session_status = 'IN_PROGRESS' then 0 when s.session_status = 'READY' then 1 else 2 end,
+                      s.scheduled_start asc
+                    """,
+                    (rs, row) -> new TrainingScheduleSummary(
+                            rs.getObject("id", UUID.class),
+                            rs.getString("task_name"),
+                            rs.getString("racetrack_name"),
+                            rs.getString("workload_intensity"),
+                            readOffsetDateTime(rs, "scheduled_start"),
+                            readOffsetDateTime(rs, "scheduled_end"),
+                            rs.getString("session_status")
+                    ),
+                    horseId);
+            return list.isEmpty() ? null : list.getFirst();
+        } catch (Exception e) {
+            log.warn("Failed to query active training schedule for horse {}: {}", horseId, e.getMessage());
+            return null;
+        }
+    }
+
+    public boolean isHorseCurrentlyTraining(UUID horseId) {
+        if (jdbc == null || horseId == null) return false;
+        try {
+            return findActiveTrainingSchedule(horseId) != null;
+        } catch (Exception e) {
+            log.warn("Failed to check if horse is currently training {}: {}", horseId, e.getMessage());
+            return false;
+        }
+    }
+
     public DailyRoutineView getDailyRoutine(UUID routineId) {
         List<DailyRoutineView> rows = jdbc.query("select id, horse_id, status, data_json from module_records "
                         + "where id=? and module_code='STABLE_CARE' and record_type='HORSE_DAILY_ROUTINE'",
@@ -631,6 +791,9 @@ public class StableService {
         if (r.activityType() == null || r.activityType().isBlank()) throw new BusinessException("Hoạt động sinh hoạt không được để trống");
         if (r.startTime() == null || r.endTime() == null) throw new BusinessException("Thời gian bắt đầu và kết thúc không được để trống");
         if (!r.startTime().isBefore(r.endTime())) throw new BusinessException("Giờ bắt đầu phải trước giờ kết thúc");
+        if ("OTHER".equalsIgnoreCase(r.activityType().trim()) && (r.notes() == null || r.notes().isBlank())) {
+            throw new BusinessException("Vui lòng nhập nội dung cho hoạt động khác");
+        }
     }
 
     private void validateRoutineAllowedForHorse(UUID horseId, Horse horse, DailyRoutineRequest r) {
@@ -807,15 +970,44 @@ public class StableService {
     }
     public record StableView(UUID id, String name, String location, boolean active, List<StallView> stalls) {}
     public record StallView(UUID id, String code, boolean active, AssignmentView currentAssignment) {}
+    public record TrainingScheduleSummary(
+            UUID id,
+            String taskName,
+            String racetrackName,
+            String workloadIntensity,
+            OffsetDateTime scheduledStart,
+            OffsetDateTime scheduledEnd,
+            String sessionStatus
+    ) {}
     public record AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
                                  UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
                                  OffsetDateTime assignedUntil, boolean active,
-                                 String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive) {
+                                 String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive,
+                                 String photoUrl,
+                                 boolean isTrainingActive,
+                                 TrainingScheduleSummary trainingSchedule) {
         public AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
                               UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
                               OffsetDateTime assignedUntil, boolean active) {
             this(id, stableId, stableName, stallId, stallCode, horseId, horseName, horseCode, assignedBy,
-                    assignedFrom, assignedUntil, active, null, false, null, false);
+                    assignedFrom, assignedUntil, active, null, false, null, false, null, false, null);
+        }
+
+        public AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
+                              UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
+                              OffsetDateTime assignedUntil, boolean active,
+                              String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive) {
+            this(id, stableId, stableName, stallId, stallCode, horseId, horseName, horseCode, assignedBy,
+                    assignedFrom, assignedUntil, active, horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive, null, false, null);
+        }
+
+        public AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
+                              UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
+                              OffsetDateTime assignedUntil, boolean active,
+                              String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive,
+                              String photoUrl) {
+            this(id, stableId, stableName, stallId, stallCode, horseId, horseName, horseCode, assignedBy,
+                    assignedFrom, assignedUntil, active, horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive, photoUrl, false, null);
         }
     }
     public record DailyRoutineView(UUID id, UUID horseId, String activityType, LocalTime startTime, LocalTime endTime, String notes, boolean active) {}

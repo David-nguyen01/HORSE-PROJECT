@@ -106,6 +106,35 @@ public class MedicalExaminationService {
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
         if (emergencyIncidentId == null) requireDoctorForExamination(horse, veterinarianId, currentFollowUpId);
 
+        List<MedicalAttachmentResponse> attachments = new ArrayList<>();
+        if (req.attachmentFileIds() != null && !req.attachmentFileIds().isEmpty()) {
+            for (UUID fileId : req.attachmentFileIds()) {
+                if (fileId == null) continue;
+                List<Map<String, Object>> files = jdbc.queryForList(
+                        "select id, uploaded_by_user_id, resource_type, original_filename, file_size, content_type, secure_url from stored_files where id = ?",
+                        fileId);
+                if (files.isEmpty()) {
+                    throw new ResourceNotFoundException("Không tìm thấy file đính kèm: " + fileId);
+                }
+                Map<String, Object> file = files.getFirst();
+                UUID uploaderId = (UUID) file.get("uploaded_by_user_id");
+                if (!Objects.equals(uploaderId, veterinarianId)) {
+                    throw new BusinessException("Không có quyền sử dụng file đính kèm không thuộc sở hữu của bạn: " + fileId);
+                }
+                String resourceType = (String) file.get("resource_type");
+                String contentType = (String) file.get("content_type");
+                boolean isImage = "image".equalsIgnoreCase(resourceType) || (contentType != null && contentType.toLowerCase(Locale.ROOT).startsWith("image/"));
+                if (!isImage) {
+                    throw new BusinessException("File đính kèm phải là hình ảnh: " + fileId);
+                }
+                String url = (String) file.get("secure_url");
+                String filename = (String) file.get("original_filename");
+                Number fileSizeNum = (Number) file.get("file_size");
+                Long fileSize = fileSizeNum != null ? fileSizeNum.longValue() : null;
+                attachments.add(new MedicalAttachmentResponse(fileId, url, filename, fileSize, contentType));
+            }
+        }
+
         UUID examId = UUID.randomUUID();
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("symptoms", req.symptoms().trim());
@@ -123,6 +152,9 @@ public class MedicalExaminationService {
             data.put("weightKg", req.weightKg());
             jdbc.update("update horses set weight_kg=?, weight_record_id=?, weight_measured_at=SYSDATETIMEOFFSET(), weight_measured_by_user_id=?, weight_notes=?, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?",
                     req.weightKg(), examId, veterinarianId, "Ghi nhận lúc khám lâm sàng: " + req.diagnosis().trim(), horseId);
+        }
+        if (!attachments.isEmpty()) {
+            data.put("attachments", attachments);
         }
 
         jdbc.update("""
@@ -215,7 +247,8 @@ public class MedicalExaminationService {
                 req.bodyLengthCm(),
                 req.temperatureCelsius(),
                 req.heightCm(),
-                req.weightKg());
+                req.weightKg(),
+                attachments);
     }
 
     @Transactional
@@ -330,12 +363,13 @@ public class MedicalExaminationService {
             BigDecimal temperatureCelsius = node.hasNonNull("temperatureCelsius") ? new BigDecimal(node.path("temperatureCelsius").asText()) : null;
             Integer heightCm = node.hasNonNull("heightCm") ? node.path("heightCm").asInt() : null;
             BigDecimal weightKg = node.hasNonNull("weightKg") ? new BigDecimal(node.path("weightKg").asText()) : null;
+            List<MedicalAttachmentResponse> attachments = parseAttachments(node);
 
             return new MedicalExaminationDetailResponse(
                     id, horseId, horseCode, horseName, vetId, vetName,
                     examDate, symptoms, diagnosis, treatment, medication,
                     followUpDate, healthStatusAfter, createdAt, List.of(), scheduleIds,
-                    heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg);
+                    heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg, attachments);
         }, examId);
 
         if (rows.isEmpty()) {
@@ -373,7 +407,7 @@ public class MedicalExaminationService {
                 exam.followUpDate(), exam.healthStatusAfter(),
                 exam.createdAt(), addenda, exam.preventiveScheduleIds(),
                 exam.heartRateBpm(), exam.bodyLengthCm(), exam.temperatureCelsius(),
-                exam.heightCm(), exam.weightKg());
+                exam.heightCm(), exam.weightKg(), exam.attachments());
     }
 
     @Transactional(readOnly = true)
@@ -414,13 +448,32 @@ public class MedicalExaminationService {
             BigDecimal temperatureCelsius = node.hasNonNull("temperatureCelsius") ? new BigDecimal(node.path("temperatureCelsius").asText()) : null;
             Integer heightCm = node.hasNonNull("heightCm") ? node.path("heightCm").asInt() : null;
             BigDecimal weightKg = node.hasNonNull("weightKg") ? new BigDecimal(node.path("weightKg").asText()) : null;
+            List<MedicalAttachmentResponse> attachments = parseAttachments(node);
 
             return new MedicalExaminationResponse(
                     id, horseId, vetId, vetName,
                     examDate, symptoms, diagnosis, treatment, medication,
                     followUpDate, healthStatusAfter, createdAt, addendaCount,
-                    heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg);
+                    heartRateBpm, bodyLengthCm, temperatureCelsius, heightCm, weightKg, attachments);
         }, horseId);
+    }
+
+    private List<MedicalAttachmentResponse> parseAttachments(JsonNode node) {
+        if (node == null || !node.has("attachments") || !node.path("attachments").isArray()) {
+            return List.of();
+        }
+        List<MedicalAttachmentResponse> list = new ArrayList<>();
+        for (JsonNode attNode : node.path("attachments")) {
+            try {
+                UUID fileId = attNode.hasNonNull("fileId") ? UUID.fromString(attNode.path("fileId").asText()) : null;
+                String url = attNode.path("url").asText("");
+                String filename = attNode.path("filename").asText("");
+                Long fileSize = attNode.hasNonNull("fileSize") ? attNode.path("fileSize").asLong() : null;
+                String contentType = attNode.path("contentType").asText("");
+                list.add(new MedicalAttachmentResponse(fileId, url, filename, fileSize, contentType));
+            } catch (Exception ignored) {}
+        }
+        return Collections.unmodifiableList(list);
     }
 
     private String normalizeHealthStatus(String status) {

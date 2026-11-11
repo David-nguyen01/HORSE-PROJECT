@@ -47,6 +47,14 @@ export const vetApi = {
     api(`/api/medical-examinations/addenda/${addendumId}`, {
       method: 'DELETE',
     }),
+  uploadAttachment: (file, scope = 'medical-treatment') => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api(`/api/files?scope=${encodeURIComponent(scope)}`, {
+      method: 'POST',
+      body: formData,
+    })
+  },
 
   // Injury Tracking
   getHorseInjuries: (horseId, status) =>

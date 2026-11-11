@@ -97,24 +97,21 @@ public class StableController {
     }
 
     @PostMapping("/horses/{horseId}/daily-routines") @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasRole('STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.DailyRoutineView addDailyRoutine(@PathVariable UUID horseId, @AuthenticationPrincipal Jwt jwt,
+                                                   Authentication authentication,
                                                    @Valid @RequestBody StableService.DailyRoutineRequest request) {
-        return service.addDailyRoutine(horseId, user(jwt), request);
+        return service.addDailyRoutine(horseId, user(jwt), true, request);
     }
 
     @PutMapping("/daily-routines/{routineId}")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasRole('STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.DailyRoutineView updateDailyRoutine(@PathVariable UUID routineId, @AuthenticationPrincipal Jwt jwt,
+                                                      Authentication authentication,
                                                       @Valid @RequestBody StableService.DailyRoutineRequest request) {
-        return service.updateDailyRoutine(routineId, user(jwt), request);
+        return service.updateDailyRoutine(routineId, user(jwt), true, request);
     }
 
-    @DeleteMapping("/daily-routines/{routineId}") @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
-    void deleteDailyRoutine(@PathVariable UUID routineId) {
-        service.deleteDailyRoutine(routineId);
-    }
 
     @GetMapping("/routines/backfill-preview")
     @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
@@ -123,7 +120,7 @@ public class StableController {
     }
 
     @PostMapping("/routines/backfill-execute")
-    @PreAuthorize("hasAnyRole('HEAD_TRAINER','CLUB_MANAGER') and hasAuthority('PERM_STABLE_CARE_EDIT')")
+    @PreAuthorize("hasRole('STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.RoutineBackfillPreview executeRoutineBackfill(@AuthenticationPrincipal Jwt jwt) {
         return service.executeRoutineBackfill(user(jwt));
     }

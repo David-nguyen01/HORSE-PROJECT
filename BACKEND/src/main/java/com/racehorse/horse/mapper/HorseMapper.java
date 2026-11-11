@@ -51,6 +51,7 @@ public class HorseMapper {
                 ownerships.stream().map(this::ownerSummary).toList(),
                 horse.getStableLocation(),
                 horse.getStatus(),
+                horse.getHealthStatus(),
                 horse.getArchivedAt(),
                 horse.getCreatedAt(),
                 horse.getUpdatedAt(),

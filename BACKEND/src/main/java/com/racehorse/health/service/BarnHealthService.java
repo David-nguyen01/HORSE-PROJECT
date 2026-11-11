@@ -54,12 +54,13 @@ public class BarnHealthService {
                     true, lockId, reason, reviewDate, lockedAt));
         });
 
-        // 2. Fetch all active horses
+        // 2. Fetch all active horses (including active profile photo)
         Map<UUID, BarnHealthMapResponse.HorseView> horsesById = new HashMap<>();
         jdbc.query("""
-                select id, code, name, gender, health_status, stable_location
-                from horses
-                where archived_at is null
+                select h.id, h.code, h.name, h.gender, h.health_status, h.stable_location,
+                       (select top 1 hpf.secure_url from horse_profile_files hpf where hpf.horse_id = h.id and hpf.status = 'ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc) as photo_url
+                from horses h
+                where h.archived_at is null
                 """, rs -> {
             UUID id = rs.getObject("id", UUID.class);
             String code = rs.getString("code");
@@ -70,10 +71,11 @@ public class BarnHealthService {
                 healthStatus = "UNKNOWN";
             }
             String stableLocation = rs.getString("stable_location");
+            String photoUrl = rs.getString("photo_url");
             BarnHealthMapResponse.TrainingLockView lockView = activeLocks.get(id);
 
             horsesById.put(id, new BarnHealthMapResponse.HorseView(
-                    id, code, name, gender, healthStatus, stableLocation, lockView));
+                    id, code, name, gender, healthStatus, stableLocation, lockView, photoUrl));
         });
 
         // 3. Fetch active stall assignments: stallId -> horseId

@@ -3,6 +3,8 @@ package com.racehorse.media.service;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.entity.UserAccount;
 import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.common.exception.BusinessException;
+import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.entity.Horse;
 import com.racehorse.horse.entity.HorseGender;
 import com.racehorse.horse.entity.HorseStatus;
@@ -27,7 +29,9 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -76,6 +80,189 @@ class HorseProfileFileServiceTest {
         assertThat(response.status()).isEqualTo(ProfileFileStatus.ACTIVE);
         assertThat(response.approvedAt()).isEqualTo(NOW);
         assertThat(response.approvedBy().username()).isEqualTo("manager");
+        verify(horseAccessService, never()).requireOwned(any(), any());
+    }
+
+    @Test
+    void clubManagerOnlyReplacesHorsePhotoWithoutOwnershipRecord() {
+        UUID horseId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount manager = user("manager", Role.CLUB_MANAGER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(managerId)).thenReturn(Optional.of(manager));
+        when(cloudStorage.upload(any(byte[].class), any(String.class), any(UUID.class)))
+                .thenReturn(imageAsset());
+        when(repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(HorseProfileFile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseProfileFileResponse response = service.replaceDirectly(
+                horseId, managerId, imageFile());
+
+        assertThat(response.status()).isEqualTo(ProfileFileStatus.ACTIVE);
+        assertThat(response.approvedAt()).isEqualTo(NOW);
+        assertThat(response.approvedBy().username()).isEqualTo("manager");
+        verify(horseAccessService, never()).requireOwned(any(), any());
+    }
+
+    @Test
+    void clubManagerAndHorseOwnerReplacesHorsePhotoWithoutOwnershipRecord() {
+        UUID horseId = UUID.randomUUID();
+        UUID multiRoleId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount multiRoleUser = userWithRoles("manager-owner", Role.CLUB_MANAGER, Role.HORSE_OWNER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(multiRoleId)).thenReturn(Optional.of(multiRoleUser));
+        when(cloudStorage.upload(any(byte[].class), any(String.class), any(UUID.class)))
+                .thenReturn(imageAsset());
+        when(repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(HorseProfileFile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseProfileFileResponse response = service.replaceDirectly(
+                horseId, multiRoleId, imageFile());
+
+        assertThat(response.status()).isEqualTo(ProfileFileStatus.ACTIVE);
+        assertThat(response.approvedAt()).isEqualTo(NOW);
+        assertThat(response.approvedBy().username()).isEqualTo("manager-owner");
+        verify(horseAccessService, never()).requireOwned(any(), any());
+    }
+
+    @Test
+    void clubManagerAndHorseOwnerReplacesHorsePhotoWhenOwningHorse() {
+        UUID horseId = UUID.randomUUID();
+        UUID multiRoleId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount multiRoleUser = userWithRoles("manager-owner", Role.CLUB_MANAGER, Role.HORSE_OWNER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(multiRoleId)).thenReturn(Optional.of(multiRoleUser));
+        when(cloudStorage.upload(any(byte[].class), any(String.class), any(UUID.class)))
+                .thenReturn(imageAsset());
+        when(repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(HorseProfileFile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseProfileFileResponse response = service.replaceDirectly(
+                horseId, multiRoleId, imageFile());
+
+        assertThat(response.status()).isEqualTo(ProfileFileStatus.ACTIVE);
+        assertThat(response.approvedAt()).isEqualTo(NOW);
+        assertThat(response.approvedBy().username()).isEqualTo("manager-owner");
+        verify(horseAccessService, never()).requireOwned(any(), any());
+    }
+
+    @Test
+    void horseOwnerOnlyReplacesPersonallyOwnedHorsePhoto() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount owner = user("owner", Role.HORSE_OWNER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        when(horseAccessService.requireOwned(horseId, ownerId)).thenReturn(horse);
+        when(cloudStorage.upload(any(byte[].class), any(String.class), any(UUID.class)))
+                .thenReturn(imageAsset());
+        when(repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(HorseProfileFile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseProfileFileResponse response = service.replaceDirectly(
+                horseId, ownerId, imageFile());
+
+        assertThat(response.status()).isEqualTo(ProfileFileStatus.ACTIVE);
+        assertThat(response.approvedAt()).isEqualTo(NOW);
+        assertThat(response.approvedBy().username()).isEqualTo("owner");
+        verify(horseAccessService).requireOwned(horseId, ownerId);
+    }
+
+    @Test
+    void horseOwnerOnlyIsRejectedWhenAttemptingToReplaceAnotherOwnerHorsePhoto() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount owner = user("owner", Role.HORSE_OWNER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        when(horseAccessService.requireOwned(horseId, ownerId))
+                .thenThrow(new ResourceNotFoundException("Not authorized for horse"));
+
+        assertThatThrownBy(() -> service.replaceDirectly(horseId, ownerId, imageFile()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Not authorized for horse");
+
+        verify(cloudStorage, never()).upload(any(byte[].class), any(String.class), any(UUID.class));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void horseOwnerOnlyFileTypeRestrictionsRemainEnforced() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount owner = user("owner", Role.HORSE_OWNER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(ownerId)).thenReturn(Optional.of(owner));
+        when(horseAccessService.requireOwned(horseId, ownerId)).thenReturn(horse);
+
+        MockMultipartFile pdf = pdfFile();
+        assertThatThrownBy(() -> service.replaceDirectly(horseId, ownerId, pdf))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Chủ ngựa chỉ được thay ảnh đại diện bằng file hình ảnh");
+
+        verify(cloudStorage, never()).upload(any(byte[].class), any(String.class), any(UUID.class));
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void clubManagerDocumentReplacementBehaviorRemainsUnchanged() {
+        UUID horseId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount manager = user("manager", Role.CLUB_MANAGER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(managerId)).thenReturn(Optional.of(manager));
+        when(cloudStorage.upload(any(byte[].class), any(String.class), any(UUID.class)))
+                .thenReturn(pdfAsset());
+        when(repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(HorseProfileFile.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        HorseProfileFileResponse response = service.replaceDirectly(
+                horseId, managerId, pdfFile());
+
+        assertThat(response.status()).isEqualTo(ProfileFileStatus.ACTIVE);
+        assertThat(response.contentType()).isEqualTo("application/pdf");
+        assertThat(response.format()).isEqualTo("pdf");
+        assertThat(response.approvedBy().username()).isEqualTo("manager");
+        verify(horseAccessService, never()).requireOwned(any(), any());
+    }
+
+    @Test
+    void replaceDirectlyRollsBackCloudinaryAssetWhenPersistenceFails() {
+        UUID horseId = UUID.randomUUID();
+        UUID managerId = UUID.randomUUID();
+        Horse horse = horse();
+        UserAccount manager = user("manager", Role.CLUB_MANAGER);
+        when(horseAccessService.requireExisting(horseId)).thenReturn(horse);
+        when(userRepository.findById(managerId)).thenReturn(Optional.of(manager));
+        when(cloudStorage.upload(any(byte[].class), any(String.class), any(UUID.class)))
+                .thenReturn(imageAsset());
+        when(repository.findFirstByHorseIdAndStatus(horseId, ProfileFileStatus.ACTIVE))
+                .thenReturn(Optional.empty());
+        when(repository.save(any(HorseProfileFile.class)))
+                .thenThrow(new RuntimeException("Simulated persistence failure"));
+
+        assertThatThrownBy(() -> service.replaceDirectly(horseId, managerId, imageFile()))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessage("Simulated persistence failure");
+
+        verify(cloudStorage).delete("racehorse/horses/file", "image");
     }
 
     @Test
@@ -162,6 +349,10 @@ class HorseProfileFileServiceTest {
         return new MockMultipartFile("file", "horse.png", "image/png", new byte[]{(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1});
     }
 
+    private MockMultipartFile pdfFile() {
+        return new MockMultipartFile("file", "document.pdf", "application/pdf", "%PDF-1.4 sample content".getBytes());
+    }
+
     private CloudAsset imageAsset() {
         return new CloudAsset(
                 "asset-id",
@@ -170,6 +361,16 @@ class HorseProfileFileServiceTest {
                 "png",
                 3,
                 "https://res.cloudinary.com/example/image/upload/file.png");
+    }
+
+    private CloudAsset pdfAsset() {
+        return new CloudAsset(
+                "asset-id-pdf",
+                "racehorse/horses/document",
+                "image",
+                "pdf",
+                25,
+                "https://res.cloudinary.com/example/image/upload/document.pdf");
     }
 
     private HorseProfileFile profileFile(
@@ -196,6 +397,14 @@ class HorseProfileFileServiceTest {
                 username + "@example.com",
                 "encoded-password",
                 Set.of(role));
+    }
+
+    private UserAccount userWithRoles(String username, Role... roles) {
+        return new UserAccount(
+                username,
+                username + "@example.com",
+                "encoded-password",
+                Set.of(roles));
     }
 
     private Horse horse() {
