@@ -396,9 +396,15 @@ function HorseRow({ horse }) {
 }
 
 function HorseCard({ horse }) {
+  const photoUrl = horse.profilePhoto?.contentType?.startsWith('image/') && horse.profilePhoto.secureUrl
+    ? horse.profilePhoto.secureUrl : horsePortrait(horse)
   return <Link className="horse-profile-card" to={`/horses/${horse.id}`}>
     <div className="horse-profile-cover" aria-hidden="true" />
-    <img className="horse-profile-photo" src={horsePortrait(horse)} alt="Ảnh minh họa ngựa" loading="lazy" />
+    <img className="horse-profile-photo" src={photoUrl} alt={horse.profilePhoto ? horse.name : 'Ảnh minh họa ngựa'} loading="lazy"
+      onError={event => {
+        const fallback = horsePortrait(horse)
+        if (event.currentTarget.src !== new URL(fallback, window.location.href).href) event.currentTarget.src = fallback
+      }} />
     <div className="horse-profile-info">
       <b>{horse.name}</b>
       <span>{horse.breed || '—'}</span>
@@ -410,10 +416,34 @@ function HorseCard({ horse }) {
 function Horses() {
   const { user } = useAuth(); const canEdit = hasAny(user, 'CLUB_MANAGER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !canEdit; const canAdd = hasAny(user, 'CLUB_MANAGER', 'HORSE_OWNER')
   const [horses, setHorses] = useState([]); const [query, setQuery] = useState(''); const [status, setStatus] = useState(''); const [loading, setLoading] = useState(true); const [showCreate, setShowCreate] = useState(false)
-  const load = useCallback(() => {
+  const loadRequest = useRef(0)
+  const load = useCallback(async () => {
+    const request = ++loadRequest.current
     setLoading(true); const params = new URLSearchParams({ size: '100' }); if (query) params.set('query', query); if (status) params.set('status', status)
     const path = hasAny(user, 'HORSE_OWNER') && !canEdit ? `/api/horses/mine?${params}` : `/api/horses?${params}`
-    api(path).then((data) => setHorses(pageContent(data))).catch(() => setHorses([])).finally(() => setLoading(false))
+    try {
+      const list = pageContent(await api(path))
+      const withPhotos = []
+      for (let start = 0; start < list.length; start += 5) {
+        const batch = await Promise.all(list.slice(start, start + 5).map(async horse => {
+          try {
+            const profilePhoto = await api(`/api/horses/${horse.id}/main-file`)
+            return { ...horse, profilePhoto }
+          } catch {
+            return horse
+          }
+        }))
+        withPhotos.push(...batch)
+        if (request !== loadRequest.current) return
+        setHorses([...withPhotos, ...list.slice(withPhotos.length)])
+        setLoading(false)
+      }
+      if (!list.length) setHorses([])
+    } catch {
+      if (request === loadRequest.current) setHorses([])
+    } finally {
+      if (request === loadRequest.current) setLoading(false)
+    }
   }, [query, status, user, canEdit])
   useEffect(() => { if (hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF')) load(); else setLoading(false) }, [load, user])
   return <><PageHeading eyebrow="FR01 · HỒ SƠ GỐC" title="Danh mục ngựa" description="Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành." action={canAdd && <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Thêm ngựa</button>} /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên, mã hoặc số chip…" /></label><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div><section className="card table-card horse-catalog">{loading ? <Empty title="Đang tải dữ liệu…" text="Vui lòng chờ trong giây lát." /> : horses.length ? <div className="horse-profile-grid">{horses.map((h) => <HorseCard key={h.id} horse={h} />)}</div> : <Empty title="Không tìm thấy hồ sơ" text="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." />}</section>{showCreate && <HorseModal isOwner={isOwner} onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); load() }} />}</>
@@ -988,14 +1018,16 @@ function HorseOwnerPaymentCard({ horse, onPaid }) {
       <div><small>Gói hiện tại</small><b>{currentPlan ? `${currentPlan.slice(1)} ngày` : 'Chưa có gói'}</b></div>
       <div><small>Trạng thái</small><b>{paid ? 'Đã thanh toán' : 'Chờ thanh toán'}</b></div>
       <div><small>Ngày đến hạn</small><b>{ownPlan?.nextDueDate || '—'}</b></div></div>
-    {!paid && <div className="horse-payment-actions">
-      {currentPlan
-        ? <button className="button primary" disabled={busy || !wallet || Number(wallet.balanceVnd) < Number(ownPlan?.renewalAmountVnd || 0)} onClick={pay}>
-            {busy ? 'Đang thanh toán…' : 'Gia hạn cho ngựa'}</button>
-        : <Link className="button primary" to="/wallet">Đăng ký gói và đồng ý điều khoản</Link>}
-      <Link className="button secondary" to="/wallet">Nạp tiền / xem ví</Link>
-    </div>}
-    <Link className="button secondary horse-payment-wallet-link" to="/wallet">Thanh toán · Ví & gói dịch vụ</Link>
+    <div className="horse-payment-actions">
+      {!paid && <>
+        {currentPlan
+          ? <button className="button primary" disabled={busy || !wallet || Number(wallet.balanceVnd) < Number(ownPlan?.renewalAmountVnd || 0)} onClick={pay}>
+              {busy ? 'Đang thanh toán…' : 'Gia hạn cho ngựa'}</button>
+          : <Link className="button primary" to="/wallet">Đăng ký gói và đồng ý điều khoản</Link>}
+        <Link className="button secondary" to="/wallet">Nạp tiền / xem ví</Link>
+      </>}
+      <Link className="button secondary horse-payment-wallet-link" to="/wallet">Thanh toán · Ví & gói dịch vụ</Link>
+    </div>
     <p className="wallet-hint">Gói của ngựa tự gia hạn vào kỳ tiếp theo khi ví đủ số dư.</p>
   </section>
 }
