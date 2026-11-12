@@ -63,18 +63,29 @@ export default function WalletPage() {
   useEffect(() => { refresh().catch(err => setError(err.message)) }, [refresh])
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search)
-    const responseCode = params.get('vnp_ResponseCode')
-    if (responseCode) {
-      if (responseCode === '00') {
-        setMessage('Thanh toán VNPAY thành công. Đang cập nhật số dư ví...')
-        refresh().catch(() => {})
-      } else {
-        setError(`Giao dịch thanh toán VNPAY không thành công hoặc đã bị hủy (Mã: ${responseCode}).`)
-      }
+    const search = window.location.search
+    if (!search) return
+    const params = new URLSearchParams(search)
+    if (params.has('vnp_ResponseCode')) {
+      const data = Object.fromEntries(params.entries())
+      window.history.replaceState({}, '', window.location.pathname)
+      setBusy(true)
+      api('/api/wallet/vnpay/return', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      })
+        .then(res => {
+          if (res.success) {
+            setMessage(res.message || 'Nạp ví thành công qua VNPAY!')
+            refresh().catch(() => {})
+          } else {
+            setError(res.message || 'Giao dịch VNPAY không thành công.')
+          }
+        })
+        .catch(err => setError(err.message || 'Không thể xác nhận giao dịch VNPAY.'))
+        .finally(() => setBusy(false))
     }
-  }, [location.search, refresh])
-
+  }, [refresh])
   useEffect(() => {
     if (!order || order.status !== 'PENDING') return
     const tick = () => setSeconds(Math.max(0, Math.ceil((new Date(order.expiresAt).getTime() - Date.now()) / 1000)))
@@ -153,7 +164,7 @@ export default function WalletPage() {
                   <b>Đơn thanh toán VNPAY · {order.orderCode}</b>
                   <p>{money(order.amountVnd)} · Hết hạn sau {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</p>
                   {order.checkoutUrl ? (
-                    <a className="button primary" href={order.checkoutUrl} target="_blank" rel="noreferrer">
+                    <a className="button primary" href={order.checkoutUrl}>
                       Mở cổng thanh toán VNPAY
                     </a>
                   ) : (

@@ -207,8 +207,9 @@ public class WalletService {
                 return Map.of("RspCode", "04", "Message", "Invalid amount");
             }
 
+            String txStatus = parameters.get("vnp_TransactionStatus");
             if (!"00".equals(parameters.get("vnp_ResponseCode"))
-                    || !"00".equals(parameters.get("vnp_TransactionStatus"))) {
+                    || (txStatus != null && !"00".equals(txStatus))) {
                 jdbc.update("update module_records set status='FAILED',updated_at=SYSDATETIMEOFFSET() "
                         + "where id=? and status='PENDING'", orderId);
                 return Map.of("RspCode", "00", "Message", "Confirm Success");
@@ -218,6 +219,32 @@ public class WalletService {
             return Map.of("RspCode", "00", "Message", "Confirm Success");
         } catch (NumberFormatException exception) {
             return Map.of("RspCode", "04", "Message", "Invalid request data");
+        }
+    }
+
+    @Transactional
+    public Map<String, Object> acceptVnpayReturn(Map<String, String> parameters) {
+        if (!gateway.isVnpay() || !gateway.verifyVnpay(parameters))
+            return Map.of("success", false, "message", "Chữ ký giao dịch không hợp lệ");
+        String responseCode = parameters.get("vnp_ResponseCode");
+        String txStatus = parameters.get("vnp_TransactionStatus");
+        if (!"00".equals(responseCode) || (txStatus != null && !"00".equals(txStatus)))
+            return Map.of("success", false, "message", "Giao dịch không thành công (mã phản hồi: " + responseCode + ")");
+        try {
+            long orderCode = Long.parseLong(parameters.getOrDefault("vnp_TxnRef", ""));
+            long amountRaw = Long.parseLong(parameters.getOrDefault("vnp_Amount", ""));
+            if (amountRaw <= 0 || amountRaw % 100 != 0)
+                return Map.of("success", false, "message", "Số tiền không hợp lệ");
+            long receivedVnd = amountRaw / 100;
+            List<UUID> ids = jdbc.query("select id from module_records where payos_order_code=? "
+                            + "and module_code='SYSTEM' and record_type='PAYOS_TOPUP'",
+                    (rs, n) -> rs.getObject(1, UUID.class), orderCode);
+            if (ids.isEmpty()) return Map.of("success", false, "message", "Không tìm thấy đơn nạp ví");
+            complete(ids.getFirst(), receivedVnd);
+            return Map.of("success", true, "message", "Nạp tiền thành công qua VNPAY",
+                    "amountVnd", receivedVnd, "orderCode", orderCode);
+        } catch (NumberFormatException exception) {
+            return Map.of("success", false, "message", "Dữ liệu giao dịch không hợp lệ");
         }
     }
 

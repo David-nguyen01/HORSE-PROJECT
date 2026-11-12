@@ -93,14 +93,15 @@ final class VnpayGateway implements PayosGateway {
     public boolean verifyVnpay(Map<String, String> parameters) {
         if (parameters == null || !terminalId.equals(parameters.get("vnp_TmnCode"))) return false;
         String provided = parameters.get("vnp_SecureHash");
-        if (provided == null || !provided.matches("[0-9a-fA-F]{128}")) return false;
+        if (provided == null || !provided.trim().matches("(?i)[0-9a-f]{128}")) return false;
         TreeMap<String, String> signed = new TreeMap<>();
         parameters.forEach((key, value) -> {
-            if (key.startsWith("vnp_") && !"vnp_SecureHash".equals(key) && !"vnp_SecureHashType".equals(key))
+            if (key.startsWith("vnp_") && !"vnp_SecureHash".equals(key) && !"vnp_SecureHashType".equals(key)
+                    && value != null && !value.isBlank())
                 signed.put(key, value);
         });
         byte[] expected = HexFormat.of().parseHex(sign(encode(signed)));
-        byte[] actual = HexFormat.of().parseHex(provided);
+        byte[] actual = HexFormat.of().parseHex(provided.trim());
         return MessageDigest.isEqual(expected, actual);
     }
 
@@ -112,6 +113,7 @@ final class VnpayGateway implements PayosGateway {
 
     private String encode(Map<String, String> parameters) {
         return parameters.entrySet().stream()
+                .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
                 .map(entry -> URLEncoder.encode(entry.getKey(), StandardCharsets.UTF_8) + "="
                         + URLEncoder.encode(entry.getValue(), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));

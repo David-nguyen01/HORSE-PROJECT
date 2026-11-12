@@ -33,6 +33,11 @@ class VnpayGatewayTest {
         assertEquals("500000000", parameters.get("vnp_Amount"));
         assertTrue(gateway.verifyVnpay(parameters));
 
+        // VNPay may return blank optional parameters (e.g. BankTranNo, CardType) which must be ignored
+        parameters.put("vnp_BankTranNo", "");
+        parameters.put("vnp_CardType", "   ");
+        assertTrue(gateway.verifyVnpay(parameters));
+
         parameters.put("vnp_Amount", "500000001");
         assertFalse(gateway.verifyVnpay(parameters));
     }

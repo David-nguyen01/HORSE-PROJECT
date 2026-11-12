@@ -201,6 +201,54 @@ class WalletServiceVnpayTest {
     }
 
     @Test
+    void acceptVnpayReturnReturnsErrorOnInvalidSignature() {
+        when(gateway.isVnpay()).thenReturn(true);
+        when(gateway.verifyVnpay(any())).thenReturn(false);
+
+        Map<String, Object> result = service.acceptVnpayReturn(Map.of("vnp_SecureHash", "invalid"));
+        assertEquals(false, result.get("success"));
+        assertTrue(((String) result.get("message")).contains("Chữ ký"));
+    }
+
+    @Test
+    void acceptVnpayReturnCreditsWalletOnSuccess() {
+        when(gateway.isVnpay()).thenReturn(true);
+        when(gateway.verifyVnpay(any())).thenReturn(true);
+
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        when(jdbc.query(anyString(), any(RowMapper.class), eq(123456L))).thenReturn(List.of(orderId));
+
+        when(jdbc.query(anyString(), any(RowMapper.class), eq(orderId))).thenReturn(List.of(
+                Map.of(
+                        "id", orderId,
+                        "user_id", userId,
+                        "status", "PENDING",
+                        "payos_expected_amount_vnd", BigDecimal.valueOf(100_000),
+                        "payos_expires_at", Instant.parse("2026-11-11T12:30:00Z"),
+                        "data_json", "{}"
+                )
+        ));
+
+        when(jdbc.queryForList(contains("from users"), eq(userId))).thenReturn(List.of(
+                Map.of("id", userId, "wallet_balance_vnd", BigDecimal.valueOf(200_000))
+        ));
+
+        Map<String, String> params = Map.of(
+                "vnp_TxnRef", "123456",
+                "vnp_Amount", "10000000",
+                "vnp_ResponseCode", "00"
+        );
+
+        Map<String, Object> result = service.acceptVnpayReturn(params);
+        assertEquals(true, result.get("success"));
+        assertEquals(100_000L, result.get("amountVnd"));
+        verify(jdbc).update(contains("update users set wallet_balance_vnd=wallet_balance_vnd+?"),
+                eq(BigDecimal.valueOf(100_000)), eq(userId));
+    }
+
+    @Test
     void createTopUpFailsWhenGatewayNotVnpay() {
         when(gateway.isVnpay()).thenReturn(false);
 
