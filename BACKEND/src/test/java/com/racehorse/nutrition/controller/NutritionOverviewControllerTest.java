@@ -61,6 +61,31 @@ class NutritionOverviewControllerTest {
         assertThat(swAuth).isNotNull();
         assertThat(swAuth.value()).isEqualTo("hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')");
         assertThat(stablesWorkloadMethod.getAnnotation(GetMapping.class).value()).containsExactly("/stables-workload");
+
+        Method createMethod = NutritionOverviewController.class.getDeclaredMethod("createStandardPlan",
+                org.springframework.security.oauth2.jwt.Jwt.class,
+                org.springframework.security.core.Authentication.class,
+                com.racehorse.nutrition.dto.CreateStandardFeedingPlanRequest.class);
+        PreAuthorize createAuth = createMethod.getAnnotation(PreAuthorize.class);
+        assertThat(createAuth).isNotNull();
+        assertThat(createAuth.value()).isEqualTo("hasRole('VETERINARIAN')");
+
+        Method updateMethod = NutritionOverviewController.class.getDeclaredMethod("updateStandardPlan",
+                String.class,
+                org.springframework.security.oauth2.jwt.Jwt.class,
+                org.springframework.security.core.Authentication.class,
+                com.racehorse.nutrition.dto.UpdateStandardFeedingPlanRequest.class);
+        PreAuthorize updateAuth = updateMethod.getAnnotation(PreAuthorize.class);
+        assertThat(updateAuth).isNotNull();
+        assertThat(updateAuth.value()).isEqualTo("hasRole('VETERINARIAN')");
+
+        Method deleteMethod = NutritionOverviewController.class.getDeclaredMethod("deleteStandardPlan",
+                String.class,
+                org.springframework.security.oauth2.jwt.Jwt.class,
+                org.springframework.security.core.Authentication.class);
+        PreAuthorize deleteAuth = deleteMethod.getAnnotation(PreAuthorize.class);
+        assertThat(deleteAuth).isNotNull();
+        assertThat(deleteAuth.value()).isEqualTo("hasRole('VETERINARIAN')");
     }
 
     @Test

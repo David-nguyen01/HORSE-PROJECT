@@ -483,6 +483,7 @@ function AppLayout() {
     { to: '/vet', label: 'Bảng điều khiển y tế', icon: HeartPulse },
     { to: '/vet/health-map', label: 'Bản đồ chuồng & Thể trạng', icon: Home },
     { to: '/vet/medical-records', label: 'Hồ sơ bệnh án & Chấn thương', icon: FileText },
+    { to: '/vet/nutrition', label: 'Thư viện khẩu phần chuẩn', icon: Utensils },
     { to: '/vet/training', label: 'Theo dõi & Đánh giá buổi tập', icon: Activity },
   ] : [
     { to: '/', label: 'Tổng quan', icon: LayoutDashboard },

@@ -47,6 +47,7 @@ import { vetApi } from './vetApi'
 import { horseIcon } from './navIcons'
 import { handleImageFallback } from './imageFallback'
 import HorseBodyModel3D from './components/horse3d/HorseBodyModel3D'
+import VetNutritionLibraryView from './VetNutritionLibraryView'
 
 const HEALTH_STATUS_MAP = {
   UNKNOWN: { label: 'Chưa xác định', cls: 'resting', color: '#66756d', bg: '#edf1ee' },
@@ -295,7 +296,7 @@ export default function VetPage() {
       {activeTab === 'medical-records' && <MedicalRecordsView initialHorseId={initialHorseId} />}
       {activeTab === 'injuries' && <MedicalRecordsView initialHorseId={initialHorseId} defaultSubTab="injuries" />}
       {activeTab === 'preventive' && <Navigate to={`/vet/medical-records${initialHorseId ? `?horseId=${initialHorseId}` : ''}`} replace />}
-      {activeTab === 'nutrition' && <Navigate to="/stable-care/nutrition" replace />}
+      {activeTab === 'nutrition' && <VetNutritionLibraryView onNavigate={setTab} />}
       {(activeTab === 'training-assessment' || activeTab === 'training') && <TrainingAssessmentView onNavigate={setTab} />}
       {activeTab === 'horses' && <Navigate to={`/vet/health-map${initialHorseId ? `?horseId=${initialHorseId}` : ''}`} replace />}
       {activeTab === 'training-locks' && <AutomatedLocksNotice onNavigate={setTab} />}

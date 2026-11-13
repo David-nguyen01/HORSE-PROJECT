@@ -14,5 +14,12 @@ public record NutritionPlanResponse(
         String notes,
         List<MealItem> meals,
         UUID createdByUserId,
-        OffsetDateTime createdAt
-) {}
+        OffsetDateTime createdAt,
+        String sourceTemplateCode
+) {
+    public NutritionPlanResponse(UUID id, UUID horseId, int version, LocalDate effectiveDate,
+                                 String status, String notes, List<MealItem> meals,
+                                 UUID createdByUserId, OffsetDateTime createdAt) {
+        this(id, horseId, version, effectiveDate, status, notes, meals, createdByUserId, createdAt, null);
+    }
+}

@@ -4,6 +4,7 @@ import com.racehorse.common.exception.BusinessException;
 import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.nutrition.dto.*;
+import com.racehorse.nutrition.util.MealKeyGenerator;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,9 +13,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -23,15 +26,27 @@ public class NutritionPlanService {
     private final JdbcTemplate jdbc;
     private final HorseAccessService horseAccess;
     private final ObjectMapper json;
+    private final Clock clock;
+    private static final ZoneId CLUB_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     public NutritionPlanService(JdbcTemplate jdbc, HorseAccessService horseAccess, ObjectMapper json) {
+        this(jdbc, horseAccess, json, Clock.system(CLUB_ZONE));
+    }
+
+    public NutritionPlanService(JdbcTemplate jdbc, HorseAccessService horseAccess, ObjectMapper json, Clock clock) {
         this.jdbc = jdbc;
         this.horseAccess = horseAccess;
         this.json = json;
+        this.clock = clock != null ? clock : Clock.system(CLUB_ZONE);
     }
 
     @Transactional
     public NutritionPlanResponse createPlan(UUID horseId, UUID actor, CreateNutritionPlanRequest request) {
+        return createPlan(horseId, actor, request, null);
+    }
+
+    @Transactional
+    public NutritionPlanResponse createPlan(UUID horseId, UUID actor, CreateNutritionPlanRequest request, String sourceTemplateCode) {
         horseAccess.requireActive(horseId);
         validatePlan(request);
 
@@ -54,19 +69,11 @@ public class NutritionPlanService {
         data.put("version", newVersion);
         data.put("effectiveDate", request.effectiveDate().toString());
         data.put("notes", request.notes() == null ? null : request.notes().trim());
-
-        List<Map<String, Object>> mealList = new ArrayList<>();
-        for (MealItem item : request.meals()) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("mealName", item.mealName().trim());
-            m.put("feedingTime", item.feedingTime().toString());
-            m.put("concentrateKg", item.concentrateKg());
-            m.put("concentrateType", item.concentrateType() == null ? null : item.concentrateType().trim());
-            m.put("forageKg", item.forageKg());
-            m.put("forageType", item.forageType() == null ? null : item.forageType().trim());
-            m.put("supplements", item.supplements() == null ? null : item.supplements().trim());
-            mealList.add(m);
+        if (sourceTemplateCode != null && !sourceTemplateCode.isBlank()) {
+            data.put("sourceTemplateCode", sourceTemplateCode.trim());
         }
+
+        List<Map<String, Object>> mealList = serializeMeals(request.meals());
         data.put("meals", mealList);
 
         jdbc.update(
@@ -77,7 +84,8 @@ public class NutritionPlanService {
         return new NutritionPlanResponse(
                 planId, horseId, newVersion, request.effectiveDate(), "ACTIVE",
                 request.notes() == null ? null : request.notes().trim(),
-                request.meals(), actor, now
+                request.meals(), actor, now,
+                sourceTemplateCode != null && !sourceTemplateCode.isBlank() ? sourceTemplateCode.trim() : null
         );
     }
 
@@ -148,9 +156,87 @@ public class NutritionPlanService {
         List<MealItem> sortedMeals = new ArrayList<>(plan.meals());
         sortedMeals.sort(Comparator.comparing(MealItem::feedingTime));
 
+        // Attach persisted daily feeding confirmations
+        List<Map<String, Object>> confirmedLogs = queryConfirmedLogs(horseId, targetDate);
+        Map<String, Map<String, Object>> logsByKey = new HashMap<>();
+        for (Map<String, Object> log : confirmedLogs) {
+            String key = (String) log.get("meal_key");
+            if (key != null) {
+                logsByKey.put(key.toLowerCase(Locale.ROOT), log);
+            }
+        }
+
+        List<DailyFeedingChecklistMealItem> checklistMeals = new ArrayList<>();
+        LocalDate today = LocalDate.now(clock);
+        LocalTime nowTime = LocalTime.now(clock);
+
+        for (MealItem meal : sortedMeals) {
+            String mealKey = meal.resolveIdentity();
+            Map<String, Object> log = logsByKey.get(mealKey.toLowerCase(Locale.ROOT));
+            if (log == null) {
+                String legacyKey = MealKeyGenerator.generate(meal.mealName(), meal.feedingTime());
+                log = logsByKey.get(legacyKey.toLowerCase(Locale.ROOT));
+            }
+            if (log == null) {
+                String legacySlug = MealKeyGenerator.slugify(meal.mealName());
+                log = logsByKey.get(legacySlug.toLowerCase(Locale.ROOT));
+            }
+
+            boolean isConfirmed = log != null;
+            OffsetDateTime confirmedAt = isConfirmed ? (OffsetDateTime) log.get("confirmed_at") : null;
+            String confirmedByName = isConfirmed ? (String) log.get("confirmed_by_name") : null;
+
+            String status;
+            if (isConfirmed) {
+                status = "CONFIRMED";
+            } else if (targetDate.isAfter(today)) {
+                status = "PENDING";
+            } else if (targetDate.isBefore(today)) {
+                status = "OVERDUE";
+            } else {
+                status = nowTime.isBefore(meal.feedingTime()) ? "PENDING" : "OVERDUE";
+            }
+
+            checklistMeals.add(new DailyFeedingChecklistMealItem(
+                    mealKey,
+                    meal.mealName(),
+                    meal.feedingTime(),
+                    meal.concentrateKg(),
+                    meal.concentrateType(),
+                    meal.forageKg(),
+                    meal.forageType(),
+                    meal.supplements(),
+                    isConfirmed,
+                    confirmedAt,
+                    confirmedByName,
+                    status
+            ));
+        }
+
         return new DailyFeedingChecklistResponse(
-                horseId, code, name, stableLocation, targetDate, plan.version(), sortedMeals
+                horseId, code, name, stableLocation, targetDate, plan.version(), checklistMeals
         );
+    }
+
+    private List<Map<String, Object>> queryConfirmedLogs(UUID horseId, LocalDate targetDate) {
+        try {
+            return jdbc.query(
+                    "select l.meal_key, l.confirmed_at, u.username as confirmed_by_name " +
+                            "from daily_feeding_logs l " +
+                            "left join users u on u.id = l.confirmed_by_user_id " +
+                            "where l.horse_id = ? and l.feeding_date = ?",
+                    (rs, rn) -> {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("meal_key", rs.getString("meal_key"));
+                        map.put("confirmed_at", rs.getObject("confirmed_at", OffsetDateTime.class));
+                        map.put("confirmed_by_name", rs.getString("confirmed_by_name"));
+                        return map;
+                    },
+                    horseId, targetDate
+            );
+        } catch (Exception ex) {
+            return Collections.emptyList();
+        }
     }
     @Transactional(readOnly = true)
     public List<Map<String, Object>> listStandardPlans() {
@@ -158,33 +244,133 @@ public class NutritionPlanService {
                 "select id, data_json, created_at from module_records " +
                         "where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' and status='ACTIVE' " +
                         "order by JSON_VALUE(data_json,'$.planName') asc",
-                (rs, rowNum) -> {
-                    Map<String, Object> map = new LinkedHashMap<>();
-                    map.put("id", rs.getObject("id"));
-                    JsonNode node = read(rs.getString("data_json"));
-                    map.put("planCode", node.path("planCode").asText(""));
-                    map.put("planName", node.path("planName").asText(""));
-                    map.put("description", node.path("description").asText(""));
-                    map.put("targetGroup", node.path("targetGroup").asText(""));
+                (rs, rowNum) -> mapStandardPlan(rs));
+    }
 
-                    List<MealItem> meals = new ArrayList<>();
-                    JsonNode mealsNode = node.path("meals");
-                    if (mealsNode.isArray()) {
-                        for (JsonNode m : mealsNode) {
-                            meals.add(new MealItem(
-                                    m.path("mealName").asText(""),
-                                    LocalTime.parse(m.path("feedingTime").asText("07:00")),
-                                    new BigDecimal(m.path("concentrateKg").asText("0")),
-                                    m.path("concentrateType").isNull() ? null : m.path("concentrateType").asText(null),
-                                    new BigDecimal(m.path("forageKg").asText("0")),
-                                    m.path("forageType").isNull() ? null : m.path("forageType").asText(null),
-                                    m.path("supplements").isNull() ? null : m.path("supplements").asText(null)
-                            ));
-                        }
-                    }
-                    map.put("meals", meals);
-                    return map;
-                });
+    @Transactional(readOnly = true)
+    public Map<String, Object> getStandardPlan(String planCode) {
+        if (planCode == null || planCode.isBlank()) {
+            throw new BusinessException("Mã khẩu phần mẫu không được để trống");
+        }
+        String code = planCode.trim();
+        List<Map<String, Object>> rows = jdbc.query(
+                "select id, data_json, created_at from module_records " +
+                        "where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' and status='ACTIVE' " +
+                        "and JSON_VALUE(data_json,'$.planCode')=?",
+                (rs, rowNum) -> mapStandardPlan(rs), code);
+        if (rows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + code);
+        }
+        return rows.getFirst();
+    }
+
+    @Transactional
+    public Map<String, Object> createStandardPlan(UUID actor, CreateStandardFeedingPlanRequest request) {
+        if (request == null) {
+            throw new BusinessException("Yêu cầu tạo khẩu phần mẫu không hợp lệ");
+        }
+        validateStandardPlan(request.planCode(), request.planName(), request.meals());
+
+        String code = request.planCode().trim();
+
+        Integer count = jdbc.queryForObject(
+                "select count(*) from module_records where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' " +
+                        "and JSON_VALUE(data_json,'$.planCode')=?",
+                Integer.class, code);
+        if (count != null && count > 0) {
+            throw new BusinessException("Mã khẩu phần mẫu đã tồn tại: " + code);
+        }
+
+        UUID id = UUID.randomUUID();
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("planCode", code);
+        data.put("planName", request.planName().trim());
+        data.put("description", request.description() == null ? "" : request.description().trim());
+        data.put("targetGroup", request.targetGroup() == null ? "" : request.targetGroup().trim());
+        data.put("meals", serializeMeals(request.meals()));
+
+        jdbc.update(
+                "insert into module_records(id,module_code,record_type,source_table,user_id,status,event_date,data_json,created_at,updated_at) " +
+                        "values(?,'STABLE_CARE','STANDARD_FEEDING_PLAN','api',?,'ACTIVE',CAST(SYSDATETIMEOFFSET() AS DATE),?,SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())",
+                id, actor, toJson(data));
+
+        return getStandardPlan(code);
+    }
+
+    @Transactional
+    public Map<String, Object> updateStandardPlan(String planCode, UUID actor, UpdateStandardFeedingPlanRequest request) {
+        if (planCode == null || planCode.isBlank()) {
+            throw new BusinessException("Mã khẩu phần mẫu không được để trống");
+        }
+        String code = planCode.trim();
+
+        List<Map<String, Object>> existing = jdbc.query(
+                "select id, data_json from module_records where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' " +
+                        "and status='ACTIVE' and JSON_VALUE(data_json,'$.planCode')=?",
+                (rs, rn) -> Map.of("id", rs.getObject("id"), "data_json", rs.getString("data_json")),
+                code);
+        if (existing.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + code);
+        }
+
+        UUID recordId = (UUID) existing.getFirst().get("id");
+
+        if (request.planCode() != null && !request.planCode().isBlank() && !request.planCode().trim().equalsIgnoreCase(code)) {
+            throw new BusinessException("Không được phép thay đổi mã khẩu phần mẫu sau khi đã tạo");
+        }
+
+        validateStandardPlan(code, request.planName(), request.meals());
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("planCode", code);
+        data.put("planName", request.planName().trim());
+        data.put("description", request.description() == null ? "" : request.description().trim());
+        data.put("targetGroup", request.targetGroup() == null ? "" : request.targetGroup().trim());
+        data.put("meals", serializeMeals(request.meals()));
+
+        int updated = jdbc.update(
+                "update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                toJson(data), recordId);
+        if (updated == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + code);
+        }
+
+        return getStandardPlan(code);
+    }
+
+    @Transactional
+    public void deleteStandardPlan(String planCode, UUID actor) {
+        if (planCode == null || planCode.isBlank()) {
+            throw new BusinessException("Mã khẩu phần mẫu không được để trống");
+        }
+        String code = planCode.trim();
+
+        // 1. Verify existence
+        List<UUID> templateIds = jdbc.query(
+                "select id from module_records where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' " +
+                        "and JSON_VALUE(data_json,'$.planCode')=?",
+                (rs, rn) -> rs.getObject("id", UUID.class),
+                code);
+        if (templateIds.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + code);
+        }
+
+        // 2. Identify active prescriptions sourced from this template and cancel them (preserving history)
+        jdbc.update(
+                "update module_records set status='CANCELLED', updated_at=SYSDATETIMEOFFSET() " +
+                        "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and status='ACTIVE' " +
+                        "and JSON_VALUE(data_json,'$.sourceTemplateCode')=?",
+                code);
+
+        // 3. Physically delete the shared template record (HARD DELETE)
+        int deleted = jdbc.update(
+                "delete from module_records where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' " +
+                        "and JSON_VALUE(data_json,'$.planCode')=?",
+                code);
+
+        if (deleted == 0) {
+            throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + code);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -311,7 +497,10 @@ public class NutritionPlanService {
                     JsonNode mealsNode = n.path("meals");
                     if (mealsNode.isArray()) {
                         for (JsonNode m : mealsNode) {
+                            String mealId = m.has("id") && !m.path("id").isNull() && !m.path("id").asText().isBlank()
+                                    ? m.path("id").asText() : null;
                             meals.add(new MealItem(
+                                    mealId,
                                     m.path("mealName").asText(""),
                                     LocalTime.parse(m.path("feedingTime").asText("07:00")),
                                     new BigDecimal(m.path("concentrateKg").asText("0")),
@@ -372,7 +561,7 @@ public class NutritionPlanService {
                 templateMeals
         );
 
-        return createPlan(horseId, actor, createReq);
+        return createPlan(horseId, actor, createReq, tCode);
     }
 
     @Transactional(readOnly = true)
@@ -590,12 +779,16 @@ public class NutritionPlanService {
         int version = node.path("version").asInt(1);
         LocalDate effectiveDate = LocalDate.parse(node.path("effectiveDate").asText());
         String notes = node.path("notes").isNull() ? null : node.path("notes").asText(null);
+        String sourceTemplateCode = node.path("sourceTemplateCode").isNull() ? null : node.path("sourceTemplateCode").asText(null);
 
         List<MealItem> meals = new ArrayList<>();
         JsonNode mealsNode = node.path("meals");
         if (mealsNode.isArray()) {
             for (JsonNode m : mealsNode) {
+                String mealId = m.has("id") && !m.path("id").isNull() && !m.path("id").asText().isBlank()
+                        ? m.path("id").asText() : null;
                 meals.add(new MealItem(
+                        mealId,
                         m.path("mealName").asText(),
                         LocalTime.parse(m.path("feedingTime").asText()),
                         new BigDecimal(m.path("concentrateKg").asText("0")),
@@ -608,7 +801,7 @@ public class NutritionPlanService {
         }
 
         return new NutritionPlanResponse(
-                id, horseId, version, effectiveDate, status, notes, meals, userId, createdAt
+                id, horseId, version, effectiveDate, status, notes, meals, userId, createdAt, sourceTemplateCode
         );
     }
 
@@ -621,6 +814,222 @@ public class NutritionPlanService {
                 horseId);
         if (updated == 0) {
             throw new ResourceNotFoundException("Không tìm thấy kế hoạch dinh dưỡng đang kích hoạt của ngựa: " + horseId);
+        }
+    }
+
+    private Map<String, Object> mapStandardPlan(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", rs.getObject("id"));
+        JsonNode node = read(rs.getString("data_json"));
+        map.put("planCode", node.path("planCode").asText(""));
+        map.put("planName", node.path("planName").asText(""));
+        map.put("description", node.path("description").asText(""));
+        map.put("targetGroup", node.path("targetGroup").asText(""));
+
+        List<MealItem> meals = new ArrayList<>();
+        JsonNode mealsNode = node.path("meals");
+        if (mealsNode.isArray()) {
+            for (JsonNode m : mealsNode) {
+                String mealId = m.has("id") && !m.path("id").isNull() && !m.path("id").asText().isBlank()
+                        ? m.path("id").asText() : null;
+                meals.add(new MealItem(
+                        mealId,
+                        m.path("mealName").asText(""),
+                        LocalTime.parse(m.path("feedingTime").asText("07:00")),
+                        new BigDecimal(m.path("concentrateKg").asText("0")),
+                        m.path("concentrateType").isNull() ? null : m.path("concentrateType").asText(null),
+                        new BigDecimal(m.path("forageKg").asText("0")),
+                        m.path("forageType").isNull() ? null : m.path("forageType").asText(null),
+                        m.path("supplements").isNull() ? null : m.path("supplements").asText(null)
+                ));
+            }
+        }
+        map.put("meals", meals);
+        return map;
+    }
+
+    private void validateStandardPlan(String planCode, String planName, List<MealItem> meals) {
+        if (planCode == null || planCode.isBlank()) {
+            throw new BusinessException("Mã khẩu phần mẫu không được để trống");
+        }
+        if (planName == null || planName.isBlank()) {
+            throw new BusinessException("Tên khẩu phần mẫu không được để trống");
+        }
+        if (meals == null || meals.isEmpty()) {
+            throw new BusinessException("Khẩu phần mẫu phải có ít nhất một bữa ăn");
+        }
+        for (MealItem item : meals) {
+            if (item.mealName() == null || item.mealName().isBlank()) {
+                throw new BusinessException("Tên bữa ăn không được để trống");
+            }
+            if (item.feedingTime() == null) {
+                throw new BusinessException("Giờ cho ăn không được để trống");
+            }
+            if (item.concentrateKg() == null || item.concentrateKg().signum() < 0) {
+                throw new BusinessException("Lượng thức ăn tinh không hợp lệ (>= 0)");
+            }
+            if (item.forageKg() == null || item.forageKg().signum() < 0) {
+                throw new BusinessException("Lượng thức ăn thô xanh không hợp lệ (>= 0)");
+            }
+        }
+    }
+
+    private List<Map<String, Object>> serializeMeals(List<MealItem> meals) {
+        List<Map<String, Object>> mealList = new ArrayList<>();
+        if (meals != null) {
+            for (MealItem item : meals) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                String stableId = item.id();
+                if (stableId == null || stableId.isBlank()) {
+                    stableId = "meal_" + UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+                }
+                m.put("id", stableId);
+                m.put("mealName", item.mealName().trim());
+                m.put("feedingTime", item.feedingTime().toString());
+                m.put("concentrateKg", item.concentrateKg());
+                m.put("concentrateType", item.concentrateType() == null ? null : item.concentrateType().trim());
+                m.put("forageKg", item.forageKg());
+                m.put("forageType", item.forageType() == null ? null : item.forageType().trim());
+                m.put("supplements", item.supplements() == null ? null : item.supplements().trim());
+                mealList.add(m);
+            }
+        }
+        return mealList;
+    }
+
+    @Transactional(readOnly = true)
+    public List<StallQuickFeedItem> getStablesQuickFeed(LocalDate date) {
+        LocalDate targetDate = date == null ? LocalDate.now(clock) : date;
+        LocalDate today = LocalDate.now(clock);
+        LocalTime nowTime = LocalTime.now(clock);
+
+        Map<String, Object> workload = getStableWorkload(targetDate);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> stalls = (List<Map<String, Object>>) workload.get("stalls");
+        if (stalls == null || stalls.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Map<String, Object>> confirmedLogs = queryConfirmedLogsForDate(targetDate);
+        Map<UUID, Map<String, Map<String, Object>>> logsByHorse = new HashMap<>();
+        for (Map<String, Object> log : confirmedLogs) {
+            UUID hId = (UUID) log.get("horse_id");
+            String key = (String) log.get("meal_key");
+            if (hId != null && key != null) {
+                logsByHorse.computeIfAbsent(hId, k -> new HashMap<>()).put(key.toLowerCase(Locale.ROOT), log);
+            }
+        }
+
+        List<StallQuickFeedItem> result = new ArrayList<>();
+        for (Map<String, Object> stall : stalls) {
+            boolean hasHorse = Boolean.TRUE.equals(stall.get("hasHorse"));
+            if (!hasHorse) {
+                continue;
+            }
+
+            UUID stableId = (UUID) stall.get("stableId");
+            String stableName = (String) stall.get("stableName");
+            UUID stallId = (UUID) stall.get("stallId");
+            String stallCode = (String) stall.get("stallCode");
+            String locationDisplay = (String) stall.get("stallLocationDisplay");
+
+            UUID horseId = (UUID) stall.get("horseId");
+            String horseCode = (String) stall.get("horseCode");
+            String horseName = (String) stall.get("horseName");
+            String horseDisplay = (String) stall.get("horseDisplay");
+
+            boolean hasPlan = Boolean.TRUE.equals(stall.get("hasPlan"));
+            UUID planId = (UUID) stall.get("planId");
+            int planVersion = stall.get("version") instanceof Number n ? n.intValue() : 0;
+
+            List<QuickFeedMealItem> quickFeedMeals = new ArrayList<>();
+            if (hasPlan && stall.get("meals") instanceof List<?> rawMeals) {
+                Map<String, Map<String, Object>> horseLogs = logsByHorse.getOrDefault(horseId, Collections.emptyMap());
+
+                for (Object o : rawMeals) {
+                    if (o instanceof MealItem meal) {
+                        String mealId = meal.resolveIdentity();
+                        Map<String, Object> log = horseLogs.get(mealId.toLowerCase(Locale.ROOT));
+                        if (log == null) {
+                            String legacyKey = MealKeyGenerator.generate(meal.mealName(), meal.feedingTime());
+                            log = horseLogs.get(legacyKey.toLowerCase(Locale.ROOT));
+                        }
+                        if (log == null) {
+                            String slugKey = MealKeyGenerator.slugify(meal.mealName());
+                            log = horseLogs.get(slugKey.toLowerCase(Locale.ROOT));
+                        }
+
+                        boolean isConfirmed = log != null;
+                        OffsetDateTime confirmedAt = isConfirmed ? (OffsetDateTime) log.get("confirmed_at") : null;
+                        String confirmedByName = isConfirmed ? (String) log.get("confirmed_by_name") : null;
+
+                        String status;
+                        if (isConfirmed) {
+                            status = "CONFIRMED";
+                        } else if (targetDate.isAfter(today)) {
+                            status = "PENDING";
+                        } else if (targetDate.isBefore(today)) {
+                            status = "OVERDUE";
+                        } else {
+                            status = nowTime.isBefore(meal.feedingTime()) ? "PENDING" : "OVERDUE";
+                        }
+
+                        quickFeedMeals.add(new QuickFeedMealItem(
+                                mealId,
+                                meal.mealName(),
+                                meal.feedingTime(),
+                                meal.concentrateKg(),
+                                meal.concentrateType(),
+                                meal.forageKg(),
+                                meal.forageType(),
+                                meal.supplements(),
+                                status,
+                                isConfirmed,
+                                confirmedAt,
+                                confirmedByName
+                        ));
+                    }
+                }
+            }
+
+            result.add(new StallQuickFeedItem(
+                    stableId,
+                    stableName,
+                    stallId,
+                    stallCode,
+                    locationDisplay,
+                    horseId,
+                    horseCode,
+                    horseName,
+                    horseDisplay,
+                    hasPlan,
+                    planId,
+                    planVersion,
+                    quickFeedMeals
+            ));
+        }
+
+        return result;
+    }
+
+    private List<Map<String, Object>> queryConfirmedLogsForDate(LocalDate date) {
+        try {
+            return jdbc.query(
+                    "select d.horse_id, d.meal_key, d.confirmed_at, d.confirmed_by_user_id, u.full_name as confirmed_by_name " +
+                            "from daily_feeding_logs d " +
+                            "left join users u on u.id = d.confirmed_by_user_id " +
+                            "where d.feeding_date = ?",
+                    (rs, rowNum) -> {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("horse_id", rs.getObject("horse_id", UUID.class));
+                        m.put("meal_key", rs.getString("meal_key"));
+                        m.put("confirmed_at", rs.getObject("confirmed_at", OffsetDateTime.class));
+                        m.put("confirmed_by_user_id", rs.getObject("confirmed_by_user_id", UUID.class));
+                        m.put("confirmed_by_name", rs.getString("confirmed_by_name"));
+                        return m;
+                    }, date);
+        } catch (Exception ex) {
+            return Collections.emptyList();
         }
     }
 

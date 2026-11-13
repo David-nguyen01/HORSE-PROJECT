@@ -11,5 +11,5 @@ public record DailyFeedingChecklistResponse(
         String stableLocation,
         LocalDate date,
         int planVersion,
-        List<MealItem> meals
+        List<DailyFeedingChecklistMealItem> meals
 ) {}

@@ -202,11 +202,21 @@ export const stableCareApi = {
   getActiveNutritionPlan: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan${date ? `?date=${date}` : ''}`),
   getNutritionHistory: (horseId) => api(`/api/horses/${horseId}/nutrition-plan/history`),
   getDailyFeedingChecklist: (horseId, date) => api(`/api/horses/${horseId}/nutrition-plan/daily-checklist${date ? `?date=${date}` : ''}`),
+  confirmDailyFeedingMeal: (horseId, payload) => api(`/api/horses/${horseId}/daily-feeding/confirm`, { method: 'POST', body: JSON.stringify(payload) }),
+  getDailyFeedingHistory: (horseId, params) => {
+    const q = params ? new URLSearchParams(params).toString() : ''
+    return api(`/api/horses/${horseId}/daily-feeding/history${q ? `?${q}` : ''}`)
+  },
   getStandardPlans: () => api('/api/nutrition/standard-plans'),
+  getStandardPlan: (planCode) => api(`/api/nutrition/standard-plans/${encodeURIComponent(planCode)}`),
+  createStandardPlan: (payload) => api('/api/nutrition/standard-plans', { method: 'POST', body: JSON.stringify(payload) }),
+  updateStandardPlan: (planCode, payload) => api(`/api/nutrition/standard-plans/${encodeURIComponent(planCode)}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteStandardPlan: (planCode) => api(`/api/nutrition/standard-plans/${encodeURIComponent(planCode)}`, { method: 'DELETE' }),
   getFeedingTemplateOptions: (horseId) => api(`/api/horses/${horseId}/nutrition-plan/template-options`),
   applyFeedingTemplate: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan/apply-template`, { method: 'POST', body: JSON.stringify(payload) }),
   getHorsesActivePlans: (date) => api(`/api/nutrition/horses-active${date ? `?date=${date}` : ''}`),
   getStablesWorkload: (date) => api(`/api/nutrition/stables-workload${date ? `?date=${date}` : ''}`),
+  getStablesQuickFeed: (date) => api(`/api/nutrition/stables-quick-feed${date ? `?date=${date}` : ''}`),
   createNutritionPlan: (horseId, payload) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'POST', body: JSON.stringify(payload) }),
   deleteNutritionPlan: (horseId) => api(`/api/horses/${horseId}/nutrition-plan`, { method: 'DELETE' }),
   getRoutineBackfillPreview: () => api('/api/stables/routines/backfill-preview'),

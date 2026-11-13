@@ -110,6 +110,24 @@ export const vetApi = {
       method: 'DELETE',
     }),
 
+  // Shared Standard Feeding Plans (Library Management)
+  getStandardPlans: () => api('/api/nutrition/standard-plans'),
+  getStandardPlan: (planCode) => api(`/api/nutrition/standard-plans/${encodeURIComponent(planCode)}`),
+  createStandardPlan: (payload) =>
+    api('/api/nutrition/standard-plans', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateStandardPlan: (planCode, payload) =>
+    api(`/api/nutrition/standard-plans/${encodeURIComponent(planCode)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteStandardPlan: (planCode) =>
+    api(`/api/nutrition/standard-plans/${encodeURIComponent(planCode)}`, {
+      method: 'DELETE',
+    }),
+
   // Training Locks
   getCurrentTrainingLock: (horseId) => api(`/api/horses/${horseId}/training-locks/current`),
   getTrainingLockHistory: (horseId) => api(`/api/horses/${horseId}/training-locks`),
@@ -203,6 +221,14 @@ export const vetApi = {
     api(`/api/horses/${horseId}/weights`),
   getHorseRaceReadiness: (horseId) =>
     api(`/api/horses/${horseId}/race-readiness`),
+
+  // Daily Feeding History & Quick Feed Status
+  getDailyFeedingHistory: (horseId, params) => {
+    const q = params ? new URLSearchParams(params).toString() : ''
+    return api(`/api/horses/${horseId}/daily-feeding/history${q ? `?${q}` : ''}`)
+  },
+  getStablesQuickFeed: (date) =>
+    api(`/api/nutrition/stables-quick-feed${date ? `?date=${date}` : ''}`),
 
   // Sessions of horses assigned to the diagnosing veterinarian
   getMyTrainingSessions: (from, to) => {
