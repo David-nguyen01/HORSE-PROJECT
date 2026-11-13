@@ -1,37 +1,70 @@
-# Supabase PostgreSQL migration
+# Supabase PostgreSQL migrations
 
-The `racehorse_local` SQL Server database remains unchanged. The Supabase project
-`batrbucfjoyozmnpqfld` currently has these migrations applied:
+This directory is the Supabase CLI project used by the GitHub integration. The
+hosted project reference is `batrbucfjoyozmnpqfld`. The application tables live in
+the private `dbo` schema and are accessed only by the trusted Spring backend.
 
-1. `01_schema_draft.sql` — 31 tables in the private `dbo` schema, keys, checks and indexes.
-2. `02_seed_reference.sql` — five demo accounts and roles, 67 role grants, two stables,
-   ten racetracks, 40 lanes, five care routines, three standard feeding plans and
-   five starter inventory items. No existing local user, horse, medical or finance
-   data was copied. `10_seed_demo_data.sql` was intentionally not imported.
-3. `03_business_triggers.sql` — PostgreSQL equivalents of the seven business triggers.
-4. `04_private_schema_access.sql` — direct access denied to Supabase `anon` and
-   `authenticated` roles. The Spring backend should connect with a trusted database
-   credential; frontend clients must continue calling the backend API.
+## GitHub integration
 
-## Current limitation
+Configure Supabase Dashboard > Project Settings > Integrations > GitHub as follows:
 
-The Spring backend is **not yet ready to use Supabase**. `application-supabase.properties`
-and the PostgreSQL JDBC driver are present, but many `JdbcTemplate` queries still use
-SQL Server syntax (`TOP`, `WITH (UPDLOCK,HOLDLOCK)`, `JSON_VALUE`, `SYSDATETIMEOFFSET`,
-`DATEADD`, SQL Server pagination). Port and integration-test these before activating
-`SPRING_PROFILES_ACTIVE=supabase`. The existing `local` profile keeps SQL Server working.
+- Repository: `David-nguyen01/HORSE-PROJECT`
+- Working directory: `DATABASE`
+- Deploy to production: enabled
+- Production branch: `develop`
+- Automatic/preview branching: disabled (not required for production deployment)
 
-Supabase reports that RLS is disabled for the 31 `dbo` tables. The schema is private
-and the `anon`/`authenticated` roles have no schema or table access, as verified after
-deployment. If direct Supabase Data API access is enabled later, design role-specific
-RLS policies before granting access. See the [RLS guide](https://supabase.com/docs/guides/database/postgres/row-level-security).
+Supabase automatically applies only new files under `supabase/migrations/`. It does
+not copy live table data to GitHub and it does not deploy the frontend or backend.
 
-The five seeded accounts use the documented test password from the SQL Server seed.
-Change those passwords before exposing an internet-facing backend.
+## Migration baseline
 
-## Reproducing the schema files
+The first five filenames use the exact versions already registered in the hosted
+project's migration history. Supabase will therefore skip them instead of trying to
+recreate the existing schema:
 
-`generate_schema.py` reads the current local SQL Server schema through Windows
-authentication and requires `pyodbc`. `generate_reference_seed.py` reads only the
-checked-in `09_seed_reference_data.sql` file. The SQL files are committed artifacts;
-the generators are not required to connect to Supabase.
+1. `20261110023411_racehorse_initial_schema.sql`
+2. `20261110023643_racehorse_reference_seed.sql`
+3. `20261110023828_racehorse_business_triggers.sql`
+4. `20261110023850_racehorse_private_schema_access.sql`
+5. `20261110075656_sql_server_json_compatibility.sql`
+
+`20261113120524_service_packages_catalog.sql` is the next pending migration. It is
+idempotent and completes the partially deployed service package catalog without
+deleting the existing custom package or application data.
+
+## Rules for future changes
+
+1. Never edit, rename, reorder, or delete an applied migration.
+2. Create a new timestamped migration for every schema or reference-data change.
+3. Test the SQL before pushing it to `develop`; this branch deploys to production.
+4. Do not place database passwords, access tokens, or connection strings in Git.
+5. Do not use `seed.sql` for live data. Production reference data must use an
+   idempotent migration with conflict handling.
+6. Deleting a migration file does not roll back the hosted database. Create a new
+   forward migration to reverse a change.
+
+With Supabase CLI installed, create a migration from the repository root with:
+
+```powershell
+npx supabase migration new <descriptive_name> --workdir DATABASE
+```
+
+This creates `DATABASE/supabase/migrations/<timestamp>_<descriptive_name>.sql`.
+
+## Security model
+
+RLS is currently disabled on the private `dbo` tables. The `anon` and
+`authenticated` roles have neither schema usage nor table grants, so browser clients
+cannot access these tables through the Supabase Data API. Do not expose `dbo` or add
+frontend grants without first designing and testing role-specific RLS policies.
+
+The seeded test accounts use a shared documented test password. Replace those
+passwords before using the system with real users.
+
+## Local SQL Server generators
+
+The `racehorse_local` SQL Server database remains independent. `generate_schema.py`
+reads it through Windows authentication and requires `pyodbc`.
+`generate_reference_seed.py` converts the checked-in SQL Server reference seed.
+Neither generator connects to or changes the hosted Supabase database.

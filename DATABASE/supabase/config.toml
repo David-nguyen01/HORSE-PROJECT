@@ -1,0 +1,27 @@
+#:schema https://supabase.com/schemas/config/v1.json
+
+# Repository-local identifier. The hosted project is linked by the Supabase
+# GitHub integration, not by committing credentials to this file.
+project_id = "racehorse-training-management"
+
+[api]
+enabled = true
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+enabled = true
+schema_paths = []
+
+# Production reference data is versioned as explicit migrations. Automatic
+# seed execution stays disabled so a deployment cannot overwrite live data.
+[db.seed]
+enabled = false
+sql_paths = []
+
