@@ -93,8 +93,7 @@ function EvaluationModal({ horses, initialHorseId, onClose, onSaved }) {
     injured: 'false',
     injuryLocation: '',
     injuryNotes: '',
-    trainerNotes: '',
-    videoUrl: ''
+    trainerNotes: ''
   })
   const [schedules, setSchedules] = useState([])
   const [loadingSchedules, setLoadingSchedules] = useState(false)
@@ -182,8 +181,7 @@ function EvaluationModal({ horses, initialHorseId, onClose, onSaved }) {
           injured: form.injured === 'true',
           injuryLocation: form.injuryLocation || null,
           injuryNotes: form.injuryNotes || null,
-          trainerNotes: form.trainerNotes.trim(),
-          videoUrl: form.videoUrl || null
+          trainerNotes: form.trainerNotes.trim()
         })
       })
       onSaved()
@@ -304,9 +302,6 @@ function EvaluationModal({ horses, initialHorseId, onClose, onSaved }) {
             </>
           )}
 
-          <Field label="Liên kết video">
-            <input type="url" value={form.videoUrl} onChange={set('videoUrl')} placeholder="https://…" />
-          </Field>
 
           <label className="field full">
             <span>Ghi chú huấn luyện viên *</span>

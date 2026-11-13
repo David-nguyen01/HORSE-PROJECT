@@ -104,7 +104,7 @@ public class CareRoutineDefinitionService {
                 scope, is_active, sort_order, created_at, updated_at
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
-                ?, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                ?, FALSE, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
             """;
 
@@ -176,7 +176,7 @@ public class CareRoutineDefinitionService {
             WHERE id = ?
             """;
 
-        int updated = jdbc.update(sql, targetActive ? 1 : 0, id);
+        int updated = jdbc.update(sql, targetActive, id);
         if (updated == 0) {
             throw new ResourceNotFoundException("Không tìm thấy định nghĩa quy trình chăm sóc: " + id);
         }

@@ -73,6 +73,14 @@ public class HorseMeasurementService {
         String status=request.status().trim().toUpperCase(Locale.ROOT);
         if(!Set.of("FIT","MONITOR","INJURED","QUARANTINED").contains(status))
             throw new com.racehorse.common.exception.BusinessException("status chỉ nhận FIT, MONITOR, INJURED hoặc QUARANTINED");
+        if ("FIT".equals(status)) {
+            Integer activeInjuries = jdbc.queryForObject(
+                    "select count(*) from module_records where horse_id=? and module_code='MEDICAL' "
+                            + "and record_type in ('INJURY_MARKER','INJURY') and status not in ('HEALED','RESOLVED')",
+                    Integer.class, horseId);
+            if (activeInjuries != null && activeInjuries > 0)
+                throw new com.racehorse.common.exception.BusinessException("Cần xác nhận tất cả chấn thương đã bình phục trước khi chuyển thể trạng sang khỏe mạnh");
+        }
         String source=request.sourceType()==null||request.sourceType().isBlank()?"MANUAL":request.sourceType().trim().toUpperCase(Locale.ROOT);
         jdbc.update("update horses set health_status=?,health_changed_by_user_id=?,health_source_type=?,health_source_id=?,health_changed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 status,veterinarianId,source,request.sourceId(),horseId);
@@ -88,7 +96,8 @@ public class HorseMeasurementService {
             }
         } else if ("FIT".equals(status)) {
             jdbc.update(
-                    "update training_locks set released_at=CURRENT_TIMESTAMP, released_by_user_id=?, release_reason=? where horse_id=? and released_at is null",
+                    "update training_locks set released_at=CURRENT_TIMESTAMP, released_by_user_id=?, release_reason=? "
+                            + "where horse_id=? and released_at is null and (reason like 'Tự động khóa:%' or reason like 'Khóa tự động từ kết quả khám:%')",
                     veterinarianId, "Tự động gỡ khóa: Bác sĩ thú y xác nhận thể trạng FIT", horseId);
         }
 

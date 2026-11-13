@@ -97,7 +97,7 @@ public class InjuryService {
                 """,
                 updateId, horseId, veterinarianId, initialStatus, today, toJson(updateData));
 
-        if (!"RESOLVED".equals(initialStatus)) {
+        if (!"HEALED".equals(initialStatus)) {
             // A recorded active injury must immediately prevent training, even when
             // the marker is created outside a medical examination.
             jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
@@ -190,6 +190,7 @@ public class InjuryService {
                 where id = ?
                 """,
                 newStatus, newStatus, injuryId);
+        reconcileInjuryTrainingState(horseId, veterinarianId);
 
         String vetName = findUsername(veterinarianId);
         OffsetDateTime now = OffsetDateTime.now();
@@ -419,6 +420,44 @@ public class InjuryService {
                 """, injuryId.toString(), injuryId.toString(), "%" + injuryId + "%");
         // Delete injury record
         jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')", injuryId);
+        reconcileInjuryTrainingState(horseId, actorId);
+    }
+
+    private void reconcileInjuryTrainingState(UUID horseId, UUID actorId) {
+        if (horseId == null) return;
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
+        Integer activeInjuries = jdbc.queryForObject(
+                "select count(*) from module_records where horse_id=? and module_code='MEDICAL' "
+                        + "and record_type in ('INJURY_MARKER','INJURY') and status not in ('HEALED','RESOLVED')",
+                Integer.class, horseId);
+        if (activeInjuries != null && activeInjuries > 0) {
+            jdbc.update("""
+                    update horses set health_status='INJURED', health_changed_by_user_id=?,
+                        health_source_type='INJURY_MARKER', health_changed_at=CURRENT_TIMESTAMP,
+                        updated_at=CURRENT_TIMESTAMP, version=version+1
+                    where id=? and health_status='FIT'
+                    """, actorId, horseId);
+            jdbc.update("""
+                    insert into training_locks(id,horse_id,reason,review_date,locked_by_user_id,locked_at)
+                    select ?,?,'Tự động khóa: Chấn thương đang theo dõi',null,?,CURRENT_TIMESTAMP
+                    where not exists (select 1 from training_locks where horse_id=? and released_at is null)
+                    """, UUID.randomUUID(), horseId, actorId, horseId);
+            return;
+        }
+
+        jdbc.update("""
+                update horses set health_status='FIT', health_changed_by_user_id=?,
+                    health_source_type=null, health_source_id=null,
+                    health_changed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP, version=version+1
+                where id=? and health_source_type='INJURY_MARKER'
+                """, actorId, horseId);
+        jdbc.update("""
+                update training_locks set released_at=CURRENT_TIMESTAMP, released_by_user_id=?,
+                    release_reason='Tự động gỡ khóa: Không còn chấn thương hoạt động'
+                where horse_id=? and released_at is null
+                  and (reason like 'Tự động khóa:%' or reason like 'Khóa tự động từ kết quả khám:%')
+                  and exists (select 1 from horses where id=? and health_status='FIT')
+                """, actorId, horseId, horseId);
     }
 
     private String findUsername(UUID userId) {

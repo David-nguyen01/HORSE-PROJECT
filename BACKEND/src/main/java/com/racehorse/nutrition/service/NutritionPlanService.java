@@ -293,7 +293,7 @@ public class NutritionPlanService {
 
         jdbc.update(
                 "insert into module_records(id,module_code,record_type,source_table,user_id,status,event_date,data_json,created_at,updated_at) " +
-                        "values(?,'STABLE_CARE','STANDARD_FEEDING_PLAN','api',?,'ACTIVE',CAST(SYSDATETIMEOFFSET() AS DATE),?,SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())",
+                        "values(?,'STABLE_CARE','STANDARD_FEEDING_PLAN','api',?,'ACTIVE',CURRENT_DATE,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 id, actor, toJson(data));
 
         return getStandardPlan(code);
@@ -331,7 +331,7 @@ public class NutritionPlanService {
         data.put("meals", serializeMeals(request.meals()));
 
         int updated = jdbc.update(
-                "update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                 toJson(data), recordId);
         if (updated == 0) {
             throw new ResourceNotFoundException("Không tìm thấy khẩu phần mẫu: " + code);
@@ -359,7 +359,7 @@ public class NutritionPlanService {
 
         // 2. Identify active prescriptions sourced from this template and cancel them (preserving history)
         jdbc.update(
-                "update module_records set status='CANCELLED', updated_at=SYSDATETIMEOFFSET() " +
+                "update module_records set status='CANCELLED', updated_at=CURRENT_TIMESTAMP " +
                         "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and status='ACTIVE' " +
                         "and JSON_VALUE(data_json,'$.sourceTemplateCode')=?",
                 code);

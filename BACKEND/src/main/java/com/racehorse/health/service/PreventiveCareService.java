@@ -19,6 +19,7 @@ public class PreventiveCareService {
     public PreventiveCareService(JdbcTemplate jdbc,HorseAccessService access){this.jdbc=jdbc;this.access=access;}
     @Transactional
     public PreventiveCareResponse create(UUID horse,UUID actor,CreatePreventiveCareRequest r){
+        requireCurrentOrFutureDate(r.dueDate());
         access.requireActive(horse); String type=normalizedType(r.careType());
         String name=normalizedName(type,r.careName());
         UUID id=UUID.randomUUID();
@@ -78,6 +79,7 @@ public class PreventiveCareService {
     }
     @Transactional
     public CareView update(UUID id,CreatePreventiveCareRequest r,UUID actor){
+        requireCurrentOrFutureDate(r.dueDate());
         Map<String,Object> row=requirePending(id); String type=normalizedType(r.careType());
         String name=normalizedName(type,r.careName());
         int changed=jdbc.update("update preventive_care_schedules set care_type=?,care_name=?,details=?,due_date=?,recurrence_days=?,reminder_lead_days=? where id=? and completed_at is null and cancelled_at is null",
@@ -141,6 +143,10 @@ public class PreventiveCareService {
         return row;
     }
     private UUID uuid(Object value){return value instanceof UUID id?id:UUID.fromString(String.valueOf(value));}
+    private void requireCurrentOrFutureDate(LocalDate dueDate) {
+        if (dueDate == null || dueDate.isBefore(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"))))
+            throw new BusinessException("Ngày dự kiến chăm sóc không được ở quá khứ");
+    }
     private String normalizedType(String value){
         String type=value.trim().toUpperCase(Locale.ROOT);
         if(!List.of("VACCINATION","DEWORMING","FARRIER","OTHER").contains(type))

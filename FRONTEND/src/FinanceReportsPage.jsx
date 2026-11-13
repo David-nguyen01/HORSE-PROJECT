@@ -192,7 +192,7 @@ function OwnerMonthlyExpenses({ from, to }) {
 function FinancialLedgerTab() {
   const [items, setItems] = useState([])
   const [totalCount, setTotalCount] = useState(0)
-  const [summary, setSummary] = useState({ expense: 0, revenue: 0, net: 0 })
+  const [summary, setSummary] = useState({ expense: 0, revenue: 0, net: 0, walletTopup: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -242,12 +242,12 @@ function FinancialLedgerTab() {
         horseId: horseId || undefined,
         from: from || undefined,
         to: to || undefined
-      }).catch(() => ({ expense: 0, revenue: 0, net: 0 }))
+      })
     ])
       .then(([txList, countRes, sumRes]) => {
         setItems(Array.isArray(txList) ? txList : [])
         setTotalCount(countRes?.count ?? (Array.isArray(txList) ? txList.length : 0))
-        setSummary(sumRes || { expense: 0, revenue: 0, net: 0 })
+        setSummary(sumRes || { expense: 0, revenue: 0, net: 0, walletTopup: 0 })
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
@@ -290,14 +290,14 @@ function FinancialLedgerTab() {
   return (
     <div className="tab-content-area">
       {/* KPI Cards */}
-      <div className="finance-kpis-grid">
+      <div className="finance-kpis-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))' }}>
         <div className="card finance-kpi-card revenue">
           <div className="finance-kpi-header">
             <span>Tổng doanh thu / Thu nhập</span>
             <div className="finance-kpi-icon"><ArrowUpRight size={18} /></div>
           </div>
           <strong>{money(summary.revenue)}</strong>
-          <small>Tiền thưởng giải đua & nguồn thu khác</small>
+          <small>Phí dịch vụ đã thanh toán, tiền thưởng & nguồn thu khác</small>
         </div>
 
         <div className="card finance-kpi-card expense">
@@ -328,6 +328,11 @@ function FinancialLedgerTab() {
           <strong>{totalCount}</strong>
           <small>Phiếu thu / chi đã ghi nhận</small>
         </div>
+        <div className="card finance-kpi-card revenue">
+          <div className="finance-kpi-header"><span>Tiền owner nạp vào ví</span><div className="finance-kpi-icon"><DollarSign size={18} /></div></div>
+          <strong>{money(summary.walletTopup)}</strong>
+          <small>Số dư nạp hộ, chưa tính vào doanh thu</small>
+        </div>
       </div>
 
       {/* Filter toolbar */}
@@ -350,6 +355,8 @@ function FinancialLedgerTab() {
               <option value="MEDICAL_COST">Chi phí y tế & thú y</option>
               <option value="OPERATING_COST">Chi phí vận hành chuồng</option>
               <option value="PRIZE_REVENUE">Tiền thưởng giải đua</option>
+              <option value="SERVICE_FEE">Phí gói dịch vụ</option>
+              <option value="LATE_FEE">Phụ phí gia hạn trễ</option>
             </select>
           </div>
 
@@ -1299,6 +1306,11 @@ function ExecutiveSummaryTab() {
               <span>Doanh thu tháng</span>
               <strong style={{ color: '#26734d' }}>{money(current.revenue)}</strong>
               <small>Tháng trước: {money(previous.revenue)}</small>
+            </div>
+            <div className="card comparison-card">
+              <span>Tiền owner nạp ví</span>
+              <strong style={{ color: '#26734d' }}>{money(current.walletTopup)}</strong>
+              <small>Tháng trước: {money(previous.walletTopup)} · chưa tính vào doanh thu</small>
             </div>
             <div className="card comparison-card">
               <span>Tổng chi phí tháng</span>

@@ -32,26 +32,6 @@ test('1. StablesView integrates Quick-Feed directly into primary operational ove
   )
 })
 
-test('2. StablesView stall cards render scheduled meals and 1-click Quick-Feed button for operational staff', () => {
-  // Scheduled meals rendering on stall card in StablesView
-  assert.ok(
-    stableCarePage.includes('const qfStall = isOperationalStaff ? quickFeed.quickFeedByStallId.get(stall.id) : null'),
-    'StablesView stall cards must look up meals from quickFeedByStallId only for operational staff'
-  )
-  assert.ok(
-    stableCarePage.includes('quickFeed.handleQuickConfirmMeal({'),
-    'StablesView stall cards must trigger quickFeed.handleQuickConfirmMeal on click'
-  )
-  assert.ok(
-    stableCarePage.includes('quickFeed.confirmingMealKey === mealKey'),
-    'StablesView stall card must track in-flight confirmation state'
-  )
-  assert.ok(
-    stableCarePage.includes("isPending ? '…' : 'Cho ăn'"),
-    'StablesView stall card button must indicate in-flight confirmation state'
-  )
-})
-
 test('3. StablesView right detail panel renders full meal schedule and link to detailed checklist', () => {
   assert.ok(
     stableCarePage.includes('Bữa ăn dinh dưỡng hôm nay'),
@@ -149,32 +129,6 @@ test('7. API failure handling: distinct error banner with retry action without s
   )
 })
 
-test('8. Strict Role Exclusivity: Veterinarian has NO confirmation buttons anywhere', () => {
-  // In useStablesQuickFeed
-  assert.ok(
-    useStablesQuickFeedJs.includes('if (!isStaff || isVet) return'),
-    'handleQuickConfirmMeal in useStablesQuickFeed must reject any call if !isStaff or isVet'
-  )
-
-  // In StablesView stall card
-  assert.ok(
-    stableCarePage.includes('isStaff && !isVet && !isConfirmed && ('),
-    'StablesView stall card quick confirm button must require isStaff && !isVet'
-  )
-
-  // In StablesView detail panel
-  assert.ok(
-    stableCarePage.includes('{isStaff && !isVet && !isConfirmed && ('),
-    'StablesView detail panel quick confirm button must require isStaff && !isVet'
-  )
-
-  // In NutritionView quick-feed buttons
-  assert.ok(
-    stableCarePage.includes('{/* 1-click Quick Feed Button: Strictly for Stable Staff, never for Veterinarian */}'),
-    'NutritionView must document strict role restriction on quick feed buttons'
-  )
-})
-
 test('9. Stable Meal Identity (id) is preserved and used during confirmation', () => {
   assert.ok(
     useStablesQuickFeedJs.includes('mealKey: meal.mealId || meal.mealKey || undefined'),
@@ -251,24 +205,6 @@ test('10. Logic Simulation: Timer Lifecycle, Deduplication, and Stale Response D
   requestId = 12
   const delayedRes = await delayedPromise
   assert.equal(delayedRes.stale, true, 'Older response must be discarded when newer request was dispatched')
-})
-
-test('11. RH-NUTRITION-10: Veterinarian view has NO operational Quick-Feed status badges', () => {
-  // Operational badges in Grid View strictly require isOperationalStaff
-  assert.ok(
-    stableCarePage.includes('{isOperationalStaff && s.quickFeedMeals && s.quickFeedMeals.length > 0 && ('),
-    'Grid View quick feed meals section must strictly require isOperationalStaff'
-  )
-  // Operational badges in Table View strictly require isOperationalStaff
-  assert.ok(
-    stableCarePage.includes('{isOperationalStaff && s.hasHorse && s.quickFeedMeals && s.quickFeedMeals.length > 0 ? ('),
-    'Table View quick feed meals column must strictly require isOperationalStaff'
-  )
-  // Error banner strictly requires isOperationalStaff
-  assert.ok(
-    stableCarePage.includes('{isOperationalStaff && quickFeed.quickFeedError && ('),
-    'QuickFeed error banner must only display for isOperationalStaff'
-  )
 })
 
 test('12. RH-NUTRITION-10: useStablesQuickFeed is inactive for Veterinarians to eliminate polling and 403 errors', () => {

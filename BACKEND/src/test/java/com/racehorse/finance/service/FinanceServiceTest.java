@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,6 +36,32 @@ class FinanceServiceTest {
     @BeforeEach
     void setUp() {
         service = new FinanceService(jdbc, audit);
+    }
+
+    @Test
+    void managerSummaryCountsPaidServiceFeesAsRevenueAndKeepsTopupsSeparate() {
+        when(jdbc.queryForList(anyString(), any(Object[].class))).thenReturn(List.of(
+                Map.of("transaction_type", "REVENUE", "total", new BigDecimal("15000000"))));
+        when(jdbc.queryForObject(contains("category='WALLET_TOPUP'"), eq(BigDecimal.class), any(Object[].class)))
+                .thenReturn(new BigDecimal("20000000"));
+
+        FinanceService.SummaryView result = service.summary(actor, true, null, null, null);
+
+        assertThat(result.revenue()).isEqualByComparingTo("15000000");
+        assertThat(result.net()).isEqualByComparingTo("15000000");
+        assertThat(result.walletTopup()).isEqualByComparingTo("20000000");
+        verify(jdbc).queryForList(argThat(sql -> sql.contains("SERVICE_FEE")
+                && sql.contains("LATE_FEE") && sql.contains("group by case when")), any(Object[].class));
+    }
+
+    @Test
+    void managerLedgerFiltersUsingClubRevenueTypeForPaidServiceFees() {
+        service.list(actor, true, null, null, null, null, "REVENUE", "SERVICE_FEE", 0, 25);
+
+        verify(jdbc).query(argThat(sql -> sql.contains("case when ft.source_entity_type='WALLET'")
+                && sql.contains("ft.category in ('SERVICE_FEE','LATE_FEE')")
+                && sql.contains("then 'REVENUE' else ft.transaction_type end=?")),
+                any(RowMapper.class), any(Object[].class));
     }
 
     @Test

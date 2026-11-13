@@ -2,7 +2,6 @@ package com.racehorse.health.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -11,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreateMedicalExaminationRequest(
-        @NotNull @PastOrPresent LocalDate examinationDate,
+        @NotNull LocalDate examinationDate,
         @NotBlank @Size(max = 2000) String symptoms,
         @NotBlank @Size(max = 2000) String diagnosis,
         @NotBlank @Size(max = 4000) String treatmentProtocol,

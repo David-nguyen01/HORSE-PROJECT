@@ -1184,8 +1184,9 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
   const [form, setForm] = useState({
     durationMinutes: '', distanceMeters: '', trackCompletionSeconds: '', maxSpeedKmh: '',
     stopBpm: '', oneMinuteBpm: '',
-    injured: 'false', injuryLocation: '', injuryNotes: '', trainerNotes: '', videoUrl: ''
+    injured: 'false', injuryLocation: '', injuryNotes: '', trainerNotes: ''
   })
+  const [existingVideoUrl, setExistingVideoUrl] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(Boolean(evaluationId))
@@ -1194,11 +1195,12 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
     let current = true
     api(`/api/training-evaluations/${evaluationId}`).then(value => {
       if (!current) return
+      setExistingVideoUrl(value.videoUrl || null)
       setForm({ durationMinutes: String(value.durationMinutes ?? ''), distanceMeters: String(value.distanceMeters ?? ''),
         trackCompletionSeconds: String(value.trackCompletionSeconds ?? ''), maxSpeedKmh: String(value.maxSpeedKmh ?? ''),
         stopBpm: String(value.stopBpm ?? ''), oneMinuteBpm: String(value.oneMinuteBpm ?? ''),
         injured: String(Boolean(value.injured)), injuryLocation: value.injuryLocation || '',
-        injuryNotes: value.injuryNotes || '', trainerNotes: value.trainerNotes || '', videoUrl: value.videoUrl || '' })
+        injuryNotes: value.injuryNotes || '', trainerNotes: value.trainerNotes || '' })
     }).catch(err => { if (current) setError(err.message) }).finally(() => { if (current) setLoading(false) })
     return () => { current = false }
   }, [evaluationId])
@@ -1237,7 +1239,7 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
           injuryLocation: form.injuryLocation || null,
           injuryNotes: form.injuryNotes || null,
           trainerNotes: form.trainerNotes,
-          videoUrl: form.videoUrl || null
+          videoUrl: existingVideoUrl
         })
       })
       onSaved()
@@ -1290,7 +1292,6 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
           <label className="field"><span>Ngựa bị chấn thương?</span><select value={form.injured} onChange={e => setForm({...form, injured: e.target.value})}><option value="false">Không</option><option value="true">Có</option></select></label>
           {form.injured === 'true' && <><label className="field"><span>Vị trí chấn thương</span><input maxLength="200" value={form.injuryLocation} onChange={e => setForm({...form, injuryLocation: e.target.value})} /></label><label className="field full"><span>Ghi chú chấn thương</span><textarea maxLength="4000" value={form.injuryNotes} onChange={e => setForm({...form, injuryNotes: e.target.value})} rows="2" /></label></>}
 
-          <label className="field full"><span>Video URL</span><input type="url" value={form.videoUrl} onChange={e => setForm({...form, videoUrl: e.target.value})} /></label>
           <label className="field full"><span>Ghi chú *</span><textarea required value={form.trainerNotes} onChange={e => setForm({...form, trainerNotes: e.target.value})} rows="3" /></label>
           <div className="evaluation-note full">Cường độ, HRR1, trạng thái và số giờ được máy chủ tính hoặc thiết lập. Giá trị xem trước không được gửi.</div>
 

@@ -177,6 +177,25 @@ class InjuryServiceTest {
     }
 
     @Test
+    void healingLastInjuryReleasesOnlyAutomaticTrainingLock() {
+        UUID injuryId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("select id, horse_id, data_json"), eq(injuryId)))
+                .thenReturn(List.of(Map.of("id", injuryId, "horse_id", horseId, "data_json", "{}")));
+        when(jdbc.queryForObject(contains("select id from horses where id=? for update"), eq(UUID.class), eq(horseId)))
+                .thenReturn(horseId);
+        when(jdbc.queryForObject(contains("select count(*) from module_records"), eq(Integer.class), eq(horseId)))
+                .thenReturn(0);
+
+        service.addRecoveryUpdate(injuryId, vetId,
+                new AddInjuryRecoveryUpdateRequest("HEALED", "Đã bình phục", List.of()));
+
+        verify(jdbc).update(contains("health_source_type='INJURY_MARKER'"), eq(vetId), eq(horseId));
+        verify(jdbc).update(contains("reason like 'Tự động khóa:%'"), eq(vetId), eq(horseId), eq(horseId));
+    }
+
+    @Test
     void deleteRemovesMarkerAndRecoveryUpdates() {
         UUID injuryId = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();

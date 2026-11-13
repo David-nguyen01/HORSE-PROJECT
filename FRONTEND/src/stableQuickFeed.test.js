@@ -48,40 +48,6 @@ test('2. useStablesQuickFeed fetches quick-feed data on targetDate change with r
   )
 })
 
-test('3. Stalls are enriched with quickFeedMeals by stallId for operational staff', () => {
-  assert.ok(
-    useStablesQuickFeedJs.includes('quickFeedByStallId = useMemo'),
-    'Must construct quickFeedByStallId lookup map'
-  )
-  assert.ok(
-    stableCarePage.includes('quickFeedMeals: isOperationalStaff ? (quickFeed.quickFeedByStallId.get(s.stallId)?.meals || []) : []'),
-    'Must enrich stall objects with quickFeedMeals from quickFeedByStallId for operational staff'
-  )
-})
-
-test('4. Stall cards in Grid View render scheduled meals with pure derived status badges', () => {
-  assert.ok(
-    stableCarePage.includes("meal.status === 'CONFIRMED'"),
-    'Must evaluate CONFIRMED status'
-  )
-  assert.ok(
-    stableCarePage.includes("meal.status === 'OVERDUE'"),
-    'Must evaluate OVERDUE status'
-  )
-  assert.ok(
-    stableCarePage.includes('Đã cho ăn'),
-    'Must display Đã cho ăn badge for confirmed meals'
-  )
-  assert.ok(
-    stableCarePage.includes('Quá giờ'),
-    'Must display Quá giờ badge for overdue meals'
-  )
-  assert.ok(
-    stableCarePage.includes('Chờ cho ăn'),
-    'Must display Chờ cho ăn badge for pending meals'
-  )
-})
-
 test('5. Confirmed meals display confirmation metadata (staff name and timestamp)', () => {
   assert.ok(
     stableCarePage.includes('meal.confirmedByName'),
@@ -90,21 +56,6 @@ test('5. Confirmed meals display confirmation metadata (staff name and timestamp
   assert.ok(
     stableCarePage.includes('formatVNDateTime(meal.confirmedAt)'),
     'Must format confirmedAt timestamp with formatVNDateTime'
-  )
-})
-
-test('6. Stable Staff has 1-click Quick Feed confirm button without navigating to checklist', () => {
-  assert.ok(
-    stableCarePage.includes('handleQuickConfirmMeal = useCallback'),
-    'Must define handleQuickConfirmMeal handler'
-  )
-  assert.ok(
-    stableCarePage.includes('isStaff && !isVet && !isConfirmed'),
-    'Quick-feed confirmation button must strictly require isStaff && !isVet && !isConfirmed'
-  )
-  assert.ok(
-    stableCarePage.includes('handleQuickConfirmMeal(s, meal)'),
-    'Stall card must invoke handleQuickConfirmMeal with stall and meal'
   )
 })
 
@@ -125,21 +76,6 @@ test('7. Veterinarian view is strictly read-only with NO confirmation actions', 
   )
 })
 
-test('8. Duplicate in-flight clicks are guarded and button shows pending state', () => {
-  assert.ok(
-    stableCarePage.includes('if (confirmingMealKey === key || meal.confirmed) return'),
-    'Must guard against duplicate clicks when request is in-flight or meal already confirmed'
-  )
-  assert.ok(
-    stableCarePage.includes("disabled={isPending}"),
-    'Button must be disabled when isPending is true'
-  )
-  assert.ok(
-    stableCarePage.includes("isPending ? 'Đang gửi…' : 'Cho ăn'"),
-    "Button must show 'Đang gửi…' while pending"
-  )
-})
-
 test('9. Error handling displays dismissible error banner and preserves unconfirmed state', () => {
   assert.ok(
     stableCarePage.includes("setConfirmError(err.message || 'Không thể xác nhận cho ăn. Vui lòng thử lại.')"),
@@ -148,17 +84,6 @@ test('9. Error handling displays dismissible error banner and preserves unconfir
   assert.ok(
     stableCarePage.includes("onClick={() => setConfirmError('')}"),
     'Must provide dismissal button for confirmError banner'
-  )
-})
-
-test('10. Table View renders meal progress and Quick-Feed buttons in Bữa ăn trong ca column', () => {
-  assert.ok(
-    stableCarePage.includes('<span>Bữa ăn trong ca</span>'),
-    'Table header must include Bữa ăn trong ca column'
-  )
-  assert.ok(
-    stableCarePage.includes('s.hasHorse && s.quickFeedMeals && s.quickFeedMeals.length > 0'),
-    'Table row must conditionally render quick feed meals when present'
   )
 })
 

@@ -904,9 +904,6 @@ a { color: inherit; text-decoration: none; }
 .tm-sparkline { margin-top: auto; width: 100%; height: 65px; min-width: 0; }
 .tm-chart-empty { display: grid; place-items: center; min-height: 65px; color: #626e63; font-size: 13px; }
 .tm-chart .tm-chart-empty { min-height: 220px; }
-.tm-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 20px; margin-bottom: 20px; }
-.tm-filters label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
-.tm-filters select, .tm-filters input { border: 1px solid #dfe4da; border-radius: 8px; background: white; padding: 10px; font: inherit; color: inherit; }
 .tm-summaries { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
 .tm-summary { padding: 20px; display: flex; flex-direction: column; gap: 10px; }
 .tm-summary strong { font-size: 25px; color: var(--green, #123f32); }
@@ -924,7 +921,7 @@ a { color: inherit; text-decoration: none; }
 .tm-warning { color: #9b322b; overflow-wrap: anywhere; }
 @media (max-width: 850px) { .tm-summaries, .tm-session-values { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 851px) and (max-width: 1200px) { .tm-summaries { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 580px) { .tm-charts, .tm-horses { grid-template-columns: 1fr; } .tm-filters > label { width: 100%; } .tm-summary { padding: 14px; } .tm-summary strong { font-size: 20px; } }
+@media (max-width: 580px) { .tm-charts, .tm-horses { grid-template-columns: 1fr; } .tm-summary { padding: 14px; } .tm-summary strong { font-size: 20px; } }
 
 @media (min-width: 901px) { .training-schedule-grid { grid-template-columns: 100px minmax(140px,1.5fr) minmax(130px,1fr) 90px minmax(110px,1fr) 110px 100px 130px; } }
 
@@ -1087,6 +1084,9 @@ body { font-size: 14px; line-height: 1.5; }
   line-height: 1.35;
 }
 .horse-row .stable-location { overflow-wrap: anywhere; }
+.nutrition-stall-card { position: relative; overflow: hidden; isolation: isolate; }
+.nutrition-stall-card > :not(.nutrition-stall-photo) { position: relative; z-index: 1; }
+.nutrition-stall-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; opacity: .19; pointer-events: none; }
 .horse-row .badge-payment { margin: 0; white-space: nowrap; }
 .horse-row > svg { justify-self: end; }
 @media (max-width: 1000px) {

@@ -82,6 +82,19 @@ class MedicalExaminationServiceTest {
     }
 
     @Test
+    void createRejectsPastExamDate() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        CreateMedicalExaminationRequest req = new CreateMedicalExaminationRequest(
+                LocalDate.now().minusDays(2), "Kiểm tra", "Theo dõi",
+                "Nghỉ ngơi", null, null, "MONITOR");
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ngày hôm nay");
+    }
+
+    @Test
     void createRejectsFollowUpBeforeExamDate() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
@@ -364,7 +377,7 @@ class MedicalExaminationServiceTest {
 
         service.delete(examId, actorId);
 
-        verify(jdbc).update(contains("'$.sourceExaminationDeleted',1"), eq(examId.toString()));
+        verify(jdbc).update(contains("'$.sourceExaminationDeleted','1'"), eq(examId.toString()));
         verify(jdbc, never()).update(contains("status='CANCELLED'"), eq(horseId));
     }
 

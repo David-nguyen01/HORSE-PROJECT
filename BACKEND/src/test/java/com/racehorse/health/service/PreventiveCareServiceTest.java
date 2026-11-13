@@ -51,6 +51,19 @@ class PreventiveCareServiceTest {
     }
 
     @Test
+    void createRejectsPastDueDate() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        CreatePreventiveCareRequest req = new CreatePreventiveCareRequest(
+                "VACCINATION", "Rabies booster", LocalDate.now().minusDays(2), null, 3);
+
+        assertThatThrownBy(() -> service.create(horseId, vetId, req))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("quá khứ");
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
     void createPersistsValidCareSchedule() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();

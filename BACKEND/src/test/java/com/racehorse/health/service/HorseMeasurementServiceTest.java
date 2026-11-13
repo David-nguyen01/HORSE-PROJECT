@@ -1,6 +1,8 @@
 package com.racehorse.health.service;
 
 import com.racehorse.health.dto.CreateHorseWeightRequest;
+import com.racehorse.health.dto.UpdateHorseHealthStatusRequest;
+import com.racehorse.common.exception.BusinessException;
 import com.racehorse.horse.service.HorseAccessService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,18 +19,34 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class HorseMeasurementServiceTest {
     @Mock JdbcTemplate jdbc;
     @Mock HorseAccessService access;
     @InjectMocks HorseMeasurementService service;
+
+    @Test
+    void cannotMarkHorseFitWhileInjuryIsActive() {
+        UUID horseId = UUID.randomUUID();
+        UUID vetId = UUID.randomUUID();
+        when(jdbc.queryForObject(contains("record_type in ('INJURY_MARKER','INJURY')"), eq(Integer.class), eq(horseId)))
+                .thenReturn(1);
+
+        assertThatThrownBy(() -> service.updateHealthStatus(horseId, vetId,
+                new UpdateHorseHealthStatusRequest("FIT", "MANUAL", null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("chấn thương");
+        verify(jdbc, never()).update(contains("update horses set health_status="), any(Object[].class));
+    }
 
     @Test
     void veterinarianWeightReplacesCurrentHorseWeightWithoutCreatingTimelineRow() {

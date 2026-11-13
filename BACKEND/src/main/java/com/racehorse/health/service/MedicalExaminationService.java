@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.OffsetDateTime;
 import java.util.*;
 
@@ -95,15 +96,19 @@ public class MedicalExaminationService {
         UUID currentFollowUpId = emergencyIncidentId == null && followUpService != null
                 ? followUpService.requireAssignedForExamination(horseId, veterinarianId) : null;
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
         if (req.examinationDate().isAfter(today)) {
             throw new BusinessException("Ngày khám không được ở tương lai");
+        }
+        if (req.examinationDate().isBefore(today)) {
+            throw new BusinessException("Ngày khám phải là ngày hôm nay");
         }
         if (req.followUpDate() != null && !req.followUpDate().isAfter(req.examinationDate())) {
             throw new BusinessException("Ngày tái khám phải sau ngày khám");
         }
 
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
+        ensureFitHasNoActiveInjuries(horseId, healthStatusAfter);
         if (emergencyIncidentId == null) requireDoctorForExamination(horse, veterinarianId, currentFollowUpId);
 
         List<MedicalAttachmentResponse> attachments = new ArrayList<>();
@@ -183,10 +188,11 @@ public class MedicalExaminationService {
                     where id = ?
                     """,
                     healthStatusAfter, veterinarianId, examId, horseId);
+            if ("FIT".equals(healthStatusAfter)) releaseAutomaticTrainingLocksIfFit(horseId, veterinarianId);
         }
 
         // Tự động tạo Training Lock nếu chẩn đoán liên quan đến chấn thương
-        boolean isInjury = isInjuryDiagnosis(req.diagnosis(), healthStatusAfter);
+        boolean isInjury = !"FIT".equals(healthStatusAfter) && isInjuryDiagnosis(req.diagnosis(), healthStatusAfter);
         if (isInjury && trainingLockService != null && trainingLockRepository != null) {
             if (trainingLockRepository.findByHorseIdAndReleasedAtIsNull(horseId).isEmpty()) {
                 String lockReason = "Khóa tự động từ kết quả khám: " + req.diagnosis().trim();
@@ -275,6 +281,7 @@ public class MedicalExaminationService {
                 ? followUpService.requireAssignedForExamination(horseId, authorId) : null;
 
         String healthStatusAfter = normalizeHealthStatus(req.healthStatusAfter());
+        ensureFitHasNoActiveInjuries(horseId, healthStatusAfter);
         requireDoctorForExamination(horse, authorId, currentFollowUpId);
 
         UUID addendumId = UUID.randomUUID();
@@ -308,6 +315,7 @@ public class MedicalExaminationService {
                     where id = ?
                     """,
                     healthStatusAfter, authorId, addendumId, horseId);
+            if ("FIT".equals(healthStatusAfter)) releaseAutomaticTrainingLocksIfFit(horseId, authorId);
         }
 
         String authorName = findUsername(authorId);
@@ -523,7 +531,7 @@ public class MedicalExaminationService {
                     update module_records set event_date=case when event_date>(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
                                                                 then (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date else event_date end,
                         data_json=dbo.json_modify(dbo.json_modify(data_json,'$.sourceExaminationId',NULL),
-                                              '$.sourceExaminationDeleted',1),
+                                              '$.sourceExaminationDeleted','1'),
                         updated_at=CURRENT_TIMESTAMP
                     where module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                       and status in ('ASSIGNED','HANDOVER_REQUESTED')
@@ -538,6 +546,7 @@ public class MedicalExaminationService {
         // Revert horse health status if this exam was the source
         if (horseId != null) {
             revertHorseHealthStatusIfSourceMatches(horseId, examId, actorId);
+            releaseAutomaticTrainingLocksIfFit(horseId, actorId);
         }
     }
 
@@ -559,7 +568,30 @@ public class MedicalExaminationService {
 
         if (horseId != null) {
             revertHorseHealthStatusIfSourceMatches(horseId, addendumId, actorId);
+            releaseAutomaticTrainingLocksIfFit(horseId, actorId);
         }
+    }
+
+    private void ensureFitHasNoActiveInjuries(UUID horseId, String status) {
+        if (!"FIT".equals(status)) return;
+        Integer activeInjuries = jdbc.queryForObject(
+                "select count(*) from module_records where horse_id=? and module_code='MEDICAL' "
+                        + "and record_type in ('INJURY_MARKER','INJURY') and status not in ('HEALED','RESOLVED')",
+                Integer.class, horseId);
+        if (activeInjuries != null && activeInjuries > 0)
+            throw new BusinessException("Cần xác nhận tất cả chấn thương đã bình phục trước khi chuyển thể trạng sang khỏe mạnh");
+    }
+
+    private void releaseAutomaticTrainingLocksIfFit(UUID horseId, UUID actorId) {
+        jdbc.update("""
+                update training_locks set released_at=CURRENT_TIMESTAMP, released_by_user_id=?,
+                    release_reason='Tự động gỡ khóa: Thể trạng đã khỏe mạnh'
+                where horse_id=? and released_at is null
+                  and (reason like 'Tự động khóa:%' or reason like 'Khóa tự động từ kết quả khám:%')
+                  and exists (select 1 from horses where id=? and health_status='FIT')
+                  and not exists (select 1 from module_records where horse_id=? and module_code='MEDICAL'
+                      and record_type in ('INJURY_MARKER','INJURY') and status not in ('HEALED','RESOLVED'))
+                """, actorId, horseId, horseId, horseId);
     }
 
     private void revertHorseHealthStatusIfSourceMatches(UUID horseId, UUID deletedSourceId, UUID actorId) {
@@ -568,6 +600,22 @@ public class MedicalExaminationService {
         if (horseRows.isEmpty()) return;
         UUID currentSourceId = toUuid(horseRows.getFirst().get("health_source_id"));
         if (currentSourceId == null || !currentSourceId.equals(deletedSourceId)) {
+            return;
+        }
+
+        List<UUID> activeInjuryIds = jdbc.query("""
+                select id from module_records
+                where horse_id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER','INJURY')
+                  and status not in ('HEALED','RESOLVED')
+                order by created_at desc limit 1
+                """, (rs, row) -> rs.getObject(1, UUID.class), horseId);
+        if (activeInjuryIds != null && !activeInjuryIds.isEmpty()) {
+            jdbc.update("""
+                    update horses set health_status='INJURED', health_changed_by_user_id=?,
+                        health_source_type='INJURY_MARKER', health_source_id=?,
+                        health_changed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP, version=version+1
+                    where id=?
+                    """, actorId, activeInjuryIds.getFirst(), horseId);
             return;
         }
 

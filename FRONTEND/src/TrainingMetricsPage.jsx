@@ -14,8 +14,6 @@ const METRICS = [
   ['durationMinutes', 'Thời lượng vận động', 'phút'],
   ['hrr1', 'Hồi phục nhịp tim HRR1', 'nhịp/phút'],
 ]
-const clubToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-const blankFilters = { from: '', to: '', status: '' }
 const number = value => value == null || value === '' ? '—' : new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value)
 const date = value => value ? new Intl.DateTimeFormat('vi-VN').format(new Date(`${value}T00:00:00`)) : '—'
 const mean = rows => { const values = rows.map(row => row.averageSpeedKmh).filter(value => value != null); return values.length ? values.reduce((sum, value) => sum + Number(value), 0) / values.length : null }
@@ -57,8 +55,6 @@ export default function TrainingMetricsPage({ user, isOwner }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [query, setQuery] = useState('')
-  const [filters, setFilters] = useState(blankFilters)
-  const [applied, setApplied] = useState(blankFilters)
   const [medical, setMedical] = useState(null)
   const [linkedEvaluation, setLinkedEvaluation] = useState(null)
 
@@ -94,7 +90,7 @@ export default function TrainingMetricsPage({ user, isOwner }) {
   }, [isOwner, user?.id])
 
   useEffect(() => {
-    setFilters(blankFilters); setApplied(blankFilters); setMedical(null)
+    setMedical(null)
     if (!horseId || !horses.some(horse => horse.id === horseId)) return
     const controller = new AbortController()
     api(`/api/horses/${horseId}/race-readiness`, { signal: controller.signal })
@@ -130,7 +126,7 @@ export default function TrainingMetricsPage({ user, isOwner }) {
     setParams(previous => { const next = new URLSearchParams(previous); next.delete('horseId'); next.delete('evaluationId'); if (id) next.set('horseId', id); if (evaluation) next.set('evaluationId', evaluation); return next })
   }
   const horse = horses.find(item => item.id === horseId)
-  const rows = (horse?.evaluations || []).filter(row => (!applied.from || row.sessionDate >= applied.from) && (!applied.to || row.sessionDate <= applied.to) && (!applied.status || row.fitnessStatus === applied.status))
+  const rows = horse?.evaluations || []
   const session = horse && linkedEvaluation?.horse.id === horse.id ? linkedEvaluation : null
   const visibleHorses = horses.filter(item => `${item.name} ${item.code}`.toLocaleLowerCase('vi-VN').includes(query.trim().toLocaleLowerCase('vi-VN')))
 
@@ -148,17 +144,11 @@ export default function TrainingMetricsPage({ user, isOwner }) {
       </button> })}</div>{!visibleHorses.length && <div className="card tm-empty">Không có ngựa phù hợp.</div>}
     </> : <>
       {horse.error && <div className="notice error">Không tải được đánh giá: {horse.error}</div>}
-      <form className="card tm-filters" onSubmit={event => { event.preventDefault(); if ((filters.from && filters.to && filters.from > filters.to) || filters.to > clubToday()) { setError('Khoảng ngày không hợp lệ hoặc ở tương lai.'); return } setError(''); setApplied({ ...filters }) }}>
-        <label>Thể lực<select value={filters.status} onChange={event => setFilters({ ...filters, status: event.target.value })}><option value="">Tất cả trạng thái</option>{Object.entries(FITNESS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
-        <label>Từ ngày<input type="date" value={filters.from} max={filters.to || clubToday()} onChange={event => setFilters({ ...filters, from: event.target.value })} /></label>
-        <label>Đến ngày<input type="date" value={filters.to} max={clubToday()} min={filters.from || undefined} onChange={event => setFilters({ ...filters, to: event.target.value })} /></label><button className="button primary">Áp dụng</button>
-      </form>
-      <div className="tm-summaries"><Summary label="Buổi đã đánh giá trong bộ lọc" value={horse.error ? '—' : rows.length} /><Summary label="Tốc độ trung bình các buổi (km/h)" value={number(mean(rows))} /><Summary label="Sức khỏe hiện tại" value={medical ? HEALTH[medical.health] || medical.health || 'Chưa có dữ liệu' : 'Đang tải…'} /><Summary label="Nhịp tim nghỉ (BPM)" value={medical ? (medical.restingHeartRateBpm == null ? 'Chưa ghi nhận' : number(medical.restingHeartRateBpm)) : 'Đang tải…'} /><Summary label="Cân nặng hiện tại (kg)" value={medical ? number(medical.weightKg) : 'Đang tải…'} /></div>
-      {medical && <p className="tm-muted">Sức khỏe, nhịp tim nghỉ và cân nặng không phụ thuộc bộ lọc buổi tập.</p>}
+      <div className="tm-summaries"><Summary label="Buổi đã đánh giá" value={horse.error ? '—' : rows.length} /><Summary label="Tốc độ trung bình các buổi (km/h)" value={number(mean(rows))} /><Summary label="Sức khỏe hiện tại" value={medical ? HEALTH[medical.health] || medical.health || 'Chưa có dữ liệu' : 'Đang tải…'} /><Summary label="Nhịp tim nghỉ (BPM)" value={medical ? (medical.restingHeartRateBpm == null ? 'Chưa ghi nhận' : number(medical.restingHeartRateBpm)) : 'Đang tải…'} /><Summary label="Cân nặng hiện tại (kg)" value={medical ? number(medical.weightKg) : 'Đang tải…'} /></div>
       {medical?.errors.map(message => <div className="notice error" key={message}>{message}</div>)}
       {session && <section className="card tm-session" aria-label="Chi tiết đánh giá"><div className="card-head"><h2>Buổi tập ngày {date(session.sessionDate)}</h2><Badge status={session.fitnessStatus} /></div><p>Mã đánh giá: {session.id}</p><div className="tm-session-values">{METRICS.map(([key, label, unit]) => <div key={key}><span>{label}</span><strong>{number(session[key])} {unit}</strong></div>)}</div><p className="tm-notes">{session.trainerNotes || 'Không có ghi chú.'}</p>{/^https?:\/\//i.test(session.videoUrl || '') && <a href={session.videoUrl} target="_blank" rel="noreferrer">Xem video buổi tập</a>}</section>}
       <div className="tm-charts">{METRICS.map(metric => <MetricChart key={metric[0]} rows={rows} metric={metric} />)}</div>
-      <section className="card tm-session"><h2>Các buổi đã đánh giá</h2><p>Chọn ngày để xem đầy đủ thông số và ghi chú. Các số đo nhịp tim gốc được lưu trong phần đánh giá sau buổi tập.</p><div className="source-table-scroll"><table><thead><tr><th>Ngày</th><th>Thể lực</th><th>Tốc độ (km/h)</th><th>HRR1 (nhịp/phút)</th><th>Thời lượng (phút)</th></tr></thead><tbody>{[...rows].reverse().map(row => <tr key={row.id}><td><button className="button secondary" onClick={() => select(horse.id, row.id)}>{date(row.sessionDate)}</button></td><td><Badge status={row.fitnessStatus} /></td><td>{number(row.averageSpeedKmh)}</td><td>{number(row.hrr1)}</td><td>{number(row.durationMinutes)}</td></tr>)}</tbody></table></div>{!rows.length && <p>Chưa có đánh giá phù hợp bộ lọc.</p>}</section>
+      <section className="card tm-session"><h2>Các buổi đã đánh giá</h2><p>Chọn ngày để xem đầy đủ thông số và ghi chú. Các số đo nhịp tim gốc được lưu trong phần đánh giá sau buổi tập.</p><div className="source-table-scroll"><table><thead><tr><th>Ngày</th><th>Thể lực</th><th>Tốc độ (km/h)</th><th>HRR1 (nhịp/phút)</th><th>Thời lượng (phút)</th></tr></thead><tbody>{[...rows].reverse().map(row => <tr key={row.id}><td><button className="button secondary" onClick={() => select(horse.id, row.id)}>{date(row.sessionDate)}</button></td><td><Badge status={row.fitnessStatus} /></td><td>{number(row.averageSpeedKmh)}</td><td>{number(row.hrr1)}</td><td>{number(row.durationMinutes)}</td></tr>)}</tbody></table></div>{!rows.length && <p>Chưa có đánh giá.</p>}</section>
     </>}
   </div>
 }

@@ -80,6 +80,10 @@ const localDateAfter = (days) => {
   return localDate(date)
 }
 const localToday = () => localDate(new Date())
+const clubToday = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date())
+const dayAfter = (date) => new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10)
 
 const PREVENTIVE_TYPES = {
   VACCINATION: 'Tiêm phòng',
@@ -2844,6 +2848,7 @@ function CreatePreventiveModal({ horse, schedule, onClose, onSaved }) {
     try {
       if (!form.careType) throw new Error('Vui lòng chọn loại chăm sóc.')
       if (form.careType === 'OTHER' && !form.careName.trim()) throw new Error('Vui lòng nhập tên loại chăm sóc khác.')
+      if (!form.dueDate || form.dueDate < localToday()) throw new Error('Ngày dự kiến chăm sóc không được ở quá khứ.')
       const recurrenceDays = getRecurrenceDays()
       const payload = {
         careType: form.careType,
@@ -2906,6 +2911,7 @@ function CreatePreventiveModal({ horse, schedule, onClose, onSaved }) {
             <input
               type="date"
               required
+              min={localToday()}
               value={form.dueDate}
               onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
             />
@@ -3026,7 +3032,6 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
     return () => { cancelled = true }
   }, [horse?.id, emergencyIncidentId])
   const [form, setForm] = useState({
-    examinationDate: localToday(),
     symptoms: '',
     diagnosis: '',
     treatmentProtocol: '',
@@ -3135,10 +3140,6 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
     if (e) e.preventDefault()
     setStepError('')
     if (step === 1) {
-      if (!form.examinationDate) {
-        setStepError('Vui lòng chọn ngày khám.')
-        return
-      }
       if (!form.symptoms.trim()) {
         setStepError('Vui lòng nhập triệu chứng lâm sàng phát hiện.')
         return
@@ -3153,7 +3154,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
         setStepError('Vui lòng nhập phác đồ điều trị / hướng dẫn can thiệp.')
         return
       }
-      if (form.followUpDate && form.followUpDate <= form.examinationDate) {
+      if (form.followUpDate && form.followUpDate <= clubToday()) {
         setStepError('Ngày tái khám phải sau ngày khám.')
         return
       }
@@ -3183,7 +3184,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
         .map((a) => a.fileId)
 
       await vetApi.createMedicalExam(horse.id, {
-        examinationDate: form.examinationDate,
+        examinationDate: clubToday(),
         symptoms: form.symptoms,
         diagnosis: form.diagnosis,
         treatmentProtocol: form.treatmentProtocol,
@@ -3268,12 +3269,12 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
         {step === 1 && (
           <div className="form-grid">
             <div className="field">
-              <span>Ngày khám *</span>
+              <span>Ngày khám (tự động lấy ngày hôm nay)</span>
               <input
-                type="date"
-                required
-                value={form.examinationDate}
-                onChange={(e) => setForm({ ...form, examinationDate: e.target.value })}
+                type="text"
+                readOnly
+                value={formatVNDate(clubToday())}
+                style={{ background: '#f5f7f3', color: '#333' }}
               />
             </div>
             <div className="field">
@@ -3517,7 +3518,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
               <span>Ngày hẹn tái khám (tùy chọn)</span>
               <input
                 type="date"
-                min={form.examinationDate ? new Date(Date.parse(`${form.examinationDate}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : undefined}
+                min={dayAfter(clubToday())}
                 value={form.followUpDate}
                 onChange={(e) => setForm({ ...form, followUpDate: e.target.value })}
               />
@@ -3845,7 +3846,6 @@ const MUSCLE_OPTIONS = {
 }
 
 function TrainingAssessmentView({ onNavigate }) {
-  const [subTab, setSubTab] = useState('mine') // 'mine' | 'calendar'
   const todayStr = () => localToday()
   const pastDt = (days) => localDateAfter(-days)
   const futureDt = (days) => localDateAfter(days)
@@ -3854,12 +3854,8 @@ function TrainingAssessmentView({ onNavigate }) {
   const [dateFrom, setDateFrom] = useState(pastDt(7))
   const [dateTo, setDateTo] = useState(futureDt(14))
 
-  // Single date for calendar view
-  const [selectedDate, setSelectedDate] = useState(todayStr())
-
   // Data states
   const [mySessions, setMySessions] = useState([])
-  const [calendarSessions, setCalendarSessions] = useState([])
   const [assessmentsMap, setAssessmentsMap] = useState({})
   const [loading, setLoading] = useState(false)
   const [activeSession, setActiveSession] = useState(null)
@@ -3921,65 +3917,7 @@ function TrainingAssessmentView({ onNavigate }) {
     }
   }, [dateFrom, dateTo])
 
-  // Load Calendar by Date
-  const loadCalendarSessions = useCallback(async () => {
-    setLoading(true)
-    try {
-      const [sessionsRes, assessmentsRes] = await Promise.allSettled([
-        vetApi.getTrainingSessionsByDate(selectedDate),
-        vetApi.getVetAssessmentsByDate(selectedDate),
-      ])
-
-      const sessList = sessionsRes.status === 'fulfilled' ? (Array.isArray(sessionsRes.value) ? sessionsRes.value : pageContent(sessionsRes.value) || []) : []
-      setCalendarSessions(sessList)
-
-      const assessList = assessmentsRes.status === 'fulfilled' ? (Array.isArray(assessmentsRes.value) ? assessmentsRes.value : pageContent(assessmentsRes.value) || []) : []
-      const map = {}
-      assessList.forEach((a) => {
-        if (a.scheduleId) {
-          map[a.scheduleId] = a
-          if (typeof a.scheduleId === 'string') map[a.scheduleId.toLowerCase()] = a
-        }
-      })
-
-      // Also query individual assessment if not matched by date
-      await Promise.allSettled(
-        sessList.map(async (s) => {
-          const key = s.id
-          const keyLower = typeof key === 'string' ? key.toLowerCase() : key
-          if (!map[key] && !map[keyLower]) {
-            try {
-              const a = await vetApi.getVetAssessment(s.id)
-              if (a && (a.id || a.scheduleId)) {
-                map[key] = a
-                map[keyLower] = a
-                if (a.scheduleId) {
-                  map[a.scheduleId] = a
-                  if (typeof a.scheduleId === 'string') map[a.scheduleId.toLowerCase()] = a
-                }
-              }
-            } catch (e) {
-              // no assessment yet
-            }
-          }
-        })
-      )
-      setAssessmentsMap({ ...map })
-    } catch (err) {
-      console.error('Lỗi tải buổi tập theo ngày:', err)
-      setCalendarSessions([])
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedDate])
-
-  useEffect(() => {
-    if (subTab === 'mine') {
-      loadMySessions()
-    } else if (subTab === 'calendar') {
-      loadCalendarSessions()
-    }
-  }, [subTab, loadMySessions, loadCalendarSessions])
+  useEffect(() => { loadMySessions() }, [loadMySessions])
 
   const renderVetBadge = (s) => <span>{s.horse?.diagnosingVet?.username || 'Chưa có bác sĩ chẩn đoán'}</span>
   const renderStaffBadge = (s) => <span>{s.horse?.caretaker?.username || 'Chưa có nhân viên chăm sóc'}</span>
@@ -3994,38 +3932,8 @@ function TrainingAssessmentView({ onNavigate }) {
         </div>
       </div>
 
-      {/* Sub-tab Switcher */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', borderBottom: '1px solid #e0e6e2', paddingBottom: '10px' }}>
-        <button
-          className={`button ${subTab === 'mine' ? 'primary' : 'secondary'}`}
-          style={{ height: '36px', fontSize: '13px' }}
-          onClick={() => setSubTab('mine')}
-        >
-          <CheckCircle2 size={15} /> Lịch theo dõi của tôi & Đánh giá lâm sàng
-        </button>
-        <button
-          className={`button ${subTab === 'calendar' ? 'primary' : 'secondary'}`}
-          style={{ height: '36px', fontSize: '13px' }}
-          onClick={() => setSubTab('calendar')}
-        >
-          <Calendar size={15} /> Tất cả lịch tập theo ngày
-        </button>
-      </div>
-
       {/* FILTER TOOLBAR */}
       <div className="toolbar card" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
-        {subTab === 'calendar' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Calendar size={16} color="#4f6358" />
-            <span style={{ fontWeight: 600, fontSize: '13px' }}>Ngày buổi tập:</span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              style={{ minHeight: '36px', padding: '4px 10px' }}
-            />
-          </div>
-        ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontWeight: 600, fontSize: '13px', color: '#333' }}>Từ ngày:</span>
@@ -4046,14 +3954,10 @@ function TrainingAssessmentView({ onNavigate }) {
               />
             </div>
           </div>
-        )}
 
         <button
           className="button secondary"
-          onClick={() => {
-            if (subTab === 'mine') loadMySessions()
-            else loadCalendarSessions()
-          }}
+          onClick={loadMySessions}
           disabled={loading}
           style={{ height: '36px' }}
         >
@@ -4061,12 +3965,10 @@ function TrainingAssessmentView({ onNavigate }) {
         </button>
 
         <span className="record-count" style={{ marginLeft: 'auto', fontSize: '12px', color: '#666' }}>
-          {subTab === 'mine' && `${mySessions.length} phiên tập trong lịch theo dõi của bạn`}
-          {subTab === 'calendar' && `${calendarSessions.length} buổi tập trong ngày ${formatVNDate(selectedDate)}`}
+          {mySessions.length} phiên tập trong lịch theo dõi của bạn
         </span>
       </div>
 
-      {subTab === 'mine' && (
         <div style={{ display: 'grid', gap: '14px' }}>
           {loading ? (
             <div className="empty card">Đang tải lịch theo dõi của bạn…</div>
@@ -4178,95 +4080,6 @@ function TrainingAssessmentView({ onNavigate }) {
             })
           )}
         </div>
-      )}
-
-      {/* ----------------------------------------------------------------- */}
-      {/* SUBTAB 3: TẤT CẢ LỊCH TẬP THEO NGÀY (ALL SESSIONS BY DATE)        */}
-      {/* ----------------------------------------------------------------- */}
-      {subTab === 'calendar' && (
-        <div style={{ display: 'grid', gap: '14px' }}>
-          {loading ? (
-            <div className="empty card">Đang tải lịch tập theo ngày…</div>
-          ) : calendarSessions.length === 0 ? (
-            <div className="empty card" style={{ padding: '36px' }}>
-              <Activity size={32} color="#718078" />
-              <b>Không có buổi tập nào trong ngày {formatVNDate(selectedDate)}</b>
-              <p style={{ margin: '4px 0 0', fontSize: '13px', color: '#666' }}>Huấn luyện viên chưa lên lịch hoặc chưa phát hành lịch tập cho ngày này.</p>
-            </div>
-          ) : (
-            calendarSessions.map((sess) => {
-              const assess = assessmentsMap[sess.id] || (typeof sess.id === 'string' ? assessmentsMap[sess.id.toLowerCase()] : null)
-              const isAssessed = !!assess
-              const horseName = sess.horse?.name || sess.horseName || 'Ngựa tập'
-              const horseCode = sess.horse?.code || sess.horseCode || ''
-              const task = sess.taskName || sess.phase?.name || 'Huấn luyện cơ bản'
-              const timeSlot = sess.scheduledStart
-                ? `${new Date(sess.scheduledStart).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${sess.scheduledEnd ? new Date(sess.scheduledEnd).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—'}`
-                : 'Trong ngày'
-
-              return (
-                <div
-                  key={sess.id}
-                  className="card"
-                  style={{
-                    padding: '18px 22px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderLeft: isAssessed ? '4px solid #27714d' : '4px solid #d59d32',
-                    flexWrap: 'wrap',
-                    gap: '14px',
-                  }}
-                >
-                  <div style={{ flex: 1, minWidth: '280px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#1f382b' }}>
-                        {horseName} {horseCode && `(${horseCode})`}
-                      </span>
-                      <span style={{ fontSize: '11px', background: '#f0f4f1', padding: '2px 8px', borderRadius: '4px', color: '#4f6358' }}>
-                        {task}
-                      </span>
-                      {renderVetBadge(sess)}
-                      {isAssessed ? (
-                        <span style={{ color: '#27714d', fontSize: '11px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <Check size={13} /> ĐÃ ĐÁNH GIÁ LÂM SÀNG
-                        </span>
-                      ) : (
-                        <span style={{ color: '#b08412', fontSize: '11px', fontWeight: 700 }}>
-                          ⏳ CHƯA ĐÁNH GIÁ
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#555', marginTop: '6px', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-                      <span>Thời gian: <b>{timeSlot}</b></span>
-                      <span>Sân: <b>{sess.racetrack?.name || 'CLB'}</b></span>
-                      <span>Cường độ: <b>{sess.workloadIntensity || 'Tiêu chuẩn'}</b></span>
-                      <span>Nhân viên: {renderStaffBadge(sess)}</span>
-                    </div>
-                    {isAssessed && (
-                      <div style={{ marginTop: '8px', fontSize: '12px', background: '#f8faf7', padding: '8px 12px', borderRadius: '6px' }}>
-                        <span>Thể trạng: <b>{VET_CONDITION_OPTIONS[assess.overallCondition] || assess.overallCondition}</b> • Nhịp tim hồi phục: <b>{assess.heartRateRecoveryBpm} BPM</b> • Dáng đi: <b>{GAIT_OPTIONS[assess.gaitStatus] || assess.gaitStatus}</b></span>
-                        {assess.clinicalConclusion && <div style={{ color: '#333', marginTop: '3px' }}>Kết luận: <i>{assess.clinicalConclusion}</i></div>}
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button
-                      className={`button ${isAssessed ? 'secondary' : 'primary'}`}
-                      style={{ padding: '8px 16px', fontSize: '12px' }}
-                      onClick={() => setActiveSession({ session: sess, assessment: assess })}
-                    >
-                      <Stethoscope size={14} /> {isAssessed ? 'Xem / Cập nhật đánh giá' : 'Đánh giá lâm sàng'}
-                    </button>
-                  </div>
-                </div>
-              )
-            })
-          )}
-        </div>
-      )}
-
       {/* CLINICAL ASSESSMENT MODAL */}
       {activeSession && (
         <VetAssessmentModal
@@ -4275,8 +4088,7 @@ function TrainingAssessmentView({ onNavigate }) {
           onClose={() => setActiveSession(null)}
           onSaved={() => {
             setActiveSession(null)
-            if (subTab === 'mine') loadMySessions()
-            else loadCalendarSessions()
+            loadMySessions()
           }}
         />
       )}
