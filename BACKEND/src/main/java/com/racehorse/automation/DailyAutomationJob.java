@@ -21,22 +21,22 @@ public class DailyAutomationJob {
     void remindPreventiveCare(LocalDate today){
         jdbc.update("""
                 insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key)
-                select newid(),ur.user_id,'PREVENTIVE_CARE_DUE',
+                select gen_random_uuid(),ur.user_id,'PREVENTIVE_CARE_DUE',
                        case when s.due_date<? then 'HIGH' else 'NORMAL' end,
-                       N'Nhắc lịch chăm sóc phòng ngừa',concat(N'Lịch ',coalesce(nullif(s.care_name,N''),s.care_type),N' đến hạn ',convert(varchar(10),s.due_date,23)),
-                       'PREVENTIVE_CARE',s.id,concat('preventive:',cast(s.id as varchar(36)),':',convert(varchar(10),s.due_date,23),':',cast(ur.user_id as varchar(36)))
+                       'Nhắc lịch chăm sóc phòng ngừa',concat('Lịch ',coalesce(nullif(s.care_name,''),s.care_type),' đến hạn ',to_char(s.due_date,'YYYY-MM-DD')),
+                       'PREVENTIVE_CARE',s.id,concat('preventive:',cast(s.id as varchar(36)),':',to_char(s.due_date,'YYYY-MM-DD'),':',cast(ur.user_id as varchar(36)))
                 from preventive_care_schedules s cross join user_roles ur
                 join users u on u.id = ur.user_id
-                where ur.role in ('VETERINARIAN', 'HEAD_TRAINER') and u.enabled = 1
+                where ur.role in ('VETERINARIAN', 'HEAD_TRAINER') and u.enabled=true
                   and s.cancelled_at is null
-                  and dateadd(day,-s.reminder_lead_days,s.due_date)<=?
+                  and (s.due_date - s.reminder_lead_days)<=?
                   and s.completed_at is null
-                  and not exists(select 1 from notifications n where n.deduplication_key=concat('preventive:',cast(s.id as varchar(36)),':',convert(varchar(10),s.due_date,23),':',cast(ur.user_id as varchar(36))))
+                  and not exists(select 1 from notifications n where n.deduplication_key=concat('preventive:',cast(s.id as varchar(36)),':',to_char(s.due_date,'YYYY-MM-DD'),':',cast(ur.user_id as varchar(36))))
                 """,today,today);
     }
 
     void createOwnerReports(LocalDate day){
-        UUID generator=jdbc.query("select top 1 u.id from users u join user_roles ur on ur.user_id=u.id where ur.role='CLUB_MANAGER' and u.enabled=1 order by u.created_at",
+        UUID generator=jdbc.query("select u.id from users u join user_roles ur on ur.user_id=u.id where ur.role='CLUB_MANAGER' and u.enabled=true order by u.created_at limit 1",
                 rs->rs.next()?rs.getObject(1,UUID.class):null);
         if(generator==null) return;
         List<UUID> owners=jdbc.query("select distinct owner_id from horse_ownerships",(rs,row)->rs.getObject(1,UUID.class));
@@ -79,7 +79,7 @@ public class DailyAutomationJob {
             } catch (org.springframework.dao.DuplicateKeyException ignore) {
                 continue;
             }
-            jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key) values(newid(),?,'OWNER_REPORT_READY','NORMAL',?,?, 'OWNER_REPORT',?,?)",
+            jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key) values(gen_random_uuid(),?,'OWNER_REPORT_READY','NORMAL',?,?, 'OWNER_REPORT',?,?)",
                     owner, "Báo cáo ngày mới", "Báo cáo ngày " + day + " đã sẵn sàng (VND).",
                     report, "owner-report:" + owner + ":" + day);
         }

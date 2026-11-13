@@ -133,8 +133,8 @@ public class TrainingEvaluationService {
         if (request.injured()) {
             if (jdbc == null) throw new IllegalStateException("Medical audit persistence is unavailable");
             jdbc.update("update horses set status='INJURED',health_status='INJURED',health_source_type='TRAINING_EVALUATION',"
-                            + "health_source_id=?,health_changed_by_user_id=?,health_changed_at=SYSDATETIMEOFFSET(),"
-                            + "updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                            + "health_source_id=?,health_changed_by_user_id=?,health_changed_at=CURRENT_TIMESTAMP,"
+                            + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                     saved.getId(), actorId, horse.getId());
         }
         notifyEvaluation(horse, saved, request.injured());
@@ -162,8 +162,8 @@ public class TrainingEvaluationService {
             } else notifyUser(caretakerId, "TRAINING_EVALUATION_YELLOW_CARETAKER", "Đánh giá huấn luyện mức YELLOW",
                     horse, evaluation, "CARETAKER");
             String previous = firstString("""
-                    select top 1 fitness_status from training_evaluations
-                    where horse_id=? and id<>? order by session_date desc,completed_at desc
+                    select fitness_status from training_evaluations
+                    where horse_id=? and id<>? order by session_date desc,completed_at desc limit 1
                     """, horse.getId(), evaluation.getId());
             if ("YELLOW".equals(previous)) notifyVet(vetId, horse, evaluation, "YELLOW_STREAK",
                     "Ngựa có hai buổi đánh giá YELLOW liên tiếp");
@@ -210,8 +210,8 @@ public class TrainingEvaluationService {
             if (jdbc == null) throw new IllegalStateException("Medical audit persistence is unavailable");
             jdbc.update("update horses set status='INJURED',health_status='INJURED',"
                             + "health_source_type='TRAINING_EVALUATION',health_source_id=?,"
-                            + "health_changed_by_user_id=?,health_changed_at=SYSDATETIMEOFFSET(),"
-                            + "updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                            + "health_changed_by_user_id=?,health_changed_at=CURRENT_TIMESTAMP,"
+                            + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                     evaluationId, actorId, horse.getId());
         }
         TrainingEvaluation saved = repository.save(evaluation);
@@ -341,12 +341,12 @@ public class TrainingEvaluationService {
         data.put("createdAt", now.toString());
 
         List<UUID> existing = jdbc.query(
-                "select id from module_records where module_code='TRAINING' and record_type='VET_TRAINING_ASSESSMENT' and JSON_VALUE(data_json, '$.scheduleId')=?",
+                "select id from module_records where module_code='TRAINING' and record_type='VET_TRAINING_ASSESSMENT' and dbo.json_value(data_json, '$.scheduleId')=?",
                 (rs, n) -> toUuid(rs.getObject("id")),
                 scheduleId.toString());
         if (!existing.isEmpty()) {
             assessmentId = existing.getFirst();
-            jdbc.update("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+            jdbc.update("update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                     toJson(data), assessmentId);
         } else {
             jdbc.update("""
@@ -356,7 +356,7 @@ public class TrainingEvaluationService {
                         created_at, updated_at
                     ) values (?, 'TRAINING', 'VET_TRAINING_ASSESSMENT', 'training_schedules',
                               ?, ?, 'COMPLETED', ?, ?,
-                              SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                              CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     """,
                     assessmentId, schedule.getHorse().getId(), vetId, today, toJson(data));
         }
@@ -398,14 +398,15 @@ public class TrainingEvaluationService {
     public VetAssessmentResponse getVetAssessment(UUID scheduleId) {
         if (jdbc == null) return null;
         List<Map<String, Object>> rows = jdbc.queryForList("""
-                select top 1 m.id, m.horse_id, h.code as horse_code, h.name as horse_name,
+                select m.id, m.horse_id, h.code as horse_code, h.name as horse_name,
                        m.user_id, u.username as vet_name, m.data_json, m.created_at
                 from module_records m
                 join horses h on h.id = m.horse_id
                 join users u on u.id = m.user_id
                 where m.module_code = 'TRAINING' and m.record_type = 'VET_TRAINING_ASSESSMENT'
-                  and JSON_VALUE(m.data_json, '$.scheduleId') = ?
+                  and dbo.json_value(m.data_json, '$.scheduleId') = ?
                 order by m.created_at desc
+                limit 1
                 """, scheduleId.toString());
         if (rows.isEmpty()) return null;
         return mapVetAssessmentRow(rows.getFirst());

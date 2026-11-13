@@ -87,8 +87,8 @@ public interface TrainingScheduleRepository extends JpaRepository<TrainingSchedu
               and s.cancelledAt is null
               and s.completedAt is null
               and (s.sessionStatus is null or s.sessionStatus in ('PREPARING', 'READY'))
-              and (:fromInclusive is null or s.scheduledEnd > :fromInclusive)
-              and (:toExclusive is null or s.scheduledStart < :toExclusive)
+              and s.scheduledEnd > :fromInclusive
+              and s.scheduledStart < :toExclusive
             order by s.scheduledStart
             """)
     List<TrainingSchedule> findForCaretaker(@Param("userId") UUID userId, @Param("fromInclusive") Instant fromInclusive, @Param("toExclusive") Instant toExclusive);
@@ -99,8 +99,8 @@ public interface TrainingScheduleRepository extends JpaRepository<TrainingSchedu
             where s.horse.diagnosingVet.id = :userId
               and s.publishedAt is not null
               and s.cancelledAt is null
-              and (:fromInclusive is null or s.scheduledEnd > :fromInclusive)
-              and (:toExclusive is null or s.scheduledStart < :toExclusive)
+              and s.scheduledEnd > :fromInclusive
+              and s.scheduledStart < :toExclusive
             order by s.scheduledStart
             """)
     List<TrainingSchedule> findForDiagnosingVet(@Param("userId") UUID userId, @Param("fromInclusive") Instant fromInclusive, @Param("toExclusive") Instant toExclusive);

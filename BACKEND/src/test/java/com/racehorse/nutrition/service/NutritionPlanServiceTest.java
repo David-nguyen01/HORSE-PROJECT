@@ -43,7 +43,7 @@ class NutritionPlanServiceTest {
         UUID horseId = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
 
-        when(jdbc.queryForObject(contains("max(cast(JSON_VALUE"), eq(Integer.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("max(cast(dbo.json_value"), eq(Integer.class), eq(horseId)))
                 .thenReturn(1);
 
         MealItem breakfast = new MealItem("Breakfast", LocalTime.of(6, 30), new BigDecimal("2.5"), "Oats",
@@ -232,7 +232,7 @@ class NutritionPlanServiceTest {
         UUID stableId = UUID.randomUUID();
         UUID stallId = UUID.randomUUID();
 
-        when(jdbc.queryForList(contains("from stables where is_active=1")))
+        when(jdbc.queryForList(contains("from stables where is_active=true")))
                 .thenReturn(List.of(Map.of("id", stableId, "name", "Barn A", "location", "North", "is_active", true)));
 
         when(jdbc.query(contains("record_type='STALL'"), any(RowMapper.class), eq(stableId.toString())))
@@ -263,7 +263,7 @@ class NutritionPlanServiceTest {
         UUID stallId = UUID.randomUUID();
         UUID horseId = UUID.randomUUID();
 
-        when(jdbc.queryForList(contains("from stables where is_active=1")))
+        when(jdbc.queryForList(contains("from stables where is_active=true")))
                 .thenReturn(List.of(Map.of("id", stableId, "name", "Barn B", "location", "East", "is_active", true)));
 
         when(jdbc.query(contains("record_type='STALL'"), any(RowMapper.class), eq(stableId.toString())))
@@ -305,7 +305,7 @@ class NutritionPlanServiceTest {
         UUID horseId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
 
-        when(jdbc.queryForList(contains("from stables where is_active=1")))
+        when(jdbc.queryForList(contains("from stables where is_active=true")))
                 .thenReturn(List.of(Map.of("id", stableId, "name", "Barn A", "location", "North", "is_active", true)));
 
         when(jdbc.query(contains("record_type='STALL'"), any(RowMapper.class), eq(stableId.toString())))

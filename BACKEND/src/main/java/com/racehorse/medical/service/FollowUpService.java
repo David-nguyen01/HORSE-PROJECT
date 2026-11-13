@@ -40,10 +40,10 @@ public class FollowUpService {
         return jdbc.query("""
                 select f.id, f.horse_id, h.code, h.name, f.event_date, f.user_id,
                        u.username as veterinarian_name, f.status,
-                       JSON_VALUE(f.data_json,'$.sourceExaminationId') as source_examination_id,
-                       JSON_VALUE(f.data_json,'$.handoverReason') as handover_reason,
-                       JSON_VALUE(f.data_json,'$.handoverMode') as handover_mode,
-                       JSON_VALUE(f.data_json,'$.visitType') as visit_type
+                       dbo.json_value(f.data_json,'$.sourceExaminationId') as source_examination_id,
+                       dbo.json_value(f.data_json,'$.handoverReason') as handover_reason,
+                       dbo.json_value(f.data_json,'$.handoverMode') as handover_mode,
+                       dbo.json_value(f.data_json,'$.visitType') as visit_type
                 from module_records f
                 join horses h on h.id=f.horse_id
                 join users u on u.id=f.user_id
@@ -84,10 +84,10 @@ public class FollowUpService {
         }
         int changed = jdbc.update("""
                 update module_records set status='HANDOVER_REQUESTED',
-                    data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.handoverReason',?),
+                    data_json=dbo.json_modify(dbo.json_modify(dbo.json_modify(data_json,'$.handoverReason',?),
                                           '$.handoverMode',?),
-                                          '$.handoverRequestedAt',CONVERT(varchar(33),SYSDATETIMEOFFSET(),127)),
-                    updated_at=SYSDATETIMEOFFSET()
+                                          '$.handoverRequestedAt',to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+                    updated_at=CURRENT_TIMESTAMP
                 where id=? and horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                   and status='ASSIGNED' and user_id=?
                 """, reason.trim(), normalizedMode, followUpId, horseId, veterinarianId);
@@ -115,9 +115,9 @@ public class FollowUpService {
         }
         int changed = jdbc.update("""
                 update module_records set user_id=?, status='ASSIGNED',
-                    data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.acceptedBy',CONVERT(varchar(36),?)),
-                                          '$.acceptedAt',CONVERT(varchar(33),SYSDATETIMEOFFSET(),127)),
-                    updated_at=SYSDATETIMEOFFSET()
+                    data_json=dbo.json_modify(dbo.json_modify(data_json,'$.acceptedBy',cast(? as varchar(36))),
+                                          '$.acceptedAt',to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+                    updated_at=CURRENT_TIMESTAMP
                 where id=? and horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                   and status='HANDOVER_REQUESTED' and user_id<>?
                 """, veterinarianId, veterinarianId, followUpId, horseId, veterinarianId);
@@ -125,7 +125,7 @@ public class FollowUpService {
         FollowUpView view = get(followUpId);
         if (TRANSFER_CARE.equals(view.handoverMode())) {
             int transferred = jdbc.update("update horses set diagnosing_vet_user_id=?, "
-                    + "updated_at=SYSDATETIMEOFFSET(),version=version+1 "
+                    + "updated_at=CURRENT_TIMESTAMP,version=version+1 "
                     + "where id=? and diagnosing_vet_user_id=? and archived_at is null",
                     veterinarianId, horseId, previousVets.getFirst());
             if (transferred != 1) throw new BusinessException("Bác sĩ phụ trách ngựa đã thay đổi; vui lòng tải lại");
@@ -143,9 +143,9 @@ public class FollowUpService {
         UUID horseId = lockHorseForFollowUp(followUpId);
         int changed = jdbc.update("""
                 update module_records set status='ASSIGNED',
-                    data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.handoverReason',NULL),
+                    data_json=dbo.json_modify(dbo.json_modify(dbo.json_modify(data_json,'$.handoverReason',NULL),
                                            '$.handoverMode',NULL),'$.handoverRequestedAt',NULL),
-                    updated_at=SYSDATETIMEOFFSET()
+                    updated_at=CURRENT_TIMESTAMP
                 where id=? and horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                   and status='HANDOVER_REQUESTED' and user_id=?
                 """, followUpId, horseId, veterinarianId);
@@ -175,8 +175,8 @@ public class FollowUpService {
         if (currentFollowUpId != null) {
             int changed = jdbc.update("""
                     update module_records set status='COMPLETED',
-                        data_json=JSON_MODIFY(data_json,'$.completedExaminationId',CONVERT(varchar(36),?)),
-                        updated_at=SYSDATETIMEOFFSET()
+                        data_json=dbo.json_modify(data_json,'$.completedExaminationId',cast(? as varchar(36))),
+                        updated_at=CURRENT_TIMESTAMP
                     where id=? and horse_id=? and user_id=? and status='ASSIGNED'
                     """, examinationId, currentFollowUpId, horseId, veterinarianId);
             if (changed != 1) throw new BusinessException("Ca tái khám đã thay đổi, vui lòng tải lại");
@@ -198,7 +198,7 @@ public class FollowUpService {
                     insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,
                                                status,event_date,data_json,created_at,updated_at)
                     values(?,'MEDICAL','MEDICAL_FOLLOW_UP','medical_examinations',?,?,'ASSIGNED',?,?,
-                           SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())
+                           CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                     """, UUID.randomUUID(), horseId, nextVeterinarianId, nextDate, json.writeValueAsString(data));
         } catch (Exception exception) {
             if (exception instanceof RuntimeException runtime) throw runtime;
@@ -218,7 +218,7 @@ public class FollowUpService {
                 ? requestedFollowUpDate : monthlyDue;
         int updated = jdbc.update("""
                 update module_records set event_date=case when event_date>? then ? else event_date end,
-                    updated_at=SYSDATETIMEOFFSET()
+                    updated_at=CURRENT_TIMESTAMP
                 where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                   and status in ('ASSIGNED','HANDOVER_REQUESTED')
                 """, due, due, horseId);
@@ -233,7 +233,7 @@ public class FollowUpService {
                     insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,
                                                status,event_date,data_json,created_at,updated_at)
                     values(?,'MEDICAL','MEDICAL_FOLLOW_UP','medical_examinations',?,?,'ASSIGNED',?,?,
-                           SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())
+                           CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
                     """, UUID.randomUUID(), horseId, primaryDoctor, due, json.writeValueAsString(data));
         } catch (Exception exception) {
             if (exception instanceof RuntimeException runtime) throw runtime;
@@ -248,7 +248,7 @@ public class FollowUpService {
                 """, (rs, row) -> rs.getObject(1, UUID.class), followUpId);
         if (horses.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy ca tái khám: " + followUpId);
         UUID horseId = horses.getFirst();
-        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         return horseId;
     }
 

@@ -30,7 +30,7 @@ public class CareRoutineDefinitionService {
         String sql = """
             SELECT id, code, title, description, task_type, scheduled_time, scope, is_active, sort_order, created_at, updated_at
             FROM dbo.care_routine_definitions
-            WHERE is_active = 1
+            WHERE is_active=true
             ORDER BY sort_order ASC, scheduled_time ASC, created_at ASC
             """;
         return jdbc.query(sql, (rs, rn) -> mapRow(rs));
@@ -41,7 +41,7 @@ public class CareRoutineDefinitionService {
         String sql = """
             SELECT id, code, title, description, task_type, scheduled_time, scope, is_active, sort_order, created_at, updated_at
             FROM dbo.care_routine_definitions
-            WHERE is_active = 0
+            WHERE is_active=false
             ORDER BY sort_order ASC, scheduled_time ASC, created_at ASC
             """;
         return jdbc.query(sql, (rs, rn) -> mapRow(rs));
@@ -92,7 +92,7 @@ public class CareRoutineDefinitionService {
             sortOrder = req.sortOrder();
         } else {
             Integer max = jdbc.queryForObject(
-                    "SELECT MAX(sort_order) FROM dbo.care_routine_definitions WHERE is_active = 0",
+                    "SELECT MAX(sort_order) FROM dbo.care_routine_definitions WHERE is_active=false",
                     Integer.class);
             sortOrder = (max != null) ? max + 10 : 0;
         }
@@ -104,7 +104,7 @@ public class CareRoutineDefinitionService {
                 scope, is_active, sort_order, created_at, updated_at
             ) VALUES (
                 ?, ?, ?, ?, ?, ?,
-                ?, 0, ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET()
+                ?, 0, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
             """;
 
@@ -140,7 +140,7 @@ public class CareRoutineDefinitionService {
                 scheduled_time = ?,
                 scope = ?,
                 sort_order = ?,
-                updated_at = SYSDATETIMEOFFSET()
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """;
 
@@ -172,7 +172,7 @@ public class CareRoutineDefinitionService {
         String sql = """
             UPDATE dbo.care_routine_definitions
             SET is_active = ?,
-                updated_at = SYSDATETIMEOFFSET()
+                updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
             """;
 
@@ -208,7 +208,7 @@ public class CareRoutineDefinitionService {
             UUID defId = orderedIds.get(i);
             int sortOrder = (i + 1) * 10;
             jdbc.update(
-                    "UPDATE dbo.care_routine_definitions SET sort_order = ?, updated_at = SYSDATETIMEOFFSET() WHERE id = ?",
+                    "UPDATE dbo.care_routine_definitions SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     sortOrder, defId
             );
         }

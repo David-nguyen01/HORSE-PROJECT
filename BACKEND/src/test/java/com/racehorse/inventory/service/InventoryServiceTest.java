@@ -117,7 +117,7 @@ class InventoryServiceTest {
 
         service.updateStock(itemId, actorId, req);
 
-        verify(jdbc).update(contains("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc).update(contains("update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 contains("\"quantityOnHand\":200.0"), eq(itemId));
     }
 
@@ -126,7 +126,7 @@ class InventoryServiceTest {
         UUID reqId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(reqId)))
+        when(jdbc.queryForList(contains("for update"), eq(reqId)))
                 .thenReturn(List.of(Map.of("status", "PENDING_APPROVAL")));
 
         String reqJson = """
@@ -175,11 +175,11 @@ class InventoryServiceTest {
         service.reviewReplenishment(reqId, managerId, reviewReq);
 
         // Verify proposal status update
-        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 eq("APPROVED"), anyString(), eq(reqId));
 
         // Approval alone does not claim that the goods physically arrived.
-        verify(jdbc, never()).update(contains("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc, never()).update(contains("update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 anyString(), eq(itemId));
     }
 
@@ -187,7 +187,7 @@ class InventoryServiceTest {
     void reviewReplenishmentRejectsAlreadyProcessed() {
         UUID reqId = UUID.randomUUID();
         UUID managerId = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(reqId)))
+        when(jdbc.queryForList(contains("for update"), eq(reqId)))
                 .thenReturn(List.of(Map.of("status", "APPROVED")));
 
         when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'"),
@@ -413,7 +413,7 @@ class InventoryServiceTest {
 
         service.updateItem(itemId, actorId, req);
 
-        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 eq("ACTIVE"),
                 argThat(jsonStr -> jsonStr.toString().contains("Gạc y tế tiệt trùng cao cấp")
                         && jsonStr.toString().contains("135000")),
@@ -448,7 +448,7 @@ class InventoryServiceTest {
 
         service.deleteItem(itemId, actorId);
 
-        verify(jdbc).update(contains("update module_records set status='INACTIVE', updated_at=SYSDATETIMEOFFSET() where id=?"), eq(itemId));
+        verify(jdbc).update(contains("update module_records set status='INACTIVE', updated_at=CURRENT_TIMESTAMP where id=?"), eq(itemId));
     }
 
     @Test
@@ -457,7 +457,7 @@ class InventoryServiceTest {
         UUID managerId = UUID.randomUUID();
         UUID stableId = UUID.randomUUID();
         UUID transactionId = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(itemId)))
+        when(jdbc.queryForList(contains("for update"), eq(itemId)))
                 .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
                         {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":5.0}
                         """)));
@@ -481,7 +481,7 @@ class InventoryServiceTest {
     void usageCannotExceedAvailableStockOrCreateExpense() {
         UUID itemId = UUID.randomUUID();
         UUID stableId = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(itemId)))
+        when(jdbc.queryForList(contains("for update"), eq(itemId)))
                 .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
                         {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":2.0}
                         """)));
@@ -495,7 +495,7 @@ class InventoryServiceTest {
     @Test
     void alreadyFulfilledReplenishmentCannotIncreaseStockAgain() {
         UUID requestId = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(requestId)))
+        when(jdbc.queryForList(contains("for update"), eq(requestId)))
                 .thenReturn(List.of(Map.of("status", "FULFILLED", "data_json", "{}")));
 
         assertThatThrownBy(() -> service.receiveReplenishment(requestId, UUID.randomUUID(),
@@ -514,9 +514,9 @@ class InventoryServiceTest {
                 {"itemId":"%s","itemName":"Cỏ khô","category":"FEED",
                  "requestedQuantity":4,"unit":"kg","reason":"Bổ sung"}
                 """.formatted(itemId);
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(requestId)))
+        when(jdbc.queryForList(contains("for update"), eq(requestId)))
                 .thenReturn(List.of(Map.of("status", "APPROVED", "data_json", requestJson)));
-        when(jdbc.queryForList(contains("with (updlock,holdlock)"), eq(itemId)))
+        when(jdbc.queryForList(contains("for update"), eq(itemId)))
                 .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
                         {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":6}
                         """)));

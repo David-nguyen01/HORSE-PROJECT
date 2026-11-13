@@ -46,13 +46,14 @@ class OwnerReportLocalIntegrationTest {
         manager = UUID.fromString("5D036EA7-77FD-4D63-90AC-B90E1E4CAE11");
 
         owner2 = jdbc.queryForObject("""
-                select top 1 u.id from dbo.users u
+                select u.id from dbo.users u
                 join dbo.user_roles ur on ur.user_id=u.id
                 where ur.role='HORSE_OWNER' and u.id <> ?
+                limit 1
                 """, UUID.class, owner1);
 
         horseId = jdbc.queryForObject("""
-                select top 1 horse_id from dbo.horse_ownerships where owner_id=?
+                select horse_id from dbo.horse_ownerships where owner_id=? limit 1
                 """, UUID.class, owner1);
     }
 

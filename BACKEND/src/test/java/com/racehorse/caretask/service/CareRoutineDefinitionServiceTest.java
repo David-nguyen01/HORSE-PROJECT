@@ -34,7 +34,7 @@ class CareRoutineDefinitionServiceTest {
     @Test
     void listActiveReturnsOnlyActiveRoutinesOrdered() {
         UUID id = UUID.randomUUID();
-        when(jdbc.query(contains("WHERE is_active = 1"), any(RowMapper.class)))
+        when(jdbc.query(contains("WHERE is_active=true"), any(RowMapper.class)))
                 .thenAnswer(inv -> {
                     RowMapper<CareRoutineDefinitionResponse> mapper = inv.getArgument(1);
                     ResultSet rs = mock(ResultSet.class);
@@ -61,7 +61,7 @@ class CareRoutineDefinitionServiceTest {
     @Test
     void listReserveReturnsOnlyReserveRoutinesOrdered() {
         UUID id = UUID.randomUUID();
-        when(jdbc.query(contains("WHERE is_active = 0"), any(RowMapper.class)))
+        when(jdbc.query(contains("WHERE is_active=false"), any(RowMapper.class)))
                 .thenAnswer(inv -> {
                     RowMapper<CareRoutineDefinitionResponse> mapper = inv.getArgument(1);
                     ResultSet rs = mock(ResultSet.class);
@@ -160,7 +160,7 @@ class CareRoutineDefinitionServiceTest {
         assertThat(created).isNotNull();
         assertThat(created.isActive()).isFalse();
 
-        // Verify that INSERT statement inserts is_active = 0
+        // Verify that INSERT statement inserts is_active =false
         verify(jdbc).update(
                 contains("INSERT INTO dbo.care_routine_definitions"),
                 any(UUID.class),
@@ -345,8 +345,8 @@ class CareRoutineDefinitionServiceTest {
     @Test
     void dailyTaskGenerationQueryStrictlyExcludesReserveDefinitions() {
         // Verification of CareTaskService ensureRoutineInstancesForDate SQL invariant:
-        // CareTaskService lines 46-47 enforces 'WHERE d.is_active = 1', guaranteeing
-        // that reserve definitions (is_active = 0) are never generated as daily tasks.
+        // CareTaskService enforces 'WHERE d.is_active=true', guaranteeing
+        // that reserve definitions (is_active=false) are never generated as daily tasks.
         CareTaskService careTaskService = new CareTaskService(jdbc, mock(com.racehorse.horse.service.HorseAccessService.class));
         java.time.LocalDate today = java.time.LocalDate.of(2026, 11, 11);
 
@@ -354,7 +354,7 @@ class CareRoutineDefinitionServiceTest {
 
         verify(jdbc).update(
                 argThat(sql -> sql.contains("FROM dbo.care_routine_definitions d")
-                        && sql.contains("WHERE d.is_active = 1")),
+                        && sql.contains("WHERE d.is_active=true")),
                 eq(java.sql.Date.valueOf(today)),
                 eq(java.sql.Date.valueOf(today))
         );

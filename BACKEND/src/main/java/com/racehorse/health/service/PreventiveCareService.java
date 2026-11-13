@@ -32,7 +32,7 @@ public class PreventiveCareService {
             throw new BusinessException("Thời điểm thực hiện không được ở tương lai");
         // Serialize completions of the same schedule before creating its recurring successor.
         List<Map<String,Object>> rows=jdbc.queryForList(
-                "select * from preventive_care_schedules with (UPDLOCK,HOLDLOCK) where id=?",id);
+                "select * from preventive_care_schedules where id=? for update",id);
         if(rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy lịch chăm sóc: "+id);
         Map<String,Object> s=rows.getFirst();
         if(s.get("cancelled_at")!=null) throw new BusinessException("Lịch này đã bị hủy");
@@ -44,9 +44,10 @@ public class PreventiveCareService {
         if(changed!=1) throw new BusinessException("Lịch này đã được xử lý trước đó");
         if(recurrence!=null){
             next=UUID.randomUUID();
-            jdbc.update("insert into preventive_care_schedules(id,horse_id,care_type,care_name,details,due_date,recurrence_days,reminder_lead_days,created_by_user_id) values(?,?,?,?,?,dateadd(day,?,?),?,?,?)",
-                    next,s.get("horse_id"),s.get("care_type"),s.get("care_name"),s.get("details"),recurrence,
-                    r.performedAt().atZoneSameInstant(ZoneId.of("Asia/Bangkok")).toLocalDate(),recurrence,s.get("reminder_lead_days"),actor);
+            jdbc.update("insert into preventive_care_schedules(id,horse_id,care_type,care_name,details,due_date,recurrence_days,reminder_lead_days,created_by_user_id) values(?,?,?,?,?,cast(? as date)+cast(? as integer),?,?,?)",
+                    next,s.get("horse_id"),s.get("care_type"),s.get("care_name"),s.get("details"),
+                    r.performedAt().atZoneSameInstant(ZoneId.of("Asia/Bangkok")).toLocalDate(),recurrence,
+                    recurrence,s.get("reminder_lead_days"),actor);
             jdbc.update("update preventive_care_schedules set next_schedule_id=? where id=?",next,id);
         }
         Object dueValue=s.get("due_date");
@@ -129,11 +130,11 @@ public class PreventiveCareService {
     @Transactional
     public void cancel(UUID id){
         requirePending(id);
-        int changed=jdbc.update("update preventive_care_schedules set cancelled_at=SYSDATETIMEOFFSET() where id=? and completed_at is null and cancelled_at is null",id);
+        int changed=jdbc.update("update preventive_care_schedules set cancelled_at=CURRENT_TIMESTAMP where id=? and completed_at is null and cancelled_at is null",id);
         if(changed!=1)throw new BusinessException("Lịch đã được xử lý; vui lòng tải lại");
     }
     private Map<String,Object> requirePending(UUID id){
-        List<Map<String,Object>> rows=jdbc.queryForList("select * from preventive_care_schedules with (UPDLOCK,HOLDLOCK) where id=?",id);
+        List<Map<String,Object>> rows=jdbc.queryForList("select * from preventive_care_schedules where id=? for update",id);
         if(rows.isEmpty())throw new ResourceNotFoundException("Không tìm thấy lịch chăm sóc: "+id);
         Map<String,Object> row=rows.getFirst();
         if(row.get("completed_at")!=null||row.get("cancelled_at")!=null)throw new BusinessException("Chỉ có thể thay đổi lịch đang chờ");

@@ -30,7 +30,7 @@ public class AdminManagementService {
         if(query!=null&&!query.isBlank()){sql.append(" and (u.username like ? or u.email like ?)");args.add("%"+query.trim()+"%");args.add("%"+query.trim()+"%");}
         if(role!=null){sql.append(" and exists(select 1 from user_roles r where r.user_id=u.id and r.role=?)");args.add(role.name());}
         if(enabled!=null){sql.append(" and u.enabled=?");args.add(enabled);}
-        sql.append(" order by u.username,u.id offset (?) rows fetch next (?) rows only");args.add((long)page*size);args.add(size);
+        sql.append(" order by u.username,u.id limit ? offset ?");args.add(size);args.add((long)page*size);
         return jdbc.query(sql.toString(),(rs,n)->{
             UUID id=rs.getObject("id",UUID.class);
             Map<String,Object> row=new LinkedHashMap<>();row.put("id",id);row.put("username",rs.getString("username"));row.put("email",rs.getString("email"));row.put("enabled",rs.getBoolean("enabled"));
@@ -44,7 +44,7 @@ public class AdminManagementService {
         if(username.length()<3)throw new BusinessException("Tên tài khoản cần ít nhất 3 ký tự");
         Integer duplicate=jdbc.queryForObject("select count(*) from users where id<>? and (username=? or email=?)",Integer.class,id,username,email);
         if(duplicate!=null&&duplicate>0)throw new BusinessException("Tên tài khoản hoặc email đã tồn tại");
-        jdbc.update("update users set username=?,email=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",username,email,id);
+        jdbc.update("update users set username=?,email=?,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",username,email,id);
         writeAudit(actor,"UPDATE",id,"Cập nhật thông tin tài khoản",before,userSnapshot(id));
     }
 
@@ -58,14 +58,14 @@ public class AdminManagementService {
         List<UUID> managers=jdbc.query("select u.id from users u where cast(u.enabled as varchar(5)) in ('1', 'true', 't') and exists(select 1 from user_roles r where r.user_id=u.id and r.role='CLUB_MANAGER')",(rs,n)->rs.getObject(1,UUID.class));
         if(!enabled&&managers.contains(id)&&managers.size()<=1)throw new BusinessException("Phải giữ ít nhất một Club Manager hoạt động");
         if(!enabled)activityGuard.requireNoActiveAssignments(id);
-        jdbc.update("update users set enabled=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",enabled,id);
+        jdbc.update("update users set enabled=?,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",enabled,id);
         if(!enabled)revokeSessions(id);
         writeAudit(actor,"STATUS_CHANGE",id,enabled?"Mở khóa tài khoản":"Khóa tài khoản",
                 Map.of("enabled",currentEnabled),Map.of("enabled",enabled));
     }
 
     @Transactional
-    public void resetPassword(UUID actor,UUID id,String password){requireUser(id);jdbc.update("update users set password_hash=?,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",encoder.encode(password),id);revokeSessions(id);writeAudit(actor,"PASSWORD_RESET",id,"Đặt lại mật khẩu và thu hồi phiên",null,Map.of("sessionsRevoked",true));}
+    public void resetPassword(UUID actor,UUID id,String password){requireUser(id);jdbc.update("update users set password_hash=?,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",encoder.encode(password),id);revokeSessions(id);writeAudit(actor,"PASSWORD_RESET",id,"Đặt lại mật khẩu và thu hồi phiên",null,Map.of("sessionsRevoked",true));}
 
     @Transactional(readOnly=true)
     public List<Map<String,Object>> userSessions(UUID id){
@@ -73,7 +73,7 @@ public class AdminManagementService {
         return jdbc.query("""
             select id, ip_address, user_agent, last_activity_at, expires_at, created_at
             from login_sessions
-            where user_id=? and revoked_at is null and expires_at > SYSDATETIMEOFFSET()
+            where user_id=? and revoked_at is null and expires_at > CURRENT_TIMESTAMP
             order by last_activity_at desc
             """, (rs, row) -> {
                 Map<String,Object> m = new LinkedHashMap<>();
@@ -90,23 +90,23 @@ public class AdminManagementService {
     @Transactional
     public void revokeUserSessions(UUID actor, UUID id){
         requireUser(id);
-        int count = jdbc.update("update login_sessions set revoked_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where user_id=? and revoked_at is null", id);
+        int count = jdbc.update("update login_sessions set revoked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1 where user_id=? and revoked_at is null", id);
         writeAudit(actor, "SESSION_REVOKE", id, "Thu hồi " + count + " phiên đăng nhập của tài khoản", null, Map.of("revokedCount", count));
     }
 
-    private void revokeSessions(UUID id){jdbc.update("update login_sessions set revoked_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where user_id=? and revoked_at is null",id);}
+    private void revokeSessions(UUID id){jdbc.update("update login_sessions set revoked_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1 where user_id=? and revoked_at is null",id);}
     private void requireUser(UUID id){Integer n=jdbc.queryForObject("select count(*) from users where id=?",Integer.class,id);if(n==null||n==0)throw new ResourceNotFoundException("Không tìm thấy tài khoản");}
 
     @Transactional(readOnly=true)
     public List<Map<String,Object>> archivedHorses(String query,int page,int size){
         pageCheck(page,size);String pattern="%"+(query==null?"":query.trim())+"%";
-        return jdbc.query("select id,code,name,breed,status,archived_at from horses where archived_at is not null and (name like ? or code like ?) order by archived_at desc,id offset (?) rows fetch next (?) rows only",(rs,n)->{
+        return jdbc.query("select id,code,name,breed,status,archived_at from horses where archived_at is not null and (name like ? or code like ?) order by archived_at desc,id limit ? offset ?",(rs,n)->{
             Map<String,Object> r=new LinkedHashMap<>();r.put("id",rs.getObject("id",UUID.class));r.put("code",rs.getString("code"));r.put("name",rs.getString("name"));r.put("breed",rs.getString("breed"));r.put("status",rs.getString("status"));r.put("archivedAt",rs.getObject("archived_at",java.time.OffsetDateTime.class));return r;
-        },pattern,pattern,(long)page*size,size);
+        },pattern,pattern,size,(long)page*size);
     }
     @Transactional
     public void restore(UUID actor,UUID id){
-        int n=jdbc.update("update horses set archived_at=null,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=? and archived_at is not null",id);
+        int n=jdbc.update("update horses set archived_at=null,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=? and archived_at is not null",id);
         if(n==0)throw new BusinessException("Không tìm thấy hồ sơ đang lưu trữ để khôi phục");
         audit.record(actor,"PROFILE","RESTORE","HORSE",id,"Khôi phục hồ sơ ngựa",null,toJson(Map.of("archived",false)),null,null);
     }
@@ -148,7 +148,7 @@ public class AdminManagementService {
         }
 
         jdbc.update(
-                "update horses set payment_status=?, service_override=?, override_reason=?, paid_until=?, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?",
+                "update horses set payment_status=?, service_override=?, override_reason=?, paid_until=?, updated_at=CURRENT_TIMESTAMP, version=version+1 where id=?",
                 newStatus, newOverride, newReason, newPaidUntil, horseId);
 
         Map<String, Object> after = Map.of(

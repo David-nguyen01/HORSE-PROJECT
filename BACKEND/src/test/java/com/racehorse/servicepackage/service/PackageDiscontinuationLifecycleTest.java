@@ -207,7 +207,7 @@ class PackageDiscontinuationLifecycleTest {
         assertThat(sql).contains("where not exists");
         assertThat(sql).contains("module_code='SYSTEM'");
         assertThat(sql).contains("record_type='SERVICE_PACKAGE_DISCONTINUATION'");
-        assertThat(sql).contains("JSON_VALUE(data_json, '$.packageId')=?");
-        assertThat(sql).contains("JSON_VALUE(data_json, '$.packageVersion')=?");
+        assertThat(sql).contains("dbo.json_value(data_json, '$.packageId')=?");
+        assertThat(sql).contains("dbo.json_value(data_json, '$.packageVersion')=?");
     }
 }

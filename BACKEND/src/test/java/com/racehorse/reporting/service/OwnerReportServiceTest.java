@@ -324,7 +324,7 @@ class OwnerReportServiceTest {
 
     @Test
     void getOwnersQueriesActiveHorseOwners() {
-        when(jdbc.query(contains("where ur.role='HORSE_OWNER' and u.enabled=1"), any(RowMapper.class)))
+        when(jdbc.query(contains("where ur.role='HORSE_OWNER' and u.enabled=true"), any(RowMapper.class)))
                 .thenReturn(List.of(new OwnerReportService.OwnerOption(ownerId, "ownerA", "a@test.com", 2)));
 
         List<OwnerReportService.OwnerOption> owners = service.getOwners();

@@ -104,7 +104,7 @@ public class NotificationService {
                       where mr.module_code = 'SYSTEM'
                         and mr.record_type = 'PACKAGE_DISCONTINUATION_DISMISSAL'
                         and mr.user_id = n.recipient_user_id
-                        and lower(JSON_VALUE(mr.data_json, '$.notificationId')) = lower(cast(n.id as varchar(36)))
+                        and lower(dbo.json_value(mr.data_json, '$.notificationId')) = lower(cast(n.id as varchar(36)))
                   )
                 order by n.created_at desc
                 """;
@@ -144,7 +144,7 @@ public class NotificationService {
         if (jdbc != null) {
             Integer count = jdbc.queryForObject(
                     "select count(*) from dbo.module_records where module_code='SYSTEM' and record_type='PACKAGE_DISCONTINUATION_DISMISSAL' "
-                            + "and user_id=? and lower(JSON_VALUE(data_json, '$.notificationId'))=lower(?)",
+                            + "and user_id=? and lower(dbo.json_value(data_json, '$.notificationId'))=lower(?)",
                     Integer.class, recipientId, notificationId.toString());
 
             if (count == null || count == 0) {

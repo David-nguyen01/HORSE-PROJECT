@@ -175,11 +175,11 @@ public class ServicePackageService {
         if (jdbc != null) {
             try {
                 Long maxVer = jdbc.queryForObject(
-                        "select max(cast(JSON_VALUE(data_json, '$.packageVersion') as bigint)) "
+                        "select max(cast(dbo.json_value(data_json, '$.packageVersion') as bigint)) "
                                 + "from dbo.module_records "
                                 + "where module_code = 'SYSTEM' "
                                 + "  and record_type = 'SERVICE_PACKAGE_DISCONTINUATION' "
-                                + "  and JSON_VALUE(data_json, '$.packageId') = ?",
+                                + "  and dbo.json_value(data_json, '$.packageId') = ?",
                         Long.class, pkg.getId().toString());
                 if (maxVer != null && versionToUse <= maxVer) {
                     versionToUse = maxVer + 1;
@@ -206,8 +206,8 @@ public class ServicePackageService {
                                 + "select ?, 'SYSTEM', 'SERVICE_PACKAGE_DISCONTINUATION', ?, 'ACTIVE', ?, ? "
                                 + "where not exists (select 1 from dbo.module_records where module_code='SYSTEM' "
                                 + "and record_type='SERVICE_PACKAGE_DISCONTINUATION' "
-                                + "and JSON_VALUE(data_json, '$.packageId')=? "
-                                + "and JSON_VALUE(data_json, '$.packageVersion')=?)",
+                                + "and dbo.json_value(data_json, '$.packageId')=? "
+                                + "and dbo.json_value(data_json, '$.packageVersion')=?)",
                         eventId, actorId, now.toLocalDate(), json != null ? json.writeValueAsString(eventData) : "{}",
                         pkg.getId().toString(), String.valueOf(versionToUse));
             }
@@ -294,7 +294,7 @@ public class ServicePackageService {
                         where module_code = 'SYSTEM'
                           and record_type = 'DISCONTINUED_HORSE_EXPIRY_ALERT'
                           and horse_id = ?
-                          and lower(JSON_VALUE(data_json, '$.discontinuationEventId')) = lower(?)
+                          and lower(dbo.json_value(data_json, '$.discontinuationEventId')) = lower(?)
                     )
                     """,
                     alertId, horseId, ownerId, today, alertJson,
@@ -329,7 +329,7 @@ public class ServicePackageService {
                         + "where module_code = 'SYSTEM' "
                         + "  and record_type = 'DISCONTINUED_HORSE_EXPIRY_ALERT' "
                         + "  and status = 'PENDING_EXPIRY' "
-                        + "  and lower(JSON_VALUE(data_json, '$.packageId')) = lower(?)",
+                        + "  and lower(dbo.json_value(data_json, '$.packageId')) = lower(?)",
                 packageId.toString());
 
         for (Map<String, Object> row : rows) {
@@ -364,7 +364,7 @@ public class ServicePackageService {
                 updatedJson = dataJsonStr;
             }
 
-            jdbc.update("update dbo.module_records set status = 'RESOLVED', data_json = ?, updated_at = SYSDATETIMEOFFSET() where id = ?",
+            jdbc.update("update dbo.module_records set status = 'RESOLVED', data_json = ?, updated_at = CURRENT_TIMESTAMP where id = ?",
                     updatedJson, id);
         }
     }

@@ -222,9 +222,9 @@ class RaceEventOwnerAccessTest {
         UUID horseId = UUID.randomUUID();
         RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
         doReturn(event(eventId, null)).when(service).event(eventId);
-        when(jdbc.queryForObject(contains("with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
-        when(jdbc.queryForObject(contains("JSON_VALUE(data_json,'$.raceEventId')=?"), eq(Integer.class),
+        when(jdbc.queryForObject(contains("dbo.json_value(data_json,'$.raceEventId')=?"), eq(Integer.class),
                 eq(horseId), eq(eventId.toString()))).thenReturn(0);
         when(jdbc.queryForObject(contains("e.completed_at is null"), eq(Integer.class), eq(horseId)))
                 .thenReturn(1);
@@ -241,9 +241,9 @@ class RaceEventOwnerAccessTest {
         LocalDate raceDate = event(eventId, null).raceDate();
         RaceEventService service = spy(new RaceEventService(jdbc, json, measurement, horseAccess));
         doReturn(event(eventId, null)).when(service).event(eventId);
-        when(jdbc.queryForObject(contains("with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
-        when(jdbc.queryForObject(contains("JSON_VALUE(data_json,'$.raceEventId')=?"), eq(Integer.class),
+        when(jdbc.queryForObject(contains("dbo.json_value(data_json,'$.raceEventId')=?"), eq(Integer.class),
                 eq(horseId), eq(eventId.toString()))).thenReturn(0);
         when(jdbc.queryForObject(contains("e.completed_at is null"), eq(Integer.class), eq(horseId)))
                 .thenReturn(0);

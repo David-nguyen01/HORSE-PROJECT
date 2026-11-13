@@ -85,7 +85,7 @@ public class MedicalExaminationService {
                 || (req.preventiveSchedules() != null && !req.preventiveSchedules().isEmpty())) {
             throw new BusinessException("Lịch phòng ngừa phải được tạo riêng qua /api/horses/{horseId}/preventive-care");
         }
-        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = horseAccessService.requireActive(horseId);
         UUID emergencyIncidentId = activeEmergencyClaim(horseId, veterinarianId);
         if (emergencyIncidentId == null && activeEmergencyClaimByAnotherVet(horseId)) {
@@ -152,7 +152,7 @@ public class MedicalExaminationService {
         if (req.heightCm() != null) data.put("heightCm", req.heightCm());
         if (req.weightKg() != null) {
             data.put("weightKg", req.weightKg());
-            jdbc.update("update horses set weight_kg=?, weight_record_id=?, weight_measured_at=SYSDATETIMEOFFSET(), weight_measured_by_user_id=?, weight_notes=?, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?",
+            jdbc.update("update horses set weight_kg=?, weight_record_id=?, weight_measured_at=CURRENT_TIMESTAMP, weight_measured_by_user_id=?, weight_notes=?, updated_at=CURRENT_TIMESTAMP, version=version+1 where id=?",
                     req.weightKg(), examId, veterinarianId, "Ghi nhận lúc khám lâm sàng: " + req.diagnosis().trim(), horseId);
         }
         if (!attachments.isEmpty()) {
@@ -166,7 +166,7 @@ public class MedicalExaminationService {
                     created_at, updated_at
                 ) values (?, 'MEDICAL', 'MEDICAL_EXAMINATION', 'medical_examinations',
                           ?, ?, 'RECORDED', ?, ?,
-                          SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 examId, horseId, veterinarianId, req.examinationDate(), toJson(data));
 
@@ -177,8 +177,8 @@ public class MedicalExaminationService {
                         health_changed_by_user_id = ?,
                         health_source_type = 'MEDICAL_EXAM',
                         health_source_id = ?,
-                        health_changed_at = SYSDATETIMEOFFSET(),
-                        updated_at = SYSDATETIMEOFFSET(),
+                        health_changed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP,
                         version = version + 1
                     where id = ?
                     """,
@@ -219,11 +219,11 @@ public class MedicalExaminationService {
         if (emergencyIncidentId != null) {
             int closed = jdbc.update("""
                     update module_records set status='RESOLVED',
-                        data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.emergencyExaminationId',CONVERT(varchar(36),?)),
-                                              '$.resolvedAt',CONVERT(varchar(33),SYSDATETIMEOFFSET(),127)),
-                        updated_at=SYSDATETIMEOFFSET()
+                        data_json=dbo.json_modify(dbo.json_modify(data_json,'$.emergencyExaminationId',cast(? as varchar(36))),
+                                              '$.resolvedAt',to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+                        updated_at=CURRENT_TIMESTAMP
                     where id=? and horse_id=? and module_code='STABLE_CARE' and record_type='INCIDENT_REPORT'
-                      and status='ACKNOWLEDGED' and JSON_VALUE(data_json,'$.emergencyVetId')=?
+                      and status='ACKNOWLEDGED' and dbo.json_value(data_json,'$.emergencyVetId')=?
                     """, examId, emergencyIncidentId, horseId, veterinarianId.toString());
             if (closed != 1) throw new BusinessException("Ca cấp cứu đã thay đổi; vui lòng tải lại trước khi lưu phiếu khám");
         }
@@ -268,7 +268,7 @@ public class MedicalExaminationService {
         }
 
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
-        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = horseAccessService.requireActive(horseId);
         requireInitialExamAccess(horseId, authorId, horse.getIntakeStatus());
         UUID currentFollowUpId = followUpService != null
@@ -291,7 +291,7 @@ public class MedicalExaminationService {
                     created_at, updated_at
                 ) values (?, 'MEDICAL', 'MEDICAL_EXAMINATION_ADDENDUM', 'medical_examination_addenda',
                           ?, ?, 'RECORDED', ?, ?,
-                          SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 addendumId, horseId, authorId, today, toJson(data));
 
@@ -302,8 +302,8 @@ public class MedicalExaminationService {
                         health_changed_by_user_id = ?,
                         health_source_type = 'MEDICAL_EXAM_ADDENDUM',
                         health_source_id = ?,
-                        health_changed_at = SYSDATETIMEOFFSET(),
-                        updated_at = SYSDATETIMEOFFSET(),
+                        health_changed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP,
                         version = version + 1
                     where id = ?
                     """,
@@ -387,7 +387,7 @@ public class MedicalExaminationService {
                 from module_records a
                 join users u on u.id = a.user_id
                 where a.module_code = 'MEDICAL' and a.record_type = 'MEDICAL_EXAMINATION_ADDENDUM'
-                  and JSON_VALUE(a.data_json, '$.examinationId') = ?
+                  and dbo.json_value(a.data_json, '$.examinationId') = ?
                 order by a.created_at asc
                 """, (rs, rowNum) -> {
             UUID id = rs.getObject("id", UUID.class);
@@ -422,7 +422,7 @@ public class MedicalExaminationService {
                        (select count(*)
                         from module_records a
                         where a.module_code = 'MEDICAL' and a.record_type = 'MEDICAL_EXAMINATION_ADDENDUM'
-                          and JSON_VALUE(a.data_json, '$.examinationId') = cast(m.id as varchar(36))
+                          and dbo.json_value(a.data_json, '$.examinationId') = cast(m.id as varchar(36))
                        ) as addenda_count
                 from module_records m
                 join users u on u.id = m.user_id
@@ -500,7 +500,7 @@ public class MedicalExaminationService {
         }
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         if (horseId != null) {
-            jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+            jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
             horseAccessService.requireActive(horseId);
             requireFollowUpMutationAccess(horseId, actorId);
         }
@@ -512,26 +512,26 @@ public class MedicalExaminationService {
             // Keep the appointment row for audit, but no examination may remain open without a real exam.
             jdbc.update("""
                     update module_records set status='CANCELLED',
-                        data_json=JSON_MODIFY(data_json,'$.cancelReason','NO_RECORDED_EXAMINATION'),
-                        updated_at=SYSDATETIMEOFFSET()
+                        data_json=dbo.json_modify(data_json,'$.cancelReason','NO_RECORDED_EXAMINATION'),
+                        updated_at=CURRENT_TIMESTAMP
                     where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                       and status in ('ASSIGNED','HANDOVER_REQUESTED')
                     """, horseId);
         } else {
             // Another examination still exists: keep the check due and remove the deleted source reference.
             jdbc.update("""
-                    update module_records set event_date=case when event_date>CONVERT(date,SYSDATETIMEOFFSET() AT TIME ZONE 'SE Asia Standard Time')
-                                                                then CONVERT(date,SYSDATETIMEOFFSET() AT TIME ZONE 'SE Asia Standard Time') else event_date end,
-                        data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.sourceExaminationId',NULL),
+                    update module_records set event_date=case when event_date>(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date
+                                                                then (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Ho_Chi_Minh')::date else event_date end,
+                        data_json=dbo.json_modify(dbo.json_modify(data_json,'$.sourceExaminationId',NULL),
                                               '$.sourceExaminationDeleted',1),
-                        updated_at=SYSDATETIMEOFFSET()
+                        updated_at=CURRENT_TIMESTAMP
                     where module_code='MEDICAL' and record_type='MEDICAL_FOLLOW_UP'
                       and status in ('ASSIGNED','HANDOVER_REQUESTED')
-                      and JSON_VALUE(data_json,'$.sourceExaminationId')=?
+                      and dbo.json_value(data_json,'$.sourceExaminationId')=?
                     """, examId.toString());
         }
         // Delete addenda of this examination
-        jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM' and JSON_VALUE(data_json, '$.examinationId')=?", examId.toString());
+        jdbc.update("delete from module_records where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM' and dbo.json_value(data_json, '$.examinationId')=?", examId.toString());
         // Delete examination record
         jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'", examId);
 
@@ -551,7 +551,7 @@ public class MedicalExaminationService {
         }
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         if (horseId != null) {
-            jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+            jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
             horseAccessService.requireActive(horseId);
             requireFollowUpMutationAccess(horseId, actorId);
         }
@@ -572,9 +572,10 @@ public class MedicalExaminationService {
         }
 
         List<Map<String, Object>> remainingExams = jdbc.queryForList("""
-                select top 1 id, data_json from module_records
+                select id, data_json from module_records
                 where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'
                 order by event_date desc, created_at desc
+                limit 1
                 """, horseId);
 
         if (!remainingExams.isEmpty()) {
@@ -583,10 +584,11 @@ public class MedicalExaminationService {
             String prevStatus = examData.path("healthStatusAfter").asText("FIT");
 
             List<Map<String, Object>> addenda = jdbc.queryForList("""
-                    select top 1 id, data_json from module_records
+                    select id, data_json from module_records
                     where module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'
-                      and JSON_VALUE(data_json, '$.examinationId')=?
+                      and dbo.json_value(data_json, '$.examinationId')=?
                     order by created_at desc
+                    limit 1
                     """, prevExamId.toString());
             if (!addenda.isEmpty()) {
                 JsonNode addendumData = read((String) addenda.getFirst().get("data_json"));
@@ -603,8 +605,8 @@ public class MedicalExaminationService {
                         health_changed_by_user_id = ?,
                         health_source_type = 'MEDICAL_EXAM',
                         health_source_id = ?,
-                        health_changed_at = SYSDATETIMEOFFSET(),
-                        updated_at = SYSDATETIMEOFFSET(),
+                        health_changed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP,
                         version = version + 1
                     where id = ?
                     """,
@@ -616,8 +618,8 @@ public class MedicalExaminationService {
                         health_changed_by_user_id = ?,
                         health_source_type = null,
                         health_source_id = null,
-                        health_changed_at = SYSDATETIMEOFFSET(),
-                        updated_at = SYSDATETIMEOFFSET(),
+                        health_changed_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP,
                         version = version + 1
                     where id = ?
                     """,
@@ -631,7 +633,7 @@ public class MedicalExaminationService {
         }
         if (!"IN_MEDICAL".equals(intakeStatus)) return;
 
-        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Integer assignedToThisVet = jdbc.queryForObject(
                 "select count(*) from module_records where module_code='MEDICAL' "
                         + "and record_type='MEDICAL_ASSIGNMENT' and horse_id=? and user_id=? and status='ACTIVE'",
@@ -645,9 +647,9 @@ public class MedicalExaminationService {
         List<UUID> claims = jdbc.query("""
                 select id from module_records where horse_id=? and module_code='STABLE_CARE'
                   and record_type='INCIDENT_REPORT' and status='ACKNOWLEDGED'
-                  and JSON_VALUE(data_json,'$.severity') in ('HIGH','CRITICAL')
-                  and JSON_VALUE(data_json,'$.emergencyVetId')=?
-                  and JSON_VALUE(data_json,'$.emergencyExaminationId') is null
+                  and dbo.json_value(data_json,'$.severity') in ('HIGH','CRITICAL')
+                  and dbo.json_value(data_json,'$.emergencyVetId')=?
+                  and dbo.json_value(data_json,'$.emergencyExaminationId') is null
                 """, (rs, row) -> rs.getObject(1, UUID.class), horseId, veterinarianId.toString());
         return claims.isEmpty() ? null : claims.getFirst();
     }
@@ -656,8 +658,8 @@ public class MedicalExaminationService {
         Integer count = jdbc.queryForObject("""
                 select count(*) from module_records where horse_id=? and module_code='STABLE_CARE'
                   and record_type='INCIDENT_REPORT' and status='ACKNOWLEDGED'
-                  and JSON_VALUE(data_json,'$.emergencyVetId') is not null
-                  and JSON_VALUE(data_json,'$.emergencyExaminationId') is null
+                  and dbo.json_value(data_json,'$.emergencyVetId') is not null
+                  and dbo.json_value(data_json,'$.emergencyExaminationId') is null
                 """, Integer.class, horseId);
         return count != null && count > 0;
     }

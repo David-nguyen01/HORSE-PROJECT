@@ -43,7 +43,7 @@ public class RaceEventService {
     @Transactional
     public EventView update(UUID id, EventCommand command) {
         event(id); validate(command);
-        jdbc.update("update race_events set race_name=?,racecourse=?,race_date=?,registration_deadline=?,distance_meters=?,race_class=?,minimum_age_years=?,maximum_age_years=?,minimum_weight_kg=?,maximum_weight_kg=?,is_active=?,updated_at=SYSDATETIMEOFFSET() where id=?",
+        jdbc.update("update race_events set race_name=?,racecourse=?,race_date=?,registration_deadline=?,distance_meters=?,race_class=?,minimum_age_years=?,maximum_age_years=?,minimum_weight_kg=?,maximum_weight_kg=?,is_active=?,updated_at=CURRENT_TIMESTAMP where id=?",
                 required(command.raceName()), required(command.racecourse()), command.raceDate(), command.registrationDeadline(),
                 command.distanceMeters(), required(command.raceClass()), command.minimumAgeYears(), command.maximumAgeYears(),
                 command.minimumWeightKg(), command.maximumWeightKg(), command.active(), id);
@@ -53,7 +53,7 @@ public class RaceEventService {
     @Transactional
     public void deactivate(UUID id) {
         event(id);
-        jdbc.update("update race_events set is_active=0,updated_at=SYSDATETIMEOFFSET() where id=?", id);
+        jdbc.update("update race_events set is_active=false,updated_at=CURRENT_TIMESTAMP where id=?", id);
     }
 
     @Transactional
@@ -61,7 +61,7 @@ public class RaceEventService {
         EventView value = event(id);
         if (value.raceDate().isAfter(LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"))))
             throw new BusinessException("Không thể hoàn thành giải đua trước ngày đua");
-        jdbc.update("update race_events set completed_at=coalesce(completed_at,SYSDATETIMEOFFSET()),updated_at=SYSDATETIMEOFFSET() where id=?", id);
+        jdbc.update("update race_events set completed_at=coalesce(completed_at,CURRENT_TIMESTAMP),updated_at=CURRENT_TIMESTAMP where id=?", id);
         return event(id);
     }
 
@@ -90,17 +90,17 @@ public class RaceEventService {
         requireRegistrationAccess(horseId, actor, manager);
         horseAccess.requireTrainingReady(horseId);
         // Serialize registrations for one horse across different race events.
-        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         if (!event.active()) throw new BusinessException("Giải đua đã ngừng nhận đăng ký");
         if (event.completedAt() != null) throw new BusinessException("Giải đua đã hoàn thành");
         OffsetDateTime now = OffsetDateTime.now();
         if (now.isAfter(event.registrationDeadline())) throw new BusinessException("Đã quá hạn đăng ký giải đua");
         Integer duplicate = jdbc.queryForObject("select count(*) from module_records where module_code='RACING' "
-                + "and record_type='RACE_REGISTRATION' and horse_id=? and JSON_VALUE(data_json,'$.raceEventId')=?",
+                + "and record_type='RACE_REGISTRATION' and horse_id=? and dbo.json_value(data_json,'$.raceEventId')=?",
                 Integer.class, horseId, eventId.toString());
         if (duplicate != null && duplicate > 0) throw new BusinessException("Ngựa đã được đăng ký cho giải này");
         Integer pending = jdbc.queryForObject("select count(*) from module_records m join race_events e "
-                + "on cast(e.id as varchar(36))=JSON_VALUE(m.data_json,'$.raceEventId') "
+                + "on cast(e.id as varchar(36))=dbo.json_value(m.data_json,'$.raceEventId') "
                 + "where m.module_code='RACING' and m.record_type='RACE_REGISTRATION' and m.horse_id=? "
                 + "and m.status in ('SUBMITTED','APPROVE','CONFIRMED') and e.completed_at is null",
                 Integer.class, horseId);
@@ -108,7 +108,7 @@ public class RaceEventService {
             throw new BusinessException("Ngựa đã đăng ký một giải đua chưa hoàn thành");
         LocalDate monthStart = event.raceDate().withDayOfMonth(1);
         Integer monthlyRegistrations = jdbc.queryForObject("select count(*) from module_records m join race_events e "
-                + "on cast(e.id as varchar(36))=JSON_VALUE(m.data_json,'$.raceEventId') "
+                + "on cast(e.id as varchar(36))=dbo.json_value(m.data_json,'$.raceEventId') "
                 + "where m.module_code='RACING' and m.record_type='RACE_REGISTRATION' and m.horse_id=? "
                 + "and m.status in ('SUBMITTED','APPROVE','CONFIRMED') "
                 + "and e.race_date>=? and e.race_date<?",
@@ -129,8 +129,8 @@ public class RaceEventService {
                 id, horseId, actor, event.raceDate(), toJson(data));
         jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,"
                         + "related_entity_type,related_entity_id,deduplication_key) "
-                        + "select newid(),ho.owner_id,'RACE_REGISTRATION','NORMAL',N'Yêu cầu đăng ký đua',"
-                        + "N'Huấn luyện viên đã gửi đăng ký đua cho ngựa của bạn. Vui lòng duyệt hoặc từ chối.',"
+                        + "select gen_random_uuid(),ho.owner_id,'RACE_REGISTRATION','NORMAL','Yêu cầu đăng ký đua',"
+                        + "'Huấn luyện viên đã gửi đăng ký đua cho ngựa của bạn. Vui lòng duyệt hoặc từ chối.',"
                         + "'RACE_REGISTRATION',?,concat('race-registration:',cast(? as varchar(36)),':',cast(ho.owner_id as varchar(36))) "
                         + "from horse_ownerships ho where ho.horse_id=?",
                 id, id, horseId);
@@ -139,7 +139,7 @@ public class RaceEventService {
 
     @Transactional
     public RegistrationView confirm(UUID registrationId, UUID actor, boolean manager) {
-        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
+        jdbc.queryForObject("select id from module_records where id=? and module_code='RACING' and record_type='RACE_REGISTRATION' for update", UUID.class, registrationId);
         RegistrationView value = registration(registrationId);
         requireRegistrationAccess(value.horseId(), actor, manager);
         EventView event = event(value.raceEventId());
@@ -164,7 +164,7 @@ public class RaceEventService {
 
         String at = OffsetDateTime.now().toString();
         try {
-            jdbc.update("update module_records set status='CONFIRMED',data_json=JSON_MODIFY(data_json,'$.confirmedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='APPROVE'",
+            jdbc.update("update module_records set status='CONFIRMED',data_json=dbo.json_modify(data_json,'$.confirmedAt',?),updated_at=CURRENT_TIMESTAMP where id=? and status='APPROVE'",
                     at, registrationId);
         } catch (DataAccessException ex) {
             String msg = ex.getMessage() != null ? ex.getMessage() : "";
@@ -186,8 +186,8 @@ public class RaceEventService {
         String normalizedReason = reason == null || reason.isBlank() ? null : reason.trim();
         if (normalizedReason != null && normalizedReason.length() > 500) throw new BusinessException("Lý do tối đa 500 ký tự");
 
-        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
-        jdbc.update("update module_records set status=?,data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.decisionReason',?),'$.decidedAt',?),'$.confirmedAt',?),updated_at=SYSDATETIMEOFFSET() where id=? and status='SUBMITTED'",
+        jdbc.queryForObject("select id from module_records where id=? and module_code='RACING' and record_type='RACE_REGISTRATION' for update", UUID.class, registrationId);
+        jdbc.update("update module_records set status=?,data_json=dbo.json_modify(dbo.json_modify(dbo.json_modify(data_json,'$.decisionReason',?),'$.decidedAt',?),'$.confirmedAt',?),updated_at=CURRENT_TIMESTAMP where id=? and status='SUBMITTED'",
                 approve ? "CONFIRMED" : "REJECT", normalizedReason, OffsetDateTime.now().toString(),
                 approve ? OffsetDateTime.now().toString() : null, registrationId);
         return registration(registrationId);
@@ -195,7 +195,7 @@ public class RaceEventService {
 
     @Transactional
     public RegistrationView withdraw(UUID registrationId, UUID actor, boolean manager) {
-        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='RACING' and record_type='RACE_REGISTRATION'", UUID.class, registrationId);
+        jdbc.queryForObject("select id from module_records where id=? and module_code='RACING' and record_type='RACE_REGISTRATION' for update", UUID.class, registrationId);
         RegistrationView value = registration(registrationId);
         requireRegistrationAccess(value.horseId(), actor, manager);
         EventView event = event(value.raceEventId());
@@ -218,7 +218,7 @@ public class RaceEventService {
 
         OffsetDateTime now = OffsetDateTime.now();
         try {
-            jdbc.update("update module_records set status='WITHDRAWN',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.withdrawnAt',?),'$.withdrawnByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=? and status in ('SUBMITTED','APPROVE')",
+            jdbc.update("update module_records set status='WITHDRAWN',data_json=dbo.json_modify(dbo.json_modify(data_json,'$.withdrawnAt',?),'$.withdrawnByUserId',?),updated_at=CURRENT_TIMESTAMP where id=? and status in ('SUBMITTED','APPROVE')",
                     now.toString(), actor.toString(), registrationId);
         } catch (DataAccessException ex) {
             String msg = ex.getMessage() != null ? ex.getMessage() : "";
@@ -234,7 +234,7 @@ public class RaceEventService {
                                                 UUID trainerId) {
         StringBuilder sql = new StringBuilder(registrationSelect()).append(" where m.module_code='RACING' and m.record_type='RACE_REGISTRATION'");
         List<Object> args = new ArrayList<>();
-        if (eventId != null) { sql.append(" and JSON_VALUE(m.data_json,'$.raceEventId')=?"); args.add(eventId.toString()); }
+        if (eventId != null) { sql.append(" and dbo.json_value(m.data_json,'$.raceEventId')=?"); args.add(eventId.toString()); }
         if (horseId != null) { sql.append(" and m.horse_id=?"); args.add(horseId); }
         if (status != null && !status.isBlank()) { sql.append(" and m.status=?"); args.add(status.trim().toUpperCase(Locale.ROOT)); }
         if (ownerId != null) { sql.append(" and exists (select 1 from horse_ownerships ho where ho.horse_id=m.horse_id and ho.owner_id=?)"); args.add(ownerId); }
@@ -260,7 +260,7 @@ public class RaceEventService {
 
     private String registrationSelect() {
         return "select m.id,m.horse_id,h.name horse_name,m.user_id,m.status,m.data_json,e.race_name,e.race_date "
-                + "from module_records m join horses h on h.id=m.horse_id join race_events e on cast(e.id as varchar(36))=JSON_VALUE(m.data_json,'$.raceEventId')";
+                + "from module_records m join horses h on h.id=m.horse_id join race_events e on cast(e.id as varchar(36))=dbo.json_value(m.data_json,'$.raceEventId')";
     }
 
     private RegistrationView registration(java.sql.ResultSet rs, int row) throws java.sql.SQLException {

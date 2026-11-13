@@ -144,7 +144,7 @@ class MedicalExaminationServiceTest {
         Horse inMedical = mock(Horse.class);
         when(inMedical.getIntakeStatus()).thenReturn("IN_MEDICAL");
         when(horseAccessService.requireActive(horseId)).thenReturn(inMedical);
-        when(jdbc.queryForObject(contains("UPDLOCK,HOLDLOCK"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
         when(jdbc.queryForObject(contains("MEDICAL_ASSIGNMENT"), eq(Integer.class), eq(horseId), eq(otherVet)))
                 .thenReturn(0);
@@ -329,7 +329,7 @@ class MedicalExaminationServiceTest {
 
         when(jdbc.queryForList(contains("select horse_id from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId)))
                 .thenReturn(List.of(Map.of("horse_id", horseId)));
-        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("select id from horses where id=? for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
         when(jdbc.queryForList(contains("select health_source_id from horses where id=?"), eq(horseId)))
                 .thenReturn(List.of(Map.of("health_source_id", examId)));
@@ -355,7 +355,7 @@ class MedicalExaminationServiceTest {
         UUID actorId = UUID.randomUUID();
         when(jdbc.queryForList(contains("select horse_id from module_records where id=?"), eq(examId)))
                 .thenReturn(List.of(Map.of("horse_id", horseId)));
-        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK,HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("select id from horses where id=? for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
         when(jdbc.queryForObject(contains("select count(*) from module_records"), eq(Integer.class), eq(horseId), eq(examId)))
                 .thenReturn(1);

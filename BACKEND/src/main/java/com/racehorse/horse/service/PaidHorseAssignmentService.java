@@ -21,7 +21,7 @@ public class PaidHorseAssignmentService {
     @Transactional(readOnly = true)
     public List<PaidHorse> pendingTrainer() {
         return jdbc.query("select h.id,h.code,h.name,h.payment_status from horses h where h.archived_at is null "
-                        + "and (h.service_override=1 or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?))) "
+                        + "and (h.service_override=true or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?))) "
                         + "and h.current_trainer_id is null "
                         + "order by updated_at,id",
                 (rs, row) -> new PaidHorse(rs.getObject("id", UUID.class), rs.getString("code"),
@@ -31,7 +31,7 @@ public class PaidHorseAssignmentService {
 
     @Transactional
     public PaidHorse assignTrainer(UUID horseId, UUID trainerId) {
-        int changed = jdbc.update("update horses set current_trainer_id=?,updated_at=SYSDATETIMEOFFSET(),"
+        int changed = jdbc.update("update horses set current_trainer_id=?,updated_at=CURRENT_TIMESTAMP,"
                         + "version=version+1 where id=? and archived_at is null "
                         + "and (cast(service_override as varchar(5)) in ('1', 'true', 't') or (payment_status='PAID' and (paid_until is null or paid_until>=?))) "
                         + "and current_trainer_id is null "
