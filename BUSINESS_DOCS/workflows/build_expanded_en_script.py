@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-OUT_FILE = Path(r'D:\HORSE-PROJECT\BUSINESS_DOCS\workflows\CLUB_MANAGER_WORKFLOW_EN.drawio')
+OUT_FILE = Path(__file__).with_name('CLUB_MANAGER_WORKFLOW_EN.drawio')
 W, H = 1920, 1180
 
 C = {
@@ -963,16 +963,10 @@ def main():
         
     ET.indent(mx, space='  ')
     
-    target_path = Path(r'D:\HORSE-PROJECT\BUSINESS_DOCS\workflows\CLUB_MANAGER_WORKFLOW_EN.drawio')
-    ET.ElementTree(mx).write(target_path, encoding='utf-8', xml_declaration=True)
-    
-    # Also write a copy to root for quick access if user looks at root
-    root_copy = Path(r'D:\HORSE-PROJECT\CLUB_MANAGER_WORKFLOW_EN.drawio')
-    ET.ElementTree(mx).write(root_copy, encoding='utf-8', xml_declaration=True)
+    ET.ElementTree(mx).write(OUT_FILE, encoding='utf-8', xml_declaration=True)
     
     print(f"Successfully generated expanded English workflow with {len(pages)} pages!")
-    print(f"Target: {target_path} ({target_path.stat().st_size} bytes)")
-    print(f"Root copy: {root_copy} ({root_copy.stat().st_size} bytes)")
+    print(f"Target: {OUT_FILE} ({OUT_FILE.stat().st_size} bytes)")
 
 if __name__ == '__main__':
     main()
