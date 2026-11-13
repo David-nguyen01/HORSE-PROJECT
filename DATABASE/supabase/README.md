@@ -37,6 +37,11 @@ partially deployed owner-report content hash, preserves historical reports, adds
 the concurrency-safe unique index, fixes trigger search paths, and adds a focused
 set of workflow indexes. It performs no table truncation or row deletion.
 
+The hosted migration history also contains version `20261113144107`, which ran
+the same idempotent training-window trigger removal as local version
+`20261113143548`. Keep both files so Supabase recognizes the hosted history and
+can apply later migrations, including the trial-run booking trigger fix.
+
 ## Rules for future changes
 
 1. Never edit, rename, reorder, or delete an applied migration.

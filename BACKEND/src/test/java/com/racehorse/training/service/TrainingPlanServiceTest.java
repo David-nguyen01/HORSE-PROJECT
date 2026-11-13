@@ -76,6 +76,25 @@ class TrainingPlanServiceTest {
     }
 
     @Test
+    void deletingPlanRemovesItsSessionsBeforeThePlan() {
+        UUID planId = UUID.randomUUID();
+        UUID scheduleId = UUID.randomUUID();
+        TrainingPlan plan = new TrainingPlan(horse, "Plan", null, trainer, true);
+        TrainingSchedule session = org.mockito.Mockito.mock(TrainingSchedule.class);
+        when(session.getId()).thenReturn(scheduleId);
+        when(repository.findDetailById(planId)).thenReturn(Optional.of(plan));
+        when(scheduleRepository.findPlanSessions(planId)).thenReturn(List.of(session));
+        when(horseAccessService.requireTrainingAccess(horseId, actorId, false, true, false)).thenReturn(horse);
+
+        service.delete(planId, actorId, false, true);
+
+        verify(jdbc).update("delete from training_schedules where id=?", scheduleId);
+        verify(jdbc).update("update training_plans set source_plan_id=null where source_plan_id=?", planId);
+        verify(repository).delete(plan);
+        verify(repository).flush();
+    }
+
+    @Test
     void rejectsOverlappingPhases() {
         assertRejected(List.of(phase("Base", "2026-09-01", "2026-09-10", List.of(LocalDate.parse("2026-09-07"))),
                 phase("Speed", "2026-09-10", "2026-09-20", List.of(LocalDate.parse("2026-09-14")))), "không được trùng");
