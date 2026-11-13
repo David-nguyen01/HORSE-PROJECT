@@ -318,17 +318,6 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
   const [showAssignSingleModal, setShowAssignSingleModal] = useState(false)
   const [targetAssignStall, setTargetAssignStall] = useState(null)
 
-  // Quick-Feed operational state for StablesView (only active for Stable Staff)
-  const isOperationalStaff = Boolean(isStaff && !isVet)
-  const [feedDate, setFeedDate] = useState(today())
-  const quickFeed = useStablesQuickFeed({
-    targetDate: feedDate,
-    isStaff: isOperationalStaff,
-    isVet,
-    enabled: isOperationalStaff,
-    refreshIntervalMs: 60000,
-  })
-
   const loadPendingCounts = useCallback(async () => {
     try {
       const [waiting, cleared] = await Promise.all([
@@ -427,9 +416,8 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
     await Promise.all([
       loadStables(),
       loadPendingCounts(),
-      quickFeed.reloadQuickFeed(),
     ])
-  }, [loading, loadStables, loadPendingCounts, quickFeed])
+  }, [loading, loadStables, loadPendingCounts])
 
   useEffect(() => {
     loadStables()
@@ -529,18 +517,6 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {isOperationalStaff && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}>
-              <Calendar size={14} className="muted" />
-              <span style={{ fontWeight: 500 }}>Ngày cho ăn:</span>
-              <input
-                type="date"
-                value={feedDate}
-                onChange={(e) => setFeedDate(e.target.value)}
-                style={{ width: '135px', padding: '4px 8px', borderRadius: '6px', border: '1px solid #ccc', fontSize: '12px' }}
-              />
-            </div>
-          )}
           <button
             type="button"
             className="button secondary"
@@ -605,38 +581,6 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
       </div>
 
       {error && <div className="notice error"><X size={16} /> {error}</div>}
-      {isOperationalStaff && quickFeed.quickFeedError && (
-        <div className="notice error" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertTriangle size={16} />
-            <span>Không thể tải dữ liệu cho ăn trong ca ({quickFeed.quickFeedError}).</span>
-          </div>
-          <button
-            type="button"
-            className="button secondary"
-            style={{ fontSize: '11px', padding: '2px 10px', height: '26px' }}
-            onClick={quickFeed.reloadQuickFeed}
-          >
-            <RotateCw size={12} style={{ marginRight: '4px' }} /> Thử lại
-          </button>
-        </div>
-      )}
-      {isOperationalStaff && quickFeed.confirmError && (
-        <div className="notice error" style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <X size={16} />
-            <span>{quickFeed.confirmError}</span>
-          </div>
-          <button
-            type="button"
-            className="button secondary"
-            style={{ fontSize: '11px', padding: '2px 8px', height: '24px' }}
-            onClick={() => quickFeed.setConfirmError('')}
-          >
-            Đóng
-          </button>
-        </div>
-      )}
 
       <div className="sub-tabs">
         {stables.map((s) => (
@@ -935,105 +879,6 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
                   </Link>
                 </div>
               </div>
-
-              {/* Quick-Feed Card for Selected Horse in StablesView */}
-              {(() => {
-                const qfHorse = isOperationalStaff ? quickFeed.quickFeedByStallId.get(selectedHorse.stallId) : null
-                if (!qfHorse || !qfHorse.hasPlan || !qfHorse.meals || qfHorse.meals.length === 0) return null
-                return (
-                  <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', marginBottom: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Utensils size={14} style={{ color: '#27704e' }} />
-                        <b style={{ fontSize: '13px', color: '#15352c' }}>Bữa ăn dinh dưỡng hôm nay ({formatVNDate(feedDate)})</b>
-                      </div>
-                      <span className="badge-tag" style={{ fontSize: '10px' }}>
-                        {qfHorse.meals.filter((m) => m.confirmed || m.status === 'CONFIRMED').length}/{qfHorse.meals.length} bữa hoàn thành
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {qfHorse.meals.map((meal) => {
-                        const mealKey = meal.mealId || `${feedDate}-${selectedHorse.id}-${meal.mealName}`
-                        const isPending = quickFeed.confirmingMealKey === mealKey
-                        const isConfirmed = Boolean(meal.confirmed || meal.status === 'CONFIRMED')
-                        const isOverdue = !isConfirmed && meal.status === 'OVERDUE'
-                        return (
-                          <div
-                            key={mealKey}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '6px 10px',
-                              borderRadius: '6px',
-                              background: isConfirmed ? '#f0fdf4' : isOverdue ? '#fff1f2' : '#ffffff',
-                              border: '1px solid ' + (isConfirmed ? '#bbf7d0' : isOverdue ? '#fecdd3' : '#e2e8f0'),
-                              fontSize: '12px',
-                              gap: '8px',
-                            }}
-                          >
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <b style={{ color: isConfirmed ? '#166534' : isOverdue ? '#be123c' : '#1e293b' }}>
-                                  {meal.feedingTime} · {meal.mealName}
-                                </b>
-                                {isConfirmed ? (
-                                  <span className="badge-tag completed" style={{ fontSize: '10px', padding: '1px 5px' }}>
-                                    <Check size={10} style={{ marginRight: '2px' }} /> Đã cho ăn
-                                  </span>
-                                ) : isOverdue ? (
-                                  <span className="badge-tag injured" style={{ fontSize: '10px', padding: '1px 5px', background: '#ffe4e6', color: '#be123c', border: '1px solid #fecdd3' }}>
-                                    <AlertTriangle size={10} style={{ marginRight: '2px' }} /> Quá giờ
-                                  </span>
-                                ) : (
-                                  <span className="badge-tag pending" style={{ fontSize: '10px', padding: '1px 5px' }}>
-                                    <Clock size={10} style={{ marginRight: '2px' }} /> Chờ cho ăn
-                                  </span>
-                                )}
-                              </div>
-                              <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                                {meal.concentrateKg ? `${meal.concentrateKg}kg thức ăn tinh` : ''}
-                                {meal.forageKg ? ` · ${meal.forageKg}kg cỏ` : ''}
-                                {meal.supplements ? ` · ${meal.supplements}` : ''}
-                              </div>
-                              {isConfirmed && (meal.confirmedByName || meal.confirmedAt) && (
-                                <div style={{ fontSize: '10px', color: '#166534', marginTop: '2px' }}>
-                                  ✓ {meal.confirmedByName || 'Nhân viên chuồng'}
-                                  {meal.confirmedAt && ` · ${formatVNDateTime(meal.confirmedAt)}`}
-                                </div>
-                              )}
-                            </div>
-                            {isStaff && !isConfirmed && (
-                              <button
-                                type="button"
-                                className="button primary"
-                                disabled={isPending}
-                                style={{
-                                  fontSize: '11px',
-                                  padding: '3px 10px',
-                                  minHeight: '26px',
-                                  height: '26px',
-                                  whiteSpace: 'nowrap',
-                                  background: isOverdue ? '#e11d48' : '#26754b',
-                                  borderColor: isOverdue ? '#be123c' : '#1e5e3a',
-                                }}
-                                onClick={() => {
-                                  quickFeed.handleQuickConfirmMeal({
-                                    stallId: selectedHorse.stallId,
-                                    horseId: selectedHorse.id,
-                                  }, meal)
-                                }}
-                              >
-                                {isPending ? 'Đang gửi…' : 'Xác nhận cho ăn'}
-                              </button>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })()}
 
               {/* 3-State Presentation: State C (Medical hold) > State B (Training schedule) > State A (Default routine) */}
               {isMedicallyRestricted ? (
