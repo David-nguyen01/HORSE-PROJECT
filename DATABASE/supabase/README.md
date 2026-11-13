@@ -29,9 +29,13 @@ recreate the existing schema:
 4. `20261110023850_racehorse_private_schema_access.sql`
 5. `20261110075656_sql_server_json_compatibility.sql`
 
-`20261113120524_service_packages_catalog.sql` is the next pending migration. It is
-idempotent and completes the partially deployed service package catalog without
-deleting the existing custom package or application data.
+`20261113120524_service_packages_catalog.sql` is applied and completes the service
+package catalog without deleting the existing custom package or application data.
+
+`20261113120525_harden_owner_reports_and_database_performance.sql` completes the
+partially deployed owner-report content hash, preserves historical reports, adds
+the concurrency-safe unique index, fixes trigger search paths, and adds a focused
+set of workflow indexes. It performs no table truncation or row deletion.
 
 ## Rules for future changes
 

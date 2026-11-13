@@ -1,18 +1,34 @@
+const CLOUD_API_URL = 'https://horse-project-4qa4.onrender.com'
+const LOCAL_API_URL = 'http://127.0.0.1:8080'
+
+export function canConfigureApiUrl() {
+  if (typeof window === 'undefined') return false
+  return window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+}
+
 export function getApiUrl() {
-  if (typeof window !== 'undefined') {
+  const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '')
+
+  // A deployed frontend must never inherit a stale localhost/custom URL from
+  // this browser. VITE_API_URL remains the explicit production override.
+  if (typeof window !== 'undefined' && !canConfigureApiUrl()) {
+    return envUrl || CLOUD_API_URL
+  }
+
+  if (canConfigureApiUrl()) {
     const custom = (localStorage.getItem('racehorse.api_url') || '').trim()
     if (custom) return custom.replace(/\/$/, '')
   }
-  const envUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '')
   if (envUrl) return envUrl
-  if (typeof window !== 'undefined' && window.location.hostname === 'horse-project-phi.vercel.app') {
-    return 'https://horse-project-4qa4.onrender.com'
-  }
-  return 'http://127.0.0.1:8080'
+  return LOCAL_API_URL
 }
 
 export function setCustomApiUrl(url) {
   if (typeof window !== 'undefined') {
+    if (!canConfigureApiUrl()) {
+      localStorage.removeItem('racehorse.api_url')
+      return
+    }
     const trimmed = (url || '').trim().replace(/\/$/, '')
     if (trimmed) {
       localStorage.setItem('racehorse.api_url', trimmed)

@@ -1,7 +1,7 @@
 import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Activity, AlertTriangle, ArrowLeft, ArchiveRestore, Award, Bell, Calendar, Check, ChevronRight, CircleUserRound, Clock, DollarSign, FileSpreadsheet, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Package, PackageCheck, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Utensils, Warehouse, X, Zap , ClipboardList } from 'lucide-react'
-import { api, authApi, broadcastApi, checkLocalBackend, clearAuth, getAuth, getApiUrl, setCustomApiUrl, localApiUrl, pageContent, reportingApi, saveAuth, walletAlertApi } from './api'
+import { api, authApi, broadcastApi, canConfigureApiUrl, checkLocalBackend, clearAuth, getAuth, getApiUrl, setCustomApiUrl, localApiUrl, pageContent, reportingApi, saveAuth, walletAlertApi } from './api'
 import { walletIcon, horseIcon, trainingIcon, scheduleIcon } from './navIcons'
 import { handleImageFallback } from './imageFallback'
 import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, InventoryCatalogPage, PermissionsPage, ServicePackageCatalogPage, StablesPage, TaskCatalogPage } from './AdminPages'
@@ -82,6 +82,7 @@ function AuthShell({ mode }) {
   const [showConfig, setShowConfig] = useState(false)
   const [inputUrl, setInputUrl] = useState(getApiUrl())
   const [apiPanelOpen, setApiPanelOpen] = useState(false)
+  const apiUrlConfigurable = canConfigureApiUrl()
   const apiPanelRef = useRef(null)
   const apiTriggerRef = useRef(null)
 
@@ -181,16 +182,18 @@ function AuthShell({ mode }) {
                 </span>
                 <span className="auth-api-url" title={currentApiUrl}>API: {currentApiUrl}</span>
               </div>
-              <button
-                type="button"
-                className="auth-api-btn-link"
-                onClick={() => setShowConfig(!showConfig)}
-              >
-                {showConfig ? 'Hủy' : 'Đổi URL'}
-              </button>
+              {apiUrlConfigurable && (
+                <button
+                  type="button"
+                  className="auth-api-btn-link"
+                  onClick={() => setShowConfig(!showConfig)}
+                >
+                  {showConfig ? 'Hủy' : 'Đổi URL'}
+                </button>
+              )}
             </div>
 
-            {showConfig && (
+            {apiUrlConfigurable && showConfig && (
               <div className="auth-api-config-box">
                 <input
                   type="text"

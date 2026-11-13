@@ -11,10 +11,10 @@ Project → Settings → Environment Variables, rồi redeploy frontend. Biến 
 cập nhật trang đang phát hành. Không đưa mật khẩu database, JWT secret hoặc
 khóa Cloudinary vào biến `VITE_*`.
 
-Trang Vercel chính cũng có URL Render mặc định nếu chưa đặt `VITE_API_URL`;
-giá trị `racehorse.api_url` đã lưu trong localStorage của từng trình duyệt vẫn
-được ưu tiên. Khi chuyển từ cấu hình cũ, xóa giá trị tùy chỉnh trong giao diện
-hoặc localStorage nếu trình duyệt vẫn gọi `127.0.0.1`.
+Trang Vercel chính cũng có URL Render mặc định nếu chưa đặt `VITE_API_URL`.
+Bản production luôn ưu tiên cấu hình Vercel/Render và bỏ qua URL tùy chỉnh cũ
+trong localStorage, nhờ đó không thể gọi nhầm `127.0.0.1` trên máy người xem.
+Chỉ frontend chạy tại `localhost` mới hiển thị chức năng đổi URL API.
 
 Khi chạy frontend tại `localhost` mà không đặt `VITE_API_URL`, API mặc định
 là `http://127.0.0.1:8080`.
