@@ -87,8 +87,10 @@ public class HorseController {
     @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER')")
     Page<HorseResponse> mine(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(name = "query", required = false) String query,
+            @RequestParam(name = "status", required = false) HorseStatus status,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
-        return horseService.findOwnedBy(userId(jwt), pageable);
+        return horseService.findOwnedBy(userId(jwt), query, status, pageable);
     }
 
     @GetMapping("/{id:[0-9a-fA-F\\-]{36}}")

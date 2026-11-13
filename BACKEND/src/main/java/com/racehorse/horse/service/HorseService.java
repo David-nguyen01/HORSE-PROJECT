@@ -203,8 +203,9 @@ public class HorseService {
     }
 
     @Transactional(readOnly = true)
-    public Page<HorseResponse> findOwnedBy(UUID ownerId, Pageable pageable) {
-        return horseRepository.findOwnedBy(ownerId, pageable).map(this::toResponse);
+    public Page<HorseResponse> findOwnedBy(UUID ownerId, String query, HorseStatus status, Pageable pageable) {
+        return horseRepository.findOwnedBy(ownerId, query == null || query.isBlank(), searchPattern(query), status, pageable)
+                .map(this::toResponse);
     }
 
     @Transactional

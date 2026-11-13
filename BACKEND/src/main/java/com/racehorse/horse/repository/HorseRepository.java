@@ -38,7 +38,8 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             where h.archivedAt is null
               and (:matchAll = true
                    or lower(h.code) like :pattern
-                   or lower(h.name) like :pattern)
+                   or lower(h.name) like :pattern
+                   or lower(h.microchipPassportNumber) like :pattern)
               and (:status is null or h.status = :status)
             """)
     Page<Horse> search(
@@ -51,7 +52,8 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             select h from Horse h
             where h.archivedAt is null and h.currentTrainer.id = :trainerId
               and (:matchAll = true or lower(h.code) like :pattern
-                   or lower(h.name) like :pattern)
+                   or lower(h.name) like :pattern
+                   or lower(h.microchipPassportNumber) like :pattern)
               and (:status is null or h.status = :status)
             """)
     Page<Horse> searchForTrainer(@Param("matchAll") boolean matchAll, @Param("pattern") String pattern,
@@ -77,7 +79,8 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
               and (h.serviceOverride = true or (h.paymentStatus = 'PAID'
                    and (h.paidUntil is null or h.paidUntil >= :today)))
               and (:matchAll = true or lower(h.code) like :pattern
-                   or lower(h.name) like :pattern)
+                   or lower(h.name) like :pattern
+                   or lower(h.microchipPassportNumber) like :pattern)
               and (:status is null or h.status = :status)
             """)
     Page<Horse> searchForVeterinarian(@Param("matchAll") boolean matchAll, @Param("pattern") String pattern,
@@ -90,9 +93,16 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
             join HorseOwnership ho on ho.horse = h
             where ho.owner.id = :ownerId
               and h.archivedAt is null
+              and (:matchAll = true or lower(h.code) like :pattern
+                   or lower(h.name) like :pattern
+                   or lower(h.microchipPassportNumber) like :pattern)
+              and (:status is null or h.status = :status)
             """)
     Page<Horse> findOwnedBy(
             @Param("ownerId") UUID ownerId,
+            @Param("matchAll") boolean matchAll,
+            @Param("pattern") String pattern,
+            @Param("status") HorseStatus status,
             Pageable pageable);
 
     @Query("""
@@ -103,7 +113,8 @@ public interface HorseRepository extends JpaRepository<Horse, UUID> {
                        and (h.paidUntil is null or h.paidUntil >= :today)))
               and (:matchAll = true
                    or lower(h.code) like :pattern
-                   or lower(h.name) like :pattern)
+                   or lower(h.name) like :pattern
+                   or lower(h.microchipPassportNumber) like :pattern)
               and (:status is null or h.status = :status)
             """)
     Page<Horse> searchPaidOnly(

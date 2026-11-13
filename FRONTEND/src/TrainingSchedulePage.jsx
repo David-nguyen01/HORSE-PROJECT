@@ -1139,7 +1139,7 @@ function CreateScheduleModal({ horses, horsesLoading, onClose, onSaved }) {
             <span>Sân tập *</span>
             <select required value={selectedRacetrack} disabled={racetracksLoading || racetracks.length === 0} onChange={e => setSelectedRacetrack(e.target.value)}>
               <option value="">{racetracksLoading ? 'Đang tải sân tập…' : racetracks.length ? '-- Chọn sân tập --' : 'Không có sân tập hoạt động'}</option>
-              {racetracks.map(r => <option key={r.id} value={r.id}>{r.name} ({r.surfaceType})</option>)}
+              {racetracks.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </label>
           {racetracksError && <div className="notice error full"><X size={17} />{racetracksError}</div>}

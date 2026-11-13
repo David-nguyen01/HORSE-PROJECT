@@ -536,8 +536,6 @@ function AppLayout() {
 }
 
 function NotificationBell() {
-  const navigate = useNavigate()
-  const { user } = useAuth()
   const [linkError, setLinkError] = useState('')
   const [markingAll, setMarkingAll] = useState(false)
   const [items, setItems] = useState([])
@@ -566,65 +564,8 @@ function NotificationBell() {
   const openNotification = async (item) => {
     setLinkError('')
     try {
-      let target = null
-      const isStaffUser = hasAny(user, 'STABLE_STAFF')
-      const isVetUser = hasAny(user, 'VETERINARIAN')
-      const canOpenTraining = hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER')
-      const id = encodeURIComponent(item.relatedEntityId || '')
-
-      if (isStaffUser) {
-        if (item.notificationType === 'TRAINING_SCHEDULE_PUBLISHED' || item.relatedEntityType === 'TRAINING_SCHEDULE') {
-          target = id ? `/stable-care/training?scheduleId=${id}` : '/stable-care/training'
-        } else if (item.notificationType === 'TRAINING_EVALUATION_YELLOW_CARETAKER' || item.relatedEntityType === 'TRAINING_EVALUATION') {
-          target = '/stable-care/training'
-        } else if (item.notificationType === 'PREVENTIVE_CARE_SCHEDULED' || item.relatedEntityType === 'PREVENTIVE_CARE') {
-          target = '/stable-care/tasks'
-        } else if (item.notificationType === 'HORSE_PROFILE_UPDATED' || item.relatedEntityType === 'HORSE') {
-          target = id ? `/stable-care/stables?horseId=${id}` : '/stable-care/stables'
-        } else if (item.relatedEntityType === 'INCIDENT_REPORT') {
-          target = id ? `/stable-care/incidents?incidentId=${id}` : '/stable-care/incidents'
-        } else if (item.relatedEntityType === 'INVENTORY' || item.relatedEntityType === 'REPLENISHMENT') {
-          target = '/stable-care/inventory'
-        } else {
-          target = '/stable-care/tasks'
-        }
-      } else if (isVetUser) {
-        if (item.notificationType === 'HORSE_WAITING_FOR_VET') {
-          target = '/vet'
-        } else if (item.relatedEntityType === 'INCIDENT_REPORT') {
-          target = '/vet'
-        } else if (item.relatedEntityType === 'PREVENTIVE_CARE' || item.notificationType === 'PREVENTIVE_CARE_SCHEDULED') {
-          target = id ? `/vet/medical-records?horseId=${id}` : '/vet/medical-records'
-        } else if (item.relatedEntityType === 'TRAINING_EVALUATION' || item.relatedEntityType === 'TRAINING_SESSION') {
-          target = '/vet/training'
-        } else if (item.relatedEntityType === 'HORSE') {
-          target = id ? `/vet/medical-records?horseId=${id}` : '/vet'
-        } else {
-          target = '/vet'
-        }
-      } else {
-        if (item.relatedEntityType === 'HORSE' && item.relatedEntityId) target = '/horses/' + id
-        if (item.relatedEntityType === 'INCIDENT_REPORT' && item.relatedEntityId && hasAny(user, 'HORSE_OWNER', 'HEAD_TRAINER')) {
-          const emergency = await api('/api/incidents/training-emergency/' + id)
-          target = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER')
-            ? `/horses/${encodeURIComponent(emergency.horseId)}?emergencyId=${id}`
-            : `/training-emergency?emergencyId=${id}`
-        }
-        if (item.relatedEntityType === 'WALLET' && hasAny(user, 'HORSE_OWNER')) target = '/wallet'
-        if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_EVALUATION') target = '/fitness?evaluationId=' + id
-        if (canOpenTraining && item.relatedEntityId && item.relatedEntityType === 'TRAINING_SCHEDULE') {
-          const owner = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'HEAD_TRAINER', 'CLUB_MANAGER')
-          const schedule = await api('/api/training-schedules/' + id + (owner ? '/owner-view' : ''))
-          target = schedule.evaluation?.id ? '/fitness?evaluationId=' + encodeURIComponent(schedule.evaluation.id)
-            : schedule.horse?.id ? '/fitness?horseId=' + encodeURIComponent(schedule.horse.id) : '/training-schedule'
-        }
-        if (item.relatedEntityId && item.relatedEntityType === 'RACE_REGISTRATION'
-            && hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER'))
-          target = '/races?registrationId=' + id
-      }
       await markRead(item.id)
-      if (target) { navigate(target); setOpen(false) }
-    } catch (error) { setLinkError(error.message || 'Không mở được thông báo.') }
+    } catch (error) { setLinkError(error.message || 'Không đánh dấu được thông báo.') }
   }
   return <div className="notification-center">
     <button className="notification-button" aria-label="Thông báo" onClick={() => setOpen((value) => !value)}><Bell size={19} />{items.length > 0 && <span>{items.length > 99 ? '99+' : items.length}</span>}</button>
@@ -645,7 +586,7 @@ function Dashboard() {
     api(path).then((data) => setHorses(pageContent(data))).catch(() => {}).finally(() => setLoading(false))
   }, [user])
   return <><PageHeading eyebrow="TRUNG TÂM ĐIỀU HÀNH" title={`Chào ${user?.username}`} description="Toàn cảnh hoạt động câu lạc bộ hôm nay." />
-    <div className="stats-grid"><Stat icon={Activity} label="Tổng số ngựa" value={loading ? '…' : horses.length} accent="green" /><Stat icon={Zap} label="Đang hoạt động" value={loading ? '…' : horses.filter((h) => h.status === 'ACTIVE').length} accent="gold" /><Stat icon={HeartPulse} label="Đang chấn thương" value={loading ? '…' : horses.filter((h) => h.status === 'INJURED').length} accent="rose" /><Stat icon={ShieldCheck} label="Quyền truy cập" value={user?.roles?.length || 0} accent="blue" /></div>
+    <div className="stats-grid dashboard-stats-grid"><Stat icon={Activity} label="Tổng số ngựa" value={loading ? '…' : horses.length} accent="green" /><Stat icon={Zap} label="Đang hoạt động" value={loading ? '…' : horses.filter((h) => h.status === 'ACTIVE').length} accent="gold" /><Stat icon={HeartPulse} label="Đang chấn thương" value={loading ? '…' : horses.filter((h) => h.status === 'INJURED').length} accent="rose" /></div>
     <div className="dashboard-grid"><section className="card"><CardHead title="Hồ sơ cập nhật gần đây" action={<Link to="/horses">Xem tất cả <ChevronRight size={16} /></Link>} />{horses.length ? <div className="horse-list">{horses.slice(0, 5).map((horse) => <HorseRow key={horse.id} horse={horse} />)}</div> : <Empty title="Chưa có dữ liệu ngựa" text="Hồ sơ phù hợp với quyền của bạn sẽ xuất hiện tại đây." />}</section><section className="card role-card"><p className="eyebrow light">PHIÊN LÀM VIỆC</p><ShieldCheck size={36} /><h3>{ROLE_LABELS[user?.roles?.[0]]}</h3><p>Hệ thống chỉ hiển thị dữ liệu và thao tác thuộc phạm vi vai trò của bạn.</p><div className="role-pills">{user?.roles?.map((r) => <span key={r}>{ROLE_LABELS[r]}</span>)}</div></section></div>
   </>
 }
@@ -700,13 +641,15 @@ function HorseCard({ horse }) {
 }
 
 function Horses() {
-  const { user } = useAuth(); const canEdit = hasAny(user, 'CLUB_MANAGER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !canEdit; const canAdd = hasAny(user, 'CLUB_MANAGER', 'HORSE_OWNER')
-  const [horses, setHorses] = useState([]); const [query, setQuery] = useState(''); const [status, setStatus] = useState(''); const [loading, setLoading] = useState(true); const [showCreate, setShowCreate] = useState(false)
+  const { user } = useAuth(); const canEdit = hasAny(user, 'CLUB_MANAGER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER'); const canAdd = hasAny(user, 'CLUB_MANAGER', 'HORSE_OWNER')
+  const statusOptions = isOwner ? ['PENDING_PAYMENT', 'ACTIVE', 'INJURED']
+    : hasAny(user, 'HEAD_TRAINER') && !canEdit ? ['ACTIVE', 'INJURED'] : Object.keys(STATUS_LABELS)
+  const [horses, setHorses] = useState([]); const [query, setQuery] = useState(''); const [status, setStatus] = useState(''); const [loading, setLoading] = useState(true); const [loadError, setLoadError] = useState(''); const [showCreate, setShowCreate] = useState(false)
   const loadRequest = useRef(0)
   const load = useCallback(async () => {
     const request = ++loadRequest.current
-    setLoading(true); const params = new URLSearchParams({ size: '100' }); if (query) params.set('query', query); if (status) params.set('status', status)
-    const path = hasAny(user, 'HORSE_OWNER') && !canEdit ? `/api/horses/mine?${params}` : `/api/horses?${params}`
+    setLoading(true); setLoadError(''); const params = new URLSearchParams({ size: '100' }); if (query.trim()) params.set('query', query.trim()); if (status) params.set('status', status)
+    const path = isOwner ? `/api/horses/mine?${params}` : `/api/horses?${params}`
     try {
       const list = pageContent(await api(path))
       const withPhotos = []
@@ -723,14 +666,14 @@ function Horses() {
         if (request !== loadRequest.current) return
       }
       setHorses(withPhotos)
-    } catch {
-      if (request === loadRequest.current) setHorses([])
+    } catch (error) {
+      if (request === loadRequest.current) { setHorses([]); setLoadError(error.message || 'Không thể tải danh sách ngựa.') }
     } finally {
       if (request === loadRequest.current) setLoading(false)
     }
-  }, [query, status, user, canEdit])
+  }, [query, status, user, isOwner])
   useEffect(() => { if (hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF')) load(); else setLoading(false) }, [load, user])
-  return <><PageHeading eyebrow="FR01 · HỒ SƠ GỐC" title="Danh mục ngựa" description="Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành." action={canAdd && <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Thêm ngựa</button>} /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên, mã hoặc số chip…" /></label><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{Object.entries(STATUS_LABELS).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></div><section className="card table-card horse-catalog">{loading ? <Empty title="Đang tải dữ liệu…" text="Vui lòng chờ trong giây lát." /> : horses.length ? <div className="horse-profile-grid">{horses.map((h) => <HorseCard key={h.id} horse={h} />)}</div> : <Empty title="Không tìm thấy hồ sơ" text="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." />}</section>{showCreate && <HorseModal isOwner={isOwner} onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); load() }} />}</>
+  return <><PageHeading eyebrow="FR01 · HỒ SƠ GỐC" title="Danh mục ngựa" description="Tra cứu hồ sơ định danh, chủ sở hữu và trạng thái vận hành." action={canAdd && <button className="button primary" onClick={() => setShowCreate(true)}><Plus size={18} /> Thêm ngựa</button>} /><div className="toolbar card"><label className="search-box"><Search size={18} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm theo tên, mã hoặc số chip…" /></label><select value={status} onChange={(e) => setStatus(e.target.value)}><option value="">Tất cả trạng thái</option>{statusOptions.map(key => <option key={key} value={key}>{STATUS_LABELS[key]}</option>)}</select></div><section className="card table-card horse-catalog">{loading ? <Empty title="Đang tải dữ liệu…" text="Vui lòng chờ trong giây lát." /> : loadError ? <Empty title="Không tải được hồ sơ" text={loadError} /> : horses.length ? <div className="horse-profile-grid">{horses.map((h) => <HorseCard key={h.id} horse={h} />)}</div> : <Empty title="Không tìm thấy hồ sơ" text="Thử thay đổi từ khóa hoặc bộ lọc trạng thái." />}</section>{showCreate && <HorseModal isOwner={isOwner} onClose={() => setShowCreate(false)} onSaved={() => { setShowCreate(false); load() }} />}</>
 }
 
 const emptyHorse = { code: '', name: '', microchipPassportNumber: '', birthDate: '', gender: 'STALLION', colorMarkings: '', breed: '', sireMode: 'NONE', sireId: '', sireManualName: '', sireManualId: '', damMode: 'NONE', damId: '', damManualName: '', damManualId: '', stableLocation: '', status: 'ACTIVE', initialOwnerId: '' }
