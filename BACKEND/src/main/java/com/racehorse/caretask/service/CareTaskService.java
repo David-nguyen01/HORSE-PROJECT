@@ -40,11 +40,11 @@ public class CareTaskService {
                 created_at, updated_at
             )
             SELECT
-                NEWID(), d.id, 'ROUTINE', d.scope, NULL,
+                gen_random_uuid(), d.id, 'ROUTINE', d.scope, NULL,
                 d.title, d.description, d.task_type, ?, d.scheduled_time, 'PENDING',
-                SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET()
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM dbo.care_routine_definitions d
-            WHERE d.is_active = 1
+            WHERE d.is_active=true
               AND NOT EXISTS (
                   SELECT 1 FROM dbo.care_tasks t
                   WHERE t.routine_definition_id = d.id
@@ -85,9 +85,9 @@ public class CareTaskService {
                 title, description, task_type, scheduled_date, scheduled_time,
                 assigned_staff_id, status, created_by_user_id, created_at, updated_at
             ) VALUES (
-                NEWID(), NULL, 'SPECIAL', 'HORSE', ?,
+                gen_random_uuid(), NULL, 'SPECIAL', 'HORSE', ?,
                 ?, ?, 'HEALTH_CHECK', ?, ?,
-                ?, 'PENDING', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET()
+                ?, 'PENDING', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
             """;
         try {
@@ -124,7 +124,7 @@ public class CareTaskService {
             ) VALUES (
                 ?, NULL, 'SPECIAL', ?, ?,
                 ?, NULL, ?, ?, ?,
-                ?, 'PENDING', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET()
+                ?, 'PENDING', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             )
             """;
 
@@ -204,26 +204,45 @@ public class CareTaskService {
                 (rs, rn) -> rs.getString("username"), actor);
         String staffName = names.isEmpty() ? "Nhân viên chuồng" : names.getFirst();
 
-        int updated = jdbc.update(
-                """
-                UPDATE dbo.care_tasks
-                SET status = 'COMPLETED',
-                    assigned_staff_id = CASE WHEN ? = 1 THEN assigned_staff_id ELSE COALESCE(assigned_staff_id, ?) END,
-                    completed_at = SYSDATETIMEOFFSET(),
-                    completed_by_user_id = ?,
-                    completed_by_name = ?,
-                    completion_notes = ?,
-                    photo_url = ?,
-                    photo_bytes = CONVERT(VARBINARY(MAX), ?),
-                    photo_content_type = ?,
-                    updated_at = SYSDATETIMEOFFSET()
-                WHERE id = ? AND status = 'PENDING'
-                  AND (? = 1 OR assigned_staff_id = ?
-                       OR (assigned_staff_id IS NULL AND task_category = 'ROUTINE'))
-                """,
-                manager, actor, actor, staffName, notes, photoUrl, photoBytes, photoContentType,
-                taskId, manager, actor
-        );
+        int updated;
+        if (manager) {
+            updated = jdbc.update(
+                    """
+                    UPDATE dbo.care_tasks
+                    SET status = 'COMPLETED',
+                        completed_at = CURRENT_TIMESTAMP,
+                        completed_by_user_id = ?,
+                        completed_by_name = ?,
+                        completion_notes = ?,
+                        photo_url = ?,
+                        photo_bytes = ?,
+                        photo_content_type = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND status = 'PENDING'
+                    """,
+                    actor, staffName, notes, photoUrl, photoBytes, photoContentType, taskId
+            );
+        } else {
+            updated = jdbc.update(
+                    """
+                    UPDATE dbo.care_tasks
+                    SET status = 'COMPLETED',
+                        assigned_staff_id = COALESCE(assigned_staff_id, ?),
+                        completed_at = CURRENT_TIMESTAMP,
+                        completed_by_user_id = ?,
+                        completed_by_name = ?,
+                        completion_notes = ?,
+                        photo_url = ?,
+                        photo_bytes = ?,
+                        photo_content_type = ?,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ? AND status = 'PENDING'
+                      AND (assigned_staff_id = ?
+                           OR (assigned_staff_id IS NULL AND task_category = 'ROUTINE'))
+                    """,
+                    actor, actor, staffName, notes, photoUrl, photoBytes, photoContentType, taskId, actor
+            );
+        }
         if (updated != 1) {
             throw new BusinessException("Nhiệm vụ đã thay đổi trạng thái hoặc không còn được phân công cho bạn");
         }
@@ -261,7 +280,7 @@ public class CareTaskService {
             throw new BusinessException("Không thể hủy nhiệm vụ đã hoàn thành");
         }
         int updated = jdbc.update(
-                "UPDATE dbo.care_tasks SET status = 'CANCELLED', updated_at = SYSDATETIMEOFFSET() WHERE id = ? AND status = 'PENDING'",
+                "UPDATE dbo.care_tasks SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'PENDING'",
                 taskId);
         if (updated != 1) {
             throw new BusinessException("Nhiệm vụ đã thay đổi trạng thái; không thể hủy");

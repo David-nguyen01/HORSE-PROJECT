@@ -5,6 +5,7 @@ import com.racehorse.common.exception.ResourceNotFoundException;
 import com.racehorse.horse.service.HorseAccessService;
 import com.racehorse.nutrition.dto.*;
 import com.racehorse.nutrition.util.MealKeyGenerator;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,11 +34,12 @@ public class NutritionPlanService {
         this(jdbc, horseAccess, json, Clock.system(CLUB_ZONE));
     }
 
+    @Autowired
     public NutritionPlanService(JdbcTemplate jdbc, HorseAccessService horseAccess, ObjectMapper json, Clock clock) {
         this.jdbc = jdbc;
         this.horseAccess = horseAccess;
         this.json = json;
-        this.clock = clock != null ? clock : Clock.system(CLUB_ZONE);
+        this.clock = clock != null ? clock.withZone(CLUB_ZONE) : Clock.system(CLUB_ZONE);
     }
 
     @Transactional
@@ -51,14 +53,14 @@ public class NutritionPlanService {
         validatePlan(request);
 
         Integer latestVersion = jdbc.queryForObject(
-                "select coalesce(max(cast(JSON_VALUE(data_json,'$.version') as int)), 0) from module_records " +
+                "select coalesce(max(cast(dbo.json_value(data_json,'$.version') as int)), 0) from module_records " +
                         "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=?",
                 Integer.class, horseId);
         int newVersion = (latestVersion == null ? 0 : latestVersion) + 1;
 
         // Supersede previous active plans
         jdbc.update(
-                "update module_records set status='SUPERSEDED', updated_at=SYSDATETIMEOFFSET() " +
+                "update module_records set status='SUPERSEDED', updated_at=CURRENT_TIMESTAMP " +
                         "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE'",
                 horseId);
 
@@ -78,7 +80,7 @@ public class NutritionPlanService {
 
         jdbc.update(
                 "insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,event_date,data_json,created_at,updated_at) " +
-                        "values(?,'STABLE_CARE','NUTRITION_PLAN','api',?,?,'ACTIVE',?,?,SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())",
+                        "values(?,'STABLE_CARE','NUTRITION_PLAN','api',?,?,'ACTIVE',?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 planId, horseId, actor, request.effectiveDate(), toJson(data));
 
         return new NutritionPlanResponse(
@@ -98,7 +100,7 @@ public class NutritionPlanService {
         List<NutritionPlanResponse> rows = jdbc.query(
                 "select id, horse_id, user_id, status, event_date, data_json, created_at from module_records " +
                         "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE' and event_date <= ? " +
-                        "order by event_date desc, cast(JSON_VALUE(data_json,'$.version') as int) desc",
+                        "order by event_date desc, cast(dbo.json_value(data_json,'$.version') as int) desc",
                 (rs, rowNum) -> mapResponse(rs), horseId, targetDate);
 
         if (!rows.isEmpty()) {
@@ -129,7 +131,7 @@ public class NutritionPlanService {
         return jdbc.query(
                 "select id, horse_id, user_id, status, event_date, data_json, created_at from module_records " +
                         "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? " +
-                        "order by cast(JSON_VALUE(data_json,'$.version') as int) desc",
+                        "order by cast(dbo.json_value(data_json,'$.version') as int) desc",
                 (rs, rowNum) -> mapResponse(rs), horseId);
     }
 
@@ -243,7 +245,7 @@ public class NutritionPlanService {
         return jdbc.query(
                 "select id, data_json, created_at from module_records " +
                         "where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' and status='ACTIVE' " +
-                        "order by JSON_VALUE(data_json,'$.planName') asc",
+                        "order by dbo.json_value(data_json,'$.planName') asc",
                 (rs, rowNum) -> mapStandardPlan(rs));
     }
 
@@ -485,7 +487,7 @@ public class NutritionPlanService {
 
         List<Map<String, Object>> templateRows = jdbc.query(
                 "select data_json from module_records where module_code='STABLE_CARE' and record_type='STANDARD_FEEDING_PLAN' " +
-                        "and status='ACTIVE' and JSON_VALUE(data_json,'$.planCode')=?",
+                        "and status='ACTIVE' and dbo.json_value(data_json,'$.planCode')=?",
                 (rs, rowNum) -> {
                     JsonNode n = read(rs.getString("data_json"));
                     Map<String, Object> map = new LinkedHashMap<>();
@@ -570,7 +572,7 @@ public class NutritionPlanService {
 
         // 1. Get all active stables
         List<Map<String, Object>> stableRows = jdbc.queryForList(
-                "select id, name, location, is_active from stables where is_active=1 order by name asc");
+                "select id, name, location, is_active from stables where is_active=true order by name asc");
 
         List<Map<String, Object>> stallsList = new ArrayList<>();
         int occupiedCount = 0;
@@ -585,7 +587,7 @@ public class NutritionPlanService {
             // Query stalls for this stable
             List<Map<String, Object>> stallRows = jdbc.query(
                     "select id, data_json from module_records where module_code='STABLE_CARE' and record_type='STALL' "
-                            + "and JSON_VALUE(data_json,'$.stableId')=? order by JSON_VALUE(data_json,'$.stallCode') asc",
+                            + "and dbo.json_value(data_json,'$.stableId')=? order by dbo.json_value(data_json,'$.stallCode') asc",
                     (rs, rowNum) -> {
                         Map<String, Object> m = new LinkedHashMap<>();
                         m.put("stallId", rs.getObject("id", UUID.class));
@@ -602,10 +604,10 @@ public class NutritionPlanService {
 
                 // Check active assignment for this stall
                 List<Map<String, Object>> assignmentRows = jdbc.query(
-                        "select top 1 m.id, m.horse_id, h.code as horse_code, h.name as horse_name "
+                        "select m.id, m.horse_id, h.code as horse_code, h.name as horse_name "
                                 + "from module_records m join horses h on h.id=m.horse_id "
                                 + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
-                                + "and JSON_VALUE(m.data_json,'$.stallId')=? and JSON_VALUE(m.data_json,'$.assignedUntil') is null",
+                                + "and dbo.json_value(m.data_json,'$.stallId')=? and dbo.json_value(m.data_json,'$.assignedUntil') is null limit 1",
                         (rs, rowNum) -> {
                             Map<String, Object> a = new LinkedHashMap<>();
                             a.put("assignmentId", rs.getObject("id", UUID.class));
@@ -809,7 +811,7 @@ public class NutritionPlanService {
     public void deleteActivePlan(UUID horseId, UUID actor) {
         horseAccess.requireActive(horseId);
         int updated = jdbc.update(
-                "update module_records set status='CANCELLED', updated_at=SYSDATETIMEOFFSET() " +
+                "update module_records set status='CANCELLED', updated_at=CURRENT_TIMESTAMP " +
                         "where module_code='STABLE_CARE' and record_type='NUTRITION_PLAN' and horse_id=? and status='ACTIVE'",
                 horseId);
         if (updated == 0) {

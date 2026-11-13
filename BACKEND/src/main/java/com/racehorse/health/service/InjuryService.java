@@ -74,7 +74,7 @@ public class InjuryService {
                     created_at, updated_at
                 ) values (?, 'MEDICAL', 'INJURY_MARKER', 'injury_markers',
                           ?, ?, ?, ?, ?,
-                          SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 injuryId, horseId, veterinarianId, initialStatus, today, toJson(data));
 
@@ -93,23 +93,23 @@ public class InjuryService {
                     created_at, updated_at
                 ) values (?, 'MEDICAL', 'INJURY_RECOVERY_UPDATE', 'injury_recovery_updates',
                           ?, ?, ?, ?, ?,
-                          SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 updateId, horseId, veterinarianId, initialStatus, today, toJson(updateData));
 
         if (!"RESOLVED".equals(initialStatus)) {
             // A recorded active injury must immediately prevent training, even when
             // the marker is created outside a medical examination.
-            jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, horseId);
+            jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
             jdbc.update("""
                     update horses set health_status=case when health_status='QUARANTINED' then health_status else 'INJURED' end,
                         health_changed_by_user_id=?, health_source_type='INJURY_MARKER', health_source_id=?,
-                        health_changed_at=SYSDATETIMEOFFSET(), updated_at=SYSDATETIMEOFFSET(), version=version+1
+                        health_changed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP, version=version+1
                     where id=?
                     """, veterinarianId, injuryId, horseId);
             jdbc.update("""
                     insert into training_locks(id,horse_id,reason,review_date,locked_by_user_id,locked_at)
-                    select ?,?, ?,null,?,SYSDATETIMEOFFSET()
+                    select ?,?, ?,null,?,CURRENT_TIMESTAMP
                     where not exists (select 1 from training_locks where horse_id=? and released_at is null)
                     """, UUID.randomUUID(), horseId, "Tự động khóa: Chấn thương mới", veterinarianId, horseId);
         }
@@ -177,7 +177,7 @@ public class InjuryService {
                     created_at, updated_at
                 ) values (?, 'MEDICAL', 'INJURY_RECOVERY_UPDATE', 'injury_recovery_updates',
                           ?, ?, ?, ?, ?,
-                          SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                          CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """,
                 updateId, horseId, veterinarianId, newStatus, today, toJson(updateData));
 
@@ -185,8 +185,8 @@ public class InjuryService {
         jdbc.update("""
                 update module_records
                 set status = ?,
-                    data_json = JSON_MODIFY(data_json, '$.currentStatus', ?),
-                    updated_at = SYSDATETIMEOFFSET()
+                    data_json = dbo.json_modify(data_json, '$.currentStatus', ?),
+                    updated_at = CURRENT_TIMESTAMP
                 where id = ?
                 """,
                 newStatus, newStatus, injuryId);
@@ -259,7 +259,7 @@ public class InjuryService {
                 from module_records u
                 join users usr on usr.id = u.user_id
                 where u.module_code = 'MEDICAL' and u.record_type = 'INJURY_RECOVERY_UPDATE'
-                  and JSON_VALUE(u.data_json, '$.injuryMarkerId') = ?
+                  and dbo.json_value(u.data_json, '$.injuryMarkerId') = ?
                 order by u.created_at asc
                 """, (rs, rowNum) -> {
             UUID id = rs.getObject("id", UUID.class);
@@ -306,14 +306,14 @@ public class InjuryService {
                        (select count(*)
                         from module_records u
                         where u.module_code = 'MEDICAL' and u.record_type = 'INJURY_RECOVERY_UPDATE'
-                          and JSON_VALUE(u.data_json, '$.injuryMarkerId') = cast(m.id as varchar(36))
+                          and dbo.json_value(u.data_json, '$.injuryMarkerId') = cast(m.id as varchar(36))
                        ) as update_count
                 from module_records m
                 join users usr on usr.id = m.user_id
                 where m.module_code = 'MEDICAL' and m.record_type = 'INJURY_MARKER'
                   and m.horse_id = ?
                 """
-                + (normalizedStatus != null ? " and JSON_VALUE(m.data_json, '$.currentStatus') = ? " : "")
+                + (normalizedStatus != null ? " and dbo.json_value(m.data_json, '$.currentStatus') = ? " : "")
                 + " order by m.created_at desc";
 
         List<Object> args = new ArrayList<>();
@@ -415,7 +415,7 @@ public class InjuryService {
         jdbc.update("""
                 delete from module_records
                 where module_code='MEDICAL' and record_type='INJURY_RECOVERY_UPDATE'
-                  and (JSON_VALUE(data_json, '$.injuryMarkerId')=? or JSON_VALUE(data_json, '$.injuryId')=? or data_json like ?)
+                  and (dbo.json_value(data_json, '$.injuryMarkerId')=? or dbo.json_value(data_json, '$.injuryId')=? or data_json like ?)
                 """, injuryId.toString(), injuryId.toString(), "%" + injuryId + "%");
         // Delete injury record
         jdbc.update("delete from module_records where id=? and module_code='MEDICAL' and record_type in ('INJURY_MARKER', 'INJURY')", injuryId);

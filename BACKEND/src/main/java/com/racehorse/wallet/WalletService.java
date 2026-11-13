@@ -93,12 +93,12 @@ public class WalletService {
                         + "from financial_transactions "
                         + "where wallet_owner_user_id=? and source_entity_type='WALLET' "
                         + "and category in ('WALLET_TOPUP','SERVICE_FEE','LATE_FEE') "
-                        + "order by created_at desc,id desc offset ? rows fetch next ? rows only",
+                        + "order by created_at desc,id desc limit ? offset ?",
                 (rs, index) -> new PaymentHistoryItem(rs.getObject("id", UUID.class),
                         rs.getObject("created_at", OffsetDateTime.class), rs.getString("category"),
                         rs.getString("description"), rs.getBigDecimal("amount"),
                         rs.getString("transaction_type")),
-                ownerId, offset, limit);
+                ownerId, limit, offset);
     }
 
     @Transactional(readOnly = true)
@@ -164,7 +164,7 @@ public class WalletService {
                         + "values(?,'SYSTEM','PAYOS_TOPUP',?,'PENDING',?,'{}',?,?,?)",
                 id, ownerId, today(), code, BigDecimal.valueOf(amountVnd), OffsetDateTime.ofInstant(expires, ZoneOffset.UTC));
         PayosGateway.Link link = gateway.create(code, amountVnd, description, expires, ipAddress);
-        jdbc.update("update module_records set data_json=?,updated_at=SYSDATETIMEOFFSET() where id=?",
+        jdbc.update("update module_records set data_json=?,updated_at=CURRENT_TIMESTAMP where id=?",
                 json.writeValueAsString(Map.of("paymentLinkId", link.paymentLinkId() == null ? "" : link.paymentLinkId(),
                         "checkoutUrl", link.checkoutUrl() == null ? "" : link.checkoutUrl(),
                         "qrCode", link.qrCode() == null ? "" : link.qrCode())), id);
@@ -177,7 +177,7 @@ public class WalletService {
         Map<String, Object> row = orderRow(orderId, ownerId, false);
         JsonNode details = json.readTree((String) row.get("data_json"));
         if ("PENDING".equals(row.get("status")) && clock.instant().isAfter(expiry(row))) {
-            jdbc.update("update module_records set status='EXPIRED',updated_at=SYSDATETIMEOFFSET() "
+            jdbc.update("update module_records set status='EXPIRED',updated_at=CURRENT_TIMESTAMP "
                     + "where id=? and status='PENDING'", orderId);
             row = orderRow(orderId, ownerId, false);
         }
@@ -246,7 +246,7 @@ public class WalletService {
 
             if (!"00".equals(parameters.get("vnp_ResponseCode"))
                     || !"00".equals(parameters.get("vnp_TransactionStatus"))) {
-                jdbc.update("update module_records set status='FAILED',updated_at=SYSDATETIMEOFFSET() "
+                jdbc.update("update module_records set status='FAILED',updated_at=CURRENT_TIMESTAMP "
                         + "where id=? and status='PENDING'", orderId);
                 return Map.of("RspCode", "00", "Message", "Confirm Success");
             }
@@ -311,15 +311,15 @@ public class WalletService {
             audit(null, "PAYMENT_REVIEW", orderId,
                     paymentProviderName() + " báo thanh toán cho đơn hết hạn; ví chưa được cộng");
             if ("PENDING".equals(status))
-                jdbc.update("update module_records set status='EXPIRED',updated_at=SYSDATETIMEOFFSET() where id=?", orderId);
+                jdbc.update("update module_records set status='EXPIRED',updated_at=CURRENT_TIMESTAMP where id=?", orderId);
             return;
         }
         owner(ownerId, true);
         jdbc.update("update users set wallet_balance_vnd=wallet_balance_vnd+?,version=version+1,"
-                + "updated_at=SYSDATETIMEOFFSET() where id=?", expected, ownerId);
+                + "updated_at=CURRENT_TIMESTAMP where id=?", expected, ownerId);
         ledger(ownerId, "REVENUE", "WALLET_TOPUP", expected, orderId,
                 "Nạp ví qua " + paymentProviderName());
-        jdbc.update("update module_records set status='PAID',updated_at=SYSDATETIMEOFFSET() where id=?", orderId);
+        jdbc.update("update module_records set status='PAID',updated_at=CURRENT_TIMESTAMP where id=?", orderId);
         notifyUser(ownerId, "wallet-topup:" + orderId, "WALLET_TOPUP",
                 "Nạp ví thành công", "Ví đã được cộng " + expected.toPlainString() + " VND", orderId);
         renewIfDue(ownerId);
@@ -360,12 +360,12 @@ public class WalletService {
                     + price.subtract(balance).toPlainString() + " VND");
         UUID eventId = UUID.randomUUID();
         LocalDate due = today().plusDays(durationDays);
-        jdbc.update("update users set wallet_balance_vnd=?,version=version+1,updated_at=SYSDATETIMEOFFSET() where id=?",
+        jdbc.update("update users set wallet_balance_vnd=?,version=version+1,updated_at=CURRENT_TIMESTAMP where id=?",
                 balance.subtract(price), ownerId);
         jdbc.update("update horses set active_service_plan=?,next_service_plan=null,service_plan_started_on=?,"
                         + "service_next_due_date=?,payment_status='PAID',paid_until=?,"
                         + "status=case when status='PENDING_PAYMENT' then 'ACTIVE' else status end,"
-                        + "updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                        + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 pkg.getCode(), today(), due, due.minusDays(1), horseId);
         recordPlanPurchaseSnapshot(eventId, ownerId, horseId, "SERVICE_PLAN_PURCHASE",
                 pkg, price, today(), due.minusDays(1), due, null, true);
@@ -392,7 +392,7 @@ public class WalletService {
         if (current == null) throw new BusinessException("Ngựa chưa có gói; hãy mua gói đầu tiên");
         ServicePackageEntity pkg = resolveActivePackage(packageCode);
         String targetPlan = current.equalsIgnoreCase(pkg.getCode()) ? null : pkg.getCode();
-        jdbc.update("update horses set next_service_plan=?,updated_at=SYSDATETIMEOFFSET(),"
+        jdbc.update("update horses set next_service_plan=?,updated_at=CURRENT_TIMESTAMP,"
                         + "version=version+1 where id=?",
                 targetPlan, horseId);
         UUID eventId = UUID.randomUUID();
@@ -572,7 +572,7 @@ public class WalletService {
         if (pkg == null) {
             jdbc.update("update horses set payment_status='UNPAID',"
                             + "status=case when status='ACTIVE' then 'PENDING_PAYMENT' else status end,"
-                            + "updated_at=SYSDATETIMEOFFSET(),version=version+1 "
+                            + "updated_at=CURRENT_TIMESTAMP,version=version+1 "
                             + "where id=? and payment_status='PAID'", horseId);
             return false;
         }
@@ -581,7 +581,7 @@ public class WalletService {
         if (!pkg.isActive()) {
             jdbc.update("update horses set payment_status='UNPAID',"
                             + "status=case when status='ACTIVE' then 'PENDING_PAYMENT' else status end,"
-                            + "updated_at=SYSDATETIMEOFFSET(),version=version+1 "
+                            + "updated_at=CURRENT_TIMESTAMP,version=version+1 "
                             + "where id=? and payment_status='PAID'", horseId);
             notifyUser(ownerId, "wallet-reserve:" + horseId + ":" + due, "SERVICE_PLAN_RETIRED",
                     "Gói dịch vụ đã chuyển vào Thư viện dự phòng",
@@ -602,7 +602,7 @@ public class WalletService {
         if (balance.compareTo(charge) < 0) {
             jdbc.update("update horses set payment_status='UNPAID',"
                             + "status=case when status='ACTIVE' then 'PENDING_PAYMENT' else status end,"
-                            + "updated_at=SYSDATETIMEOFFSET(),version=version+1 "
+                            + "updated_at=CURRENT_TIMESTAMP,version=version+1 "
                             + "where id=? and payment_status='PAID'", horseId);
             return false;
         }
@@ -614,11 +614,11 @@ public class WalletService {
         LocalDate previousPaidUntil = date(horse.get("paid_until"));
 
         jdbc.update("update users set wallet_balance_vnd=?,version=version+1,"
-                        + "updated_at=SYSDATETIMEOFFSET() where id=?", balance.subtract(charge), ownerId);
+                        + "updated_at=CURRENT_TIMESTAMP where id=?", balance.subtract(charge), ownerId);
         jdbc.update("update horses set active_service_plan=?,next_service_plan=null,"
                         + "service_plan_started_on=?,service_next_due_date=?,payment_status='PAID',paid_until=?,"
                         + "status=case when status='PENDING_PAYMENT' then 'ACTIVE' else status end,"
-                        + "updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                        + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 pkg.getCode(), today(), nextDue, newPaidUntil, horseId);
 
         // 6. Immutable Snapshot
@@ -678,9 +678,10 @@ public class WalletService {
 
     private Map<String, Object> horsePlanRow(UUID ownerId, UUID horseId, boolean lock) {
         String sql = "select id,active_service_plan,next_service_plan,service_next_due_date,paid_until "
-                + "from horses " + (lock ? "with (UPDLOCK,HOLDLOCK) " : "")
+                + "from horses "
                 + "where id=? and archived_at is null and exists(select 1 from horse_ownerships "
-                + "where horse_id=horses.id and owner_id=?)";
+                + "where horse_id=horses.id and owner_id=?)"
+                + (lock ? " for update" : "");
         List<Map<String, Object>> rows = jdbc.queryForList(sql, horseId, ownerId);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy ngựa thuộc sở hữu của bạn");
         return rows.getFirst();
@@ -701,8 +702,9 @@ public class WalletService {
 
     private Map<String, Object> owner(UUID ownerId, boolean lock) {
         String sql = "select id,wallet_balance_vnd,active_service_plan,service_plan_started_on,service_next_due_date "
-                + "from users " + (lock ? "with (UPDLOCK,HOLDLOCK) " : "") + "where id=? and cast(enabled as varchar(5)) in ('1', 'true', 't') "
-                + "and exists(select 1 from user_roles where user_id=users.id and role='HORSE_OWNER')";
+                + "from users where id=? and enabled=true "
+                + "and exists(select 1 from user_roles where user_id=users.id and role='HORSE_OWNER')"
+                + (lock ? " for update" : "");
         List<Map<String, Object>> rows = jdbc.queryForList(sql, ownerId);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy ví của chủ ngựa");
         return rows.getFirst();
@@ -711,9 +713,10 @@ public class WalletService {
     private Map<String, Object> orderRow(UUID id, UUID ownerId, boolean lock) {
         String sql = "select id,user_id,status,data_json,payos_order_code,payos_expected_amount_vnd,"
                 + "payos_expires_at "
-                + "from module_records " + (lock ? "with (UPDLOCK,HOLDLOCK) " : "")
+                + "from module_records "
                 + "where id=? and module_code='SYSTEM' and record_type='PAYOS_TOPUP'"
-                + (ownerId == null ? "" : " and user_id=?");
+                + (ownerId == null ? "" : " and user_id=?")
+                + (lock ? " for update" : "");
         List<Map<String, Object>> rows = ownerId == null
                 ? jdbc.query(sql, (rs, n) -> mapOrder(rs), id)
                 : jdbc.query(sql, (rs, n) -> mapOrder(rs), id, ownerId);
@@ -768,7 +771,7 @@ public class WalletService {
         String relatedType = "PAYMENT_REVIEW".equals(type) ? "WALLET" : "HORSE";
         jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,"
                         + "related_entity_type,related_entity_id,deduplication_key) "
-                        + "select newid(),ur.user_id,?,'HIGH',?,?, ?,?,concat(?,':',cast(ur.user_id as varchar(36))) "
+                        + "select gen_random_uuid(),ur.user_id,?,'HIGH',?,?, ?,?,concat(?,':',cast(ur.user_id as varchar(36))) "
                         + "from user_roles ur join users u on u.id=ur.user_id where ur.role='CLUB_MANAGER' and cast(u.enabled as varchar(5)) in ('1', 'true', 't') "
                         + "and not exists(select 1 from notifications n where n.deduplication_key="
                         + "concat(?,':',cast(ur.user_id as varchar(36))))",
@@ -778,14 +781,14 @@ public class WalletService {
     private void notifyUser(UUID ownerId, String key, String type, String title, String message, UUID relatedId) {
         jdbc.update("insert into notifications(id,recipient_user_id,notification_type,priority,title,message,"
                         + "related_entity_type,related_entity_id,deduplication_key) "
-                        + "select newid(),? ,?,'NORMAL',?,?,'WALLET',?,? "
+                        + "select gen_random_uuid(),? ,?,'NORMAL',?,?,'WALLET',?,? "
                         + "where not exists(select 1 from notifications where deduplication_key=?)",
                 ownerId, type, title, message, relatedId, key, key);
     }
 
     private void audit(UUID actor, String action, UUID eventId, String description) {
         jdbc.update("insert into audit_logs(actor_user_id,occurred_at,module_code,action_code,entity_type,entity_id,"
-                        + "description) values(?,SYSDATETIMEOFFSET(),'ACCESS',?,'WALLET',?,?)",
+                        + "description) values(?,CURRENT_TIMESTAMP,'ACCESS',?,'WALLET',?,?)",
                 actor, action, eventId, description);
     }
 
@@ -881,7 +884,7 @@ public class WalletService {
                 updatedJson = dataJsonStr;
             }
 
-            jdbc.update("update dbo.module_records set status = 'RESOLVED', data_json = ?, updated_at = SYSDATETIMEOFFSET() where id = ?",
+            jdbc.update("update dbo.module_records set status = 'RESOLVED', data_json = ?, updated_at = CURRENT_TIMESTAMP where id = ?",
                     updatedJson, id);
         }
     }

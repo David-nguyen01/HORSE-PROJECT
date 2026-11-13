@@ -109,7 +109,7 @@ class PreventiveCareServiceTest {
                 "reminder_lead_days", 5
         );
 
-        when(jdbc.queryForList(contains("select * from preventive_care_schedules with (UPDLOCK,HOLDLOCK) where id=?"), eq(id)))
+        when(jdbc.queryForList(contains("select * from preventive_care_schedules where id=? for update"), eq(id)))
                 .thenReturn(List.of(scheduleMap));
         when(jdbc.update(contains("where id=? and completed_at is null and cancelled_at is null"),
                 eq(vetId), any(OffsetDateTime.class), eq("Completed without issue"), eq(id))).thenReturn(1);
@@ -125,8 +125,8 @@ class PreventiveCareServiceTest {
         // Verify next schedule was inserted
         verify(jdbc).update(contains("insert into preventive_care_schedules"),
                 eq(response.nextScheduleId()), eq(horseId), eq("DEWORMING"),
-                isNull(), eq("Broad spectrum paste"), eq(90),
-                eq(req.performedAt().atZoneSameInstant(ZoneId.of("Asia/Bangkok")).toLocalDate()),
+                isNull(), eq("Broad spectrum paste"),
+                eq(req.performedAt().atZoneSameInstant(ZoneId.of("Asia/Bangkok")).toLocalDate()), eq(90),
                 eq(90), eq(5), eq(vetId));
 
         // Verify current schedule was updated with completion details
@@ -138,7 +138,7 @@ class PreventiveCareServiceTest {
     @Test
     void completingAlreadyCompletedScheduleDoesNotCreateAnotherSuccessor() {
         UUID id = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (UPDLOCK,HOLDLOCK)"), eq(id)))
+        when(jdbc.queryForList(contains("for update"), eq(id)))
                 .thenReturn(List.of(Map.of("completed_at", OffsetDateTime.now())));
 
         assertThatThrownBy(() -> service.complete(id, UUID.randomUUID(),
@@ -151,9 +151,9 @@ class PreventiveCareServiceTest {
     @Test
     void cancelRejectsScheduleChangedSinceItWasRead() {
         UUID id = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (UPDLOCK,HOLDLOCK)"), eq(id)))
+        when(jdbc.queryForList(contains("for update"), eq(id)))
                 .thenReturn(List.of(Map.of("id", id)));
-        when(jdbc.update(contains("set cancelled_at=SYSDATETIMEOFFSET()"), eq(id))).thenReturn(0);
+        when(jdbc.update(contains("set cancelled_at=CURRENT_TIMESTAMP"), eq(id))).thenReturn(0);
 
         assertThatThrownBy(() -> service.cancel(id))
                 .isInstanceOf(BusinessException.class)
@@ -176,7 +176,7 @@ class PreventiveCareServiceTest {
     void failedConditionalCompletionDoesNotCreateRecurringSchedule() {
         UUID id = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
-        when(jdbc.queryForList(contains("with (UPDLOCK,HOLDLOCK)"), eq(id)))
+        when(jdbc.queryForList(contains("for update"), eq(id)))
                 .thenReturn(List.of(Map.of("recurrence_days", 30)));
         when(jdbc.update(contains("where id=? and completed_at is null and cancelled_at is null"),
                 eq(actor), any(OffsetDateTime.class), anyString(), eq(id))).thenReturn(0);

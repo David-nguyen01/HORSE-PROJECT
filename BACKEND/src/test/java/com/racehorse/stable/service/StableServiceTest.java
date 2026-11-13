@@ -146,7 +146,7 @@ class StableServiceTest {
     void listDailyRoutinesReturnsChronologicalItems() {
         UUID horseId = UUID.randomUUID();
 
-        when(jdbc.query(contains("order by JSON_VALUE(data_json,'$.startTime') asc"), any(RowMapper.class), eq(horseId)))
+        when(jdbc.query(contains("order by dbo.json_value(data_json,'$.startTime') asc"), any(RowMapper.class), eq(horseId)))
                 .thenReturn(List.of(
                         new StableService.DailyRoutineView(UUID.randomUUID(), horseId, "FEEDING", LocalTime.of(6, 0), LocalTime.of(6, 30), "Breakfast", true),
                         new StableService.DailyRoutineView(UUID.randomUUID(), horseId, "TURNOUT", LocalTime.of(7, 0), LocalTime.of(8, 30), "Paddock", true),
@@ -311,16 +311,16 @@ class StableServiceTest {
         when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
         when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
 
-        when(jdbc.queryForObject(contains("select id from module_records with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stallId)))
+        when(jdbc.queryForObject(contains("select id from module_records where id=?"), eq(UUID.class), eq(stallId)))
                 .thenReturn(stallId);
-        when(jdbc.queryForObject(contains("select id from stables with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stableId)))
+        when(jdbc.queryForObject(contains("select id from stables where id=? for update"), eq(UUID.class), eq(stableId)))
                 .thenReturn(stableId);
-        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("select id from horses where id=? for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
 
-        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
                 .thenReturn(1);
-        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(*) from module_records"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
                 .thenReturn(0);
 
         StableService.AssignmentView result = service.assign(stableId, stallId, horseId, actor);
@@ -331,9 +331,9 @@ class StableServiceTest {
         assertThat(result.horseName()).isEqualTo("Thunder");
         assertThat(result.active()).isTrue();
 
-        verify(jdbc).queryForObject(contains("select id from module_records with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stallId));
-        verify(jdbc).queryForObject(contains("select id from stables with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stableId));
-        verify(jdbc).queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId));
+        verify(jdbc).queryForObject(contains("select id from module_records where id=?"), eq(UUID.class), eq(stallId));
+        verify(jdbc).queryForObject(contains("select id from stables where id=? for update"), eq(UUID.class), eq(stableId));
+        verify(jdbc).queryForObject(contains("select id from horses where id=? for update"), eq(UUID.class), eq(horseId));
         verify(jdbc).update(contains("insert into module_records"), any(), eq(horseId), eq(actor), any(), anyString());
         verify(jdbc).update(contains("update horses set stable_location=?"), eq("Barn Alpha / S-01"), eq(horseId));
     }
@@ -357,16 +357,16 @@ class StableServiceTest {
                         new StableService.StallView(stallId, "S-01", true, null)
                 ))));
 
-        when(jdbc.queryForObject(contains("select id from module_records with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stallId)))
+        when(jdbc.queryForObject(contains("select id from module_records where id=?"), eq(UUID.class), eq(stallId)))
                 .thenReturn(stallId);
-        when(jdbc.queryForObject(contains("select id from stables with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(stableId)))
+        when(jdbc.queryForObject(contains("select id from stables where id=? for update"), eq(UUID.class), eq(stableId)))
                 .thenReturn(stableId);
-        when(jdbc.queryForObject(contains("select id from horses with (UPDLOCK, HOLDLOCK)"), eq(UUID.class), eq(horseId)))
+        when(jdbc.queryForObject(contains("select id from horses where id=? for update"), eq(UUID.class), eq(horseId)))
                 .thenReturn(horseId);
 
-        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
                 .thenReturn(1);
-        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(*) from module_records"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
                 .thenReturn(0);
 
         when(jdbc.query(contains("from horse_profile_files"), any(RowMapper.class), eq(horseId)))
@@ -395,9 +395,9 @@ class StableServiceTest {
         when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
         when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
 
-        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
                 .thenReturn(1);
-        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(*) from module_records"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
                 .thenReturn(1);
 
         assertThatThrownBy(() -> service.assign(stableId, stallId, horseId, actor))
@@ -423,7 +423,7 @@ class StableServiceTest {
         when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
         when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
 
-        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
                 .thenReturn(4);
 
         assertThatThrownBy(() -> service.assign(stableId, stallId, horseId, actor))
@@ -449,9 +449,9 @@ class StableServiceTest {
         when(horse.getIntakeStatus()).thenReturn("PENDING_STALL");
         when(horse.getDiagnosingVet()).thenReturn(mock(com.racehorse.auth.entity.UserAccount.class));
 
-        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(distinct horse_id) from module_records"), eq(Integer.class), eq(stableId.toString()), eq(horseId)))
                 .thenReturn(1);
-        when(jdbc.queryForObject(contains("count(*) from module_records with (UPDLOCK, HOLDLOCK)"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
+        when(jdbc.queryForObject(contains("count(*) from module_records"), eq(Integer.class), eq(stallId.toString()), eq(horseId)))
                 .thenReturn(0);
 
         when(jdbc.update(contains("insert into module_records"), any(), any(), any(), any(), any()))
@@ -604,7 +604,7 @@ class StableServiceTest {
                         currentStallId, "A-01", horseId, "Thunder", "TH-01", actor, null, null, true)));
 
         // Target stable already has 4 horses
-        when(jdbc.queryForObject(contains("from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?"),
+        when(jdbc.queryForObject(contains("from module_records where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=? and horse_id<>?"),
                 eq(Integer.class), eq(targetStableId.toString()), eq(horseId)))
                 .thenReturn(4);
 
@@ -636,10 +636,10 @@ class StableServiceTest {
                 .thenReturn(List.of(new StableService.AssignmentView(UUID.randomUUID(), UUID.randomUUID(), "Stable A",
                         currentStallId, "A-01", horseId, "Thunder", "TH-01", actor, null, null, true)));
 
-        when(jdbc.queryForObject(contains("from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?"),
+        when(jdbc.queryForObject(contains("from module_records where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=? and horse_id<>?"),
                 eq(Integer.class), eq(targetStableId.toString()), eq(horseId)))
                 .thenReturn(1);
-        when(jdbc.queryForObject(contains("from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?"),
+        when(jdbc.queryForObject(contains("from module_records where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stallId')=? and horse_id<>?"),
                 eq(Integer.class), eq(targetStallId.toString()), eq(horseId)))
                 .thenReturn(0);
 
@@ -679,10 +679,10 @@ class StableServiceTest {
                 .thenReturn(List.of(new StableService.AssignmentView(oldAssignmentId, UUID.randomUUID(), "Barn Alpha",
                         currentStallId, "A-01", horseId, "Storm", "ST-01", actor, null, null, true)));
 
-        when(jdbc.queryForObject(contains("from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?"),
+        when(jdbc.queryForObject(contains("from module_records where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=? and horse_id<>?"),
                 eq(Integer.class), eq(targetStableId.toString()), eq(horseId)))
                 .thenReturn(1);
-        when(jdbc.queryForObject(contains("from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?"),
+        when(jdbc.queryForObject(contains("from module_records where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stallId')=? and horse_id<>?"),
                 eq(Integer.class), eq(targetStallId.toString()), eq(horseId)))
                 .thenReturn(0);
 

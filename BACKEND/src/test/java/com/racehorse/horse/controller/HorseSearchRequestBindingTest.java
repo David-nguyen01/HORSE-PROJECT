@@ -30,6 +30,24 @@ class HorseSearchRequestBindingTest {
     }
 
     @Test
+    void ownerHorseListPassesSearchAndStatusToService() throws Exception {
+        Method mine = HorseController.class.getDeclaredMethod(
+                "mine", Jwt.class, String.class, HorseStatus.class, Pageable.class);
+        assertThat(mine.getParameters()[1].getAnnotation(RequestParam.class).name()).isEqualTo("query");
+        assertThat(mine.getParameters()[2].getAnnotation(RequestParam.class).name()).isEqualTo("status");
+
+        HorseService service = mock(HorseService.class);
+        HorseController controller = new HorseController(service);
+        UUID ownerId = UUID.randomUUID();
+        Jwt jwt = Jwt.withTokenValue("test").header("alg", "none").subject(ownerId.toString()).build();
+        Pageable pageable = Pageable.unpaged();
+
+        controller.mine(jwt, "Bolt", HorseStatus.PENDING_PAYMENT, pageable);
+
+        verify(service).findOwnedBy(ownerId, "Bolt", HorseStatus.PENDING_PAYMENT, pageable);
+    }
+
+    @Test
     void horseDetailPathDeclaresIdExplicitly() throws Exception {
         Method getById = HorseController.class.getDeclaredMethod(
                 "getById", java.util.UUID.class, Jwt.class, Authentication.class);

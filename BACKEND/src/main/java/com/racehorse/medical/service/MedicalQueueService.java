@@ -86,7 +86,7 @@ public class MedicalQueueService {
                 left join horse_ownerships ho on ho.horse_id = h.id
                 left join users u on u.id = ho.owner_id
                 where h.intake_status = 'WAITING_FOR_VET'
-                  and (h.service_override=1 or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))
+                  and (h.service_override=true or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))
                   and h.archived_at is null
                   and not exists (
                       select 1 from module_records mr
@@ -117,14 +117,15 @@ public class MedicalQueueService {
                        u.id as veterinarian_id, u.username as veterinarian_name
                 from horses h
                 left join users u on u.id = (
-                    select top 1 mr.user_id from module_records mr
+                    select mr.user_id from module_records mr
                     where mr.horse_id=h.id and mr.module_code='MEDICAL'
                       and mr.record_type='MEDICAL_ASSIGNMENT' and mr.status='ACTIVE'
                     order by mr.created_at desc
+                    limit 1
                 )
                 where h.archived_at is null
                   and h.intake_status in ('WAITING_FOR_VET','IN_MEDICAL')
-                  and (h.intake_status='IN_MEDICAL' or h.service_override=1
+                  and (h.intake_status='IN_MEDICAL' or h.service_override=true
                        or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))
                 order by h.updated_at, h.id
                 """, (rs, row) -> new QueueStatusItem(
@@ -142,7 +143,7 @@ public class MedicalQueueService {
      */
     @Transactional
     public AssignmentView receiveHorse(UUID horseId, UUID veterinarianId) {
-        jdbc.queryForObject("select id from horses with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = horseRepository.findDetailById(horseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ngựa: " + horseId));
 
@@ -172,13 +173,13 @@ public class MedicalQueueService {
 
         jdbc.update(
                 "insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,data_json,created_at,updated_at) "
-                        + "values(?,'MEDICAL','MEDICAL_ASSIGNMENT','api',?,?,'ACTIVE',?,SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())",
+                        + "values(?,'MEDICAL','MEDICAL_ASSIGNMENT','api',?,?,'ACTIVE',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 assignmentId, horseId, veterinarianId, toJson(data));
 
-        int changed = jdbc.update("update horses set intake_status='IN_MEDICAL',updated_at=SYSDATETIMEOFFSET(),version=version+1 "
+        int changed = jdbc.update("update horses set intake_status='IN_MEDICAL',updated_at=CURRENT_TIMESTAMP,version=version+1 "
                 + "where id=? and intake_status='WAITING_FOR_VET'", horseId);
         if (changed != 1) throw new BusinessException("Ngựa đã được bác sĩ khác tiếp nhận");
-        jdbc.update("update module_records set status='COMPLETED',updated_at=SYSDATETIMEOFFSET() "
+        jdbc.update("update module_records set status='COMPLETED',updated_at=CURRENT_TIMESTAMP "
                 + "where module_code='STABLE_CARE' and record_type='WAITING_ROOM_ADMISSION' "
                 + "and horse_id=? and status='ACTIVE'", horseId);
 
@@ -194,7 +195,7 @@ public class MedicalQueueService {
      */
     @Transactional
     public AssignmentView completeMedical(UUID horseId, UUID veterinarianId) {
-        jdbc.queryForObject("select id from horses with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = horseRepository.findDetailById(horseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy ngựa: " + horseId));
 
@@ -226,12 +227,12 @@ public class MedicalQueueService {
 
         // Cập nhật assignment → COMPLETED
         jdbc.update(
-                "update module_records set status='COMPLETED', data_json=JSON_MODIFY(data_json,'$.completedAt',?), "
-                        + "updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set status='COMPLETED', data_json=dbo.json_modify(data_json,'$.completedAt',?), "
+                        + "updated_at=CURRENT_TIMESTAMP where id=?",
                 OffsetDateTime.now().toString(), assignmentId);
 
         int changed = jdbc.update("update horses set intake_status='PENDING_STALL',diagnosing_vet_user_id=?, "
-                + "updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=? and intake_status='IN_MEDICAL'",
+                + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=? and intake_status='IN_MEDICAL'",
                 veterinarianId, horseId);
         if (changed != 1) throw new BusinessException("Trạng thái tiếp nhận ngựa đã thay đổi");
 
@@ -239,9 +240,10 @@ public class MedicalQueueService {
         boolean isInjured = List.of("INJURED", "UNDER_TREATMENT").contains(horse.getHealthStatus());
         if (!isInjured) {
             List<Map<String, Object>> latestExams = jdbc.queryForList("""
-                    select top 1 data_json from module_records
+                    select data_json from module_records
                     where horse_id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'
                     order by event_date desc, created_at desc
+                    limit 1
                     """, horseId);
             if (!latestExams.isEmpty()) {
                 JsonNode n = read((String) latestExams.getFirst().get("data_json"));

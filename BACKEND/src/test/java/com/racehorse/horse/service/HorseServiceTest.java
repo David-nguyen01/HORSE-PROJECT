@@ -21,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Clock;
@@ -62,6 +64,18 @@ class HorseServiceTest {
                 userRepository,
                 new HorseMapper(),
                 Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC));
+    }
+
+    @Test
+    void ownerSearchPassesStatusAndNormalizedTextToRepository() {
+        UUID ownerId = UUID.randomUUID();
+        Pageable pageable = Pageable.unpaged();
+        when(horseRepository.findOwnedBy(ownerId, false, "%bolt%", HorseStatus.PENDING_PAYMENT, pageable))
+                .thenReturn(Page.empty());
+
+        horseService.findOwnedBy(ownerId, "  BOLT  ", HorseStatus.PENDING_PAYMENT, pageable);
+
+        verify(horseRepository).findOwnedBy(ownerId, false, "%bolt%", HorseStatus.PENDING_PAYMENT, pageable);
     }
 
     @Test

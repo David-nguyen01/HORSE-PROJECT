@@ -36,7 +36,7 @@ class DailyAutomationJobTest {
 
         String executedSql = sqlCaptor.getValue();
         assertThat(executedSql).contains("ur.role in ('VETERINARIAN', 'HEAD_TRAINER')");
-        assertThat(executedSql).contains("u.enabled = 1");
+        assertThat(executedSql).contains("u.enabled=true");
         assertThat(executedSql).contains("PREVENTIVE_CARE_DUE");
     }
 }

@@ -27,11 +27,12 @@ class AccountRoleChangeLocalIntegrationTest {
     @Transactional
     void ownerWithHorseCannotChangeRole() {
         UUID ownerId = jdbc.queryForObject("""
-                select top 1 o.owner_id from dbo.horse_ownerships o
+                select o.owner_id from dbo.horse_ownerships o
                 join dbo.user_roles r on r.user_id=o.owner_id and r.role='HORSE_OWNER'
+                limit 1
                 """, UUID.class);
         UUID managerId = jdbc.queryForObject("""
-                select top 1 user_id from dbo.user_roles where role='CLUB_MANAGER'
+                select user_id from dbo.user_roles where role='CLUB_MANAGER' limit 1
                 """, UUID.class);
 
         assertThatThrownBy(() -> users.updateRoles(managerId, ownerId,

@@ -60,7 +60,7 @@ public class StableService {
     @Transactional(readOnly = true)
     public List<StableView> list(boolean includeInactive) {
         return jdbc.query("select id,name,location,is_active from stables "
-                        + (includeInactive ? "" : "where is_active=1 ") + "order by name",
+                        + (includeInactive ? "" : "where is_active=true ") + "order by name",
                 (rs, row) -> buildStable(rs.getObject("id", UUID.class), rs.getString("name"),
                         rs.getString("location"), rs.getBoolean("is_active")));
     }
@@ -96,25 +96,25 @@ public class StableService {
         // 1. Tìm tất cả các con ngựa đang được phân bổ trong chuồng này
         List<UUID> assignedHorseIds = jdbc.query(
                 "select distinct horse_id from module_records where module_code='STABLE_CARE' "
-                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=?",
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=?",
                 (rs, row) -> rs.getObject("horse_id", UUID.class), stableId.toString());
 
         // 2. Kết thúc tất cả phân bổ chuồng đang active của chuồng này
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update(
                 "update module_records set status='ENDED', "
-                + "data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?), "
-                + "updated_at=SYSDATETIMEOFFSET() "
-                + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=?",
+                + "data_json=dbo.json_modify(dbo.json_modify(data_json,'$.assignedUntil',?),'$.endedByUserId',?), "
+                + "updated_at=CURRENT_TIMESTAMP "
+                + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=?",
                 now.toString(), actor.toString(), stableId.toString());
 
         // 3. Chuyển tất cả ngựa bị ảnh hưởng ra khỏi chuồng (vị trí chuồng thành rỗng)
         for (UUID hId : assignedHorseIds) {
-            jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
+            jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 where id=?", hId);
         }
 
         // 4. Xóa tất cả các ô chuồng (STALL) của chuồng này
-        jdbc.update("delete from module_records where module_code='STABLE_CARE' and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=?",
+        jdbc.update("delete from module_records where module_code='STABLE_CARE' and record_type='STALL' and dbo.json_value(data_json,'$.stableId')=?",
                 stableId.toString());
 
         // 5. Gỡ bỏ khóa ngoại nếu có giao dịch tài chính trỏ tới chuồng này
@@ -138,7 +138,7 @@ public class StableService {
         // Quy tắc: Mỗi khu chuồng phải có ít nhất 1 ô chuồng
         Integer stallCount = jdbc.queryForObject(
                 "select count(*) from module_records where module_code='STABLE_CARE' and record_type='STALL' "
-                + "and JSON_VALUE(data_json,'$.stableId')=?",
+                + "and dbo.json_value(data_json,'$.stableId')=?",
                 Integer.class, stableId.toString());
         if (stallCount != null && stallCount <= 1) {
             throw new BusinessException("Khu chuồng phải có ít nhất 1 ô chuồng, không thể xóa bớt");
@@ -147,19 +147,19 @@ public class StableService {
         // Nếu ô chuồng đang có ngựa phân bổ, kết thúc phân bổ và cho ngựa out ra khỏi chuồng
         List<UUID> assignedHorseIds = jdbc.query(
                 "select distinct horse_id from module_records where module_code='STABLE_CARE' "
-                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=?",
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stallId')=?",
                 (rs, row) -> rs.getObject("horse_id", UUID.class), stallId.toString());
 
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update(
                 "update module_records set status='ENDED', "
-                + "data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?), "
-                + "updated_at=SYSDATETIMEOFFSET() "
-                + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=?",
+                + "data_json=dbo.json_modify(dbo.json_modify(data_json,'$.assignedUntil',?),'$.endedByUserId',?), "
+                + "updated_at=CURRENT_TIMESTAMP "
+                + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stallId')=?",
                 now.toString(), actor.toString(), stallId.toString());
 
         for (UUID hId : assignedHorseIds) {
-            jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?", hId);
+            jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 where id=?", hId);
         }
 
         // Xóa hẳn ô chuồng khỏi module_records
@@ -180,9 +180,9 @@ public class StableService {
             throw new BusinessException("Ngựa đã được phân vào ô chuồng này");
 
         // Khóa bi quan (pessimistic lock) trên ô chuồng, khu chuồng và ngựa để chống tranh chấp đồng thời
-        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='STABLE_CARE' and record_type='STALL'", UUID.class, stallId);
-        jdbc.queryForObject("select id from stables with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, stableId);
-        jdbc.queryForObject("select id from horses with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from module_records where id=? and module_code='STABLE_CARE' and record_type='STALL' for update", UUID.class, stallId);
+        jdbc.queryForObject("select id from stables where id=? for update", UUID.class, stableId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
 
         Horse horse = horseAccess.requireServiceEligible(horseId);
         Integer currentAssignment = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
@@ -195,15 +195,15 @@ public class StableService {
 
         // 2. Quy tắc sức chứa: Mỗi chuồng chứa tối đa 4 con ngựa
         Integer occupiedInStable = jdbc.queryForObject(
-                "select count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' "
-                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?",
+                "select count(distinct horse_id) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=? and horse_id<>?",
                 Integer.class, stableId.toString(), horseId);
         if (occupiedInStable != null && occupiedInStable >= 4) {
             throw new BusinessException("Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa");
         }
 
-        Integer occupied = jdbc.queryForObject("select count(*) from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' "
-                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?",
+        Integer occupied = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stallId')=? and horse_id<>?",
                 Integer.class, stallId.toString(), horseId);
         if (occupied != null && occupied > 0) throw new BusinessException("Ô chuồng đã có ngựa");
         validateHealthCompatibility(stableId, horseId, horse.getHealthStatus());
@@ -233,7 +233,7 @@ public class StableService {
             }
             throw exception;
         }
-        jdbc.update("update horses set stable_location=?,intake_status='STABLED',updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+        jdbc.update("update horses set stable_location=?,intake_status='STABLED',updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 stable.name() + " / " + stall.code(), horseId);
         createDefaultDailyRoutineIfAbsent(horseId, horse, actor);
         return new AssignmentView(assignmentId, stableId, stable.name(), stallId, stall.code(), horseId,
@@ -248,9 +248,9 @@ public class StableService {
         if (!targetStall.active()) throw new BusinessException("Ô chuồng đích đang ngừng hoạt động");
 
         // Khóa bi quan
-        jdbc.queryForObject("select id from module_records with (UPDLOCK, HOLDLOCK) where id=? and module_code='STABLE_CARE' and record_type='STALL'", UUID.class, targetStallId);
-        jdbc.queryForObject("select id from stables with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, targetStableId);
-        jdbc.queryForObject("select id from horses with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from module_records where id=? and module_code='STABLE_CARE' and record_type='STALL' for update", UUID.class, targetStallId);
+        jdbc.queryForObject("select id from stables where id=? for update", UUID.class, targetStableId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
 
         Horse horse = horseAccess.requireServiceEligible(horseId);
 
@@ -263,11 +263,11 @@ public class StableService {
                 "select m.id, m.horse_id, m.user_id, m.status, m.data_json, s.name as stable_name, "
                 + "h.name as horse_name, h.code as horse_code, h.health_status, h.status as horse_status, h.health_source_type, "
                 + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
-                + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason "
-                + "from module_records m with (UPDLOCK, HOLDLOCK) "
-                + "join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
+                + "(select reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc limit 1) as active_lock_reason "
+                + "from module_records m "
+                + "join stables s on cast(s.id as varchar(36))=dbo.json_value(m.data_json,'$.stableId') "
                 + "left join horses h on h.id=m.horse_id "
-                + "where m.horse_id=? and m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE'",
+                + "where m.horse_id=? and m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' for update of m",
                 (rs, row) -> {
                     String healthStatus = rs.getString("health_status");
                     String healthSourceType = rs.getString("health_source_type");
@@ -300,8 +300,8 @@ public class StableService {
 
         // Kiểm tra sức chứa khu chuồng đích: tối đa 4 con ngựa
         Integer occupiedInStable = jdbc.queryForObject(
-                "select count(distinct horse_id) from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' "
-                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stableId')=? and horse_id<>?",
+                "select count(distinct horse_id) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stableId')=? and horse_id<>?",
                 Integer.class, targetStableId.toString(), horseId);
         if (occupiedInStable != null && occupiedInStable >= 4) {
             throw new BusinessException("Khu chuồng này đã đạt sức chứa tối đa 4 con ngựa");
@@ -309,8 +309,8 @@ public class StableService {
 
         // Kiểm tra ô chuồng đích: đã có ngựa khác chưa
         Integer occupiedInStall = jdbc.queryForObject(
-                "select count(*) from module_records with (UPDLOCK, HOLDLOCK) where module_code='STABLE_CARE' "
-                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and JSON_VALUE(data_json,'$.stallId')=? and horse_id<>?",
+                "select count(*) from module_records where module_code='STABLE_CARE' "
+                + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and dbo.json_value(data_json,'$.stallId')=? and horse_id<>?",
                 Integer.class, targetStallId.toString(), horseId);
         if (occupiedInStall != null && occupiedInStall > 0) {
             throw new BusinessException("Ô chuồng đã có ngựa");
@@ -325,8 +325,8 @@ public class StableService {
         // Kết thúc phân bổ cũ, lưu lý do chuyển và người thực hiện
         jdbc.update(
                 "update module_records set status='ENDED', "
-                + "data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?),'$.endedReason',?), "
-                + "updated_at=SYSDATETIMEOFFSET() "
+                + "data_json=dbo.json_modify(dbo.json_modify(dbo.json_modify(data_json,'$.assignedUntil',?),'$.endedByUserId',?),'$.endedReason',?), "
+                + "updated_at=CURRENT_TIMESTAMP "
                 + "where id=?",
                 now.toString(), actor.toString(), "TRANSFERRED: " + cleanReason, currentAssignment.id());
 
@@ -363,7 +363,7 @@ public class StableService {
         }
 
         // Cập nhật vị trí mới trên hồ sơ ngựa, giữ nguyên intake_status = 'STABLED'
-        jdbc.update("update horses set stable_location=?,intake_status='STABLED',updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+        jdbc.update("update horses set stable_location=?,intake_status='STABLED',updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 targetStable.name() + " / " + targetStall.code(), horseId);
 
         return new AssignmentView(newAssignmentId, targetStableId, targetStable.name(), targetStallId, targetStall.code(),
@@ -381,7 +381,7 @@ public class StableService {
                 "select distinct coalesce(h.health_status, 'FIT') as health_status from module_records m "
                 + "join horses h on h.id = m.horse_id "
                 + "where m.module_code = 'STABLE_CARE' and m.record_type = 'STALL_ASSIGNMENT' and m.status = 'ACTIVE' "
-                + "and JSON_VALUE(m.data_json, '$.stableId') = ? and m.horse_id <> ?",
+                + "and dbo.json_value(m.data_json, '$.stableId') = ? and m.horse_id <> ?",
                 (rs, row) -> {
                     String s = rs.getString("health_status");
                     return s != null ? s.toUpperCase(Locale.ROOT) : "FIT";
@@ -406,9 +406,9 @@ public class StableService {
         AssignmentView current = requireAssignment(assignmentId);
         if (!current.active()) throw new BusinessException("Phân bổ chuồng đã kết thúc");
         OffsetDateTime now = OffsetDateTime.now();
-        jdbc.update("update module_records set status='ENDED',data_json=JSON_MODIFY(JSON_MODIFY(data_json,'$.assignedUntil',?),'$.endedByUserId',?),updated_at=SYSDATETIMEOFFSET() where id=?",
+        jdbc.update("update module_records set status='ENDED',data_json=dbo.json_modify(dbo.json_modify(data_json,'$.assignedUntil',?),'$.endedByUserId',?),updated_at=CURRENT_TIMESTAMP where id=?",
                 now.toString(), actor.toString(), assignmentId);
-        jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+        jdbc.update("update horses set stable_location='',intake_status='PENDING_STALL',current_trainer_id=NULL,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 current.horseId());
         return new AssignmentView(current.id(), current.stableId(), current.stableName(), current.stallId(),
                 current.stallCode(), current.horseId(), current.horseName(), current.horseCode(), current.assignedBy(), current.assignedFrom(), now, false,
@@ -417,7 +417,7 @@ public class StableService {
 
     private StableView buildStable(UUID id, String name, String location, boolean active) {
         List<StallView> stalls = jdbc.query("select id,status,data_json from module_records where module_code='STABLE_CARE' "
-                        + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=? order by JSON_VALUE(data_json,'$.stallCode')",
+                        + "and record_type='STALL' and dbo.json_value(data_json,'$.stableId')=? order by dbo.json_value(data_json,'$.stallCode')",
                 (rs, row) -> {
                     UUID stallId = rs.getObject("id", UUID.class);
                     JsonNode node = read(rs.getString("data_json"));
@@ -428,14 +428,14 @@ public class StableService {
     }
 
     private AssignmentView activeAssignmentForStall(UUID stallId, UUID stableId, String stableName) {
-        List<AssignmentView> rows = jdbc.query("select top 1 m.id,m.horse_id,m.user_id,m.data_json,h.name horse_name,h.code horse_code, "
+        List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.data_json,h.name horse_name,h.code horse_code, "
                         + "h.health_status, h.status horse_status, h.health_source_type, "
                         + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
-                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason, "
-                        + "(select top 1 hpf.secure_url from horse_profile_files hpf where hpf.horse_id=h.id and hpf.status='ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc) as photo_url "
+                        + "(select reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc limit 1) as active_lock_reason, "
+                        + "(select hpf.secure_url from horse_profile_files hpf where hpf.horse_id=h.id and hpf.status='ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc limit 1) as photo_url "
                         + "from module_records m left join horses h on h.id=m.horse_id "
                         + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
-                        + "and JSON_VALUE(m.data_json,'$.stallId')=? order by m.created_at desc",
+                        + "and dbo.json_value(m.data_json,'$.stallId')=? order by m.created_at desc limit 1",
                 (rs, row) -> {
                     UUID horseId = rs.getObject("horse_id", UUID.class);
                     String healthStatus = rs.getString("health_status");
@@ -465,11 +465,11 @@ public class StableService {
         List<AssignmentView> rows = jdbc.query("select m.id,m.horse_id,m.user_id,m.status,m.data_json,s.name stable_name,h.name horse_name,h.code horse_code, "
                         + "h.health_status, h.status horse_status, h.health_source_type, "
                         + "(select count(*) from training_locks tl where tl.horse_id=h.id and tl.released_at is null) as active_lock_count, "
-                        + "(select top 1 reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc) as active_lock_reason, "
-                        + "(select top 1 hpf.secure_url from horse_profile_files hpf where hpf.horse_id=h.id and hpf.status='ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc) as photo_url "
-                        + "from module_records m with (UPDLOCK, HOLDLOCK) join stables s on cast(s.id as varchar(36))=JSON_VALUE(m.data_json,'$.stableId') "
+                        + "(select reason from training_locks tl where tl.horse_id=h.id and tl.released_at is null order by tl.locked_at desc limit 1) as active_lock_reason, "
+                        + "(select hpf.secure_url from horse_profile_files hpf where hpf.horse_id=h.id and hpf.status='ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc limit 1) as photo_url "
+                        + "from module_records m join stables s on cast(s.id as varchar(36))=dbo.json_value(m.data_json,'$.stableId') "
                         + "left join horses h on h.id=m.horse_id "
-                        + "where m.id=? and m.record_type='STALL_ASSIGNMENT'",
+                        + "where m.id=? and m.record_type='STALL_ASSIGNMENT' for update of m",
                 (rs, row) -> {
                     String healthStatus = rs.getString("health_status");
                     String healthSourceType = rs.getString("health_source_type");
@@ -529,7 +529,7 @@ public class StableService {
     private String findActivePhotoUrl(UUID horseId) {
         if (horseId == null) return null;
         List<String> list = jdbc.query(
-                "select top 1 secure_url from horse_profile_files where horse_id=? and status='ACTIVE' and content_type like 'image/%' order by created_at desc",
+                "select secure_url from horse_profile_files where horse_id=? and status='ACTIVE' and content_type like 'image/%' order by created_at desc limit 1",
                 (rs, rowNum) -> rs.getString("secure_url"),
                 horseId);
         return list.isEmpty() ? null : list.getFirst();
@@ -537,12 +537,12 @@ public class StableService {
 
     private void addStallInternal(UUID stableId, UUID actor, String code) {
         Integer stallCount = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
-                + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=?", Integer.class, stableId.toString());
+                + "and record_type='STALL' and dbo.json_value(data_json,'$.stableId')=?", Integer.class, stableId.toString());
         if (stallCount != null && stallCount >= 4) {
             throw new BusinessException("Mỗi khu chuồng chỉ được chứa tối đa 4 ô chuồng");
         }
         Integer exists = jdbc.queryForObject("select count(*) from module_records where module_code='STABLE_CARE' "
-                + "and record_type='STALL' and JSON_VALUE(data_json,'$.stableId')=? and upper(JSON_VALUE(data_json,'$.stallCode'))=upper(?)",
+                + "and record_type='STALL' and dbo.json_value(data_json,'$.stableId')=? and upper(dbo.json_value(data_json,'$.stallCode'))=upper(?)",
                 Integer.class, stableId.toString(), code);
         if (exists != null && exists > 0) throw new BusinessException("Mã ô chuồng đã tồn tại trong chuồng này: " + code);
         UUID id = UUID.randomUUID();
@@ -563,7 +563,7 @@ public class StableService {
     }
 
     private void endCurrentHorseAssignment(UUID horseId, OffsetDateTime at) {
-        jdbc.update("update module_records set status='ENDED',data_json=JSON_MODIFY(data_json,'$.assignedUntil',?),updated_at=SYSDATETIMEOFFSET() "
+        jdbc.update("update module_records set status='ENDED',data_json=dbo.json_modify(data_json,'$.assignedUntil',?),updated_at=CURRENT_TIMESTAMP "
                         + "where module_code='STABLE_CARE' and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and horse_id=?",
                 at.toString(), horseId);
     }
@@ -588,7 +588,7 @@ public class StableService {
         horseAccess.requireActive(horseId);
         return jdbc.query("select id, horse_id, status, data_json from module_records "
                         + "where module_code='STABLE_CARE' and record_type='HORSE_DAILY_ROUTINE' and horse_id=? and status='ACTIVE' "
-                        + "order by JSON_VALUE(data_json,'$.startTime') asc",
+                        + "order by dbo.json_value(data_json,'$.startTime') asc",
                 (rs, row) -> {
                     JsonNode node = read(rs.getString("data_json"));
                     return new DailyRoutineView(
@@ -638,7 +638,7 @@ public class StableService {
         data.put("notes", trimToNull(request.notes()));
         data.put("isActive", true);
 
-        jdbc.update("update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+        jdbc.update("update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                 toJson(data), routineId);
         return new DailyRoutineView(routineId, existing.horseId(), request.activityType().trim().toUpperCase(Locale.ROOT),
                 request.startTime(), request.endTime(), trimToNull(request.notes()), true);
@@ -712,7 +712,7 @@ public class StableService {
         if (jdbc == null || horseId == null) return null;
         try {
             List<TrainingScheduleSummary> list = jdbc.query("""
-                    select top 1
+                    select
                         s.id,
                         s.task_name,
                         r.name as racetrack_name,
@@ -728,18 +728,19 @@ public class StableService {
                       and s.cancelled_at is null
                       and (
                         (s.session_status = 'IN_PROGRESS'
-                         and cast(s.scheduled_start at time zone 'SE Asia Standard Time' as date) = cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date))
+                         and cast(s.scheduled_start at time zone 'Asia/Ho_Chi_Minh' as date) = cast(CURRENT_TIMESTAMP at time zone 'Asia/Ho_Chi_Minh' as date))
                         or (
-                          tp.is_active = 1
-                          and cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date) between ph.start_date and ph.end_date
+                          tp.is_active=true
+                          and cast(CURRENT_TIMESTAMP at time zone 'Asia/Ho_Chi_Minh' as date) between ph.start_date and ph.end_date
                           and s.published_at is not null
                           and s.session_status in ('PREPARING', 'READY')
-                          and cast(s.scheduled_start at time zone 'SE Asia Standard Time' as date) = cast(sysdatetimeoffset() at time zone 'SE Asia Standard Time' as date)
+                          and cast(s.scheduled_start at time zone 'Asia/Ho_Chi_Minh' as date) = cast(CURRENT_TIMESTAMP at time zone 'Asia/Ho_Chi_Minh' as date)
                         )
                       )
                     order by
                       case when s.session_status = 'IN_PROGRESS' then 0 when s.session_status = 'READY' then 1 else 2 end,
                       s.scheduled_start asc
+                    limit 1
                     """,
                     (rs, row) -> new TrainingScheduleSummary(
                             rs.getObject("id", UUID.class),
@@ -856,7 +857,7 @@ public class StableService {
         String templateCode = (isInjured || hasLock) ? "TEMPLATE_STALL_REST" : "TEMPLATE_DEFAULT_HEALTHY";
 
         List<String> templateData = jdbc.query(
-                "select data_json from module_records where module_code='STABLE_CARE' and record_type='DAILY_ROUTINE_TEMPLATE' and status='ACTIVE' and JSON_VALUE(data_json,'$.templateCode')=?",
+                "select data_json from module_records where module_code='STABLE_CARE' and record_type='DAILY_ROUTINE_TEMPLATE' and status='ACTIVE' and dbo.json_value(data_json,'$.templateCode')=?",
                 (rs, row) -> rs.getString("data_json"), templateCode);
 
         List<DailyRoutineRequest> activities = new ArrayList<>();
@@ -900,7 +901,7 @@ public class StableService {
             data.put("generatedFromTemplate", templateCode);
 
             jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,data_json,created_at,updated_at) "
-                            + "values(?,'STABLE_CARE','HORSE_DAILY_ROUTINE','api',?,?,'ACTIVE',?,SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())",
+                            + "values(?,'STABLE_CARE','HORSE_DAILY_ROUTINE','api',?,?,'ACTIVE',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                     routineId, horseId, actor, toJson(data));
         }
 

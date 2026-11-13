@@ -41,15 +41,16 @@ $env:JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
 
 Lưu khóa riêng ở nơi an toàn và dùng lại qua các lần khởi động. Đổi khóa sẽ khiến access token hiện có hết hiệu lực; refresh token còn hiệu lực vẫn có thể cấp access token mới. Nếu cần buộc tất cả người dùng đăng nhập lại, phải thu hồi các phiên đăng nhập đang hoạt động. Không commit giá trị thật vào `.env.example` hoặc source code.
 
-## Triển khai ví demo lên host
+## Triển khai Render, Vercel và Supabase
 
-Luồng ví mặc định vẫn là mô phỏng: mã hiển thị không thể quét để chuyển tiền thật; nút xác nhận demo cộng tiền vào ví. Có thể chọn VNPAY Sandbox để kiểm thử checkout và IPN (không thu tiền thật). Để chạy trên host:
+Backend production dùng VNPAY Sandbox để kiểm thử checkout và IPN (không thu tiền thật). Để chạy trên host:
 
-1. Cấp một địa chỉ HTTPS ổn định cho web và API. Nếu cùng origin, reverse proxy chuyển `/api/**` và `/actuator/health` tới backend, phục vụ frontend tĩnh và chuyển các đường dẫn giao diện như `/wallet` về `index.html`; để `VITE_API_URL` trống khi build frontend. Nếu khác origin, đặt `VITE_API_URL` thành URL API **trước khi build** và đặt `CORS_ALLOWED_ORIGINS` bằng origin của frontend.
-2. Thiết lập biến môi trường backend theo `.env.example`: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`. Để dùng demo giữ `PAYOS_GATEWAY=fake`; để thử VNPAY đặt `PAYOS_GATEWAY=vnpay`, cấp `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` và `VNPAY_RETURN_URL` qua secret store. Trong VNPAY Merchant Sandbox, cấu hình IPN URL `https://<public-backend-host>/api/wallet/vnpay/ipn`. Không commit merchant secret hoặc đưa chúng vào biến `VITE_*`.
-3. Với database triển khai ngoài local, đánh giá và áp dụng các migration phù hợp lên đúng database đích; script `setup-local.ps1` và `32`–`35` hiện dùng tên `racehorse_local`, **không tự áp dụng lên Azure**. Không chạy script lên Azure chỉ vì deploy code.
-4. Build JAR Java 21, chạy JAR hoặc `Dockerfile` hiện có với biến môi trường của host; build và phục vụ thư mục `FRONTEND/dist` bằng web server tĩnh. Xác nhận `/actuator/health` trả trạng thái khỏe.
-5. Kiểm tra tạo mã demo hoặc VNPAY Sandbox checkout, nạp ví, đăng ký gói cho từng ngựa và tự gia hạn khi đến hạn. Mỗi ngựa có kỳ hạn và gói riêng; gói được đổi có hiệu lực ở kỳ tiếp theo.
+1. Vercel đặt `VITE_API_URL=https://horse-project-4qa4.onrender.com` trước khi build. Render đặt `CORS_ALLOWED_ORIGINS=https://horse-project-phi.vercel.app`.
+2. Render dùng cấu hình trong `../render.yaml`. Các biến có `sync: false` phải được nhập bằng secret store của Render; tuyệt đối không commit giá trị thật.
+3. Thiết lập `SUPABASE_DB_URL`, `SUPABASE_DB_USERNAME`, `SUPABASE_DB_PASSWORD` từ Supabase Connect > Session pooler cổng `5432`. Profile production là `supabase`.
+4. Supabase GitHub Integration theo dõi `develop`, working directory `DATABASE`, và chỉ áp dụng migration mới trong `supabase/migrations`. Không chạy script SQL Server local lên Supabase.
+5. Đặt `PAYOS_GATEWAY=vnpay`, cấp `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET` và `VNPAY_RETURN_URL` qua Render. Trong VNPAY Merchant Sandbox, cấu hình IPN URL `https://horse-project-4qa4.onrender.com/api/wallet/vnpay/ipn`.
+6. Sau mỗi deploy, xác nhận `/actuator/health`, đăng nhập, tạo VNPAY Sandbox checkout và kiểm tra IPN cập nhật ví đúng một lần.
 
 VNPAY Sandbox checkout được tạo từ backend; VNPAY xác nhận giao dịch qua IPN đã ký trước khi cộng tiền vào ví. Không dùng tài khoản/thẻ Sandbox cho giao dịch thật.
 

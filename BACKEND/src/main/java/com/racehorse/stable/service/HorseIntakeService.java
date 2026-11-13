@@ -55,7 +55,7 @@ public class HorseIntakeService {
                 from horses h
                 left join users u on u.id = h.diagnosing_vet_user_id
                 where h.archived_at is null and h.intake_status=?
-                  and (h.service_override=1 or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))
+                  and (h.service_override=true or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))
                 order by h.updated_at, h.id
                 """,
                 (rs, row) -> new IntakeHorse(
@@ -72,13 +72,13 @@ public class HorseIntakeService {
 
     @Transactional
     public IntakeHorse admitToWaitingRoom(UUID horseId, UUID staffId) {
-        jdbc.queryForObject("select id from horses with (UPDLOCK, HOLDLOCK) where id=?", UUID.class, horseId);
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = access.requireServiceEligible(horseId);
         if (!"PENDING_WAITING_ROOM".equals(horse.getIntakeStatus())) {
             throw new BusinessException("Ngựa không ở bước chờ nhân viên đưa vào phòng chờ khám");
         }
         int changed = jdbc.update("update horses set caretaker_user_id=?,intake_status='WAITING_FOR_VET', "
-                        + "updated_at=SYSDATETIMEOFFSET(),version=version+1 "
+                        + "updated_at=CURRENT_TIMESTAMP,version=version+1 "
                         + "where id=? and intake_status='PENDING_WAITING_ROOM'", staffId, horseId);
         if (changed != 1) throw new BusinessException("Ngựa đã được tiếp nhận bởi nhân viên khác");
         jdbc.update("insert into module_records(id,module_code,record_type,source_table,horse_id,user_id,status,data_json) "

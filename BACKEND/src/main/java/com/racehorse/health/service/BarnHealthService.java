@@ -58,7 +58,7 @@ public class BarnHealthService {
         Map<UUID, BarnHealthMapResponse.HorseView> horsesById = new HashMap<>();
         jdbc.query("""
                 select h.id, h.code, h.name, h.gender, h.health_status, h.stable_location,
-                       (select top 1 hpf.secure_url from horse_profile_files hpf where hpf.horse_id = h.id and hpf.status = 'ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc) as photo_url
+                       (select hpf.secure_url from horse_profile_files hpf where hpf.horse_id = h.id and hpf.status = 'ACTIVE' and hpf.content_type like 'image/%' order by hpf.created_at desc limit 1) as photo_url
                 from horses h
                 where h.archived_at is null
                 """, rs -> {
@@ -99,7 +99,7 @@ public class BarnHealthService {
                 select id, status, data_json
                 from module_records
                 where module_code='STABLE_CARE' and record_type='STALL'
-                order by JSON_VALUE(data_json,'$.stallCode')
+                order by dbo.json_value(data_json,'$.stallCode')
                 """, rs -> {
             UUID stallId = rs.getObject("id", UUID.class);
             boolean active = "ACTIVE".equalsIgnoreCase(rs.getString("status"));
@@ -116,7 +116,7 @@ public class BarnHealthService {
         });
 
         // 5. Fetch stables
-        String stableSql = "select id, name, location, is_active from stables where is_active=1 "
+        String stableSql = "select id, name, location, is_active from stables where is_active=true "
                 + (stableFilter != null ? "and id=? " : "")
                 + "order by name";
         List<BarnHealthMapResponse.StableView> stablesList = new ArrayList<>();

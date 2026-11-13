@@ -55,7 +55,7 @@ public class InventoryService {
 
         jdbc.update(
                 "insert into module_records(id, module_code, record_type, horse_id, user_id, event_date, status, data_json, created_at, updated_at) " +
-                        "values (?, 'INVENTORY', 'INVENTORY_ITEM', NULL, ?, ?, 'ACTIVE', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())",
+                        "values (?, 'INVENTORY', 'INVENTORY_ITEM', NULL, ?, ?, 'ACTIVE', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 itemId, actorId, today, toJson(data));
 
         return getItem(itemId);
@@ -93,11 +93,11 @@ public class InventoryService {
         }
 
         if (category != null && !category.isBlank()) {
-            sql.append(" and JSON_VALUE(data_json, '$.category') = ?");
+            sql.append(" and dbo.json_value(data_json, '$.category') = ?");
             args.add(category.trim().toUpperCase(Locale.ROOT));
         }
 
-        sql.append(" order by JSON_VALUE(data_json, '$.itemName') asc");
+        sql.append(" order by dbo.json_value(data_json, '$.itemName') asc");
 
         List<InventoryItemResponse> results = jdbc.query(sql.toString(), (rs, rowNum) -> mapItemResponse(rs), args.toArray());
         if (Boolean.TRUE.equals(lowStockOnly)) {
@@ -129,11 +129,11 @@ public class InventoryService {
 
         if (targetStatus != null) {
             jdbc.update(
-                    "update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                    "update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                     targetStatus, toJson(data), itemId);
         } else {
             jdbc.update(
-                    "update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                    "update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                     toJson(data), itemId);
         }
 
@@ -144,7 +144,7 @@ public class InventoryService {
     public void deleteItem(UUID itemId, UUID actorId) {
         getItem(itemId);
         jdbc.update(
-                "update module_records set status='INACTIVE', updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set status='INACTIVE', updated_at=CURRENT_TIMESTAMP where id=?",
                 itemId);
     }
 
@@ -160,7 +160,7 @@ public class InventoryService {
         data.put("lastUpdatedByUserId", actorId.toString());
 
         jdbc.update(
-                "update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                 toJson(data), itemId);
 
         return getItem(itemId);
@@ -181,8 +181,8 @@ public class InventoryService {
 
         // Lock the item row until the stock movement and its financial entry commit.
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "select status,data_json from module_records with (updlock,holdlock) "
-                        + "where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'", itemId);
+                "select status,data_json from module_records "
+                        + "where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM' for update", itemId);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy mặt hàng trong kho: " + itemId);
         Map<String, Object> row = rows.getFirst();
         if (!"ACTIVE".equals(row.get("status"))) throw new BusinessException("Mặt hàng đã ngừng sử dụng");
@@ -214,7 +214,7 @@ public class InventoryService {
         item.put("quantityOnHand", remaining);
         item.put("lastStockUpdateReason", "Xuất dùng " + request.quantity().toPlainString() + " " + unit);
         item.put("lastUpdatedByUserId", actorId.toString());
-        jdbc.update("update module_records set data_json=?,updated_at=SYSDATETIMEOFFSET() where id=?", toJson(item), itemId);
+        jdbc.update("update module_records set data_json=?,updated_at=CURRENT_TIMESTAMP where id=?", toJson(item), itemId);
 
         Map<String, Object> movement = new LinkedHashMap<>();
         movement.put("itemId", itemId.toString());
@@ -246,7 +246,7 @@ public class InventoryService {
                         + "from module_records m left join financial_transactions ft "
                         + "on ft.source_entity_type='INVENTORY_USAGE' and ft.source_entity_id=m.id "
                         + "where m.module_code='INVENTORY' and m.record_type='STOCK_USAGE' "
-                        + "order by m.created_at desc,m.id desc offset 0 rows fetch next (?) rows only", (rs, row) -> {
+                        + "order by m.created_at desc,m.id desc limit ?", (rs, row) -> {
                     JsonNode data = read(rs.getString("data_json"));
                     String stable = data.path("stableId").asText(null);
                     return new InventoryUsageResponse(rs.getObject("id", UUID.class),
@@ -304,7 +304,7 @@ public class InventoryService {
 
         jdbc.update(
                 "insert into module_records(id, module_code, record_type, horse_id, user_id, event_date, status, data_json, created_at, updated_at) " +
-                        "values (?, 'INVENTORY', 'REPLENISHMENT_REQUEST', NULL, ?, ?, 'PENDING_APPROVAL', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())",
+                        "values (?, 'INVENTORY', 'REPLENISHMENT_REQUEST', NULL, ?, ?, 'PENDING_APPROVAL', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 reqId, actorId, today, toJson(data));
 
         return getReplenishment(reqId);
@@ -342,8 +342,8 @@ public class InventoryService {
     @Transactional
     public ReplenishmentResponse reviewReplenishment(UUID id, UUID actorId, ReviewReplenishmentRequest request) {
         List<Map<String, Object>> locked = jdbc.queryForList(
-                "select status from module_records with (updlock,holdlock) "
-                        + "where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'", id);
+                "select status from module_records "
+                        + "where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST' for update", id);
         if (locked.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy đề xuất bổ sung tồn kho: " + id);
         if (!"PENDING_APPROVAL".equals(locked.getFirst().get("status"))) {
             throw new BusinessException("Đề xuất bổ sung này đã được xử lý trước đó");
@@ -370,7 +370,7 @@ public class InventoryService {
         data.put("reviewNotes", request.reviewNotes() == null ? null : request.reviewNotes().trim());
 
         jdbc.update(
-                "update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                 targetStatus, toJson(data), id);
 
         if ("APPROVED".equals(targetStatus) && Boolean.TRUE.equals(request.receiveImmediately())) {
@@ -382,8 +382,8 @@ public class InventoryService {
     @Transactional
     public ReplenishmentResponse receiveReplenishment(UUID id, UUID actorId, ReceiveReplenishmentRequest request) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "select status,data_json from module_records with (updlock,holdlock) "
-                        + "where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST'", id);
+                "select status,data_json from module_records "
+                        + "where id=? and module_code='INVENTORY' and record_type='REPLENISHMENT_REQUEST' for update", id);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy đề xuất bổ sung tồn kho: " + id);
         Map<String, Object> row = rows.getFirst();
         if (!"APPROVED".equals(row.get("status"))) {
@@ -415,14 +415,14 @@ public class InventoryService {
         data.put("itemId", itemId.toString());
         data.put("receivedByUserId", actorId.toString());
         data.put("receivedAt", OffsetDateTime.now(clock).toString());
-        jdbc.update("update module_records set status='FULFILLED',data_json=?,updated_at=SYSDATETIMEOFFSET() where id=?",
+        jdbc.update("update module_records set status='FULFILLED',data_json=?,updated_at=CURRENT_TIMESTAMP where id=?",
                 toJson(data), id);
         return getReplenishment(id);
     }
 
     private void increaseItemStock(UUID itemId, BigDecimal addedQuantity, UUID actorId, BigDecimal price) {
-        List<Map<String, Object>> rows = jdbc.queryForList("select status,data_json from module_records with (updlock,holdlock) "
-                + "where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'", itemId);
+        List<Map<String, Object>> rows = jdbc.queryForList("select status,data_json from module_records "
+                + "where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM' for update", itemId);
         if (rows.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy mặt hàng trong kho: " + itemId);
         Map<String, Object> row = rows.getFirst();
         if (!"ACTIVE".equals(row.get("status"))) throw new BusinessException("Mặt hàng trong danh mục đã ngừng sử dụng");
@@ -434,7 +434,7 @@ public class InventoryService {
         data.put("lastUpdatedByUserId", actorId.toString());
 
         jdbc.update(
-                "update module_records set data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                 toJson(data), itemId);
     }
 

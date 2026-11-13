@@ -114,9 +114,9 @@ class CareTaskServiceTest {
         service.completeTask(taskId, staffId, completeReq);
 
         verify(jdbc).update(
-                contains("photo_bytes = CONVERT(VARBINARY(MAX), ?)"),
-                eq(false), eq(staffId), eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"),
-                eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId), eq(false), eq(staffId)
+                contains("photo_bytes = ?"),
+                eq(staffId), eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"),
+                eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId), eq(staffId)
         );
     }
 
@@ -150,9 +150,9 @@ class CareTaskServiceTest {
 
         verify(jdbc).update(
                 contains("UPDATE dbo.care_tasks"),
-                eq(false), eq(staffId), eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
+                eq(staffId), eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
                 eq("/api/care-tasks/" + taskId + "/photo"),
-                eq(fakeImage), eq("image/jpeg"), eq(taskId), eq(false), eq(staffId)
+                eq(fakeImage), eq("image/jpeg"), eq(taskId), eq(staffId)
         );
     }
 
@@ -318,8 +318,8 @@ class CareTaskServiceTest {
         when(jdbc.update(contains("UPDATE dbo.care_tasks"), any(Object[].class))).thenReturn(1);
 
         guarded.completeTask(taskId, managerId, new CompleteCareTaskRequest("Xong", null), true);
-        verify(jdbc).update(contains("UPDATE dbo.care_tasks"), eq(true), eq(managerId), eq(managerId),
-                eq("manager"), eq("Xong"), isNull(), isNull(), isNull(), eq(taskId), eq(true), eq(managerId));
+        verify(jdbc).update(contains("UPDATE dbo.care_tasks"), eq(managerId),
+                eq("manager"), eq("Xong"), isNull(), isNull(), isNull(), eq(taskId));
     }
 
     @Test

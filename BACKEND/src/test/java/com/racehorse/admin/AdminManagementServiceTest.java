@@ -80,7 +80,7 @@ class AdminManagementServiceTest {
     @Test
     void restoreRejectsHorseThatIsNotArchived() {
         UUID horseId = UUID.randomUUID();
-        when(jdbc.update("update horses set archived_at=null,updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=? and archived_at is not null", horseId))
+        when(jdbc.update("update horses set archived_at=null,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=? and archived_at is not null", horseId))
                 .thenReturn(0);
 
         assertThatThrownBy(() -> service.restore(UUID.randomUUID(), horseId))
@@ -117,7 +117,7 @@ class AdminManagementServiceTest {
         service.updateServiceAccess(actor, horseId, null, true, "Club Manager bảo lãnh", null);
 
         verify(jdbc).update(
-                "update horses set payment_status=?, service_override=?, override_reason=?, paid_until=?, updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=?",
+                "update horses set payment_status=?, service_override=?, override_reason=?, paid_until=?, updated_at=CURRENT_TIMESTAMP, version=version+1 where id=?",
                 "PENDING_PAYMENT", true, "Club Manager bảo lãnh", null, horseId);
         verify(audit).record(
                 org.mockito.ArgumentMatchers.eq(actor),

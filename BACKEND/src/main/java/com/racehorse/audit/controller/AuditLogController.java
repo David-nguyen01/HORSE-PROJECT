@@ -50,8 +50,8 @@ public class AuditLogController {
             String q = "%"+query.trim()+"%";
             args.add(q);args.add(q);args.add(q);args.add(q);args.add(q);
         }
-        sql.append(" order by a.occurred_at desc,a.id desc offset ? rows fetch next ? rows only");
-        args.add((long)page*size);args.add(size);
+        sql.append(" order by a.occurred_at desc,a.id desc limit ? offset ?");
+        args.add(size);args.add((long)page*size);
         return jdbc.query(sql.toString(),(rs,row)->new AuditView(rs.getLong("id"),rs.getObject("actor_user_id",UUID.class),
                 rs.getString("actor_username"),rs.getObject("occurred_at",OffsetDateTime.class),rs.getString("module_code"),
                 rs.getString("action_code"),rs.getString("entity_type"),rs.getObject("entity_id",UUID.class),
@@ -111,7 +111,7 @@ public class AuditLogController {
             String q = "%"+query.trim()+"%";
             args.add(q);args.add(q);args.add(q);args.add(q);args.add(q);
         }
-        sql.append(" order by a.occurred_at desc, a.id desc offset 0 rows fetch next 5000 rows only");
+        sql.append(" order by a.occurred_at desc, a.id desc limit 5000");
 
         List<AuditView> logs = jdbc.query(sql.toString(), (rs, row) -> new AuditView(
                 rs.getLong("id"), rs.getObject("actor_user_id", UUID.class),

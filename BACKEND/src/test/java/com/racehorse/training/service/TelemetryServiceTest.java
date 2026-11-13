@@ -269,7 +269,7 @@ class TelemetryServiceTest {
 
         List<TelemetryService.ThresholdView> active = service.thresholds(horseId, actorId, true, false, false, false, false);
         assertThat(active).isEmpty();
-        verify(jdbc).query(contains("and (effective_to is null or effective_to>SYSDATETIMEOFFSET())"), any(RowMapper.class), eq(horseId));
+        verify(jdbc).query(contains("and (effective_to is null or effective_to>CURRENT_TIMESTAMP)"), any(RowMapper.class), eq(horseId));
 
         List<TelemetryService.ThresholdView> all = service.thresholds(horseId, actorId, true, false, false, false, true);
         assertThat(all).isEmpty();

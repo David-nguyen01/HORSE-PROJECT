@@ -61,6 +61,24 @@ test('RH-LOGIN-API-UI-01/02: Floating panel renders conditionally and preserves 
     'Floating panel must retain connection feedback styles')
 })
 
+test('RH-LOGIN-API-SEC-01: Production ignores browser API overrides while local development remains configurable', () => {
+  const apiPath = path.join(process.cwd(), 'src', 'api.js')
+  const apiContent = fs.readFileSync(apiPath, 'utf8').replace(/\r\n/g, '\n')
+  const appPath = path.join(process.cwd(), 'src', 'App.jsx')
+  const appContent = fs.readFileSync(appPath, 'utf8').replace(/\r\n/g, '\n')
+
+  assert.ok(apiContent.includes("window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'"),
+    'Only localhost origins may configure a browser-specific API URL')
+  assert.ok(apiContent.includes('if (!canConfigureApiUrl()) {\n      localStorage.removeItem'),
+    'Production must clear and ignore any legacy browser API override')
+  assert.ok(apiContent.includes('return envUrl || CLOUD_API_URL'),
+    'Production must resolve to VITE_API_URL or the hosted Render API')
+  assert.ok(appContent.includes('const apiUrlConfigurable = canConfigureApiUrl()'),
+    'Login UI must determine whether API editing is allowed')
+  assert.ok(appContent.includes('{apiUrlConfigurable && ('),
+    'Production login UI must hide API URL editing controls')
+})
+
 test('RH-LOGIN-API-UI-01/02: Outside-click and Escape key dismissal interactions are wired', () => {
   const appPath = path.join(process.cwd(), 'src', 'App.jsx')
   const appContent = fs.readFileSync(appPath, 'utf8').replace(/\r\n/g, '\n')

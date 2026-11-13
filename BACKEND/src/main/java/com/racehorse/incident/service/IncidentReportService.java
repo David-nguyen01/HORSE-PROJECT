@@ -84,7 +84,7 @@ public class IncidentReportService {
 
         jdbc.update(
                 "insert into module_records(id, module_code, record_type, horse_id, user_id, event_date, status, data_json, created_at, updated_at) " +
-                        "values (?, 'STABLE_CARE', 'INCIDENT_REPORT', ?, ?, ?, 'REPORTED', ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())",
+                        "values (?, 'STABLE_CARE', 'INCIDENT_REPORT', ?, ?, ?, 'REPORTED', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 incidentId, horse.getId(), actorId, today, toJson(data));
 
         // Push immediate notification to Veterinarians and Head Trainers
@@ -101,7 +101,7 @@ public class IncidentReportService {
         List<Session> rows = jdbc.query("""
                 select s.id schedule_id,h.id horse_id,h.code horse_code,h.name horse_name,s.task_name,
                        r.id ground_id,r.name ground_name,l.id lane_id,l.lane_number,
-                       cast(s.scheduled_start at time zone 'SE Asia Standard Time' as date) training_date,
+                       cast(s.scheduled_start at time zone 'Asia/Ho_Chi_Minh' as date) training_date,
                        h.caretaker_user_id,h.diagnosing_vet_user_id
                 from training_schedules s join horses h on h.id=s.horse_id
                 left join racetracks r on r.id=s.racetrack_id
@@ -149,16 +149,16 @@ public class IncidentReportService {
         data.put("resolvedByUserId", null); data.put("resolvedByName", null);
         data.put("resolvedAt", null); data.put("resolutionNotes", null);
         jdbc.update("insert into module_records(id,module_code,record_type,horse_id,user_id,event_date,status,data_json,created_at,updated_at) "
-                + "values(?,'STABLE_CARE','INCIDENT_REPORT',?, ?,?,'REPORTED',?,SYSDATETIMEOFFSET(),SYSDATETIMEOFFSET())",
+                + "values(?,'STABLE_CARE','INCIDENT_REPORT',?, ?,?,'REPORTED',?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
                 incidentId, session.horseId(), trainerId, session.trainingDate(), toJson(data));
         int injuredSession = jdbc.update("update training_schedules set session_status='EMERGENCY_STOPPED', "
-                        + "updated_at=SYSDATETIMEOFFSET(), version=version+1 where id=? and session_status='IN_PROGRESS'",
+                        + "updated_at=CURRENT_TIMESTAMP, version=version+1 where id=? and session_status='IN_PROGRESS'",
                 session.scheduleId());
         if (injuredSession != 1)
             throw new BusinessException("Buổi tập đã thay đổi trạng thái; hãy tải lại trước khi gửi khẩn cấp");
         int injuredHorse = jdbc.update("update horses set status='INJURED',health_status='INJURED', "
                         + "health_source_type='TRAINING_EMERGENCY',health_source_id=?,health_changed_by_user_id=?, "
-                        + "health_changed_at=SYSDATETIMEOFFSET(),updated_at=SYSDATETIMEOFFSET(),version=version+1 where id=?",
+                        + "health_changed_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP,version=version+1 where id=?",
                 incidentId, trainerId, session.horseId());
         if (injuredHorse != 1)
             throw new BusinessException("Không thể cập nhật trạng thái chấn thương của ngựa");
@@ -184,7 +184,7 @@ public class IncidentReportService {
     @Transactional(readOnly = true)
     public List<IncidentReportResponse> sentTrainingEmergencies(UUID trainerId) {
         return jdbc.query(baseSelect() + " where m.module_code='STABLE_CARE' and m.record_type='INCIDENT_REPORT' "
-                + "and m.user_id=? and JSON_VALUE(m.data_json,'$.trainingScheduleId') is not null "
+                + "and m.user_id=? and dbo.json_value(m.data_json,'$.trainingScheduleId') is not null "
                 + "order by m.created_at desc", (rs, row) -> mapResponse(rs), trainerId);
     }
 
@@ -192,7 +192,7 @@ public class IncidentReportService {
     public List<IncidentReportResponse> ownerTrainingEmergencies(UUID horseId, UUID ownerId) {
         horseAccess.requireOwned(horseId, ownerId);
         return jdbc.query(baseSelect() + " where m.module_code='STABLE_CARE' and m.record_type='INCIDENT_REPORT' "
-                + "and m.horse_id=? and JSON_VALUE(m.data_json,'$.trainingScheduleId') is not null "
+                + "and m.horse_id=? and dbo.json_value(m.data_json,'$.trainingScheduleId') is not null "
                 + "order by m.created_at desc", (rs, row) -> mapResponse(rs), horseId);
     }
 
@@ -250,7 +250,7 @@ public class IncidentReportService {
         }
 
         jdbc.update(
-                "update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?",
+                "update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?",
                 targetStatus, toJson(data), incidentId);
 
         return getReport(incidentId);
@@ -262,12 +262,12 @@ public class IncidentReportService {
         if (!List.of("HIGH", "CRITICAL").contains(report.severity())) {
             throw new BusinessException("Chỉ sự cố mức cao hoặc nguy kịch được tiếp nhận như ca cấp cứu");
         }
-        jdbc.queryForObject("select id from horses with (UPDLOCK,HOLDLOCK) where id=?", UUID.class, report.horseId());
+        jdbc.queryForObject("select id from horses where id=? for update", UUID.class, report.horseId());
         Integer otherClaim = jdbc.queryForObject("""
                 select count(*) from module_records where horse_id=? and module_code='STABLE_CARE'
                   and record_type='INCIDENT_REPORT' and status='ACKNOWLEDGED'
-                  and JSON_VALUE(data_json,'$.emergencyVetId') is not null
-                  and JSON_VALUE(data_json,'$.emergencyExaminationId') is null
+                  and dbo.json_value(data_json,'$.emergencyVetId') is not null
+                  and dbo.json_value(data_json,'$.emergencyExaminationId') is null
                 """, Integer.class, report.horseId());
         if (otherClaim != null && otherClaim > 0) {
             throw new BusinessException("Ngựa đang có ca cấp cứu do bác sĩ khác tiếp nhận");
@@ -277,12 +277,12 @@ public class IncidentReportService {
         if (names.isEmpty()) throw new ResourceNotFoundException("Không tìm thấy bác sĩ tiếp nhận");
         int changed = jdbc.update("""
                 update module_records set status='ACKNOWLEDGED',
-                    data_json=JSON_MODIFY(JSON_MODIFY(JSON_MODIFY(data_json,'$.emergencyVetId',CONVERT(varchar(36),?)),
+                    data_json=dbo.json_modify(dbo.json_modify(dbo.json_modify(data_json,'$.emergencyVetId',cast(? as varchar(36))),
                                               '$.emergencyVetName',?),
-                                              '$.emergencyClaimedAt',CONVERT(varchar(33),SYSDATETIMEOFFSET(),127)),
-                    updated_at=SYSDATETIMEOFFSET()
+                                              '$.emergencyClaimedAt',to_char(CURRENT_TIMESTAMP AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+                    updated_at=CURRENT_TIMESTAMP
                 where id=? and horse_id=? and module_code='STABLE_CARE' and record_type='INCIDENT_REPORT'
-                  and status='REPORTED' and JSON_VALUE(data_json,'$.severity') in ('HIGH','CRITICAL')
+                  and status='REPORTED' and dbo.json_value(data_json,'$.severity') in ('HIGH','CRITICAL')
                 """, veterinarianId, names.getFirst(), incidentId, report.horseId());
         if (changed != 1) throw new BusinessException("Ca cấp cứu đã được bác sĩ khác tiếp nhận hoặc không còn mở");
         return getReport(incidentId);
@@ -314,7 +314,7 @@ public class IncidentReportService {
             args.add(status.trim().toUpperCase(Locale.ROOT));
         }
         if (severity != null && !severity.isBlank()) {
-            sql.append(" and JSON_VALUE(m.data_json,'$.severity')=?");
+            sql.append(" and dbo.json_value(m.data_json,'$.severity')=?");
             args.add(severity.trim().toUpperCase(Locale.ROOT));
         }
         if (fromDate != null) {

@@ -430,6 +430,7 @@ FodyWeavers.xsd
 *.msp
 # Java / Maven
 **/target/
+**/supabase/.temp/
 /.tools/
 /BACKEND/.m2/
 /.idea/

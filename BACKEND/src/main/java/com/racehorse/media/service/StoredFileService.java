@@ -27,8 +27,8 @@ public class StoredFileService {
     @Transactional(readOnly=true)
     public List<FileView> list(UUID uploader,int page,int size){
         if(page<0||size<1||size>200)throw new BusinessException("Phân trang không hợp lệ");
-        String sql="select * from stored_files"+(uploader==null?"":" where uploaded_by_user_id=?")+" order by created_at desc offset ? rows fetch next ? rows only";
-        return uploader==null?jdbc.query(sql,this::map,page*size,size):jdbc.query(sql,this::map,uploader,page*size,size);
+        String sql="select * from stored_files"+(uploader==null?"":" where uploaded_by_user_id=?")+" order by created_at desc limit ? offset ?";
+        return uploader==null?jdbc.query(sql,this::map,size,page*size):jdbc.query(sql,this::map,uploader,size,page*size);
     }
     @Transactional(readOnly=true)
     public FileView get(UUID id){return jdbc.query("select * from stored_files where id=?",rs->{if(!rs.next())throw new ResourceNotFoundException("Không tìm thấy file: "+id);return map(rs,0);},id);}

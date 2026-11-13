@@ -196,7 +196,7 @@ public class OwnerReportService {
                        (select count(*) from horse_ownerships ho where ho.owner_id=u.id) as horse_count
                 from users u
                 join user_roles ur on ur.user_id=u.id
-                where ur.role='HORSE_OWNER' and u.enabled=1
+                where ur.role='HORSE_OWNER' and u.enabled=true
                 order by u.username
                 """;
         return jdbc.query(sql, (rs, row) -> new OwnerOption(
@@ -232,7 +232,7 @@ public class OwnerReportService {
         StringBuilder sql = new StringBuilder("""
                 select ft.id, ft.transaction_date, ft.category, ft.amount, ft.description,
                        h.id horse_id, h.code horse_code, h.name horse_name,
-                       JSON_VALUE(m.data_json, '$.plan') plan_name
+                       dbo.json_value(m.data_json, '$.plan') plan_name
                 from financial_transactions ft
                 left join module_records m on m.id=ft.source_entity_id
                     and ft.source_entity_type='WALLET' and m.module_code='SYSTEM'

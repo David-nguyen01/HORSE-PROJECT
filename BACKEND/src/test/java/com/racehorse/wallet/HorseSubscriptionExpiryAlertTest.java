@@ -457,7 +457,7 @@ class HorseSubscriptionExpiryAlertTest {
         @DisplayName("Case 21: Service access is denied after paid period expires")
         void case21_serviceAccessDenied_afterPaidPeriodExpires() {
             // Verified query pattern across codebase:
-            // "and (h.service_override=1 or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))"
+            // "and (h.service_override=true or (h.payment_status='PAID' and (h.paid_until is null or h.paid_until>=?)))"
             LocalDate expiredPaidUntil = LocalDate.of(2026, 11, 1);
             LocalDate serviceDate = LocalDate.of(2026, 11, 12);
 

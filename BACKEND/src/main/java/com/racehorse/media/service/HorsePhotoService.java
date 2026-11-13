@@ -55,7 +55,7 @@ public class HorsePhotoService {
                   AND record_type = 'HORSE_ADDITIONAL_FILE'
                   AND horse_id = ?
                   AND status = 'ACTIVE'
-                ORDER BY CAST(JSON_VALUE(data_json, '$.displayOrder') AS INT) ASC, created_at ASC
+                ORDER BY CAST(dbo.json_value(data_json, '$.displayOrder') AS INT) ASC, created_at ASC
                 """;
         return jdbc.query(sql, this::mapToResponse, horseId);
     }
@@ -83,7 +83,7 @@ public class HorsePhotoService {
         }
 
         List<Integer> existingOrders = jdbc.queryForList(
-                "SELECT CAST(JSON_VALUE(data_json, '$.displayOrder') AS INT) FROM dbo.module_records WHERE module_code='PROFILE' AND record_type='HORSE_ADDITIONAL_FILE' AND horse_id=? AND status='ACTIVE'",
+                "SELECT CAST(dbo.json_value(data_json, '$.displayOrder') AS INT) FROM dbo.module_records WHERE module_code='PROFILE' AND record_type='HORSE_ADDITIONAL_FILE' AND horse_id=? AND status='ACTIVE'",
                 Integer.class,
                 horseId);
 
@@ -123,7 +123,7 @@ public class HorsePhotoService {
         String sql = """
                 INSERT INTO dbo.module_records(
                     id, module_code, record_type, source_table, horse_id, user_id, status, event_date, data_json, created_at, updated_at
-                ) VALUES (?, 'PROFILE', 'HORSE_ADDITIONAL_FILE', 'horse_additional_files', ?, ?, 'ACTIVE', CAST(SYSDATETIMEOFFSET() AS DATE), ?, SYSDATETIMEOFFSET(), SYSDATETIMEOFFSET())
+                ) VALUES (?, 'PROFILE', 'HORSE_ADDITIONAL_FILE', 'horse_additional_files', ?, ?, 'ACTIVE', CAST(CURRENT_TIMESTAMP AS DATE), ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """;
         jdbc.update(sql, recordId, horseId, actorId, toJson(data));
 
@@ -157,7 +157,7 @@ public class HorsePhotoService {
         String storedFileIdStr = node.path("storedFileId").asText(null);
 
         jdbc.update(
-                "UPDATE dbo.module_records SET status='REMOVED', updated_at=SYSDATETIMEOFFSET() WHERE id=?",
+                "UPDATE dbo.module_records SET status='REMOVED', updated_at=CURRENT_TIMESTAMP WHERE id=?",
                 photoId);
 
         if (storedFileIdStr != null && !storedFileIdStr.isBlank()) {

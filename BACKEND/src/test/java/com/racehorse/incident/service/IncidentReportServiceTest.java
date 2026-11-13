@@ -277,7 +277,7 @@ class IncidentReportServiceTest {
 
         service.updateStatus(incidentId, actorId, updateReq, true);
 
-        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 eq("RESOLVED"), anyString(), eq(incidentId));
     }
 
@@ -318,12 +318,12 @@ class IncidentReportServiceTest {
 
         // Test ACKNOWLEDGED
         service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("ACKNOWLEDGED", "Đã tiếp nhận tạo phiếu khám"), true);
-        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 eq("ACKNOWLEDGED"), contains("acknowledgedByName"), eq(incidentId));
 
         // Test DISMISSED
         service.updateStatus(incidentId, actorId, new UpdateIncidentStatusRequest("DISMISSED", "Không cần can thiệp y tế"), true);
-        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=SYSDATETIMEOFFSET() where id=?"),
+        verify(jdbc).update(contains("update module_records set status=?, data_json=?, updated_at=CURRENT_TIMESTAMP where id=?"),
                 eq("DISMISSED"), contains("resolvedByName"), eq(incidentId));
     }
 

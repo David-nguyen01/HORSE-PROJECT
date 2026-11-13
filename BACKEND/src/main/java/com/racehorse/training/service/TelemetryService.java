@@ -39,7 +39,7 @@ public class TelemetryService {
                                           boolean owner, boolean vet, boolean includeExpired) {
         requireAccess(horseId,requester,manager,trainer,owner,vet);
         String sql="select id,horse_id,metric_type,minimum_value,maximum_value,unit,configured_by_user_id,effective_from,effective_to,created_at "
-                +"from horse_metric_thresholds where horse_id=? "+(includeExpired?"":"and (effective_to is null or effective_to>SYSDATETIMEOFFSET()) ")
+                +"from horse_metric_thresholds where horse_id=? "+(includeExpired?"":"and (effective_to is null or effective_to>CURRENT_TIMESTAMP) ")
                 +"order by metric_type,effective_from desc";
         return jdbc.query(sql,(rs,row)->new ThresholdView(rs.getObject("id",UUID.class),rs.getObject("horse_id",UUID.class),
                 rs.getString("metric_type"),rs.getBigDecimal("minimum_value"),rs.getBigDecimal("maximum_value"),
@@ -68,7 +68,7 @@ public class TelemetryService {
     @Transactional
     public void endThreshold(UUID horseId, UUID thresholdId, UUID actor, boolean manager, boolean trainer) {
         requireAccess(horseId,actor,manager,trainer,false,false);
-        int changed=jdbc.update("update horse_metric_thresholds set effective_to=case when effective_to is null or effective_to>SYSDATETIMEOFFSET() then SYSDATETIMEOFFSET() else effective_to end where id=? and horse_id=?",
+        int changed=jdbc.update("update horse_metric_thresholds set effective_to=case when effective_to is null or effective_to>CURRENT_TIMESTAMP then CURRENT_TIMESTAMP else effective_to end where id=? and horse_id=?",
                 thresholdId,horseId);
         if(changed==0) throw new com.racehorse.common.exception.ResourceNotFoundException("Không tìm thấy ngưỡng: "+thresholdId);
     }
@@ -105,7 +105,7 @@ public class TelemetryService {
         if(context!=null&&!context.isBlank()){sql.append(" and measurement_context=?");args.add(upper(context));}
         if(from!=null){sql.append(" and started_at>=?");args.add(from);}
         if(to!=null){sql.append(" and started_at<=?");args.add(to);}
-        sql.append(" order by started_at desc offset ? rows fetch next ? rows only");args.add(page*size);args.add(size);
+        sql.append(" order by started_at desc limit ? offset ?");args.add(size);args.add(page*size);
         return jdbc.query(sql.toString(),(rs,row)->{
             UUID sessionId=rs.getObject("id",UUID.class);
             List<ReadingView> readings=jdbc.query("select id,recorded_at,heart_rate_bpm,speed_kmh from telemetry_readings where telemetry_session_id=? order by recorded_at",
@@ -128,7 +128,7 @@ public class TelemetryService {
         if(acknowledged!=null)sql.append(acknowledged?" and acknowledged_at is not null":" and acknowledged_at is null");
         if(from!=null){sql.append(" and occurred_at>=?");args.add(from);}
         if(to!=null){sql.append(" and occurred_at<=?");args.add(to);}
-        sql.append(" order by occurred_at desc offset ? rows fetch next ? rows only");args.add(page*size);args.add(size);
+        sql.append(" order by occurred_at desc limit ? offset ?");args.add(size);args.add(page*size);
         return jdbc.query(sql.toString(),(rs,row)->new AlertView(rs.getObject("id",UUID.class),horseId,
                 rs.getObject("telemetry_session_id",UUID.class),rs.getLong("telemetry_reading_id"),
                 rs.getObject("threshold_id",UUID.class),rs.getString("metric_type"),rs.getBigDecimal("observed_value"),
@@ -140,7 +140,7 @@ public class TelemetryService {
     @Transactional
     public AlertView acknowledge(UUID horseId, UUID alertId, UUID actor, boolean manager, boolean trainer) {
         requireAccess(horseId,actor,manager,trainer,false,false);
-        int changed=jdbc.update("update alert_events set acknowledged_by_user_id=?,acknowledged_at=SYSDATETIMEOFFSET() where id=? and horse_id=? and acknowledged_at is null",
+        int changed=jdbc.update("update alert_events set acknowledged_by_user_id=?,acknowledged_at=CURRENT_TIMESTAMP where id=? and horse_id=? and acknowledged_at is null",
                 actor,alertId,horseId);
         if(changed==0){
             Integer exists=jdbc.queryForObject("select count(*) from alert_events where id=? and horse_id=?",Integer.class,alertId,horseId);
@@ -180,9 +180,10 @@ public class TelemetryService {
     }
     private void evaluate(UUID horse,UUID session,long readingId,String metric,BigDecimal value,OffsetDateTime at,List<TelemetryResponse.Alert> out){
         List<Map<String,Object>> rows=jdbc.queryForList("""
-                select top 1 id,minimum_value,maximum_value from horse_metric_thresholds
+                select id,minimum_value,maximum_value from horse_metric_thresholds
                 where horse_id=? and metric_type=? and effective_from<=? and (effective_to is null or effective_to>?)
                 order by effective_from desc
+                limit 1
                 """,horse,metric,at,at);
         if(rows.isEmpty()) return;
         Map<String,Object> t=rows.getFirst(); UUID threshold=uuid(t.get("id"));
@@ -196,7 +197,7 @@ public class TelemetryService {
                 id,horse,session,readingId,threshold,metric,observed,limit,direction,at);
         jdbc.update("""
                 insert into notifications(id,recipient_user_id,notification_type,priority,title,message,related_entity_type,related_entity_id,deduplication_key)
-                select newid(),ur.user_id,'FITNESS_THRESHOLD','HIGH',N'Cảnh báo chỉ số ngựa',?,'ALERT_EVENT',?,concat('alert:',cast(? as varchar(36)),':',cast(ur.user_id as varchar(36)))
+                select gen_random_uuid(),ur.user_id,'FITNESS_THRESHOLD','HIGH','Cảnh báo chỉ số ngựa',?,'ALERT_EVENT',?,concat('alert:',cast(? as varchar(36)),':',cast(ur.user_id as varchar(36)))
                 from user_roles ur where ur.role='HEAD_TRAINER'
                 """,message,id,id);
         out.add(new TelemetryResponse.Alert(id,metric,direction,message));

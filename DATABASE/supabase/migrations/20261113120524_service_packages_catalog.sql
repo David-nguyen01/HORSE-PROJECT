@@ -54,7 +54,7 @@ BEGIN
         ALTER TABLE dbo.horses ADD CONSTRAINT fk_horses_active_service_plan 
         FOREIGN KEY (active_service_plan) REFERENCES dbo.service_packages(code);
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_horses_next_service_plan') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_horses_next_plan_catalog') THEN
         ALTER TABLE dbo.horses ADD CONSTRAINT fk_horses_next_plan_catalog 
         FOREIGN KEY (next_service_plan) REFERENCES dbo.service_packages(code);
     END IF;

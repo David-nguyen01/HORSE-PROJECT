@@ -88,8 +88,8 @@ public class FinanceService {
         add(sql, args, " and ft.transaction_date<=?", to);
         add(sql, args, " and ft.transaction_type=?", cleanUpper(type));
         add(sql, args, " and ft.category=?", cleanUpper(category));
-        sql.append(" order by ft.transaction_date desc,ft.created_at desc offset ? rows fetch next ? rows only");
-        args.add(page * size); args.add(size);
+        sql.append(" order by ft.transaction_date desc,ft.created_at desc limit ? offset ?");
+        args.add(size); args.add(page * size);
         return jdbc.query(sql.toString(), this::map, args.toArray());
     }
 

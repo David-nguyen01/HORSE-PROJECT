@@ -30,7 +30,16 @@ import {
 import { api, careRoutineApi, getAuth, pageContent, stableCareApi } from './api'
 import { horseIcon } from './navIcons'
 import { handleImageFallback } from './imageFallback'
-import { isTrainingScheduleActiveForDay } from './trainingRules'
+import {
+  buildTrainingScheduleQueryParams,
+  computeTrainingScheduleCounts,
+  filterTrainingSchedules,
+  formatScheduleTime,
+  formatTimeHHmm,
+  formatTimeRange,
+  getTrainingEmptyStateMessage,
+  isTrainingScheduleActiveForDay,
+} from './trainingRules'
 import { useStablesQuickFeed } from './useStablesQuickFeed'
 
 export { useStablesQuickFeed } from './useStablesQuickFeed'
@@ -73,16 +82,6 @@ const SEVERITY_LABELS = {
   HIGH: 'Nghiêm trọng',
   MEDIUM: 'Trung bình',
   LOW: 'Nhẹ / Theo dõi',
-}
-
-const formatTimeHHmm = (val) => {
-  if (!val) return ''
-  const str = String(val).trim()
-  const m = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/)
-  if (m) {
-    return `${m[1].padStart(2, '0')}:${m[2]}`
-  }
-  return str
 }
 
 const HEALTH_STATUS_MAP = {
@@ -158,23 +157,6 @@ const formatVNDateTime = (val) => {
   } catch {
     return String(val)
   }
-}
-
-const formatTimeRange = (start, end) => {
-  if (!start && !end) return '—'
-  const fmt = (val) => {
-    if (!val) return ''
-    try {
-      const d = new Date(val)
-      if (isNaN(d.getTime())) return String(val)
-      return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-    } catch {
-      return String(val)
-    }
-  }
-  const s = fmt(start)
-  const e = fmt(end)
-  return s && e ? `${s} - ${e}` : (s || e)
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -2441,60 +2423,6 @@ function RoutineBackfillModal({ onClose, onExecuted }) {
 // =========================================================================
 // 1b. TRAINING PREPARATION / READINESS (STABLE STAFF)
 // =========================================================================
-export function isActionableTrainingSchedule(schedule) {
-  if (!schedule) return false
-  const status = (schedule.status || schedule.sessionStatus || '').trim().toUpperCase()
-  return status === 'PREPARING' || status === 'READY'
-}
-
-export function filterTrainingSchedules(schedules, statusFilter = 'ALL') {
-  if (!Array.isArray(schedules)) return []
-  const actionable = schedules.filter(isActionableTrainingSchedule)
-  if (!statusFilter || statusFilter === 'ALL') return actionable
-  return actionable.filter((s) => s.status === statusFilter)
-}
-
-export function computeTrainingScheduleCounts(schedules) {
-  const list = Array.isArray(schedules) ? schedules.filter(isActionableTrainingSchedule) : []
-  return {
-    all: list.length,
-    preparing: list.filter((s) => s.status === 'PREPARING').length,
-    ready: list.filter((s) => s.status === 'READY').length,
-  }
-}
-
-export function formatScheduleTime(item) {
-  if (!item) return '05:00 - 11:00'
-  if (item.operatingWindowStart && item.operatingWindowEnd) {
-    return `${formatTimeHHmm(item.operatingWindowStart)} - ${formatTimeHHmm(item.operatingWindowEnd)}`
-  }
-  if (item.startTime && item.endTime) {
-    return `${formatTimeHHmm(item.startTime)} - ${formatTimeHHmm(item.endTime)}`
-  }
-  if (item.scheduledStart && item.scheduledEnd) {
-    return formatTimeRange(item.scheduledStart, item.scheduledEnd)
-  }
-  return '05:00 - 11:00'
-}
-
-export function buildTrainingScheduleQueryParams(appliedDate) {
-  if (!appliedDate) return {}
-  return { from: appliedDate, to: appliedDate }
-}
-
-export function getTrainingEmptyStateMessage(appliedDate, formatVNDateFn = formatVNDate) {
-  if (appliedDate) {
-    return {
-      title: `Không có buổi tập nào trong ngày ${formatVNDateFn(appliedDate)}`,
-      subtitle: 'Hiện tại chưa có lịch huấn luyện nào cho ngựa do bạn phụ trách cần chuẩn bị trong ngày này.',
-    }
-  }
-  return {
-    title: 'Không có buổi tập nào cần chuẩn bị',
-    subtitle: 'Hiện tại chưa có lịch huấn luyện nào cho ngựa do bạn phụ trách cần chuẩn bị.',
-  }
-}
-
 function TrainingPreparationView({ isStaff }) {
   const [searchParams] = useSearchParams()
   const highlightScheduleId = searchParams.get('scheduleId')
