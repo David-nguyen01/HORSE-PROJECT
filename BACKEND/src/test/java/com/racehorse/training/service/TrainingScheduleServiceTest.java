@@ -330,6 +330,9 @@ class TrainingScheduleServiceTest {
         service.cancel(scheduleId, actorId, false, true);
 
         verify(horseAccessService).requireTrainingAccess(horseId, actorId, false, true, false);
+        verify(jdbc).queryForObject(
+                "select count(*) from pg_catalog.pg_tables where schemaname='dbo' and tablename=?",
+                Integer.class, "training_evaluation_files");
         verify(jdbc).update("delete from trial_run_bookings where training_schedule_id=?", scheduleId);
         verify(jdbc).update("delete from training_schedules where id=?", scheduleId);
     }

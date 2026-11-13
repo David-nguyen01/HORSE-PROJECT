@@ -29,7 +29,7 @@ final class TrainingSessionDeletion {
     }
 
     private static boolean tableExists(JdbcTemplate jdbc, String name) {
-        Integer count = jdbc.queryForObject("select count(*) from sys.tables where schema_id=SCHEMA_ID('dbo') and name=?",
+        Integer count = jdbc.queryForObject("select count(*) from pg_catalog.pg_tables where schemaname='dbo' and tablename=?",
                 Integer.class, name);
         return count != null && count > 0;
     }
