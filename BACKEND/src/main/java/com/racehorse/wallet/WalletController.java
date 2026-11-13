@@ -101,8 +101,8 @@ public class WalletController {
         return service.acceptVnpayIpn(parameters);
     }
 
-    @GetMapping("/vnpay/return")
-    public ResponseEntity<String> vnpayReturn(@RequestParam Map<String, String> parameters) {
+    @GetMapping(value = "/vnpay/return", produces = MediaType.TEXT_HTML_VALUE)
+    public ResponseEntity<String> vnpayReturnHtml(@RequestParam Map<String, String> parameters) {
         Map<String, String> result = service.acceptVnpayIpn(parameters);
         boolean paid = "00".equals(parameters.get("vnp_ResponseCode"))
                 && ("00".equals(result.get("RspCode")) || "02".equals(result.get("RspCode")));
@@ -115,6 +115,16 @@ public class WalletController {
                 + "margin:12vh auto;padding:24px;color:#173d32\"><h1>" + title + "</h1><p>" + detail
                 + "</p><small>Đây là giao dịch thử nghiệm trên VNPAY Sandbox.</small></body></html>";
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
+    }
+
+    @GetMapping(value = "/vnpay/return", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> vnpayReturnGet(@RequestParam Map<String, String> parameters) {
+        return service.acceptVnpayReturn(parameters);
+    }
+
+    @PostMapping("/vnpay/return")
+    public Map<String, Object> vnpayReturnPost(@RequestBody Map<String, String> parameters) {
+        return service.acceptVnpayReturn(parameters);
     }
 
     private String clientIp(HttpServletRequest request) {
