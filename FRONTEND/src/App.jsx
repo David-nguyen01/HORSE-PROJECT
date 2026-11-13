@@ -1,10 +1,10 @@
 import { Component, createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Activity, AlertTriangle, ArrowLeft, ArchiveRestore, Award, Bell, Calendar, Check, ChevronRight, CircleUserRound, Clock, DollarSign, FileSpreadsheet, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Package, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Utensils, Warehouse, X, Zap , ClipboardList } from 'lucide-react'
-import { api, authApi, checkLocalBackend, clearAuth, getAuth, getApiUrl, setCustomApiUrl, localApiUrl, pageContent, reportingApi, saveAuth } from './api'
+import { Activity, AlertTriangle, ArrowLeft, ArchiveRestore, Award, Bell, Calendar, Check, ChevronRight, CircleUserRound, Clock, DollarSign, FileSpreadsheet, FileText, Gauge, HeartPulse, Home, LayoutDashboard, LogOut, Menu, Package, PackageCheck, Plus, ScrollText, Search, Settings2, ShieldCheck, Sparkles, Trash2, Upload, UsersRound, Utensils, Warehouse, X, Zap , ClipboardList } from 'lucide-react'
+import { api, authApi, broadcastApi, checkLocalBackend, clearAuth, getAuth, getApiUrl, setCustomApiUrl, localApiUrl, pageContent, reportingApi, saveAuth, walletAlertApi } from './api'
 import { walletIcon, horseIcon, trainingIcon, scheduleIcon } from './navIcons'
 import { handleImageFallback } from './imageFallback'
-import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, InventoryCatalogPage, PermissionsPage, StablesPage, TaskCatalogPage } from './AdminPages'
+import { AccountsPage, AdminDashboard, ArchivedHorses, AuditLogs, InventoryCatalogPage, PermissionsPage, ServicePackageCatalogPage, StablesPage, TaskCatalogPage } from './AdminPages'
 import { horsePortrait } from './HorseAvatar'
 
 const FitnessPage = lazy(() => import('./FitnessPage'))
@@ -267,6 +267,196 @@ function AuthShell({ mode }) {
 
 function Field({ label, children }) { return <label className="field"><span>{label}</span>{children}</label> }
 
+export function BroadcastAcknowledgementModal({ user }) {
+  const [activeOwnerId, setActiveOwnerId] = useState(user?.id)
+  const [broadcasts, setBroadcasts] = useState([])
+  const [agreed, setAgreed] = useState(false)
+  const [dismissing, setDismissing] = useState(false)
+  const [error, setError] = useState('')
+
+  const isOwner = hasAny(user, 'HORSE_OWNER')
+  const userId = user?.id
+  const currentUserRef = useRef(userId)
+  currentUserRef.current = userId
+
+  useEffect(() => {
+    setActiveOwnerId(userId)
+    setBroadcasts([])
+    setAgreed(false)
+    setDismissing(false)
+    setError('')
+    if (!isOwner || !userId) {
+      return
+    }
+    let cancelled = false
+    broadcastApi.getActiveBroadcasts()
+      .then((data) => {
+        if (cancelled) return
+        const list = Array.isArray(data) ? data : (data?.content || [])
+        setBroadcasts(list.filter((b) => !b.dismissed))
+        setActiveOwnerId(userId)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBroadcasts([])
+          setActiveOwnerId(userId)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOwner, userId])
+
+  // Discard stale data during render if user.id does not match activeOwnerId
+  const visibleBroadcasts = userId === activeOwnerId ? broadcasts : []
+  if (!isOwner || visibleBroadcasts.length === 0) return null
+
+  const current = visibleBroadcasts[0]
+
+  const handleDismiss = async () => {
+    if (!agreed || dismissing || !current) return
+    const capturedUserId = userId
+    const targetNotificationId = current.id
+    setDismissing(true)
+    setError('')
+    try {
+      await broadcastApi.dismissBroadcast(targetNotificationId)
+      // Check live ref to ensure active account has not changed during async call
+      if (currentUserRef.current === capturedUserId) {
+        setBroadcasts((prev) => prev.filter((b) => b.id !== targetNotificationId))
+        setAgreed(false)
+      }
+    } catch (err) {
+      if (currentUserRef.current === capturedUserId) {
+        setError(err.message || 'Không thể đóng thông báo. Vui lòng thử lại.')
+      }
+    } finally {
+      if (currentUserRef.current === capturedUserId) {
+        setDismissing(false)
+      }
+    }
+  }
+
+  return (
+    <div className="modal-backdrop broadcast-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="broadcast-modal-title">
+      <div className="broadcast-modal-card">
+        <div className="broadcast-modal-badge">
+          <AlertTriangle size={14} /> Thông báo hệ thống
+        </div>
+        <h2 id="broadcast-modal-title" className="broadcast-modal-title">
+          {current.title || 'Thông báo ngừng cung cấp gói dịch vụ'}
+        </h2>
+        {current.createdAt && (
+          <div className="broadcast-modal-meta">
+            <Clock size={14} />
+            <span>{new Date(current.createdAt).toLocaleDateString('vi-VN')}</span>
+          </div>
+        )}
+        <div className="broadcast-modal-body">
+          {current.message}
+        </div>
+        {error && <div className="notice error broadcast-modal-error"><X size={16} /> {error}</div>}
+        <label className="broadcast-acknowledge-checkbox">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            disabled={dismissing}
+          />
+          <span>Tôi đã đọc thông báo</span>
+        </label>
+        <div className="broadcast-modal-actions">
+          <button
+            type="button"
+            className="button primary"
+            disabled={!agreed || dismissing}
+            onClick={handleDismiss}
+          >
+            {dismissing ? 'Đang xử lý…' : 'Đóng thông báo'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function DiscontinuedExpiryWarningBanner({ user }) {
+  const [activeOwnerId, setActiveOwnerId] = useState(user?.id)
+  const [summaryData, setSummaryData] = useState(null)
+  const [sessionDismissed, setSessionDismissed] = useState(false)
+  const isOwner = hasAny(user, 'HORSE_OWNER')
+  const userId = user?.id
+  const storageKey = userId ? `racehorse.dismissed_expiry_warning_${userId}` : null
+
+  useEffect(() => {
+    setActiveOwnerId(userId)
+    setSummaryData(null)
+    if (!isOwner || !userId) {
+      setSessionDismissed(false)
+      return
+    }
+    if (storageKey && typeof window !== 'undefined' && sessionStorage.getItem(storageKey) === 'true') {
+      setSessionDismissed(true)
+    } else {
+      setSessionDismissed(false)
+    }
+
+    let cancelled = false
+    walletAlertApi.getDiscontinuedExpirySummary()
+      .then((data) => {
+        if (!cancelled) {
+          setSummaryData(data)
+          setActiveOwnerId(userId)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSummaryData(null)
+          setActiveOwnerId(userId)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOwner, userId, storageKey])
+
+  // Discard stale data during render if user.id does not match activeOwnerId
+  const summary = userId === activeOwnerId ? summaryData : null
+  if (!isOwner || !summary?.hasUnresolvedExpiredPackages || sessionDismissed) {
+    return null
+  }
+
+  const handleDismissSession = () => {
+    if (storageKey && typeof window !== 'undefined') {
+      sessionStorage.setItem(storageKey, 'true')
+    }
+    setSessionDismissed(true)
+  }
+
+  return (
+    <div className="discontinued-expiry-banner" role="alert" aria-live="polite">
+      <div className="discontinued-expiry-banner-content">
+        <AlertTriangle size={18} className="discontinued-expiry-banner-icon" />
+        <span>{summary.warningMessage || 'Có ngựa của bạn có gói dịch vụ đã ngừng cung cấp và đã hết hạn. Vui lòng kiểm tra và chọn gói mới.'}</span>
+      </div>
+      <div className="discontinued-expiry-banner-actions">
+        <Link to="/wallet" className="discontinued-expiry-banner-link">
+          Ví &amp; gói dịch vụ
+        </Link>
+        <button
+          type="button"
+          className="discontinued-expiry-banner-close"
+          onClick={handleDismissSession}
+          title="Đóng thông báo phiên này"
+          aria-label="Đóng thông báo phiên này"
+        >
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function AppLayout() {
   const { user, logout } = useAuth(); const navigate = useNavigate(); const [open, setOpen] = useState(false)
   const isManager = hasAny(user, 'CLUB_MANAGER')
@@ -307,6 +497,7 @@ function AppLayout() {
     ...(hasAny(user, 'CLUB_MANAGER') ? [
       { to: '/races', label: 'Quản lý giải đua', icon: Award },
       { to: '/admin/finance-reports', label: 'Tài chính & Báo cáo', icon: DollarSign },
+      { to: '/admin/service-packages', label: 'Quản lý gói dịch vụ', icon: PackageCheck },
       { to: '/admin/stables', label: 'Chuồng trại', icon: Warehouse },
       { to: '/admin/care-tasks', label: 'Quản lý nhiệm vụ Stable', icon: ClipboardList },
       { to: '/admin/inventory-catalog', label: 'Vật tư & Kho hàng', icon: Package },
@@ -334,8 +525,9 @@ function AppLayout() {
       </nav>
       <div className="sidebar-foot"><div className="user-chip"><span>{initials(user?.username)}</span><div><b>{user?.username}</b><small>{ROLE_LABELS[user?.roles?.[0]] || user?.roles?.[0]}</small></div></div><button className="logout-button" onClick={doLogout}><LogOut size={18} /> Đăng xuất</button></div>
     </aside>
-    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap"><Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:isVet?<Navigate to="/vet" replace/>:<Dashboard />} /><Route path="wallet" element={hasAny(user,'HORSE_OWNER') ? <WalletPage /> : <Navigate to="/" replace />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="vet" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="vet/:tab" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER') ? <FitnessPage /> : hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingMetricsPage user={user} isOwner={!hasAny(user, 'HEAD_TRAINER')} /> : <Navigate to="/" replace />} /><Route path="training-schedule" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingSchedulePage isOwner={!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')} isHeadTrainer={hasAny(user, 'HEAD_TRAINER')} canEdit={hasAny(user, 'CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="training-reception" element={hasAny(user, 'HEAD_TRAINER') && !hasAny(user, 'CLUB_MANAGER') ? <TrainingReceptionPage /> : <Navigate to="/" replace />} /><Route path="training-emergency" element={hasAny(user,'HEAD_TRAINER') && !hasAny(user,'CLUB_MANAGER') ? <TrainingEmergencyPage /> : <Navigate to="/" replace />} /><Route path="races" element={hasAny(user,'CLUB_MANAGER') ? <TrainingRacePage isManager={true} isOwner={false} /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/finance-reports" element={hasAny(user,'CLUB_MANAGER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="finance" element={<Navigate to="/admin/finance-reports" replace/>}/><Route path="my-reports" element={hasAny(user,'HORSE_OWNER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="admin/care-tasks" element={hasAny(user,'CLUB_MANAGER')?<TaskCatalogPage/>:<Navigate to="/" replace/>}/>
+    <div className="main-column"><header className="topbar"><button className="icon-button menu-button" onClick={() => setOpen(true)}><Menu /></button><div><span className="online-dot" /> {isStaff ? 'Ca trực chăm sóc chuồng đang hoạt động' : 'Hệ thống đang hoạt động'}</div><div className="topbar-actions"><NotificationBell /><div className="top-user"><CircleUserRound size={20} /><span>{user?.email}</span></div></div></header><div className="page-wrap">{hasAny(user, 'HORSE_OWNER') && <DiscontinuedExpiryWarningBanner key={user?.id} user={user} />}<Suspense fallback={<LoadingScreen />}><Routes><Route index element={hasAny(user,'CLUB_MANAGER')?<AdminDashboard/>:hasAny(user,'STABLE_STAFF')?<Navigate to="/stable-care/tasks" replace/>:isVet?<Navigate to="/vet" replace/>:<Dashboard />} /><Route path="wallet" element={hasAny(user,'HORSE_OWNER') ? <WalletPage /> : <Navigate to="/" replace />} /><Route path="horses" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF') ? <Horses /> : <Navigate to="/" replace />} /><Route path="horses/:id" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER', 'VETERINARIAN', 'STABLE_STAFF') ? <HorseDetail /> : <Navigate to="/" replace />} /><Route path="vet" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="vet/:tab" element={isVet ? <VetPage /> : <Navigate to="/" replace />} /><Route path="fitness" element={hasAny(user, 'CLUB_MANAGER') ? <FitnessPage /> : hasAny(user, 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingMetricsPage user={user} isOwner={!hasAny(user, 'HEAD_TRAINER')} /> : <Navigate to="/" replace />} /><Route path="training-schedule" element={hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER', 'HORSE_OWNER') ? <TrainingSchedulePage isOwner={!hasAny(user, 'CLUB_MANAGER', 'HEAD_TRAINER')} isHeadTrainer={hasAny(user, 'HEAD_TRAINER')} canEdit={hasAny(user, 'CLUB_MANAGER')} /> : <Navigate to="/" replace />} /><Route path="training-reception" element={hasAny(user, 'HEAD_TRAINER') && !hasAny(user, 'CLUB_MANAGER') ? <TrainingReceptionPage /> : <Navigate to="/" replace />} /><Route path="training-emergency" element={hasAny(user,'HEAD_TRAINER') && !hasAny(user,'CLUB_MANAGER') ? <TrainingEmergencyPage /> : <Navigate to="/" replace />} /><Route path="races" element={hasAny(user,'CLUB_MANAGER') ? <TrainingRacePage isManager={true} isOwner={false} /> : <Navigate to="/" replace />} /><Route path="stable-care" element={hasAny(user, 'STABLE_STAFF') ? <Navigate to="/stable-care/tasks" replace /> : hasAny(user, 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="stable-care/:tab" element={hasAny(user, 'STABLE_STAFF', 'HEAD_TRAINER', 'VETERINARIAN') ? <StableCarePage /> : hasAny(user, 'CLUB_MANAGER') ? <Navigate to="/admin/stables" replace /> : <Navigate to="/" replace />} /><Route path="admin" element={<Navigate to="/" replace/>}/><Route path="admin/finance-reports" element={hasAny(user,'CLUB_MANAGER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="finance" element={<Navigate to="/admin/finance-reports" replace/>}/><Route path="my-reports" element={hasAny(user,'HORSE_OWNER')?<FinanceReportsPage/>:<Navigate to="/" replace/>}/><Route path="admin/care-tasks" element={hasAny(user,'CLUB_MANAGER')?<TaskCatalogPage/>:<Navigate to="/" replace/>}/><Route path="admin/service-packages" element={hasAny(user,'CLUB_MANAGER')?<ServicePackageCatalogPage/>:<Navigate to="/" replace/>}/>
 <Route path="admin/stables" element={hasAny(user,'CLUB_MANAGER')?<StablesPage/>:<Navigate to="/" replace/>}/><Route path="admin/inventory-catalog" element={hasAny(user,'CLUB_MANAGER')?<InventoryCatalogPage/>:<Navigate to="/" replace/>}/><Route path="stables" element={<Navigate to="/admin/stables" replace/>}/><Route path="admin/accounts" element={hasAny(user,'CLUB_MANAGER')?<AccountsPage/>:<Navigate to="/" replace/>}/><Route path="admin/permissions" element={hasAny(user,'CLUB_MANAGER')?<PermissionsPage/>:<Navigate to="/" replace/>}/><Route path="admin/archived-horses" element={hasAny(user,'CLUB_MANAGER')?<ArchivedHorses/>:<Navigate to="/" replace/>}/><Route path="admin/audit-logs" element={hasAny(user,'CLUB_MANAGER')?<AuditLogs/>:<Navigate to="/" replace/>}/><Route path="users" element={<Navigate to="/admin/accounts" replace/>}/><Route path="*" element={<Navigate to="/" replace/>}/></Routes></Suspense></div></div>
+    {hasAny(user, 'HORSE_OWNER') && <BroadcastAcknowledgementModal key={user?.id} user={user} />}
     {open && <button className="sidebar-backdrop" onClick={() => setOpen(false)} />}
   </div>
 }

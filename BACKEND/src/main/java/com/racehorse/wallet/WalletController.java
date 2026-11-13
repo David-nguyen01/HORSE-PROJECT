@@ -1,9 +1,12 @@
 package com.racehorse.wallet;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -27,6 +30,12 @@ public class WalletController {
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.WalletView wallet(@AuthenticationPrincipal Jwt jwt) {
         return service.wallet(UUID.fromString(jwt.getSubject()));
+    }
+
+    @GetMapping("/discontinued-expiry-summary")
+    @PreAuthorize("hasRole('HORSE_OWNER')")
+    public WalletService.DiscontinuedExpirySummaryResponse discontinuedExpirySummary(@AuthenticationPrincipal Jwt jwt) {
+        return service.discontinuedExpirySummary(UUID.fromString(jwt.getSubject()));
     }
 
     @GetMapping("/history")
@@ -56,14 +65,14 @@ public class WalletController {
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.PlanQuote quote(@AuthenticationPrincipal Jwt jwt,
                                          @Valid @RequestBody PlanRequest request) {
-        return service.quote(UUID.fromString(jwt.getSubject()), request.horseId(), request.plan());
+        return service.quote(UUID.fromString(jwt.getSubject()), request.horseId(), request.packageCode());
     }
 
     @PostMapping("/plans")
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.WalletView purchase(@AuthenticationPrincipal Jwt jwt,
                                              @Valid @RequestBody PlanRequest request) {
-        return service.purchase(UUID.fromString(jwt.getSubject()), request.horseId(), request.plan(),
+        return service.purchase(UUID.fromString(jwt.getSubject()), request.horseId(), request.packageCode(),
                 request.acceptedTerms());
     }
 
@@ -71,7 +80,7 @@ public class WalletController {
     @PreAuthorize("hasRole('HORSE_OWNER')")
     public WalletService.WalletView scheduleNextPlan(@AuthenticationPrincipal Jwt jwt,
             @PathVariable UUID horseId, @Valid @RequestBody NextPlanRequest request) {
-        return service.scheduleNextPlan(UUID.fromString(jwt.getSubject()), horseId, request.plan(),
+        return service.scheduleNextPlan(UUID.fromString(jwt.getSubject()), horseId, request.packageCode(),
                 request.acceptedTerms());
     }
 
@@ -125,6 +134,38 @@ public class WalletController {
     }
 
     public record TopUpRequest(@NotNull @Min(100_000) Long amountVnd) { }
-    public record PlanRequest(@NotNull UUID horseId, @NotNull WalletPlan plan, boolean acceptedTerms) { }
-    public record NextPlanRequest(@NotNull WalletPlan plan, boolean acceptedTerms) { }
+
+    public record PlanRequest(
+            @NotNull(message = "ID ngựa không được để trống")
+            UUID horseId,
+            @NotBlank(message = "Mã gói dịch vụ không được để trống")
+            @Size(max = 30, message = "Mã gói dịch vụ không được vượt quá 30 ký tự")
+            @JsonAlias({"plan", "packageCode"})
+            String packageCode,
+            boolean acceptedTerms) {
+
+        public PlanRequest(UUID horseId, WalletPlan plan, boolean acceptedTerms) {
+            this(horseId, plan != null ? plan.name() : null, acceptedTerms);
+        }
+
+        public String plan() {
+            return packageCode;
+        }
+    }
+
+    public record NextPlanRequest(
+            @NotBlank(message = "Mã gói dịch vụ không được để trống")
+            @Size(max = 30, message = "Mã gói dịch vụ không được vượt quá 30 ký tự")
+            @JsonAlias({"plan", "packageCode"})
+            String packageCode,
+            boolean acceptedTerms) {
+
+        public NextPlanRequest(WalletPlan plan, boolean acceptedTerms) {
+            this(plan != null ? plan.name() : null, acceptedTerms);
+        }
+
+        public String plan() {
+            return packageCode;
+        }
+    }
 }

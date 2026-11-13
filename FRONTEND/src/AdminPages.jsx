@@ -2168,3 +2168,4 @@ function EditInventoryItemModal({ item, onClose, onSaved }) {
 }
 
 export { default as TaskCatalogPage } from './TaskCatalogPage'
+export { default as ServicePackageCatalogPage } from './ServicePackageCatalogPage'

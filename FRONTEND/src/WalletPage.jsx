@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { api } from './api'
+import { api, servicePackageApi } from './api'
+import { sanitizeMojibake } from './servicePackageValidation'
 
 const money = value => new Intl.NumberFormat('vi-VN').format(Number(value || 0)) + ' ₫'
 const day = value => value ? new Intl.DateTimeFormat('vi-VN').format(new Date(`${value}T00:00:00`)) : '—'
 const todayVN = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-const plans = [
-  { code: 'P30', name: '1 tháng', price: 5000000 },
-  { code: 'P90', name: '3 tháng', price: 15000000 },
-  { code: 'P365', name: '12 tháng', price: 60000000 },
+const defaultPlans = [
+  { code: 'P30', name: '1 tháng', price: 5000000, durationDays: 30 },
+  { code: 'P90', name: '3 tháng', price: 15000000, durationDays: 90 },
+  { code: 'P365', name: '12 tháng', price: 60000000, durationDays: 365 },
 ]
-const planName = code => plans.find(item => item.code === code)?.name || 'Chưa có gói'
-const planPrice = code => plans.find(item => item.code === code)?.price || 0
+let cachedActivePlans = defaultPlans
+const planName = code => cachedActivePlans.find(item => item.code === code)?.name || defaultPlans.find(item => item.code === code)?.name || code || 'Chưa có gói'
+const planPrice = code => cachedActivePlans.find(item => item.code === code)?.price || defaultPlans.find(item => item.code === code)?.price || 0
 const historyLabels = { WALLET_TOPUP: 'Nạp ví', SERVICE_FEE: 'Thanh toán gói', LATE_FEE: 'Phí trả chậm' }
 const historyDate = value => value ? new Intl.DateTimeFormat('vi-VN', {
   timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -22,10 +24,16 @@ const planDetails = {
   P90: ['Thời hạn 3 tháng', 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo'],
   P365: ['Thời hạn 12 tháng', 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo'],
 }
+const getPlanDetails = plan => {
+  if (planDetails[plan.code]) return planDetails[plan.code]
+  if (plan.description) return [plan.description, 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo']
+  return [`Thời hạn ${plan.durationDays || 30} ngày`, 'Theo dõi gói theo từng ngựa', 'Có thể đặt gói cho kỳ tiếp theo']
+}
 
 export default function WalletPage() {
   const location = useLocation()
   const [wallet, setWallet] = useState(null)
+  const [plans, setPlans] = useState(cachedActivePlans)
   const [amount, setAmount] = useState('100000')
   const [order, setOrder] = useState(null)
   const [selectedPlans, setSelectedPlans] = useState({})
@@ -54,8 +62,22 @@ export default function WalletPage() {
   }, [])
 
   const refresh = useCallback(async () => {
-    const data = await api('/api/wallet')
+    const [data, packages] = await Promise.all([
+      api('/api/wallet'),
+      servicePackageApi.getActive().catch(() => null),
+    ])
     setWallet(data)
+    if (Array.isArray(packages) && packages.length > 0) {
+      const mapped = packages.map(p => ({
+        code: p.code,
+        name: sanitizeMojibake(p.name),
+        price: p.priceVnd != null ? Number(p.priceVnd) : (p.price || 0),
+        durationDays: p.durationDays,
+        description: sanitizeMojibake(p.description),
+      }))
+      setPlans(mapped)
+      cachedActivePlans = mapped
+    }
     await loadHistory(0)
     window.dispatchEvent(new Event('wallet-updated'))
   }, [loadHistory])
@@ -184,15 +206,26 @@ export default function WalletPage() {
           <span className="wallet-plan-card-kicker">GÓI DỊCH VỤ</span>
           <h3>{plan.name}</h3>
           <p className="wallet-plan-card-price">{money(plan.price)}<small> / ngựa</small></p>
-          <ul>{planDetails[plan.code].map(detail => <li key={detail}><span aria-hidden="true">✓</span>{detail}</li>)}</ul>
+          <ul>{getPlanDetails(plan).map(detail => <li key={detail}><span aria-hidden="true">✓</span>{detail}</li>)}</ul>
           <a className="wallet-plan-card-action" href="#wallet-horses">Chọn cho ngựa của bạn</a>
         </article>)}
       </div>
       {!horses.length && <p>Chưa có ngựa. <Link to="/horses">Thêm hồ sơ ngựa</Link> để chọn gói.</p>}
       <div className="wallet-horse-list" id="wallet-horses">{horses.map(horse => {
-        const selected = selectedPlans[horse.horseId] || horse.nextPlan || horse.activePlan || 'P30'
+        const activeCodes = new Set(plans.map(p => p.code))
+        const selected = selectedPlans[horse.horseId] || (activeCodes.has(horse.nextPlan) ? horse.nextPlan : null) || (activeCodes.has(horse.activePlan) ? horse.activePlan : null) || plans[0]?.code || 'P30'
         const paid = horse.paymentStatus === 'PAID' && horse.paidUntil && horse.paidUntil >= todayVN()
-        return <article className="wallet-horse" key={horse.horseId}>
+        const hasAlert = Boolean(horse.hasDiscontinuedExpiryAlert)
+        return <article className={`wallet-horse ${hasAlert ? 'wallet-horse--discontinued-alert' : ''}`} key={horse.horseId}>
+          {hasAlert && (
+            <span
+              className="wallet-horse-floating-alert"
+              title="Gói dịch vụ đã ngừng cung cấp và đã hết hạn. Vui lòng chọn gói mới."
+              aria-label="Cảnh báo gói dịch vụ đã ngừng cung cấp"
+            >
+              !
+            </span>
+          )}
           <div><Link to={`/horses/${horse.horseId}`}><b>{horse.name}</b></Link><small>{horse.code}</small></div>
           <div><small>Trạng thái</small><strong>{paid ? 'Đã thanh toán' : 'Chờ thanh toán'}</strong></div>
           <div><small>Gói hiện tại</small><b>{planName(horse.activePlan)}</b></div>

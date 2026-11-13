@@ -66,4 +66,29 @@ class DatabaseCompatibilityConfigurationTest {
         assertThat(cleanSql(original, false))
                 .isEqualTo("select id from dbo.horses with (UPDLOCK,HOLDLOCK) where id=?");
     }
+
+    @Test
+    void postgresRewritesJsonValueAndPrefixesServicePackages() {
+        String query = "select id from service_packages where JSON_VALUE(data_json, '$.packageId') = ?";
+
+        assertThat(cleanSql(query, true))
+                .isEqualTo("select id from dbo.service_packages where dbo.json_value(data_json, '$.packageId') = ?");
+        assertThat(cleanSql(query, false))
+                .isEqualTo("select id from dbo.service_packages where JSON_VALUE(data_json, '$.packageId') = ?");
+    }
+
+    @Test
+    void broadcastDismissalQueryCompatibleOnBothDialects() {
+        String dismissalQuery = "select count(*) from module_records where module_code='SYSTEM' "
+                + "and record_type='PACKAGE_DISCONTINUATION_DISMISSAL' and user_id=? "
+                + "and lower(JSON_VALUE(data_json, '$.notificationId')) = lower(?)";
+
+        String pgSql = cleanSql(dismissalQuery, true);
+        assertThat(pgSql).contains("from dbo.module_records");
+        assertThat(pgSql).contains("lower(dbo.json_value(data_json, '$.notificationId')) = lower(?)");
+
+        String sqlServerSql = cleanSql(dismissalQuery, false);
+        assertThat(sqlServerSql).contains("from dbo.module_records");
+        assertThat(sqlServerSql).contains("lower(JSON_VALUE(data_json, '$.notificationId')) = lower(?)");
+    }
 }

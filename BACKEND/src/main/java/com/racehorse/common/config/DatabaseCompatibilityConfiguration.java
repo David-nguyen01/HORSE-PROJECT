@@ -35,7 +35,7 @@ public class DatabaseCompatibilityConfiguration {
             "horse_profile_files", "horses", "login_sessions", "module_records",
             "notifications", "owner_reports", "preventive_care_schedules", "race_events",
             "race_results", "racetrack_lanes", "racetracks", "role_permissions",
-            "stables", "stored_files", "telemetry_readings", "telemetry_sessions",
+            "service_packages", "stables", "stored_files", "telemetry_readings", "telemetry_sessions",
             "training_evaluations", "training_locks", "training_plan_phases",
             "training_plans", "training_schedules", "trial_run_bookings", "user_roles", "users"
         );
@@ -81,6 +81,8 @@ public class DatabaseCompatibilityConfiguration {
                 sql = sql.replaceAll(
                         "(?i)\\b(is_active|is_primary_contact|service_override|granted|injured|enabled|closes_next_day)\\s*=\\s*0\\b",
                         "$1=false");
+                sql = sql.replaceAll("(?i)\\b(?<!dbo\\.)JSON_VALUE\\s*\\(", "dbo.json_value(");
+                sql = sql.replaceAll("(?i)\\b(?<!dbo\\.)JSON_MODIFY\\s*\\(", "dbo.json_modify(");
                 // PostgreSQL uses row locks after SELECT, not SQL Server table hints.
                 sql = sql.replaceAll("(?i)\\s+with\\s*\\([a-zA-Z0-9_,\\s]*(?:updlock|holdlock)[a-zA-Z0-9_,\\s]*\\)", "");
             }

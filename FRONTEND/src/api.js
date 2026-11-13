@@ -69,7 +69,21 @@ export function getAuth() {
 }
 
 export function saveAuth(auth) { sessionStorage.setItem(STORAGE_KEY, JSON.stringify(auth)) }
-export function clearAuth() { sessionStorage.removeItem(STORAGE_KEY) }
+export function clearAuth() {
+  sessionStorage.removeItem(STORAGE_KEY)
+  if (typeof window !== 'undefined') {
+    try {
+      for (let i = sessionStorage.length - 1; i >= 0; i--) {
+        const key = sessionStorage.key(i)
+        if (key && key.startsWith('racehorse.dismissed_expiry_warning_')) {
+          sessionStorage.removeItem(key)
+        }
+      }
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
 
 async function parseResponse(response) {
   if (response.status === 204) return null
@@ -270,6 +284,29 @@ export const careRoutineApi = {
   moveToReserve: (id) => api(`/api/care-routine-definitions/${id}/move-to-reserve`, { method: 'POST' }),
   delete: (id) => api(`/api/care-routine-definitions/${id}`, { method: 'DELETE' }),
   reorder: (orderedIds) => api('/api/care-routine-definitions/reorder', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
+}
+
+export const servicePackageApi = {
+  getActive: () => api('/api/service-packages/active'),
+  getReserve: () => api('/api/service-packages/reserve'),
+  getCatalog: () => api('/api/service-packages/catalog'),
+  get: (id) => api(`/api/service-packages/${id}`),
+  create: (payload) => api('/api/service-packages', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => api(`/api/service-packages/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  transfer: (id, active) => api(`/api/service-packages/${id}/transfer`, { method: 'POST', body: JSON.stringify({ active }) }),
+  moveToActive: (id) => api(`/api/service-packages/${id}/move-to-active`, { method: 'POST' }),
+  moveToReserve: (id) => api(`/api/service-packages/${id}/move-to-reserve`, { method: 'POST' }),
+  delete: (id) => api(`/api/service-packages/${id}`, { method: 'DELETE' }),
+  reorder: (orderedIds) => api('/api/service-packages/reorder', { method: 'PUT', body: JSON.stringify({ orderedIds }) }),
+}
+
+export const broadcastApi = {
+  getActiveBroadcasts: () => api('/api/notifications/broadcasts'),
+  dismissBroadcast: (id) => api(`/api/notifications/broadcasts/${id}/dismiss`, { method: 'POST' }),
+}
+
+export const walletAlertApi = {
+  getDiscontinuedExpirySummary: () => api('/api/wallet/discontinued-expiry-summary'),
 }
 
 export const inventoryApi = stableCareApi
