@@ -26,6 +26,14 @@ class DatabaseCompatibilityConfigurationTest {
     }
 
     @Test
+    void qualifiesDailyFeedingLogsUsedByChecklistQueries() {
+        String sql = cleanSql("select l.meal_key from daily_feeding_logs l join users u on u.id=l.confirmed_by_user_id");
+
+        assertThat(sql).isEqualTo(
+                "select l.meal_key from dbo.daily_feeding_logs l join dbo.users u on u.id=l.confirmed_by_user_id");
+    }
+
+    @Test
     void keepsPostgresJsonAndTimestampExpressions() {
         String sql = cleanSql(
                 "update module_records set updated_at=current_timestamp, "

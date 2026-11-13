@@ -24,7 +24,7 @@ public class DatabaseCompatibilityConfiguration {
 
     public static class CompatibleJdbcTemplate extends JdbcTemplate {
         private static final Set<String> DBO_TABLES = Set.of(
-            "alert_events", "audit_logs", "care_routine_definitions", "care_tasks",
+            "alert_events", "audit_logs", "care_routine_definitions", "care_tasks", "daily_feeding_logs",
             "financial_transactions", "horse_metric_thresholds", "horse_ownerships",
             "horse_profile_files", "horses", "login_sessions", "module_records",
             "notifications", "owner_reports", "preventive_care_schedules", "race_events",
