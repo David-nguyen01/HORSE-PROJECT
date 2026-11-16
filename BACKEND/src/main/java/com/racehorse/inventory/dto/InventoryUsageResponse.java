@@ -17,5 +17,6 @@ public record InventoryUsageResponse(
         UUID stableId,
         UUID financeTransactionId,
         String notes,
-        OffsetDateTime recordedAt
+        OffsetDateTime recordedAt,
+        String requestedByRole
 ) {}

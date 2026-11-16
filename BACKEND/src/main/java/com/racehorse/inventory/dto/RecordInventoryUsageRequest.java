@@ -11,5 +11,11 @@ public record RecordInventoryUsageRequest(
         @NotNull @DecimalMin(value = "0.01") BigDecimal unitPriceVnd,
         UUID horseId,
         UUID stableId,
-        String notes
-) {}
+        String notes,
+        String requestedByRole
+) {
+    public RecordInventoryUsageRequest(BigDecimal quantity, BigDecimal unitPriceVnd,
+                                       UUID horseId, UUID stableId, String notes) {
+        this(quantity, unitPriceVnd, horseId, stableId, notes, null);
+    }
+}

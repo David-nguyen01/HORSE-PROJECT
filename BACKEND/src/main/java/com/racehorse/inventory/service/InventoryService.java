@@ -197,7 +197,7 @@ public class InventoryService {
         String financeCategory = switch (category) {
             case "FEED", "SUPPLEMENT" -> "FEED_COST";
             case "MEDICATION" -> "MEDICAL_COST";
-            case "EQUIPMENT" -> "OPERATING_COST";
+            case "EQUIPMENT", "BEDDING" -> "OPERATING_COST";
             default -> throw new BusinessException("Danh mục vật tư không hỗ trợ ghi chi phí: " + category);
         };
         if ("MEDICAL_COST".equals(financeCategory) && request.horseId() == null) {
@@ -213,6 +213,11 @@ public class InventoryService {
         LocalDate today = LocalDate.now(clock);
         OffsetDateTime now = OffsetDateTime.now(clock);
         String notes = request.notes() == null ? "" : request.notes().trim();
+        String requestedByRole = request.requestedByRole() == null || request.requestedByRole().isBlank()
+                ? null : request.requestedByRole().trim().toUpperCase(Locale.ROOT);
+        if (requestedByRole != null && !Set.of("STABLE_STAFF", "VETERINARIAN", "HEAD_TRAINER").contains(requestedByRole)) {
+            throw new BusinessException("Bộ phận cần vật tư không hợp lệ");
+        }
 
         item.put("quantityOnHand", remaining);
         item.put("lastStockUpdateReason", "Xuất dùng " + request.quantity().toPlainString() + " " + unit);
@@ -230,6 +235,7 @@ public class InventoryService {
         movement.put("totalCostVnd", totalCost);
         movement.put("stableId", request.stableId() == null ? null : request.stableId().toString());
         movement.put("notes", notes);
+        movement.put("requestedByRole", requestedByRole);
         jdbc.update("insert into module_records(id,module_code,record_type,horse_id,user_id,event_date,status,data_json) "
                         + "values(?,'INVENTORY','STOCK_USAGE',?,?,?,'RECORDED',?)",
                 usageId, request.horseId(), actorId, today, toJson(movement));
@@ -239,7 +245,8 @@ public class InventoryService {
                 totalCost, "Xuất dùng " + request.quantity().toPlainString() + " " + unit + " " + itemName
                         + (notes.isBlank() ? "" : ": " + notes), "INVENTORY_USAGE", usageId);
         return new InventoryUsageResponse(usageId, itemId, itemName, request.quantity(), unit, remaining,
-                request.unitPriceVnd(), totalCost, request.horseId(), request.stableId(), transaction.id(), notes, now);
+                request.unitPriceVnd(), totalCost, request.horseId(), request.stableId(), transaction.id(), notes, now,
+                requestedByRole);
     }
 
     @Transactional(readOnly = true)
@@ -258,7 +265,8 @@ public class InventoryService {
                             data.path("remainingQuantity").decimalValue(), data.path("unitPriceVnd").decimalValue(),
                             data.path("totalCostVnd").decimalValue(), rs.getObject("horse_id", UUID.class),
                             stable == null ? null : UUID.fromString(stable), rs.getObject("finance_id", UUID.class),
-                            data.path("notes").asText(""), rs.getObject("created_at", OffsetDateTime.class));
+                            data.path("notes").asText(""), rs.getObject("created_at", OffsetDateTime.class),
+                            data.path("requestedByRole").asText(null));
                 }, limit);
     }
 

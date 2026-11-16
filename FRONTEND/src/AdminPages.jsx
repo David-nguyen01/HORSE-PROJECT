@@ -1840,7 +1840,7 @@ export function InventoryCatalogPage() {
         <div className="card-head"><div><h3>Lịch sử xuất dùng gần đây</h3><p className="muted" style={{margin:'5px 0 0',fontSize:'11px'}}>Mỗi lần xuất dùng trừ số tồn và ghi một khoản chi trong sổ tài chính Club Manager.</p></div></div>
         {!usage.length ? <div className="simple-empty">Chưa ghi nhận lần xuất dùng nào.</div> : <div className="inventory-request-list">
           {usage.map(record => <div className="inventory-request-row" key={record.id}>
-            <div><b>{record.itemName}</b><small>{record.quantity} {record.unit} · còn {record.remainingQuantity} {record.unit} · {record.recordedAt ? new Date(record.recordedAt).toLocaleString('vi-VN') : '—'}</small><p>{record.notes || 'Xuất dùng vật tư'}</p></div>
+            <div><b>{record.itemName}</b><small>{record.quantity} {record.unit} · còn {record.remainingQuantity} {record.unit} · {record.recordedAt ? new Date(record.recordedAt).toLocaleString('vi-VN') : '—'}</small><p>{record.requestedByRole ? `${{ STABLE_STAFF: 'Nhân viên chuồng', VETERINARIAN: 'Thú y', HEAD_TRAINER: 'Huấn luyện viên' }[record.requestedByRole] || record.requestedByRole} · ` : ''}{record.horseId ? `Ngựa ${horses.find(horse => horse.id === record.horseId)?.name || record.horseId} · ` : ''}{record.notes || 'Xuất dùng vật tư'}</p></div>
             <strong>{fmtPrice(record.totalCostVnd)}</strong>
           </div>)}
         </div>}

@@ -501,6 +501,32 @@ class InventoryServiceTest {
     }
 
     @Test
+    void beddingUsageRecordsRequesterAndOperatingExpenseForHorse() {
+        UUID itemId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
+        UUID horseId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        when(jdbc.queryForList(contains("for update"), eq(itemId)))
+                .thenReturn(List.of(Map.of("status", "ACTIVE", "data_json", """
+                        {"itemName":"Rơm lót chuồng","category":"BEDDING","unit":"cuộn","quantityOnHand":10}
+                        """)));
+        FinanceService.TransactionView transaction = mock(FinanceService.TransactionView.class);
+        when(transaction.id()).thenReturn(transactionId);
+        when(finance.create(eq(staffId), eq(horseId), isNull(), any(), eq("EXPENSE"), eq("OPERATING_COST"),
+                eq(new BigDecimal("85000.00")), anyString(), eq("INVENTORY_USAGE"), any()))
+                .thenReturn(transaction);
+
+        InventoryUsageResponse result = service.recordUsage(itemId, staffId,
+                new RecordInventoryUsageRequest(new BigDecimal("1"), new BigDecimal("85000"),
+                        horseId, null, "Thay đệm lót", "VETERINARIAN"));
+
+        assertThat(result.requestedByRole()).isEqualTo("VETERINARIAN");
+        assertThat(result.remainingQuantity()).isEqualByComparingTo("9");
+        verify(jdbc).update(contains("'STOCK_USAGE'"), any(), eq(horseId), eq(staffId), any(),
+                contains("\"requestedByRole\":\"VETERINARIAN\""));
+    }
+
+    @Test
     void usageCannotExceedAvailableStockOrCreateExpense() {
         UUID itemId = UUID.randomUUID();
         UUID stableId = UUID.randomUUID();
