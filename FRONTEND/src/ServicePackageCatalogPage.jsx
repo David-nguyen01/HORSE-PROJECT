@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -119,28 +120,17 @@ export default function ServicePackageCatalogPage() {
     }
   }
 
-  // Delete action with reference check handling
+  // Removing a package closes new registrations while preserving paid periods and history.
   const handleDeleteConfirm = async (pkg) => {
     if (!pkg) return
     setError('')
     try {
       await servicePackageApi.delete(pkg.id)
       setDeletingPackage(null)
-      notifySuccess(`Đã xóa vĩnh viễn gói dịch vụ "${pkg.name}" khỏi hệ thống.`)
+      notifySuccess(`Đã xóa gói "${pkg.name}" khỏi danh mục. Ngựa đã thanh toán vẫn dùng đến hết hạn.`)
       await loadData()
     } catch (err) {
-      const isReferenced =
-        err?.status === 409 ||
-        err?.message?.toLowerCase().includes('reference') ||
-        err?.message?.toLowerCase().includes('subscription') ||
-        err?.message?.toLowerCase().includes('tồn tại')
-      if (isReferenced) {
-        setError(
-          `Không thể xóa gói dịch vụ "${pkg.name}": Gói này đang được liên kết với hồ sơ đăng ký dịch vụ của Chủ ngựa. Vui lòng chuyển gói vào Thư viện dự phòng thay vì xóa.`
-        )
-      } else {
-        setError(err?.message || `Không thể xóa gói dịch vụ "${pkg.name}".`)
-      }
+      setError(err?.message || `Không thể xóa gói dịch vụ "${pkg.name}".`)
       setDeletingPackage(null)
     }
   }
@@ -807,7 +797,7 @@ function CreateServicePackageModal({ onClose, onCreated }) {
             {/* Price VND */}
             <label className="field">
               <span>Đơn giá (VNĐ) (*)</span>
-              <input
+              <UnitStepNumberInput
                 required
                 type="number"
                 min={0}
@@ -825,7 +815,7 @@ function CreateServicePackageModal({ onClose, onCreated }) {
             {/* Duration Days */}
             <label className="field">
               <span>Thời hạn dịch vụ (ngày) (*)</span>
-              <input
+              <UnitStepNumberInput
                 required
                 type="number"
                 min={1}
@@ -844,7 +834,7 @@ function CreateServicePackageModal({ onClose, onCreated }) {
             {/* Display Order */}
             <label className="field full" style={{ gridColumn: '1 / -1' }}>
               <span>Thứ tự hiển thị</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 value={displayOrder}
                 onChange={(e) => setDisplayOrder(e.target.value)}
@@ -1051,7 +1041,7 @@ function EditServicePackageModal({ pkg, onClose, onUpdated }) {
             {/* Price VND */}
             <label className="field">
               <span>Đơn giá mới (VNĐ) (*)</span>
-              <input
+              <UnitStepNumberInput
                 required
                 type="number"
                 min={0}
@@ -1069,7 +1059,7 @@ function EditServicePackageModal({ pkg, onClose, onUpdated }) {
             {/* Duration Days */}
             <label className="field">
               <span>Thời hạn mới (ngày) (*)</span>
-              <input
+              <UnitStepNumberInput
                 required
                 type="number"
                 min={1}
@@ -1088,7 +1078,7 @@ function EditServicePackageModal({ pkg, onClose, onUpdated }) {
             {/* Display Order */}
             <label className="field full" style={{ gridColumn: '1 / -1' }}>
               <span>Thứ tự hiển thị</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 value={displayOrder}
                 onChange={(e) => setDisplayOrder(e.target.value)}
@@ -1154,7 +1144,7 @@ function EditServicePackageModal({ pkg, onClose, onUpdated }) {
 }
 
 /**
- * DeleteConfirmDialog - Confirmation with reference protection explanation
+ * DeleteConfirmDialog - Explain the effect on existing paid subscriptions.
  */
 function DeleteConfirmDialog({ pkg, onClose, onConfirm }) {
   const [busy, setBusy] = useState(false)
@@ -1198,7 +1188,7 @@ function DeleteConfirmDialog({ pkg, onClose, onConfirm }) {
 
         <div style={{ fontSize: '14px', color: '#374151', lineHeight: 1.5, marginBottom: '20px' }}>
           <p style={{ margin: '0 0 12px 0' }}>
-            Bạn có chắc chắn muốn xóa vĩnh viễn gói dịch vụ <b>"{pkg.name}"</b> (Mã: <code>{pkg.code}</code>) khỏi danh mục quản lý?
+            Bạn có chắc chắn muốn xóa gói dịch vụ <b>"{pkg.name}"</b> (Mã: <code>{pkg.code}</code>) khỏi danh mục quản lý?
           </p>
 
           <div
@@ -1211,15 +1201,13 @@ function DeleteConfirmDialog({ pkg, onClose, onConfirm }) {
               fontSize: '13px',
             }}
           >
-            <b>Cơ chế bảo vệ toàn vẹn dữ liệu:</b>
+            <b>Hiệu lực sau khi xoá:</b>
             <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px' }}>
               <li>
-                Nếu gói này đã từng được liên kết với bất kỳ chu kỳ đăng ký nào của Chủ ngựa, hệ thống
-                sẽ <b>từ chối xóa</b> (HTTP 409 Conflict) để bảo vệ toàn vẹn lịch sử giao dịch.
+                Gói sẽ không còn hiển thị để Chủ ngựa đăng ký mới và không tự gia hạn.
               </li>
               <li>
-                Nếu muốn ngừng cung cấp gói đã từng được sử dụng, phương án an toàn nhất là chuyển gói
-                vào <b>Thư viện dự phòng</b>.
+                Ngựa đã thanh toán vẫn được hưởng dịch vụ đến hết ngày đã trả. Sau đó Chủ ngựa phải chọn gói khác đang áp dụng; lịch sử thanh toán được giữ nguyên.
               </li>
             </ul>
           </div>

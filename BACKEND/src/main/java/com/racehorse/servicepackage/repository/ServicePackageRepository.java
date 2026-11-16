@@ -19,7 +19,7 @@ public interface ServicePackageRepository extends JpaRepository<ServicePackageEn
 
     boolean existsByCode(String code);
 
-    List<ServicePackageEntity> findByIsActiveOrderByDisplayOrderAscCreatedAtAsc(boolean isActive);
+    List<ServicePackageEntity> findByIsActiveAndDeletedAtIsNullOrderByDisplayOrderAscCreatedAtAsc(boolean isActive);
 
     List<ServicePackageEntity> findAllByOrderByDisplayOrderAscCreatedAtAsc();
 

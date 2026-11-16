@@ -58,6 +58,7 @@ DATABASE/
 ├── 47_custom_preventive_care_type.sql # Cho phép bác sĩ đặt tên loại chăm sóc phòng ngừa tùy chỉnh
 ├── 48_horse_intake_caretaker.sql     # Lưu nhân viên chuồng phụ trách quá trình tiếp nhận ngựa
 ├── 49_service_packages_catalog.sql   # Danh mục gói dịch vụ động và ràng buộc gói của ngựa
+├── 50_soft_delete_service_packages.sql # Ẩn gói đã xoá, giữ kỳ dịch vụ đã thanh toán
 ├── setup-local.ps1                 # Script PowerShell khởi tạo/tái tạo toàn bộ baseline CSDL cục bộ
 ├── apply-sync.ps1                  # Script PowerShell áp dụng dữ liệu dùng chung (shared team data)
 ├── sync/                           # Thư mục lưu trữ các script đồng bộ dữ liệu dùng chung giữa các thành viên

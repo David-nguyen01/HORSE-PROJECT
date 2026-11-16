@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
@@ -54,7 +53,7 @@ public class ServicePackageService {
 
     @Transactional(readOnly = true)
     public List<ServicePackageResponse> listActive() {
-        return repository.findByIsActiveOrderByDisplayOrderAscCreatedAtAsc(true)
+        return repository.findByIsActiveAndDeletedAtIsNullOrderByDisplayOrderAscCreatedAtAsc(true)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -62,7 +61,7 @@ public class ServicePackageService {
 
     @Transactional(readOnly = true)
     public List<ServicePackageResponse> listReserve() {
-        return repository.findByIsActiveOrderByDisplayOrderAscCreatedAtAsc(false)
+        return repository.findByIsActiveAndDeletedAtIsNullOrderByDisplayOrderAscCreatedAtAsc(false)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -71,6 +70,7 @@ public class ServicePackageService {
     @Transactional(readOnly = true)
     public ServicePackageResponse get(UUID id) {
         return repository.findById(id)
+                .filter(pkg -> pkg.getDeletedAt() == null)
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ: " + id));
     }
@@ -78,6 +78,7 @@ public class ServicePackageService {
     @Transactional(readOnly = true)
     public ServicePackageResponse getByCode(String code) {
         return repository.findByCode(code)
+                .filter(pkg -> pkg.getDeletedAt() == null)
                 .map(this::toResponse)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ với mã: " + code));
     }
@@ -111,6 +112,7 @@ public class ServicePackageService {
     @Transactional
     public ServicePackageResponse update(UUID id, UUID actorId, UpdateServicePackageRequest req) {
         ServicePackageEntity entity = repository.findById(id)
+                .filter(pkg -> pkg.getDeletedAt() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ: " + id));
 
         if (req.version() != null && req.version() != entity.getVersion()) {
@@ -137,6 +139,7 @@ public class ServicePackageService {
         ServicePackageEntity entity = (opt != null && opt.isPresent())
                 ? opt.get()
                 : repository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ: " + id));
+        if (entity.getDeletedAt() != null) throw new ResourceNotFoundException("Không tìm thấy gói dịch vụ: " + id);
 
         if (entity.isActive() == targetActive) {
             return toResponse(entity);
@@ -395,7 +398,7 @@ public class ServicePackageService {
             UUID pkgId = orderedIds.get(i);
             int newOrder = (i + 1) * 10;
             ServicePackageEntity entity = repository.findById(pkgId).orElse(null);
-            if (entity != null) {
+            if (entity != null && entity.getDeletedAt() == null) {
                 entity.setDisplayOrder(newOrder);
                 entity.setUpdatedByUserId(actorId);
                 entity.setUpdatedAt(OffsetDateTime.now());
@@ -407,53 +410,16 @@ public class ServicePackageService {
 
     @Transactional
     public void delete(UUID id, UUID actorId) {
-        ServicePackageEntity entity = repository.findById(id)
+        ServicePackageEntity entity = repository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ: " + id));
-
-        String code = entity.getCode();
-
-        // 1. Check current subscriptions on horses
-        Integer horseRefCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM dbo.horses WHERE active_service_plan = ? OR next_service_plan = ?",
-                Integer.class, code, code);
-        if (horseRefCount != null && horseRefCount > 0) {
-            throw new BusinessException("Không thể xóa gói dịch vụ đang được sử dụng bởi "
-                    + horseRefCount + " ngựa trong hệ thống. Vui lòng chuyển sang Thư viện dự phòng (Reserve).");
-        }
-
-        // 2. Check legacy user account references
-        Integer userRefCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM dbo.users WHERE active_service_plan = ?",
-                Integer.class, code);
-        if (userRefCount != null && userRefCount > 0) {
-            throw new BusinessException("Không thể xóa gói dịch vụ đang được gán cho tài khoản người dùng. Vui lòng chuyển sang Thư viện dự phòng (Reserve).");
-        }
-
-        // 3. Check historical records in module_records (SYSTEM: SERVICE_PLAN_*)
-        List<String> records = jdbc.query(
-                "SELECT data_json FROM dbo.module_records WHERE module_code = 'SYSTEM' "
-                        + "AND record_type IN ('SERVICE_PLAN_PURCHASE', 'SERVICE_PLAN_RENEWAL', 'SERVICE_PLAN_TERMS_ACCEPTANCE')",
-                (rs, n) -> rs.getString("data_json"));
-
-        for (String recordJson : records) {
-            if (recordJson == null || recordJson.isBlank()) continue;
-            try {
-                JsonNode node = json.readTree(recordJson);
-                String plan = node.path("plan").asText("");
-                String pkgCode = node.path("packageCode").asText("");
-                String pkgId = node.path("packageId").asText("");
-                if (code.equalsIgnoreCase(plan) || code.equalsIgnoreCase(pkgCode) || id.toString().equalsIgnoreCase(pkgId)) {
-                    throw new BusinessException("Không thể xóa gói dịch vụ đã có dữ liệu lịch sử đăng ký hoặc thanh toán. Vui lòng chuyển sang Thư viện dự phòng (Reserve).");
-                }
-            } catch (Exception e) {
-                if (e instanceof BusinessException) throw (BusinessException) e;
-                if (recordJson.contains("\"" + code + "\"")) {
-                    throw new BusinessException("Không thể xóa gói dịch vụ đã có dữ liệu lịch sử đăng ký hoặc thanh toán. Vui lòng chuyển sang Thư viện dự phòng (Reserve).");
-                }
-            }
-        }
-
-        repository.delete(entity);
+        if (entity.getDeletedAt() != null) return;
+        boolean wasActive = entity.isActive();
+        entity.setActive(false);
+        entity.setDeletedAt(OffsetDateTime.now());
+        entity.setUpdatedByUserId(actorId);
+        entity.setUpdatedAt(OffsetDateTime.now());
+        ServicePackageEntity saved = repository.saveAndFlush(entity);
+        if (wasActive) recordDiscontinuationAndBroadcast(saved == null ? entity : saved, actorId);
     }
 
     private int nextDisplayOrder() {

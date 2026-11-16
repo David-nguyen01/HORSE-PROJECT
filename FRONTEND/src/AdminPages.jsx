@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AlertTriangle, ArchiveRestore, ArrowRight, Boxes, Check, CheckCircle2, ChevronLeft, ChevronRight, ChevronUp, DollarSign, Download, Filter, HeartPulse, KeyRound, Lock, LogOut, Monitor, Package, Pencil, Plus, RotateCcw, Save, ScrollText, Search, ShieldCheck, SlidersHorizontal, Smartphone, Tag, Trash2, Unlock, UserPlus, Utensils, Warehouse, X, XCircle } from 'lucide-react'
@@ -1916,9 +1917,9 @@ function ReceiveInventoryModal({ request, items, onClose, onSaved }) {
           {compatibleItems.map(item => <option value={item.id} key={item.id}>{item.itemName} · còn {item.quantityOnHand} {item.unit}</option>)}
         </select>
       </label>}
-      <label className="field"><span>Đơn giá tham chiếu VND / {request.unit}</span><input type="number" min="0.01" step="0.01" value={referencePrice} onChange={e => setReferencePrice(e.target.value)} placeholder="Bỏ trống nếu chưa có giá" /></label>
+      <label className="field"><span>Đơn giá tham chiếu VND / {request.unit}</span><UnitStepNumberInput type="number" min="0.01" step="0.01" value={referencePrice} onChange={e => setReferencePrice(e.target.value)} placeholder="Bỏ trống nếu chưa có giá" /></label>
       {!request.itemId && !catalogItemId && <div className="form-grid">
-        <label className="field"><span>Ngưỡng cảnh báo mặt hàng mới</span><input type="number" min="0" step="0.001" value={minThreshold} onChange={e => setMinThreshold(e.target.value)} /></label>
+        <label className="field"><span>Ngưỡng cảnh báo mặt hàng mới</span><UnitStepNumberInput type="number" min="0" step="0.001" value={minThreshold} onChange={e => setMinThreshold(e.target.value)} /></label>
         <label className="field"><span>Vị trí kho</span><input value={location} onChange={e => setLocation(e.target.value)} /></label>
       </div>}
       {error && <div className="notice error">{error}</div>}
@@ -1962,8 +1963,8 @@ function RecordInventoryUsageModal({ item, horses, stables, onClose, onSaved }) 
     <form className="form-stack" onSubmit={submit}>
       <p className="muted" style={{fontSize:'12px',margin:0}}>Tồn hiện tại: <b>{item.quantityOnHand} {item.unit}</b>. Xác nhận sẽ trừ tồn và ghi chi phí vào sổ tài chính.</p>
       <div className="form-grid">
-        <label className="field"><span>Số lượng sử dụng *</span><input type="number" required min="0.001" max={item.quantityOnHand} step="0.001" value={quantity} onChange={e => setQuantity(e.target.value)} /></label>
-        <label className="field"><span>Đơn giá xuất dùng (VND / {item.unit}) *</span><input type="number" required min="0.01" step="0.01" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} /></label>
+        <label className="field"><span>Số lượng sử dụng *</span><UnitStepNumberInput type="number" required min="0.001" max={item.quantityOnHand} step="0.001" value={quantity} onChange={e => setQuantity(e.target.value)} /></label>
+        <label className="field"><span>Đơn giá xuất dùng (VND / {item.unit}) *</span><UnitStepNumberInput type="number" required min="0.01" step="0.01" value={unitPrice} onChange={e => setUnitPrice(e.target.value)} /></label>
       </div>
       <div className="form-grid">
         <label className="field"><span>Đối tượng sử dụng</span><select value={targetType} onChange={e => {setTargetType(e.target.value);setTargetId('')}}>
@@ -2037,11 +2038,11 @@ function CreateInventoryItemModal({ onClose, onSaved }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
           <label className="field">
             <span>Số lượng ban đầu</span>
-            <input type="number" min="0" step="0.001" value={form.initialQuantity} onChange={set('initialQuantity')}/>
+            <UnitStepNumberInput type="number" min="0" step="0.001" value={form.initialQuantity} onChange={set('initialQuantity')}/>
           </label>
           <label className="field">
             <span>Ngưỡng an toàn (cảnh báo tồn thấp)</span>
-            <input type="number" min="0" step="0.001" value={form.minThreshold} onChange={set('minThreshold')}/>
+            <UnitStepNumberInput type="number" min="0" step="0.001" value={form.minThreshold} onChange={set('minThreshold')}/>
           </label>
         </div>
         <label className="field">
@@ -2050,7 +2051,7 @@ function CreateInventoryItemModal({ onClose, onSaved }) {
         </label>
         <label className="field">
           <span>Đơn giá tham chiếu (VNĐ)</span>
-          <input type="number" min="0" step="100" value={form.referencePrice} onChange={set('referencePrice')} placeholder="Bỏ trống nếu chưa có"/>
+          <UnitStepNumberInput type="number" min="0" step="100" value={form.referencePrice} onChange={set('referencePrice')} placeholder="Bỏ trống nếu chưa có"/>
         </label>
         <label className="field">
           <span>Mô tả / Ghi chú</span>
@@ -2129,11 +2130,11 @@ function EditInventoryItemModal({ item, onClose, onSaved }) {
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'10px'}}>
           <label className="field">
             <span>Ngưỡng an toàn (cảnh báo tồn thấp)</span>
-            <input type="number" min="0" step="0.001" value={form.minThreshold} onChange={set('minThreshold')}/>
+            <UnitStepNumberInput type="number" min="0" step="0.001" value={form.minThreshold} onChange={set('minThreshold')}/>
           </label>
           <label className="field">
             <span>Đơn giá tham chiếu (VNĐ)</span>
-            <input type="number" min="0" step="100" value={form.referencePrice} onChange={set('referencePrice')} placeholder="Bỏ trống nếu chưa có"/>
+            <UnitStepNumberInput type="number" min="0" step="100" value={form.referencePrice} onChange={set('referencePrice')} placeholder="Bỏ trống nếu chưa có"/>
           </label>
         </div>
         <label className="field">

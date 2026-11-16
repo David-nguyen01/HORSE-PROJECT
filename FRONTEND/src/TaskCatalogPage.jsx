@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
@@ -811,7 +812,7 @@ function TaskDefinitionModal({ isEdit, initialData, onClose, onSaved }) {
             {/* Sort Order */}
             <label className="field">
               <span>Thứ tự hiển thị</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}

@@ -163,19 +163,16 @@ test('7. Edit Modal enforces code immutability and Policy A awareness', () => {
   assert.ok(editModalSlice.includes('validateServicePackageForm'), 'Edit modal must call validateServicePackageForm')
 })
 
-test('8. Delete Protection & HTTP 409 Reference Handling', () => {
+test('8. Delete keeps paid periods and closes new registration', () => {
   const pagePath = path.resolve(process.cwd(), 'src/ServicePackageCatalogPage.jsx')
   const content = fs.readFileSync(pagePath, 'utf-8')
 
-  // Check delete modal warnings
+  // Check delete modal explains the effect on current subscriptions.
   assert.ok(content.includes('delete-package-modal'), 'Delete confirmation dialog must be present')
-  assert.ok(content.includes('409 Conflict'), 'Delete dialog must explicitly explain 409 reference rejection')
-  assert.ok(content.includes('Thư viện dự phòng'), 'Delete dialog must recommend moving to Reserve instead')
+  assert.ok(content.includes('Ngựa đã thanh toán vẫn được hưởng dịch vụ đến hết ngày đã trả'), 'Paid periods remain valid')
+  assert.ok(content.includes('Gói sẽ không còn hiển thị để Chủ ngựa đăng ký mới'), 'New purchases are closed')
 
-  // Check handle deletion error branch
-  assert.ok(content.includes('isReferenced'), 'Delete handler must identify referenced packages')
-  assert.ok(content.includes('err?.status === 409'), 'Delete handler checks 409 status')
-  assert.ok(content.includes('Không thể xóa gói dịch vụ'), 'Delete handler presents user-friendly error message')
+  assert.ok(content.includes('Ngựa đã thanh toán vẫn dùng đến hết hạn'), 'Delete success message explains existing subscriptions')
 })
 
 test('9. Policy A Banner present on main page', () => {

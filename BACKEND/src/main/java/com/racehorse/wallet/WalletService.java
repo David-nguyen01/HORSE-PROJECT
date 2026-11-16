@@ -416,8 +416,8 @@ public class WalletService {
         }
         ServicePackageEntity pkg = packageRepository.findByCode(normalized)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy gói dịch vụ với mã: " + code));
-        if (!pkg.isActive()) {
-            throw new BusinessException("Gói dịch vụ " + pkg.getName() + " (" + code + ") đã được chuyển vào Thư viện dự phòng và không còn khả dụng để đăng ký mới.");
+        if (!pkg.isActive() || pkg.getDeletedAt() != null) {
+            throw new BusinessException("Gói dịch vụ " + pkg.getName() + " (" + code + ") đã ngừng cung cấp và không còn khả dụng để đăng ký mới.");
         }
         return pkg;
     }
@@ -522,8 +522,8 @@ public class WalletService {
         String targetCode = (nextCode != null && !nextCode.isBlank()) ? nextCode.trim() : (currentCode != null ? currentCode.trim() : null);
         if (targetCode != null && packageRepository != null) {
             var pkgOpt = packageRepository.findByCode(targetCode.toUpperCase(Locale.ROOT));
-            if (pkgOpt.isPresent() && !pkgOpt.get().isActive()) {
-                throw new BusinessException("Gói dịch vụ " + pkgOpt.get().getName() + " (" + targetCode + ") đã được chuyển vào Thư viện dự phòng và không thể gia hạn. Vui lòng chọn gói đang hoạt động.");
+            if (pkgOpt.isPresent() && (!pkgOpt.get().isActive() || pkgOpt.get().getDeletedAt() != null)) {
+                throw new BusinessException("Gói dịch vụ " + pkgOpt.get().getName() + " (" + targetCode + ") đã ngừng cung cấp và không thể gia hạn. Vui lòng chọn gói đang hoạt động.");
             }
         }
         if (!renewHorseDue(ownerId, horseId)) {
@@ -578,7 +578,7 @@ public class WalletService {
         }
 
         // 2. Reserve Package Protection
-        if (!pkg.isActive()) {
+        if (!pkg.isActive() || pkg.getDeletedAt() != null) {
             jdbc.update("update horses set payment_status='UNPAID',"
                             + "status=case when status='ACTIVE' then 'PENDING_PAYMENT' else status end,"
                             + "updated_at=CURRENT_TIMESTAMP,version=version+1 "

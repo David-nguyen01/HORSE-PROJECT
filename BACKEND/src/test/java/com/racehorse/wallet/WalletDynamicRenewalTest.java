@@ -335,7 +335,7 @@ class WalletDynamicRenewalTest {
 
         assertThatThrownBy(() -> service.renewHorseNow(ownerId, horseId))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Thư viện dự phòng và không thể gia hạn");
+                .hasMessageContaining("ngừng cung cấp và không thể gia hạn");
     }
 
     // 14. Successful renewal creates a complete immutable snapshot

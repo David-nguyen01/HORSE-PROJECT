@@ -41,7 +41,7 @@ class ServicePackageServiceTest {
         ServicePackageEntity p1 = sampleEntity("P30", "Gói 1 tháng", new BigDecimal("5000000"), 30, true, 10);
         ServicePackageEntity p2 = sampleEntity("P90", "Gói 3 tháng", new BigDecimal("15000000"), 90, true, 20);
 
-        when(repository.findByIsActiveOrderByDisplayOrderAscCreatedAtAsc(true)).thenReturn(List.of(p1, p2));
+        when(repository.findByIsActiveAndDeletedAtIsNullOrderByDisplayOrderAscCreatedAtAsc(true)).thenReturn(List.of(p1, p2));
 
         List<ServicePackageResponse> list = service.listActive();
         assertThat(list).hasSize(2);
@@ -53,7 +53,7 @@ class ServicePackageServiceTest {
     @Test
     void listReserveReturnsOnlyReservePackages() {
         ServicePackageEntity p = sampleEntity("P365_OLD", "Gói cũ", new BigDecimal("55000000"), 365, false, 30);
-        when(repository.findByIsActiveOrderByDisplayOrderAscCreatedAtAsc(false)).thenReturn(List.of(p));
+        when(repository.findByIsActiveAndDeletedAtIsNullOrderByDisplayOrderAscCreatedAtAsc(false)).thenReturn(List.of(p));
 
         List<ServicePackageResponse> list = service.listReserve();
         assertThat(list).hasSize(1);
@@ -196,7 +196,7 @@ class ServicePackageServiceTest {
 
         when(repository.findById(id1)).thenReturn(Optional.of(p1));
         when(repository.findById(id2)).thenReturn(Optional.of(p2));
-        when(repository.findByIsActiveOrderByDisplayOrderAscCreatedAtAsc(true)).thenReturn(List.of(p2, p1));
+        when(repository.findByIsActiveAndDeletedAtIsNullOrderByDisplayOrderAscCreatedAtAsc(true)).thenReturn(List.of(p2, p1));
 
         List<ServicePackageResponse> result = service.reorder(actorId, List.of(id2, id1));
         assertThat(result).hasSize(2);
@@ -205,102 +205,40 @@ class ServicePackageServiceTest {
     }
 
     @Test
-    void deleteAllowedWhenNoReferencesExist() {
+    void deleteUnusedPackageHidesItWithoutRemovingHistory() {
         UUID actorId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         ServicePackageEntity entity = sampleEntity("UNUSED_PLAN", "Gói nháp", new BigDecimal("1000000"), 15, false, 50);
         entity.setId(id);
-
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(jdbc.queryForObject(contains("FROM dbo.horses"), eq(Integer.class), eq("UNUSED_PLAN"), eq("UNUSED_PLAN")))
-                .thenReturn(0);
-        when(jdbc.queryForObject(contains("FROM dbo.users"), eq(Integer.class), eq("UNUSED_PLAN")))
-                .thenReturn(0);
-        when(jdbc.query(contains("FROM dbo.module_records"), any(RowMapper.class)))
-                .thenReturn(List.of());
+        when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(entity));
+        when(repository.saveAndFlush(entity)).thenReturn(entity);
 
         service.delete(id, actorId);
-        verify(repository).delete(entity);
-    }
 
-    @Test
-    void deleteBlockedWhenReferencedByHorseActivePlan() {
-        UUID actorId = UUID.randomUUID();
-        UUID id = UUID.randomUUID();
-        ServicePackageEntity entity = sampleEntity("P30", "Gói 1 tháng", new BigDecimal("5000000"), 30, true, 10);
-        entity.setId(id);
-
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(jdbc.queryForObject(contains("FROM dbo.horses"), eq(Integer.class), eq("P30"), eq("P30")))
-                .thenReturn(2);
-
-        assertThatThrownBy(() -> service.delete(id, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("đang được sử dụng bởi 2 ngựa");
+        assertThat(entity.isActive()).isFalse();
+        assertThat(entity.getDeletedAt()).isNotNull();
+        verify(repository).saveAndFlush(entity);
         verify(repository, never()).delete(any());
     }
 
     @Test
-    void deleteBlockedWhenReferencedByUserAccount() {
+    void deleteActivePackageRetainsPaidSubscriptionsAndPublishesDiscontinuation() {
         UUID actorId = UUID.randomUUID();
         UUID id = UUID.randomUUID();
         ServicePackageEntity entity = sampleEntity("P30", "Gói 1 tháng", new BigDecimal("5000000"), 30, true, 10);
         entity.setId(id);
+        when(repository.findByIdForUpdate(id)).thenReturn(Optional.of(entity));
+        when(repository.saveAndFlush(entity)).thenReturn(entity);
+        when(jdbc.query(any(String.class), any(RowMapper.class))).thenReturn(List.of());
+        when(jdbc.queryForList(any(String.class), any(String.class), any(java.time.LocalDate.class))).thenReturn(List.of());
 
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(jdbc.queryForObject(contains("FROM dbo.horses"), eq(Integer.class), eq("P30"), eq("P30")))
-                .thenReturn(0);
-        when(jdbc.queryForObject(contains("FROM dbo.users"), eq(Integer.class), eq("P30")))
-                .thenReturn(1);
+        service.delete(id, actorId);
 
-        assertThatThrownBy(() -> service.delete(id, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("gán cho tài khoản người dùng");
+        assertThat(entity.isActive()).isFalse();
+        assertThat(entity.getDeletedAt()).isNotNull();
+        verify(jdbc).update(contains("SERVICE_PACKAGE_DISCONTINUATION"), any(), any(), any(), any(), any(), any());
         verify(repository, never()).delete(any());
     }
-
-    @Test
-    void deleteBlockedWhenReferencedByHistoricalLegacyModuleRecord() {
-        UUID actorId = UUID.randomUUID();
-        UUID id = UUID.randomUUID();
-        ServicePackageEntity entity = sampleEntity("P30", "Gói 1 tháng", new BigDecimal("5000000"), 30, true, 10);
-        entity.setId(id);
-
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(jdbc.queryForObject(contains("FROM dbo.horses"), eq(Integer.class), eq("P30"), eq("P30")))
-                .thenReturn(0);
-        when(jdbc.queryForObject(contains("FROM dbo.users"), eq(Integer.class), eq("P30")))
-                .thenReturn(0);
-        when(jdbc.query(contains("FROM dbo.module_records"), any(RowMapper.class)))
-                .thenReturn(List.of("{\"plan\":\"P30\",\"previousDueDate\":\"2026-11-01\"}"));
-
-        assertThatThrownBy(() -> service.delete(id, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("lịch sử đăng ký hoặc thanh toán");
-        verify(repository, never()).delete(any());
-    }
-
-    @Test
-    void deleteBlockedWhenReferencedByHistoricalModernPackageCodeRecord() {
-        UUID actorId = UUID.randomUUID();
-        UUID id = UUID.randomUUID();
-        ServicePackageEntity entity = sampleEntity("P30", "Gói 1 tháng", new BigDecimal("5000000"), 30, true, 10);
-        entity.setId(id);
-
-        when(repository.findById(id)).thenReturn(Optional.of(entity));
-        when(jdbc.queryForObject(contains("FROM dbo.horses"), eq(Integer.class), eq("P30"), eq("P30")))
-                .thenReturn(0);
-        when(jdbc.queryForObject(contains("FROM dbo.users"), eq(Integer.class), eq("P30")))
-                .thenReturn(0);
-        when(jdbc.query(contains("FROM dbo.module_records"), any(RowMapper.class)))
-                .thenReturn(List.of("{\"packageCode\":\"P30\",\"totalChargedVnd\":5000000}"));
-
-        assertThatThrownBy(() -> service.delete(id, actorId))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("lịch sử đăng ký hoặc thanh toán");
-        verify(repository, never()).delete(any());
-    }
-
     @Test
     void sanitizeMojibakeRestoresLegacyMojibakeStrings() {
         String mojibakeName = "GÃ³i 1 thÃ¡ng TiÃªu chuáº©n";

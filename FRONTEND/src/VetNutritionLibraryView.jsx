@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Utensils,
@@ -9,14 +10,13 @@ import {
   X,
   Search,
   Clock,
-  ExternalLink,
   ShieldAlert,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
 import { vetApi } from './vetApi'
 
-export default function VetNutritionLibraryView({ onNavigate }) {
+export default function VetNutritionLibraryView() {
   const [plans, setPlans] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -150,13 +150,6 @@ export default function VetNutritionLibraryView({ onNavigate }) {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <a
-            href="/stable-care/nutrition"
-            className="button secondary"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}
-          >
-            <ExternalLink size={15} /> Bảng theo dõi chuồng & cho ăn
-          </a>
           <button
             type="button"
             className="button primary"
@@ -718,7 +711,7 @@ function StandardPlanFormModal({ mode, initialPlan, onClose, onSaved }) {
                   </label>
                   <label className="field">
                     <span>Thức ăn tinh (kg) *</span>
-                    <input
+                    <UnitStepNumberInput
                       required
                       type="number"
                       step="0.1"
@@ -737,7 +730,7 @@ function StandardPlanFormModal({ mode, initialPlan, onClose, onSaved }) {
                   </label>
                   <label className="field">
                     <span>Thức ăn thô xanh (kg) *</span>
-                    <input
+                    <UnitStepNumberInput
                       required
                       type="number"
                       step="0.1"

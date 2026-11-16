@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -3814,7 +3815,7 @@ function CreateNutritionPlanModal({ horseId, horseInfo, onClose, onSaved }) {
                   </label>
                   <label className="field">
                     <span>Thức ăn tinh (kg) *</span>
-                    <input required type="number" step="0.1" min="0" value={m.concentrateKg} onChange={(e) => updateMeal(idx, 'concentrateKg', e.target.value)} />
+                    <UnitStepNumberInput required type="number" step="0.1" min="0" value={m.concentrateKg} onChange={(e) => updateMeal(idx, 'concentrateKg', e.target.value)} />
                   </label>
                   <label className="field">
                     <span>Loại thức ăn tinh</span>
@@ -3822,7 +3823,7 @@ function CreateNutritionPlanModal({ horseId, horseInfo, onClose, onSaved }) {
                   </label>
                   <label className="field">
                     <span>Thức ăn thô xanh (kg) *</span>
-                    <input required type="number" step="0.1" min="0" value={m.forageKg} onChange={(e) => updateMeal(idx, 'forageKg', e.target.value)} />
+                    <UnitStepNumberInput required type="number" step="0.1" min="0" value={m.forageKg} onChange={(e) => updateMeal(idx, 'forageKg', e.target.value)} />
                   </label>
                   <label className="field">
                     <span>Loại thức ăn thô</span>
@@ -5787,7 +5788,7 @@ function CreateReplenishModal({ items, onClose, onSaved }) {
           </label>
           <label className="field">
             <span>Số lượng cần nhập thêm (số nguyên) *</span>
-            <input
+            <UnitStepNumberInput
               required
               type="number"
               step="1"
@@ -5994,7 +5995,7 @@ function IssueInventoryModal({ item, onClose, onSaved }) {
           {error && <div className="notice error"><X size={16} />{error}</div>}
           <p className="muted" style={{ margin: 0 }}>Hiện có {item.quantityOnHand} {item.unit}. Xuất dùng sẽ giảm tồn và ghi chi phí cho quản lý.</p>
           <label className="field"><span>Số lượng lấy ra ({item.unit}) *</span>
-            <input required type="number" step="0.001" min="0.001" max={item.quantityOnHand} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+            <UnitStepNumberInput required type="number" step="0.001" min="0.001" max={item.quantityOnHand} value={quantity} onChange={(e) => setQuantity(e.target.value)} />
           </label>
           <label className="field"><span>Bộ phận cần vật tư *</span>
             <select required value={requestedByRole} onChange={(e) => setRequestedByRole(e.target.value)}>
@@ -6013,7 +6014,7 @@ function IssueInventoryModal({ item, onClose, onSaved }) {
             <textarea required rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Mô tả nhu cầu sử dụng vật tư" />
           </label>
           <label className="field"><span>Đơn giá xuất dùng (VND / {item.unit}) *</span>
-            <input required type="number" min="0.01" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
+            <UnitStepNumberInput required type="number" min="0.01" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} />
           </label>
           <div className="modal-actions">
             <button type="button" className="button secondary" onClick={onClose} disabled={busy}>Hủy</button>

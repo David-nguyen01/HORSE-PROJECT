@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowDownRight,
@@ -629,7 +630,7 @@ function CreateTransactionModal({ horses, stables, onClose, onSuccess }) {
 
             <label className="field">
               <span>Số tiền (VND) *</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 min="1000"
                 step="1000"
@@ -770,10 +771,9 @@ function ExecutiveSummaryTab() {
   const previous = data?.previous || {}
 
   // Calculate percentages
-  const totalExpenses = (current.feedCost || 0) + (current.medicalCost || 0) + (current.operatingCost || 0)
+  const totalExpenses = (current.feedCost || 0) + (current.medicalCost || 0)
   const feedPct = totalExpenses > 0 ? Math.round(((current.feedCost || 0) / totalExpenses) * 100) : 0
   const medPct = totalExpenses > 0 ? Math.round(((current.medicalCost || 0) / totalExpenses) * 100) : 0
-  const opPct = totalExpenses > 0 ? Math.round(((current.operatingCost || 0) / totalExpenses) * 100) : 0
 
   return (
     <div className="tab-content-area">
@@ -832,17 +832,16 @@ function ExecutiveSummaryTab() {
             <section className="card" style={{ padding: '20px' }}>
               <div className="admin-section-head" style={{ padding: '0 0 14px' }}>
                 <Layers size={18} />
-                <h3>Cơ cấu phân bổ chi phí tháng</h3>
+                <h3>Cơ cấu chi phí thức ăn & y tế</h3>
               </div>
               <p style={{ margin: '0 0 16px', fontSize: '12px', color: 'var(--muted)' }}>
-                Tổng chi phí: <b>{money(totalExpenses)}</b>
+                Tổng chi phí thức ăn và y tế: <b>{money(totalExpenses)}</b>
               </p>
 
               {/* Progress track */}
               <div style={{ height: '14px', borderRadius: '7px', display: 'flex', overflow: 'hidden', background: '#e5ebe6', marginBottom: '16px' }}>
                 <div style={{ width: `${feedPct}%`, background: '#8b5cf6' }} title={`Thức ăn: ${feedPct}%`} />
                 <div style={{ width: `${medPct}%`, background: '#ef4444' }} title={`Y tế: ${medPct}%`} />
-                <div style={{ width: `${opPct}%`, background: '#f59e0b' }} title={`Vận hành: ${opPct}%`} />
               </div>
 
               <div style={{ display: 'grid', gap: '10px' }}>
@@ -862,13 +861,6 @@ function ExecutiveSummaryTab() {
                   <span><b>{money(current.medicalCost)}</b> ({medPct}%)</span>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', padding: '8px 10px', background: '#f8f9f6', borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }} />
-                    <b>Chi phí vận hành:</b>
-                  </div>
-                  <span><b>{money(current.operatingCost)}</b> ({opPct}%)</span>
-                </div>
               </div>
             </section>
 

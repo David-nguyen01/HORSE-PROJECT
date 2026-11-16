@@ -138,7 +138,7 @@ class WalletDynamicPackageTest {
 
         assertThatThrownBy(() -> service.purchase(ownerId, horseId, "OLD_PRO_60", true))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Thư viện dự phòng và không còn khả dụng để đăng ký mới");
+                .hasMessageContaining("ngừng cung cấp và không còn khả dụng để đăng ký mới");
 
         verify(jdbc, never()).update(contains("update users"), any(), any());
     }
@@ -202,7 +202,7 @@ class WalletDynamicPackageTest {
 
         assertThatThrownBy(() -> service.scheduleNextPlan(ownerId, horseId, "RETIRED_180", true))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Thư viện dự phòng");
+                .hasMessageContaining("ngừng cung cấp");
 
         verify(jdbc, never()).update(contains("update horses set next_service_plan=?"), any(), any());
     }

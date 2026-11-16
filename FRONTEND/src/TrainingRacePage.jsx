@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Award, Check, Plus, X } from 'lucide-react'
@@ -254,23 +255,23 @@ function CreateRaceModal({ onClose, onCreated }) {
           </label>
           <label className="field">
             <span>Cự ly (mét) *</span>
-            <input required type="number" min="100" step="10" value={distanceMeters} onChange={e => setDistanceMeters(e.target.value)} placeholder="1600" />
+            <UnitStepNumberInput required type="number" min="100" step="10" value={distanceMeters} onChange={e => setDistanceMeters(e.target.value)} placeholder="1600" />
           </label>
           <label className="field">
             <span>Độ tuổi tối thiểu (tuổi)</span>
-            <input type="number" min="0" value={minAge} onChange={e => setMinAge(e.target.value)} placeholder="3" />
+            <UnitStepNumberInput type="number" min="0" value={minAge} onChange={e => setMinAge(e.target.value)} placeholder="3" />
           </label>
           <label className="field">
             <span>Độ tuổi tối đa (tuổi)</span>
-            <input type="number" min="0" value={maxAge} onChange={e => setMaxAge(e.target.value)} placeholder="Không giới hạn" />
+            <UnitStepNumberInput type="number" min="0" value={maxAge} onChange={e => setMaxAge(e.target.value)} placeholder="Không giới hạn" />
           </label>
           <label className="field">
             <span>Cân nặng tối thiểu (kg)</span>
-            <input type="number" min="0" step="0.1" value={minWeight} onChange={e => setMinWeight(e.target.value)} placeholder="VD: 420" />
+            <UnitStepNumberInput type="number" min="0" step="0.1" value={minWeight} onChange={e => setMinWeight(e.target.value)} placeholder="VD: 420" />
           </label>
           <label className="field">
             <span>Cân nặng tối đa (kg)</span>
-            <input type="number" min="0" step="0.1" value={maxWeight} onChange={e => setMaxWeight(e.target.value)} placeholder="VD: 580" />
+            <UnitStepNumberInput type="number" min="0" step="0.1" value={maxWeight} onChange={e => setMaxWeight(e.target.value)} placeholder="VD: 580" />
           </label>
           <div className="modal-actions full">
             <button type="button" className="button secondary" onClick={onClose} disabled={busy}>Hủy</button>

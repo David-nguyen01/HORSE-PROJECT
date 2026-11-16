@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { api, servicePackageApi } from './api'
@@ -11,7 +12,7 @@ const defaultPlans = [
   { code: 'P90', name: '3 tháng', price: 15000000, durationDays: 90 },
   { code: 'P365', name: '12 tháng', price: 60000000, durationDays: 365 },
 ]
-let cachedActivePlans = defaultPlans
+let cachedActivePlans = []
 const planName = code => cachedActivePlans.find(item => item.code === code)?.name || defaultPlans.find(item => item.code === code)?.name || code || 'Chưa có gói'
 const planPrice = code => cachedActivePlans.find(item => item.code === code)?.price || defaultPlans.find(item => item.code === code)?.price || 0
 const historyLabels = { WALLET_TOPUP: 'Nạp ví', SERVICE_FEE: 'Thanh toán gói', LATE_FEE: 'Phí trả chậm' }
@@ -33,7 +34,7 @@ const getPlanDetails = plan => {
 export default function WalletPage() {
   const location = useLocation()
   const [wallet, setWallet] = useState(null)
-  const [plans, setPlans] = useState(cachedActivePlans)
+  const [plans, setPlans] = useState([])
   const [amount, setAmount] = useState('100000')
   const [order, setOrder] = useState(null)
   const [selectedPlans, setSelectedPlans] = useState({})
@@ -64,10 +65,10 @@ export default function WalletPage() {
   const refresh = useCallback(async () => {
     const [data, packages] = await Promise.all([
       api('/api/wallet'),
-      servicePackageApi.getActive().catch(() => null),
+      servicePackageApi.getActive().catch(err => { setError(err.message || 'Không tải được danh sách gói dịch vụ.'); return null }),
     ])
     setWallet(data)
-    if (Array.isArray(packages) && packages.length > 0) {
+    if (Array.isArray(packages)) {
       const mapped = packages.map(p => ({
         code: p.code,
         name: sanitizeMojibake(p.name),
@@ -77,6 +78,9 @@ export default function WalletPage() {
       }))
       setPlans(mapped)
       cachedActivePlans = mapped
+    } else {
+      setPlans([])
+      cachedActivePlans = []
     }
     await loadHistory(0)
     window.dispatchEvent(new Event('wallet-updated'))
@@ -171,7 +175,7 @@ export default function WalletPage() {
         <p className="wallet-hint">Nạp tiền an toàn qua cổng VNPAY để duy trì số dư và tự động thanh toán các gói dịch vụ cho đàn ngựa.</p>
         <form onSubmit={topUp} className="wallet-form">
           <label className="field"><span>Số tiền nạp (tối thiểu 100.000 ₫)</span>
-            <input type="number" min="100000" step="1" required value={amount} onChange={event => setAmount(event.target.value)} /></label>
+            <UnitStepNumberInput type="number" min="100000" step="1" required value={amount} onChange={event => setAmount(event.target.value)} /></label>
           <div className="wallet-presets">{[100000, 300000, 1100000].map(value =>
             <button type="button" className="button secondary" key={value} onClick={() => setAmount(String(value))}>{money(value)}</button>)}</div>
           <button className="button primary" disabled={busy || !wallet?.vnpayGateway || order?.status === 'PENDING'}>
@@ -225,9 +229,12 @@ export default function WalletPage() {
       {!horses.length && <p>Chưa có ngựa. <Link to="/horses">Thêm hồ sơ ngựa</Link> để chọn gói.</p>}
       <div className="wallet-horse-list" id="wallet-horses">{horses.map(horse => {
         const activeCodes = new Set(plans.map(p => p.code))
-        const selected = selectedPlans[horse.horseId] || (activeCodes.has(horse.nextPlan) ? horse.nextPlan : null) || (activeCodes.has(horse.activePlan) ? horse.activePlan : null) || plans[0]?.code || 'P30'
+        const selected = (activeCodes.has(selectedPlans[horse.horseId]) ? selectedPlans[horse.horseId] : null) || (activeCodes.has(horse.nextPlan) ? horse.nextPlan : null) || (activeCodes.has(horse.activePlan) ? horse.activePlan : null) || plans[0]?.code || ''
         const paid = horse.paymentStatus === 'PAID' && horse.paidUntil && horse.paidUntil >= todayVN()
         const hasAlert = Boolean(horse.hasDiscontinuedExpiryAlert)
+        const discontinuedCurrent = Boolean(horse.activePlan && !activeCodes.has(horse.activePlan))
+        const discontinuedNext = Boolean(horse.nextPlan && !activeCodes.has(horse.nextPlan))
+        const renewablePlan = horse.nextPlan || horse.activePlan
         return <article className={`wallet-horse ${hasAlert ? 'wallet-horse--discontinued-alert' : ''}`} key={horse.horseId}>
           {hasAlert && (
             <span
@@ -242,14 +249,16 @@ export default function WalletPage() {
           <div><small>Trạng thái</small><strong>{paid ? 'Đã thanh toán' : 'Chờ thanh toán'}</strong></div>
           <div><small>Gói hiện tại</small><b>{planName(horse.activePlan)}</b></div>
           <div><small>Hạn thanh toán</small><b>{day(horse.nextDueDate)}</b></div>
-          <div><small>Gói kỳ tiếp theo</small><b>{planName(horse.nextPlan || horse.activePlan)}</b></div>
+          <div><small>Gói kỳ tiếp theo</small><b>{discontinuedNext || (discontinuedCurrent && !horse.nextPlan) ? 'Cần chọn gói mới' : planName(renewablePlan)}</b></div>
           <div className="wallet-horse-action"><select aria-label={`Gói cho ${horse.name}`} value={selected}
               onChange={event => setSelectedPlans(current => ({ ...current, [horse.horseId]: event.target.value }))}>
               {plans.map(plan => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</select>
-            <button className="button primary" disabled={busy || !acceptedTerms || (!horse.activePlan && Number(wallet.balanceVnd) < planPrice(selected))}
+            <button className="button primary" disabled={busy || !acceptedTerms || !selected || (!horse.activePlan && Number(wallet.balanceVnd) < planPrice(selected))}
               onClick={() => choosePlan(horse, selected)}>{horse.activePlan ? 'Đặt gói kỳ tới' : 'Thanh toán cho ngựa'}</button>
-            {horse.activePlan && !paid && <button className="button secondary" disabled={busy || Number(wallet.balanceVnd) < Number(horse.renewalAmountVnd)}
+            {horse.activePlan && !paid && activeCodes.has(renewablePlan) && <button className="button secondary" disabled={busy || Number(wallet.balanceVnd) < Number(horse.renewalAmountVnd)}
               onClick={() => renew(horse)}>Gia hạn ngay · {money(horse.renewalAmountVnd)}</button>}</div>
+          {discontinuedCurrent && <small className="wallet-shortage">Gói hiện tại đã ngừng cung cấp. Ngựa vẫn được hưởng dịch vụ đến {day(horse.paidUntil)}. Hãy chọn gói đang áp dụng cho kỳ tiếp theo.</small>}
+          {discontinuedNext && <small className="wallet-shortage">Gói đã đặt cho kỳ tiếp theo không còn được cung cấp. Hãy chọn gói khác đang áp dụng để tránh gián đoạn dịch vụ.</small>}
           {!horse.activePlan && Number(wallet.balanceVnd) < planPrice(selected) &&
             <small className="wallet-shortage">Cần nạp thêm {money(planPrice(selected) - Number(wallet.balanceVnd))} để mua gói này.</small>}
         </article>

@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useEffect, useRef, useState } from 'react'
 import { Calendar, Check, ChevronLeft, ChevronRight, Edit2, Plus, Trash2, X } from 'lucide-react'
 import { api, pageContent } from './api'
@@ -572,7 +573,7 @@ function EditPlanModal({ plan, onClose, onSaved }) {
           </div>
           <div className="form-grid">
             <label className="field"><span>Tên giai đoạn *</span><input required maxLength={200} value={phase.name} onChange={event => updatePhase(index, 'name', event.target.value)} /></label>
-            <label className="field"><span>Cự ly mục tiêu (m) *</span><input required type="number" min="0.01" step="0.01" value={phase.targetDistanceMeters} onChange={event => updatePhase(index, 'targetDistanceMeters', event.target.value)} /></label>
+            <label className="field"><span>Cự ly mục tiêu (m) *</span><UnitStepNumberInput required type="number" min="0.01" step="0.01" value={phase.targetDistanceMeters} onChange={event => updatePhase(index, 'targetDistanceMeters', event.target.value)} /></label>
             <label className="field"><span>Bắt đầu *</span><input required type="date" value={phase.startDate} onChange={event => updatePhase(index, 'startDate', event.target.value)} /></label>
             <label className="field"><span>Kết thúc *</span><input required type="date" min={phase.startDate} value={phase.endDate} onChange={event => updatePhase(index, 'endDate', event.target.value)} /></label>
             <label className="field"><span>Cường độ *</span><select value={phase.workloadIntensity} onChange={event => updatePhase(index, 'workloadIntensity', event.target.value)}><option value="LOW">LOW · Nhẹ</option><option value="MEDIUM">MEDIUM · Vừa</option><option value="HIGH">HIGH · Nặng</option></select></label>
@@ -776,7 +777,7 @@ function CreatePlanModal({ horses, horsesLoading, onClose, onSaved }) {
               </div>
               <div className="form-grid">
                 <label className="field"><span>Tên giai đoạn *</span><input required maxLength={200} value={phase.name} onChange={event => updatePhase(index, 'name', event.target.value)} /></label>
-                <label className="field"><span>Cự ly mục tiêu (m) *</span><input required type="number" min="0.01" step="0.01" value={phase.targetDistanceMeters} onChange={event => updatePhase(index, 'targetDistanceMeters', event.target.value)} /></label>
+                <label className="field"><span>Cự ly mục tiêu (m) *</span><UnitStepNumberInput required type="number" min="0.01" step="0.01" value={phase.targetDistanceMeters} onChange={event => updatePhase(index, 'targetDistanceMeters', event.target.value)} /></label>
                 <label className="field"><span>Bắt đầu *</span><input required type="date" min={todayVN()} value={phase.startDate} onChange={event => updatePhase(index, 'startDate', event.target.value)} /></label>
                 <label className="field"><span>Kết thúc *</span><input required type="date" min={phase.startDate} value={phase.endDate} onChange={event => updatePhase(index, 'endDate', event.target.value)} /></label>
                 <label className="field"><span>Cường độ *</span><select value={phase.workloadIntensity} onChange={event => updatePhase(index, 'workloadIntensity', event.target.value)}><option value="LOW">LOW · Nhẹ</option><option value="MEDIUM">MEDIUM · Vừa</option><option value="HIGH">HIGH · Nặng</option></select></label>
@@ -1278,15 +1279,15 @@ function EvaluationModal({ schedule, onClose, onSaved }) {
             <span>Khung giờ buổi tập</span>
             <input readOnly value={slotLabel(schedule)} style={{ background: '#f5f7f3', color: '#466057', cursor: 'not-allowed' }} />
           </label>
-          <label className="field"><span>Thời lượng vận động thực tế (phút) *</span><input type="number" min="1" required value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} /><small>Thời lượng vận động thực tế của ngựa trong buổi tập.</small></label>
-          <label className="field"><span>Quãng đường (m) *</span><input type="number" step="0.01" min="0.01" required value={form.distanceMeters} onChange={e => setForm({...form, distanceMeters: e.target.value})} /></label>
-          <label className="field"><span>Thời gian hoàn thành đường chạy (giây) *</span><input type="number" step="0.001" min="0.001" required value={form.trackCompletionSeconds} onChange={e => setForm({...form, trackCompletionSeconds: e.target.value})} /></label>
+          <label className="field"><span>Thời lượng vận động thực tế (phút) *</span><UnitStepNumberInput type="number" min="1" required value={form.durationMinutes} onChange={e => setForm({...form, durationMinutes: e.target.value})} /><small>Thời lượng vận động thực tế của ngựa trong buổi tập.</small></label>
+          <label className="field"><span>Quãng đường (m) *</span><UnitStepNumberInput type="number" step="0.01" min="0.01" required value={form.distanceMeters} onChange={e => setForm({...form, distanceMeters: e.target.value})} /></label>
+          <label className="field"><span>Thời gian hoàn thành đường chạy (giây) *</span><UnitStepNumberInput type="number" step="0.001" min="0.001" required value={form.trackCompletionSeconds} onChange={e => setForm({...form, trackCompletionSeconds: e.target.value})} /></label>
           <label className="field"><span>Tốc độ TB tính toán (km/h)</span><input readOnly value={average > 0 ? average.toFixed(2) : '-'} /><small>Nhập quãng đường và thời gian hoàn thành để tính tốc độ.</small></label>
-          <label className="field"><span>Tốc độ tối đa (km/h) *</span><input type="number" step="0.01" min="0.01" required value={form.maxSpeedKmh} onChange={e => setForm({...form, maxSpeedKmh: e.target.value})} /></label>
+          <label className="field"><span>Tốc độ tối đa (km/h) *</span><UnitStepNumberInput type="number" step="0.01" min="0.01" required value={form.maxSpeedKmh} onChange={e => setForm({...form, maxSpeedKmh: e.target.value})} /></label>
           <label className="field"><span>Cường độ tính toán</span><input readOnly value={intensityPreview} /><small>{average > maximum && maximum > 0 ? 'Tốc độ tối đa phải lớn hơn hoặc bằng tốc độ trung bình.' : 'Cần có tốc độ trung bình và tốc độ tối đa.'}</small></label>
 
-          <label className="field"><span>Nhịp tim đỉnh (BPM) *</span><input type="number" min="0" max="300" required value={form.stopBpm} onChange={e => setForm({...form, stopBpm: e.target.value})} /></label>
-          <label className="field"><span>Nhịp tim sau nghỉ 1 phút (BPM) *</span><input type="number" min="0" max="300" required value={form.oneMinuteBpm} onChange={e => setForm({...form, oneMinuteBpm: e.target.value})} /></label>
+          <label className="field"><span>Nhịp tim đỉnh (BPM) *</span><UnitStepNumberInput type="number" min="0" max="300" required value={form.stopBpm} onChange={e => setForm({...form, stopBpm: e.target.value})} /></label>
+          <label className="field"><span>Nhịp tim sau nghỉ 1 phút (BPM) *</span><UnitStepNumberInput type="number" min="0" max="300" required value={form.oneMinuteBpm} onChange={e => setForm({...form, oneMinuteBpm: e.target.value})} /></label>
           <label className="field"><span>HRR1</span><input readOnly value={hrr1Preview} /></label>
           <label className="field"><span>Trạng thái thể lực tính toán</span><input readOnly value={FITNESS_STATUS[statusPreview] || ''} /></label>
           <label className="field"><span>Ngựa bị chấn thương?</span><select value={form.injured} onChange={e => setForm({...form, injured: e.target.value})}><option value="false">Không</option><option value="true">Có</option></select></label>

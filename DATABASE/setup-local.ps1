@@ -82,7 +82,8 @@ $baselineScripts = @(
     "46_cancel_orphaned_medical_follow_ups.sql",
     "47_custom_preventive_care_type.sql",
     "48_horse_intake_caretaker.sql",
-    "49_service_packages_catalog.sql"
+    "49_service_packages_catalog.sql",
+    "50_soft_delete_service_packages.sql"
 )
 
 Write-Host "==========================================================" -ForegroundColor Cyan

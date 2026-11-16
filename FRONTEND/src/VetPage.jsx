@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -2945,7 +2946,7 @@ function CreatePreventiveModal({ horse, schedule, onClose, onSaved }) {
           {form.recurrencePreset === 'custom' ? (
             <div className="field">
               <span>Số ngày lặp lại *</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 min="1"
                 placeholder="VD: 60"
@@ -2957,7 +2958,7 @@ function CreatePreventiveModal({ horse, schedule, onClose, onSaved }) {
           ) : (
             <div className="field">
               <span>Nhắc trước (ngày)</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 min="0"
                 max="30"
@@ -2970,7 +2971,7 @@ function CreatePreventiveModal({ horse, schedule, onClose, onSaved }) {
           {form.recurrencePreset === 'custom' && (
             <div className="field">
               <span>Nhắc trước (ngày)</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 min="0"
                 max="30"
@@ -3305,7 +3306,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px' }}>
                 <div className="field">
                   <span style={{ fontSize: '11px' }}>Nhịp tim (BPM)</span>
-                  <input
+                  <UnitStepNumberInput
                     type="number"
                     placeholder="VD: 44"
                     min="20"
@@ -3316,7 +3317,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
                 </div>
                 <div className="field">
                   <span style={{ fontSize: '11px' }}>Thân nhiệt (°C)</span>
-                  <input
+                  <UnitStepNumberInput
                     type="number"
                     step="0.1"
                     placeholder="VD: 37.8"
@@ -3328,7 +3329,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
                 </div>
                 <div className="field">
                   <span style={{ fontSize: '11px' }}>Cân nặng (kg)</span>
-                  <input
+                  <UnitStepNumberInput
                     type="number"
                     step="0.5"
                     placeholder="VD: 480"
@@ -3340,7 +3341,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
                 </div>
                 <div className="field">
                   <span style={{ fontSize: '11px' }}>Chiều dài (cm)</span>
-                  <input
+                  <UnitStepNumberInput
                     type="number"
                     placeholder="VD: 180"
                     min="80"
@@ -3351,7 +3352,7 @@ function CreateExamModal({ horse, emergencyIncidentId, onClose, onSaved }) {
                 </div>
                 <div className="field">
                   <span style={{ fontSize: '11px' }}>Chiều cao (cm)</span>
-                  <input
+                  <UnitStepNumberInput
                     type="number"
                     placeholder="VD: 160"
                     min="80"
@@ -4163,7 +4164,7 @@ function VetAssessmentModal({ session, existingAssessment, onClose, onSaved }) {
 
             <div className="field">
               <span>Nhịp tim hồi phục (BPM sau 10p) *</span>
-              <input
+              <UnitStepNumberInput
                 type="number"
                 min="20"
                 max="250"

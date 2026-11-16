@@ -1,3 +1,4 @@
+import UnitStepNumberInput from './UnitStepNumberInput'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Activity, BarChart3, Check, FileImage, FileText, HeartPulse, Plus, Search, X } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -256,15 +257,15 @@ function EvaluationModal({ horses, initialHorseId, onClose, onSaved }) {
           </Field>
 
           <Field label="Thời lượng vận động (phút) *">
-            <input required type="number" min="1" value={form.durationMinutes} onChange={set('durationMinutes')} />
+            <UnitStepNumberInput required type="number" min="1" value={form.durationMinutes} onChange={set('durationMinutes')} />
           </Field>
 
           <Field label="Cự ly chạy (mét) *">
-            <input required type="number" min="0.01" step="0.01" value={form.distanceMeters} onChange={set('distanceMeters')} />
+            <UnitStepNumberInput required type="number" min="0.01" step="0.01" value={form.distanceMeters} onChange={set('distanceMeters')} />
           </Field>
 
           <Field label="Thời gian hoàn thành (giây) *">
-            <input required type="number" min="0.001" step="0.001" value={form.trackCompletionSeconds} onChange={set('trackCompletionSeconds')} />
+            <UnitStepNumberInput required type="number" min="0.001" step="0.001" value={form.trackCompletionSeconds} onChange={set('trackCompletionSeconds')} />
           </Field>
 
           <Field label="Tốc độ trung bình tính toán (km/h)">
@@ -272,15 +273,15 @@ function EvaluationModal({ horses, initialHorseId, onClose, onSaved }) {
           </Field>
 
           <Field label="Tốc độ tối đa (km/h) *">
-            <input required type="number" min="0.01" step="0.01" value={form.maxSpeedKmh} onChange={set('maxSpeedKmh')} />
+            <UnitStepNumberInput required type="number" min="0.01" step="0.01" value={form.maxSpeedKmh} onChange={set('maxSpeedKmh')} />
           </Field>
 
           <Field label="Nhịp tim đỉnh (BPM) *">
-            <input required type="number" min="0" max="300" value={form.stopBpm} onChange={set('stopBpm')} />
+            <UnitStepNumberInput required type="number" min="0" max="300" value={form.stopBpm} onChange={set('stopBpm')} />
           </Field>
 
           <Field label="Nhịp tim sau nghỉ 1 phút (BPM) *">
-            <input required type="number" min="0" max="300" value={form.oneMinuteBpm} onChange={set('oneMinuteBpm')} />
+            <UnitStepNumberInput required type="number" min="0" max="300" value={form.oneMinuteBpm} onChange={set('oneMinuteBpm')} />
           </Field>
 
           <Field label="Ngựa bị chấn thương?">
