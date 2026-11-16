@@ -236,8 +236,8 @@ class CareRoutineDefinitionServiceTest {
         service.transfer(id, actorId, false);
 
         verify(jdbc).update(contains("SET is_active = ?"), eq(false), eq(id));
-        // Verify historical tasks are completely untouched
-        verify(jdbc, never()).update(contains("dbo.care_tasks"), any(), any());
+        // Generated instances leave the current staff checklist but remain in the database.
+        verify(jdbc).update(contains("task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL"), eq(id));
     }
 
     @Test
@@ -276,7 +276,7 @@ class CareRoutineDefinitionServiceTest {
                     return List.of(mapper.mapRow(rs, 1));
                 });
 
-        when(jdbc.update(contains("UPDATE dbo.care_tasks SET routine_definition_id = NULL WHERE routine_definition_id = ?"), eq(id)))
+        when(jdbc.update(contains("task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL"), eq(id)))
                 .thenReturn(5); // 5 historical tasks unlinked
         when(jdbc.update(contains("DELETE FROM dbo.care_routine_definitions WHERE id = ?"), eq(id)))
                 .thenReturn(1);
@@ -285,7 +285,7 @@ class CareRoutineDefinitionServiceTest {
 
         // 1. Historical tasks unlinked (foreign key safely set to NULL without deleting task rows)
         verify(jdbc).update(
-                contains("UPDATE dbo.care_tasks SET routine_definition_id = NULL WHERE routine_definition_id = ?"),
+                contains("task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL"),
                 eq(id)
         );
 
@@ -330,14 +330,14 @@ class CareRoutineDefinitionServiceTest {
                     return List.of(mapper.mapRow(rs, 1));
                 });
 
-        when(jdbc.update(contains("UPDATE dbo.care_tasks SET routine_definition_id = NULL WHERE routine_definition_id = ?"), eq(reserveId)))
+        when(jdbc.update(contains("task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL"), eq(reserveId)))
                 .thenReturn(0); // Reserve task typically has 0 generated instances
         when(jdbc.update(contains("DELETE FROM dbo.care_routine_definitions WHERE id = ?"), eq(reserveId)))
                 .thenReturn(1);
 
         service.delete(reserveId, actorId);
 
-        verify(jdbc).update(contains("UPDATE dbo.care_tasks SET routine_definition_id = NULL WHERE routine_definition_id = ?"), eq(reserveId));
+        verify(jdbc).update(contains("task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL"), eq(reserveId));
         verify(jdbc).update(contains("DELETE FROM dbo.care_routine_definitions WHERE id = ?"), eq(reserveId));
         verify(jdbc, never()).update(contains("DELETE FROM dbo.care_tasks"), any(), any());
     }

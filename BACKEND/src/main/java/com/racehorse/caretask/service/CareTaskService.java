@@ -305,7 +305,7 @@ public class CareTaskService {
             ensureRoutineInstancesForDate(date);
         }
 
-        StringBuilder sql = new StringBuilder(baseSelect()).append(" WHERE 1=1 ");
+        StringBuilder sql = new StringBuilder(baseSelect()).append(" WHERE t.task_category <> 'ARCHIVED_ROUTINE' ");
         List<Object> args = new ArrayList<>();
 
         if (horseId != null) {

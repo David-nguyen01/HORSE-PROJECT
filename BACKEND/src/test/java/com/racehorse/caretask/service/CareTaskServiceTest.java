@@ -87,6 +87,16 @@ class CareTaskServiceTest {
     }
 
     @Test
+    void listTasksOmitsArchivedRoutineInstances() {
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        service.listTasks(null, null, null, null, false);
+
+        verify(jdbc).query(contains("WHERE t.task_category <> 'ARCHIVED_ROUTINE'"),
+                any(RowMapper.class), any(Object[].class));
+    }
+
+    @Test
     void completeTaskUpdatesStatusAndRecordsCompletionDetails() {
         UUID taskId = UUID.randomUUID();
         UUID staffId = UUID.randomUUID();

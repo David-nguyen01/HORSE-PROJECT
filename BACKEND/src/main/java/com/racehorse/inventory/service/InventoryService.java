@@ -151,6 +151,9 @@ public class InventoryService {
     @Transactional
     public InventoryItemResponse updateStock(UUID itemId, UUID actorId, UpdateStockRequest request) {
         InventoryItemResponse existing = getItem(itemId);
+        if (request.newQuantity() < existing.quantityOnHand()) {
+            throw new BusinessException("Giảm tồn kho phải ghi nhận xuất dùng để lưu lịch sử và chi phí");
+        }
         String currentJson = jdbc.queryForObject(
                 "select data_json from module_records where id=?", String.class, itemId);
         Map<String, Object> data = readMap(currentJson);

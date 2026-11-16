@@ -5933,15 +5933,44 @@ function ReviewReplenishmentModal({ request, items = [], onClose, onSaved }) {
 function UpdateStockModal({ item, onClose, onSaved }) {
   const [newQuantity, setNewQuantity] = useState(String(item.quantityOnHand))
   const [reason, setReason] = useState('')
+  const [unitPrice, setUnitPrice] = useState(item.referencePrice == null ? '' : String(item.referencePrice))
+  const [targetType, setTargetType] = useState(item.category === 'MEDICATION' ? 'HORSE' : 'STABLE')
+  const [targetId, setTargetId] = useState('')
+  const [horses, setHorses] = useState([])
+  const [stables, setStables] = useState([])
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const decrease = Number(newQuantity) < Number(item.quantityOnHand)
+  const usedQuantity = Number(item.quantityOnHand) - Number(newQuantity)
+
+  useEffect(() => {
+    Promise.all([api('/api/horses?size=200'), stableCareApi.getStables(false)])
+      .then(([horseResponse, stableResponse]) => {
+        setHorses(pageContent(horseResponse))
+        setStables(stableResponse || [])
+      })
+      .catch((err) => setError(`Không thể tải ngựa và chuồng: ${err.message}`))
+  }, [])
 
   const submit = async (e) => {
     e.preventDefault()
     setBusy(true)
     setError('')
     try {
-      await stableCareApi.updateStock(item.id, { newQuantity: Number(newQuantity), reason })
+      if (decrease) {
+        if (!targetId || !Number.isFinite(Number(unitPrice)) || Number(unitPrice) <= 0) {
+          throw new Error('Chọn đối tượng sử dụng và nhập đơn giá xuất dùng lớn hơn 0.')
+        }
+        await stableCareApi.recordUsage(item.id, {
+          quantity: usedQuantity,
+          unitPriceVnd: Number(unitPrice),
+          horseId: targetType === 'HORSE' ? targetId : null,
+          stableId: targetType === 'STABLE' ? targetId : null,
+          notes: reason.trim(),
+        })
+      } else {
+        await stableCareApi.updateStock(item.id, { newQuantity: Number(newQuantity), reason })
+      }
       onSaved()
     } catch (err) {
       setError(err.message)
@@ -5970,6 +5999,22 @@ function UpdateStockModal({ item, onClose, onSaved }) {
             <span>Lý do điều chỉnh *</span>
             <input required value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ví dụ: Kiểm kê định kỳ, hao hụt..." />
           </label>
+          {decrease && <>
+            <p className="muted" style={{ margin: 0 }}>Xuất dùng {usedQuantity} {item.unit}; lịch sử và chi phí sẽ được ghi cho quản lý.</p>
+            <label className="field"><span>Đơn giá xuất dùng (VND / {item.unit}) *</span>
+              <input required type="number" min="0.01" step="0.01" value={unitPrice} onChange={(e) => setUnitPrice(e.target.value)} /></label>
+            <label className="field"><span>Đối tượng sử dụng *</span>
+              <select value={targetType} onChange={(e) => { setTargetType(e.target.value); setTargetId('') }}>
+                <option value="HORSE">Ngựa</option>
+                {item.category !== 'MEDICATION' && <option value="STABLE">Chuồng</option>}
+              </select></label>
+            <label className="field"><span>{targetType === 'HORSE' ? 'Chọn ngựa' : 'Chọn chuồng'} *</span>
+              <select required value={targetId} onChange={(e) => setTargetId(e.target.value)}>
+                <option value="">Chọn {targetType === 'HORSE' ? 'ngựa' : 'chuồng'}</option>
+                {(targetType === 'HORSE' ? horses : stables).map((target) =>
+                  <option key={target.id} value={target.id}>{targetType === 'HORSE' ? `${target.code} · ${target.name}` : target.name}</option>)}
+              </select></label>
+          </>}
           <div className="modal-actions">
             <button type="button" className="button secondary" onClick={onClose}>Hủy</button>
             <button className="button primary" disabled={busy}>{busy ? 'Đang lưu…' : 'Lưu tồn kho'}</button>

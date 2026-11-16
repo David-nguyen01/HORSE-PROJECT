@@ -181,6 +181,11 @@ public class CareRoutineDefinitionService {
             throw new ResourceNotFoundException("Không tìm thấy định nghĩa quy trình chăm sóc: " + id);
         }
 
+        if (!targetActive) {
+            jdbc.update("UPDATE dbo.care_tasks SET task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL, "
+                    + "updated_at = CURRENT_TIMESTAMP WHERE routine_definition_id = ?", id);
+        }
+
         return get(id);
     }
 
@@ -189,8 +194,10 @@ public class CareRoutineDefinitionService {
         // 1. Verify existence
         get(id);
 
-        // 2. Safely unlink historical task instances without deleting or altering their content:
-        jdbc.update("UPDATE dbo.care_tasks SET routine_definition_id = NULL WHERE routine_definition_id = ?", id);
+        // Remove generated instances from the staff checklist while retaining their
+        // completion details for audit and direct lookup.
+        jdbc.update("UPDATE dbo.care_tasks SET task_category = 'ARCHIVED_ROUTINE', routine_definition_id = NULL, "
+                + "updated_at = CURRENT_TIMESTAMP WHERE routine_definition_id = ?", id);
 
         // 3. Physically delete the definition from the catalog:
         int deleted = jdbc.update("DELETE FROM dbo.care_routine_definitions WHERE id = ?", id);

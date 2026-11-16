@@ -123,7 +123,7 @@ public class DailyFeedingService {
 
         OffsetDateTime now = OffsetDateTime.now();
         DailyFeedingLogEntity entity = new DailyFeedingLogEntity(
-                UUID.randomUUID(),
+                null, // @UuidGenerator assigns the ID when this new entity is persisted.
                 horseId,
                 request.date(),
                 canonicalMealKey,

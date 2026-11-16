@@ -80,6 +80,7 @@ class DailyFeedingServiceTest {
 
         when(repository.saveAndFlush(any(DailyFeedingLogEntity.class))).thenAnswer(inv -> {
             DailyFeedingLogEntity entity = inv.getArgument(0);
+            assertThat(entity.getId()).isNull();
             entity.setId(UUID.randomUUID());
             return entity;
         });

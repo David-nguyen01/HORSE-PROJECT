@@ -122,6 +122,29 @@ class InventoryServiceTest {
     }
 
     @Test
+    void updateStockRejectsDecreaseWithoutUsageAndExpense() {
+        UUID itemId = UUID.randomUUID();
+        UUID actorId = UUID.randomUUID();
+        String itemJson = """
+                {"itemName":"Cỏ khô","category":"FEED","unit":"kg","quantityOnHand":50,"minThreshold":5}
+                """;
+        when(jdbc.query(contains("where id=? and module_code='INVENTORY' and record_type='INVENTORY_ITEM'"),
+                any(RowMapper.class), eq(itemId))).thenAnswer(inv -> {
+            RowMapper<InventoryItemResponse> mapper = inv.getArgument(1);
+            java.sql.ResultSet rs = mock(java.sql.ResultSet.class);
+            when(rs.getObject("id", UUID.class)).thenReturn(itemId);
+            when(rs.getString("status")).thenReturn("ACTIVE");
+            when(rs.getString("data_json")).thenReturn(itemJson);
+            return List.of(mapper.mapRow(rs, 1));
+        });
+
+        assertThatThrownBy(() -> service.updateStock(itemId, actorId, new UpdateStockRequest(45.0, "Đã dùng")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("ghi nhận xuất dùng");
+        verify(jdbc, never()).update(contains("update module_records set data_json"), any(), eq(itemId));
+    }
+
+    @Test
     void reviewReplenishmentApprovalWaitsForReceiptBeforeIncreasingStock() {
         UUID reqId = UUID.randomUUID();
         UUID itemId = UUID.randomUUID();
