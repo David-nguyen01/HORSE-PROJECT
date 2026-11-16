@@ -48,6 +48,8 @@ public class SecurityConfiguration {
                 .headers(headers -> headers.cacheControl(Customizer.withDefaults()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/races", "/api/races/**", "/api/horses/*/race-results", "/api/horses/*/race-results/**")
+                        .denyAll()
                         .requestMatchers(
                                 "/actuator/health",
                                 "/api/auth/register-roles",

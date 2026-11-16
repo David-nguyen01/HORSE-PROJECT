@@ -29,6 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.math.BigDecimal;
 import java.util.List;
@@ -81,7 +82,8 @@ class HorseServiceTest {
 
         verify(jdbc).update(org.mockito.ArgumentMatchers.argThat(sql -> sql.contains("active_service_plan=null")
                 && sql.contains("next_service_plan=null") && sql.contains("payment_status='UNPAID'")),
-                any(Instant.class), any(UUID.class));
+                org.mockito.ArgumentMatchers.eq(OffsetDateTime.parse("2026-09-10T00:00:00Z")),
+                org.mockito.ArgumentMatchers.eq(horseId));
         verify(jdbc).update(org.mockito.ArgumentMatchers.contains("record_type='STALL_ASSIGNMENT'"),
                 any(String.class), any(UUID.class));
     }
@@ -97,10 +99,10 @@ class HorseServiceTest {
         assertThatThrownBy(() -> horseService.removeForOwner(horseId, ownerId, false))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("không được hoàn tiền");
-        verify(jdbc, never()).update(any(String.class), any(Instant.class), any(UUID.class));
+        verify(jdbc, never()).update(any(String.class), any(OffsetDateTime.class), any(UUID.class));
 
         horseService.removeForOwner(horseId, ownerId, true);
-        verify(jdbc).update(any(String.class), any(Instant.class), any(UUID.class));
+        verify(jdbc).update(any(String.class), any(OffsetDateTime.class), any(UUID.class));
     }
 
     @Test
@@ -111,7 +113,7 @@ class HorseServiceTest {
 
         assertThatThrownBy(() -> horseService.removeForOwner(horseId, ownerId, true))
                 .isInstanceOf(ResourceNotFoundException.class);
-        verify(jdbc, never()).update(any(String.class), any(Instant.class), any(UUID.class));
+        verify(jdbc, never()).update(any(String.class), any(OffsetDateTime.class), any(UUID.class));
     }
 
     @Test

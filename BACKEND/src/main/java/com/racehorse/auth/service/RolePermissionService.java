@@ -22,7 +22,6 @@ public class RolePermissionService {
             "TRAINING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
             "MEDICAL", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
             "STABLE_CARE", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "RACING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
             "REPORTING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
             "INVENTORY", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
             "SYSTEM", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"));
@@ -36,7 +35,7 @@ public class RolePermissionService {
                 with roles(code) as (
                     select code from (values ('CLUB_MANAGER'),('HEAD_TRAINER'),('VETERINARIAN'),('STABLE_STAFF'),('HORSE_OWNER')) r(code)
                 ), modules(module_code) as (
-                    select m from (values ('PROFILE'),('TRAINING'),('MEDICAL'),('STABLE_CARE'),('RACING'),('REPORTING'),('INVENTORY'),('SYSTEM')) m(m)
+                    select m from (values ('PROFILE'),('TRAINING'),('MEDICAL'),('STABLE_CARE'),('REPORTING'),('INVENTORY'),('SYSTEM')) m(m)
                 ), actions(action_code) as (
                     select a from (values ('VIEW'),('EDIT'),('APPROVE'),('CLAIM')) a(a)
                 ), permissions(module_code,action_code) as (

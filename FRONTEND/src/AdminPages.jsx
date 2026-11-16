@@ -9,7 +9,7 @@ import { handleImageFallback } from './imageFallback'
 const initials = (name = '') => name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase() || 'RC'
 
 const ROLES={CLUB_MANAGER:'Quản lý câu lạc bộ',HEAD_TRAINER:'Huấn luyện viên trưởng',VETERINARIAN:'Bác sĩ thú y',STABLE_STAFF:'Nhân viên chuồng',HORSE_OWNER:'Chủ sở hữu ngựa'}
-const MODULES={PROFILE:'Hồ sơ ngựa',TRAINING:'Huấn luyện',MEDICAL:'Y tế',STABLE_CARE:'Chăm sóc chuồng',RACING:'Giải đua',REPORTING:'Báo cáo',INVENTORY:'Kho vật tư',SYSTEM:'Hệ thống'}
+const MODULES={PROFILE:'Hồ sơ ngựa',TRAINING:'Huấn luyện',MEDICAL:'Y tế',STABLE_CARE:'Chăm sóc chuồng',REPORTING:'Báo cáo',INVENTORY:'Kho vật tư',SYSTEM:'Hệ thống'}
 const money=(value)=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND',maximumFractionDigits:0}).format(value||0)
 const monthNow=()=>new Date().toISOString().slice(0,7)
 const priorMonth=(month)=>{
@@ -245,7 +245,7 @@ export function PermissionsPage(){
   useEffect(()=>{void load()},[load])
   const safeItems = Array.isArray(items) ? items : []
   const roles=Object.keys(ROLES).filter(r=>r!=='CLUB_MANAGER');
-  const modules=[...new Set(safeItems.map(x=>x.module))];
+  const modules=[...new Set(safeItems.filter(x=>x.module!=='RACING').map(x=>x.module))];
   const toggle=async item=>{
     const key=`${item.role}-${item.module}-${item.action}`;
     setBusy(key); setError('');
@@ -532,7 +532,7 @@ export function AuditLogs(){
           <span>Phân hệ</span>
           <select value={module} onChange={e=>{setModule(e.target.value);setPage(0)}}>
             <option value="">Tất cả phân hệ</option>
-            {['ACCESS','PROFILE','TRAINING','MEDICAL','STABLE_CARE','RACING','REPORTING'].map(x=>(
+            {['ACCESS','PROFILE','TRAINING','MEDICAL','STABLE_CARE','REPORTING'].map(x=>(
               <option key={x} value={x}>{MODULES[x]||x}</option>
             ))}
           </select>

@@ -354,16 +354,17 @@ public class HorseService {
         if (hasRemainingBenefits && !confirmBenefitLoss) {
             throw new BusinessException("Ngựa đang trong gói dịch vụ. Xóa ngựa sẽ mất toàn bộ quyền lợi còn lại và không được hoàn tiền, kể cả khi gói vẫn còn thời hạn. Vui lòng xác nhận để tiếp tục.");
         }
+        java.time.Instant removedAt = clock.instant();
         jdbc.update("update horses set archived_at=?,active_service_plan=null,next_service_plan=null,"
                         + "service_plan_started_on=null,service_next_due_date=null,paid_until=null,"
                         + "payment_status='UNPAID',service_override=false,override_reason=null,"
                         + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=? and archived_at is null",
-                clock.instant(), horseId);
+                java.time.OffsetDateTime.ofInstant(removedAt, java.time.ZoneOffset.UTC), horseId);
         jdbc.update("update module_records set status='ENDED',"
                         + "data_json=dbo.json_modify(data_json,'$.assignedUntil',?),"
                         + "updated_at=CURRENT_TIMESTAMP where module_code='STABLE_CARE' "
                         + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and horse_id=?",
-                java.time.OffsetDateTime.ofInstant(clock.instant(), ZoneId.of("Asia/Ho_Chi_Minh")).toString(), horseId);
+                java.time.OffsetDateTime.ofInstant(removedAt, ZoneId.of("Asia/Ho_Chi_Minh")).toString(), horseId);
     }
 
     private void validateUniqueIdentifiers(CreateHorseRequest request) {
