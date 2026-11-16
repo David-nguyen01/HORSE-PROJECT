@@ -681,6 +681,45 @@ function VetDashboard({ onNavigate }) {
             </div> : <div className="empty vet-empty">Bạn chưa phụ trách lâu dài con ngựa nào.</div>}
           </section>
 
+          {/* Section 3: Ngựa đang chấn thương */}
+          <section className="card">
+            <div className="card-head">
+              <h3>Ngựa cần theo dõi chấn thương</h3>
+              <button className="button secondary" onClick={() => onNavigate('injuries')}>
+                Xem tất cả <ChevronRight size={15} />
+              </button>
+            </div>
+            {injuredHorses.length > 0 ? (
+              <div className="horse-list">
+                {injuredHorses.map((h) => (
+                  <div key={h.id} className="horse-row vet-case-row">
+                    <div className="horse-avatar" style={{ background: '#ffebee', color: '#c62828' }}>
+                      {h.name?.slice(0, 2).toUpperCase() || 'H'}
+                    </div>
+                    <div className="horse-main">
+                      <b>{h.name}</b>
+                      <span>Mã: {h.code} · Giống: {h.breed || '—'}</span>
+                    </div>
+                    <div className="vet-row-actions">
+                      <button
+                        type="button"
+                        className="button secondary"
+                        onClick={() => onNavigate(`medical-records?horseId=${h.id}`)}
+                      >
+                        <FileText size={15} /> Xem bệnh án
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty vet-empty">
+                <CheckCircle2 size={24} color="#27714d" />
+                <span>Chưa có ngựa chấn thương cần theo dõi.</span>
+              </div>
+            )}
+          </section>
+
           <section className="card">
             <div className="card-head">
               <div>
@@ -751,45 +790,9 @@ function VetDashboard({ onNavigate }) {
             </details>}
           </section>
 
-          {/* Section 3: Ngựa đang chấn thương */}
-          <section className="card">
-            <div className="card-head">
-              <h3>Ngựa cần theo dõi chấn thương</h3>
-              <button className="button secondary" onClick={() => onNavigate('injuries')}>
-                Xem tất cả <ChevronRight size={15} />
-              </button>
-            </div>
-            {injuredHorses.length > 0 ? (
-              <div className="horse-list">
-                {injuredHorses.map((h) => (
-                  <div key={h.id} className="horse-row vet-case-row">
-                    <div className="horse-avatar" style={{ background: '#ffebee', color: '#c62828' }}>
-                      {h.name?.slice(0, 2).toUpperCase() || 'H'}
-                    </div>
-                    <div className="horse-main">
-                      <b>{h.name}</b>
-                      <span>Mã: {h.code} · Giống: {h.breed || '—'}</span>
-                    </div>
-                    <div className="vet-row-actions">
-                      <button
-                        type="button"
-                        className="button secondary"
-                        onClick={() => onNavigate(`medical-records?horseId=${h.id}`)}
-                      >
-                        <FileText size={15} /> Xem bệnh án
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="empty vet-empty">
-                <CheckCircle2 size={24} color="#27714d" />
-                <span>Chưa có ngựa chấn thương cần theo dõi.</span>
-              </div>
-            )}
-          </section>
+        </div>
 
+        <div className="vet-side-panel">
           {/* Section 4: Báo cáo sự cố từ nhân viên chuồng */}
           <section className="card">
             <div className="card-head">
@@ -852,10 +855,6 @@ function VetDashboard({ onNavigate }) {
               </div>
             )}
           </section>
-        </div>
-
-        {/* Lịch phòng ngừa vẫn hiển thị ở cột riêng để dễ theo dõi. */}
-        <div className="vet-side-panel">
           <section className="card">
             <div className="card-head">
               <h3>Chăm sóc phòng ngừa (7 ngày tới)</h3>

@@ -1107,8 +1107,8 @@ body { font-size: 14px; line-height: 1.5; }
 .vet-summary .stat { min-height: 104px; padding: 18px 20px; }
 .vet-summary .stat strong { font-size: 30px; }
 .vet-summary .stat div span { font-size: 15px; line-height: 1.35; margin-top: 7px; }
-.vet-workspace { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); align-items: start; }
-.vet-workspace .vet-side-panel { position: sticky; top: 24px; }
+.vet-workspace { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); align-items: start; }
+.vet-workspace .vet-side-panel { position: static; }
 .vet-workspace .card-head { gap: 12px; }
 .vet-workspace .card-head h3 { font-size: 20px; line-height: 1.25; }
 .vet-workspace .card-head small { display: block; margin-top: 5px; font-size: 14px; line-height: 1.45; }
@@ -1134,6 +1134,8 @@ body { font-size: 14px; line-height: 1.5; }
 .vet-empty span { font-size: 14px; }
 .vet-incidents { padding: 0 18px 18px; display: grid; gap: 10px; }
 .vet-incident-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; border: 1px solid #f0d5d4; background: #fffafa; border-radius: 12px; padding: 14px 16px; }
+.vet-side-panel .vet-incident-row { grid-template-columns: minmax(0, 1fr); }
+.vet-side-panel .vet-incident-row .vet-row-actions { justify-content: flex-start; }
 .vet-incident-row > div:first-child > div { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .vet-incident-type { color: #9f3935; font-size: 14px; font-weight: 700; }
 .vet-incident-horse { color: #52665b; font-size: 14px; }
