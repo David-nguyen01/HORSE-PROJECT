@@ -21,6 +21,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -126,6 +127,14 @@ public class HorseController {
     @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
     HorseResponse archive(@PathVariable("id") UUID id) {
         return horseService.archive(id);
+    }
+
+    @DeleteMapping("/{id}/mine")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_VIEW') and hasRole('HORSE_OWNER')")
+    ResponseEntity<Void> removeForOwner(@PathVariable("id") UUID id, @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(name = "confirmBenefitLoss", defaultValue = "false") boolean confirmBenefitLoss) {
+        horseService.removeForOwner(id, userId(jwt), confirmBenefitLoss);
+        return ResponseEntity.noContent().build();
     }
 
     private UUID userId(Jwt jwt) {

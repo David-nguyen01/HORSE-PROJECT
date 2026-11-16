@@ -336,6 +336,36 @@ public class HorseService {
         return toResponse(horse);
     }
 
+    @Transactional
+    public void removeForOwner(UUID horseId, UUID ownerId, boolean confirmBenefitLoss) {
+        List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                "select active_service_plan,paid_until,payment_status from horses "
+                        + "where id=? and archived_at is null and exists ("
+                        + "select 1 from horse_ownerships where horse_id=horses.id and owner_id=?) for update",
+                horseId, ownerId);
+        if (rows.isEmpty()) {
+            throw new ResourceNotFoundException("Không tìm thấy ngựa thuộc sở hữu của bạn");
+        }
+        java.util.Map<String, Object> row = rows.getFirst();
+        java.sql.Date paidUntil = (java.sql.Date) row.get("paid_until");
+        boolean hasRemainingBenefits = row.get("active_service_plan") != null
+                && "PAID".equals(row.get("payment_status"))
+                && (paidUntil == null || !paidUntil.toLocalDate().isBefore(serviceToday()));
+        if (hasRemainingBenefits && !confirmBenefitLoss) {
+            throw new BusinessException("Ngựa đang trong gói dịch vụ. Xóa ngựa sẽ mất toàn bộ quyền lợi còn lại và không được hoàn tiền, kể cả khi gói vẫn còn thời hạn. Vui lòng xác nhận để tiếp tục.");
+        }
+        jdbc.update("update horses set archived_at=?,active_service_plan=null,next_service_plan=null,"
+                        + "service_plan_started_on=null,service_next_due_date=null,paid_until=null,"
+                        + "payment_status='UNPAID',service_override=false,override_reason=null,"
+                        + "updated_at=CURRENT_TIMESTAMP,version=version+1 where id=? and archived_at is null",
+                clock.instant(), horseId);
+        jdbc.update("update module_records set status='ENDED',"
+                        + "data_json=dbo.json_modify(data_json,'$.assignedUntil',?),"
+                        + "updated_at=CURRENT_TIMESTAMP where module_code='STABLE_CARE' "
+                        + "and record_type='STALL_ASSIGNMENT' and status='ACTIVE' and horse_id=?",
+                java.time.OffsetDateTime.ofInstant(clock.instant(), ZoneId.of("Asia/Ho_Chi_Minh")).toString(), horseId);
+    }
+
     private void validateUniqueIdentifiers(CreateHorseRequest request) {
         String code = request.code().trim();
         if (horseRepository.existsByCodeIgnoreCase(code)) {

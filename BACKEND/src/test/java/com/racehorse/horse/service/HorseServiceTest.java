@@ -24,6 +24,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Clock;
 import java.time.LocalDate;
@@ -54,6 +55,9 @@ class HorseServiceTest {
     @Mock
     private UserAccountRepository userRepository;
 
+    @Mock
+    private JdbcTemplate jdbc;
+
     private HorseService horseService;
 
     @BeforeEach
@@ -63,7 +67,51 @@ class HorseServiceTest {
                 ownershipRepository,
                 userRepository,
                 new HorseMapper(),
-                Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC));
+                Clock.fixed(Instant.parse("2026-09-10T00:00:00Z"), ZoneOffset.UTC), jdbc);
+    }
+
+    @Test
+    void ownerCanRemoveUnpaidHorseWithoutBenefitConfirmation() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        when(jdbc.queryForList(any(String.class), any(UUID.class), any(UUID.class)))
+                .thenReturn(List.of(java.util.Map.of("active_service_plan", "P30", "payment_status", "UNPAID")));
+
+        horseService.removeForOwner(horseId, ownerId, false);
+
+        verify(jdbc).update(org.mockito.ArgumentMatchers.argThat(sql -> sql.contains("active_service_plan=null")
+                && sql.contains("next_service_plan=null") && sql.contains("payment_status='UNPAID'")),
+                any(Instant.class), any(UUID.class));
+        verify(jdbc).update(org.mockito.ArgumentMatchers.contains("record_type='STALL_ASSIGNMENT'"),
+                any(String.class), any(UUID.class));
+    }
+
+    @Test
+    void activePackageRequiresExplicitBenefitLossConfirmation() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        when(jdbc.queryForList(any(String.class), any(UUID.class), any(UUID.class))).thenReturn(List.of(java.util.Map.of(
+                "active_service_plan", "P30", "payment_status", "PAID",
+                "paid_until", java.sql.Date.valueOf("2026-09-30"))));
+
+        assertThatThrownBy(() -> horseService.removeForOwner(horseId, ownerId, false))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("không được hoàn tiền");
+        verify(jdbc, never()).update(any(String.class), any(Instant.class), any(UUID.class));
+
+        horseService.removeForOwner(horseId, ownerId, true);
+        verify(jdbc).update(any(String.class), any(Instant.class), any(UUID.class));
+    }
+
+    @Test
+    void ownerCannotRemoveHorseThatIsNotTheirs() {
+        UUID horseId = UUID.randomUUID();
+        UUID ownerId = UUID.randomUUID();
+        when(jdbc.queryForList(any(String.class), any(UUID.class), any(UUID.class))).thenReturn(List.of());
+
+        assertThatThrownBy(() -> horseService.removeForOwner(horseId, ownerId, true))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(jdbc, never()).update(any(String.class), any(Instant.class), any(UUID.class));
     }
 
     @Test

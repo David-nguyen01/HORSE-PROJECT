@@ -963,6 +963,7 @@ function HorseDetail() {
   const { id } = useParams(); const { user } = useAuth(); const navigate = useNavigate(); const location = useLocation(); const canEdit = hasAny(user, 'CLUB_MANAGER'); const isOwner = hasAny(user, 'HORSE_OWNER') && !canEdit; const isManager = hasAny(user, 'CLUB_MANAGER');
   const [horse, setHorse] = useState(null); const [pedigree, setPedigree] = useState(null); const [evaluations, setEvaluations] = useState([]); const [medicalHealth, setMedicalHealth] = useState(null); const [restingHeartRateBpm, setRestingHeartRateBpm] = useState(null); const [weightKg, setWeightKg] = useState(null); const [error, setError] = useState(''); const [showTransfer, setShowTransfer] = useState(false); const [showEdit, setShowEdit] = useState(false); const [file, setFile] = useState(null); const [uploading, setUploading] = useState(false)
   const [emergencies, setEmergencies] = useState([]); const [emergencyError, setEmergencyError] = useState(''); const [selectedEmergencyId, setSelectedEmergencyId] = useState(null)
+  const [removeDialog, setRemoveDialog] = useState(null); const [checkingRemoval, setCheckingRemoval] = useState(false); const [removing, setRemoving] = useState(false); const [removeError, setRemoveError] = useState('')
   useEffect(() => { setSelectedEmergencyId(new URLSearchParams(location.search).get('emergencyId')) }, [location.search])
   useEffect(() => {
     if (!isOwner) return
@@ -1069,6 +1070,24 @@ function HorseDetail() {
     try { setHorse(await api(`/api/horses/${id}/archive`, { method: 'PATCH' })) }
     catch (e) { setError(e.message) }
   }
+  const openRemoveDialog = async () => {
+    setCheckingRemoval(true); setError(''); setRemoveError('')
+    try {
+      const wallet = await api('/api/wallet')
+      const plan = wallet.horses?.find(item => item.horseId === id)
+      const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+      setRemoveDialog({ hasRemainingBenefits: Boolean(plan?.activePlan && plan?.paymentStatus === 'PAID' && (!plan.paidUntil || plan.paidUntil >= today)), plan })
+    } catch (e) { setError(e.message || 'Không thể kiểm tra gói dịch vụ của ngựa.') }
+    finally { setCheckingRemoval(false) }
+  }
+  const removeOwnedHorse = async () => {
+    setRemoving(true); setRemoveError('')
+    try {
+      await api(`/api/horses/${id}/mine?confirmBenefitLoss=${removeDialog.hasRemainingBenefits}`, { method: 'DELETE' })
+      navigate('/horses')
+    } catch (e) { setRemoveError(e.message || 'Không thể xoá ngựa.') }
+    finally { setRemoving(false) }
+  }
   if (error && !horse) return <><button className="back-link" onClick={() => navigate(-1)}><ArrowLeft size={17} /> Quay lại</button><Empty title="Không thể mở hồ sơ" text={error} /></>
   if (!horse) return <LoadingScreen />
   return <><button className="back-link" onClick={() => navigate('/horses')}><ArrowLeft size={17} /> Danh mục ngựa</button>{error && <div className="notice error"><X size={17} />{error}</div>}
@@ -1129,6 +1148,15 @@ function HorseDetail() {
       </article>) : <p>Chưa có yêu cầu khẩn cấp.</p>}
     </section>}
     {isManager && !horse.archivedAt && <div className="danger-zone card"><div><b>Lưu trữ hồ sơ</b><span>Hồ sơ sẽ ẩn khỏi danh mục; file hiện tại vẫn được giữ.</span></div><button className="button danger-outline" onClick={archiveHorse}>Lưu trữ</button></div>}
+    {isOwner && !horse.archivedAt && <div className="danger-zone card"><div><b>Xoá ngựa khỏi tài khoản</b><span>Hồ sơ ngựa sẽ không còn hiển thị trong tài khoản của bạn.</span></div><button type="button" className="button danger-outline" disabled={checkingRemoval} onClick={openRemoveDialog}>{checkingRemoval ? 'Đang kiểm tra…' : 'Xoá ngựa'}</button></div>}
+    {removeDialog && <Modal title={`Xoá ngựa · ${horse.name}`} onClose={() => { if (!removing) setRemoveDialog(null) }}>
+      <div className="modal-body">
+        {removeDialog.hasRemainingBenefits ? <div className="notice error"><X size={17} /><span>Ngựa đang trong gói dịch vụ{removeDialog.plan?.paidUntil ? ` đến ${formatDate(removeDialog.plan.paidUntil)}` : ''}. Nếu xoá ngựa, bạn sẽ mất toàn bộ quyền lợi còn lại và không được hoàn tiền, kể cả khi gói vẫn còn thời hạn.</span></div> : <p>Ngựa chưa có quyền lợi gói dịch vụ còn hiệu lực. Bạn có thể xoá ngựa mà không mất phí gói.</p>}
+        <p>Hồ sơ ngựa sẽ không còn hiển thị trong tài khoản sau khi xoá. <Link to="/wallet">Xem điều khoản dịch vụ</Link>.</p>
+        {removeError && <div className="notice error"><X size={17} />{removeError}</div>}
+        <div className="modal-actions"><button type="button" className="button secondary" disabled={removing} onClick={() => setRemoveDialog(null)}>Giữ ngựa</button><button type="button" className="button danger-outline" disabled={removing} onClick={removeOwnedHorse}>{removing ? 'Đang xoá…' : removeDialog.hasRemainingBenefits ? 'Tôi hiểu, xoá và mất quyền lợi' : 'Xác nhận xoá ngựa'}</button></div>
+      </div>
+    </Modal>}
     {showTransfer && <OwnershipModal horse={horse} onClose={() => setShowTransfer(false)} onSaved={() => { setShowTransfer(false); load() }} />}
     {showEdit && <HorseEditModal horse={horse} isOwner={isOwner} onClose={() => setShowEdit(false)} onSaved={() => { setShowEdit(false); load() }} />}
   </>

@@ -34,7 +34,7 @@ import java.util.Locale;
 @Service
 public class WalletService {
     private static final BigDecimal MIN_TOP_UP = BigDecimal.valueOf(100_000);
-    static final String SERVICE_TERMS_VERSION = "EQUINE-EMERGENCY-2026-10";
+    static final String SERVICE_TERMS_VERSION = "EQUINE-SERVICE-2026-11";
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
     private final PayosGateway gateway;
