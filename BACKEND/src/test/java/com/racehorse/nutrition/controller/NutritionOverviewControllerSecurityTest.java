@@ -23,6 +23,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
@@ -432,12 +433,12 @@ class NutritionOverviewControllerSecurityTest {
     @Test
     @WithMockUser(authorities = {"ROLE_STABLE_STAFF", "PERM_STABLE_CARE_VIEW"})
     void stablesQuickFeedStableStaffAllowed() throws Exception {
-        when(service.getStablesQuickFeed(any())).thenReturn(List.of());
+        when(service.getStablesQuickFeed(any(), any(UUID.class))).thenReturn(List.of());
 
         mockMvc.perform(get("/api/nutrition/stables-quick-feed?date=2026-11-13"))
                 .andExpect(status().isOk());
 
-        verify(service).getStablesQuickFeed(LocalDate.of(2026, 11, 13));
+        verify(service).getStablesQuickFeed(eq(LocalDate.of(2026, 11, 13)), any(UUID.class));
     }
 
     @Test

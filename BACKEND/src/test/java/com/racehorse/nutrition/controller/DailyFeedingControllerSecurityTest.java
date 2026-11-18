@@ -4,6 +4,7 @@ import com.racehorse.horse.service.OwnerHorseReadGuard;
 import com.racehorse.nutrition.dto.ConfirmMealFeedingRequest;
 import com.racehorse.nutrition.dto.DailyFeedingLogResponse;
 import com.racehorse.nutrition.service.DailyFeedingService;
+import com.racehorse.stable.service.StaffHorseGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -62,8 +63,11 @@ class DailyFeedingControllerSecurityTest {
         }
 
         @Bean
-        public DailyFeedingController dailyFeedingController(DailyFeedingService service, OwnerHorseReadGuard ownerGuard) {
-            return new DailyFeedingController(service, ownerGuard);
+        public StaffHorseGuard staffHorseGuard() { return mock(StaffHorseGuard.class); }
+
+        @Bean
+        public DailyFeedingController dailyFeedingController(DailyFeedingService service, OwnerHorseReadGuard ownerGuard, StaffHorseGuard staffHorseGuard) {
+            return new DailyFeedingController(service, ownerGuard, staffHorseGuard);
         }
 
         @Bean

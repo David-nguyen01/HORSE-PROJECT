@@ -90,8 +90,9 @@ public class NutritionOverviewController {
     @GetMapping("/stables-quick-feed")
     @PreAuthorize("hasRole('STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
     public List<StallQuickFeedItem> getStablesQuickFeed(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return service.getStablesQuickFeed(date);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
+        return service.getStablesQuickFeed(date, getActorId(jwt, authentication));
     }
 
     private UUID getActorId(Jwt jwt, Authentication authentication) {

@@ -3,6 +3,7 @@ package com.racehorse.nutrition.controller;
 import com.racehorse.nutrition.dto.*;
 import com.racehorse.nutrition.service.NutritionPlanService;
 import com.racehorse.horse.service.OwnerHorseReadGuard;
+import com.racehorse.stable.service.StaffHorseGuard;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -22,10 +23,12 @@ public class NutritionPlanController {
 
     private final NutritionPlanService service;
     private final OwnerHorseReadGuard ownerGuard;
+    private final StaffHorseGuard staffHorseGuard;
 
-    public NutritionPlanController(NutritionPlanService service, OwnerHorseReadGuard ownerGuard) {
+    public NutritionPlanController(NutritionPlanService service, OwnerHorseReadGuard ownerGuard, StaffHorseGuard staffHorseGuard) {
         this.service = service;
         this.ownerGuard = ownerGuard;
+        this.staffHorseGuard = staffHorseGuard;
     }
 
     @GetMapping
@@ -53,6 +56,7 @@ public class NutritionPlanController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         ownerGuard.requireHorse(horseId, jwt, authentication);
+        staffHorseGuard.requireCaretaker(horseId, UUID.fromString(jwt.getSubject()), authentication);
         return service.getDailyChecklist(horseId, date);
     }
 
@@ -71,7 +75,9 @@ public class NutritionPlanController {
     public NutritionPlanResponse applyStandardTemplate(
             @PathVariable UUID horseId,
             @AuthenticationPrincipal Jwt jwt,
+            Authentication authentication,
             @Valid @RequestBody ApplyFeedingTemplateRequest request) {
+        staffHorseGuard.requireCaretaker(horseId, UUID.fromString(jwt.getSubject()), authentication);
         return service.applyStandardTemplate(horseId, UUID.fromString(jwt.getSubject()), request);
     }
 

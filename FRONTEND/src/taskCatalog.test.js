@@ -11,7 +11,7 @@ test('1. Club Manager navigation visibility & role boundary', () => {
   const managerNavIdx = content.indexOf("hasAny(user, 'CLUB_MANAGER') ? [")
   assert.ok(managerNavIdx !== -1, 'Club Manager navigation block must exist')
 
-  const taskNavItemIdx = content.indexOf("/admin/care-tasks")
+  const taskNavItemIdx = content.indexOf("/admin/care-tasks", managerNavIdx)
   assert.ok(taskNavItemIdx !== -1, '/admin/care-tasks navigation route must exist')
   assert.ok(content.includes("'Quản lý nhiệm vụ Stable'"), "Label 'Quản lý nhiệm vụ Stable' must exist in App.jsx")
 

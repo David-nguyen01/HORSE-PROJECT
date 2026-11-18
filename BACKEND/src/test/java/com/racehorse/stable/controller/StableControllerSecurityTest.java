@@ -3,6 +3,7 @@ package com.racehorse.stable.controller;
 import com.racehorse.common.exception.BusinessException;
 import com.racehorse.horse.service.OwnerHorseReadGuard;
 import com.racehorse.stable.service.StableService;
+import com.racehorse.stable.service.StaffHorseGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,8 +58,11 @@ class StableControllerSecurityTest {
         }
 
         @Bean
-        public StableController stableController(StableService service, OwnerHorseReadGuard guard) {
-            return new StableController(service, guard);
+        public StaffHorseGuard staffHorseGuard() { return mock(StaffHorseGuard.class); }
+
+        @Bean
+        public StableController stableController(StableService service, OwnerHorseReadGuard guard, StaffHorseGuard staffHorseGuard) {
+            return new StableController(service, guard, staffHorseGuard);
         }
 
         @Bean

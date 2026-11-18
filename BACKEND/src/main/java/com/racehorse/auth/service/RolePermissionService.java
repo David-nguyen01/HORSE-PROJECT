@@ -17,17 +17,38 @@ import java.util.UUID;
 
 @Service
 public class RolePermissionService {
-    private static final Map<String, Set<String>> SUPPORTED_ACTIONS = Map.of(
-            "PROFILE", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "TRAINING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "MEDICAL", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "STABLE_CARE", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "REPORTING", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "INVENTORY", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"),
-            "SYSTEM", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM"));
+    // Only expose permissions checked by an API that the role can actually use.
+    private static final Map<Role, Map<String, Set<String>>> SUPPORTED_ACTIONS = Map.of(
+            Role.CLUB_MANAGER, Map.of(
+                    "PROFILE", Set.of("VIEW", "EDIT"), "TRAINING", Set.of("VIEW", "EDIT"),
+                    "MEDICAL", Set.of("VIEW", "EDIT"), "STABLE_CARE", Set.of("VIEW", "EDIT"),
+                    "REPORTING", Set.of("VIEW", "EDIT"), "INVENTORY", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM")),
+            Role.HEAD_TRAINER, Map.of(
+                    "PROFILE", Set.of("VIEW"), "TRAINING", Set.of("VIEW", "EDIT"),
+                    "STABLE_CARE", Set.of("VIEW", "EDIT"), "REPORTING", Set.of("VIEW"),
+                    "INVENTORY", Set.of("VIEW")),
+            Role.VETERINARIAN, Map.of(
+                    "PROFILE", Set.of("VIEW"), "TRAINING", Set.of("VIEW"),
+                    "MEDICAL", Set.of("VIEW", "EDIT"), "STABLE_CARE", Set.of("VIEW", "EDIT")),
+            Role.STABLE_STAFF, Map.of(
+                    "PROFILE", Set.of("VIEW"), "TRAINING", Set.of("VIEW", "EDIT"),
+                    "STABLE_CARE", Set.of("VIEW", "EDIT"), "INVENTORY", Set.of("VIEW", "EDIT", "CLAIM")),
+            Role.HORSE_OWNER, Map.of(
+                    "PROFILE", Set.of("VIEW"), "TRAINING", Set.of("VIEW"),
+                    "MEDICAL", Set.of("VIEW"), "STABLE_CARE", Set.of("VIEW"),
+                    "REPORTING", Set.of("VIEW")));
     private final JdbcTemplate jdbc;
 
     public RolePermissionService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+
+    public static boolean supports(Role role, String permissionCode) {
+        if (permissionCode == null || !permissionCode.startsWith("PERM_")) return false;
+        String value = permissionCode.substring(5);
+        int separator = value.lastIndexOf('_');
+        return separator > 0 && SUPPORTED_ACTIONS.getOrDefault(role, Map.of())
+                .getOrDefault(value.substring(0, separator), Set.of())
+                .contains(value.substring(separator + 1));
+    }
 
     @Transactional(readOnly = true)
     public List<RolePermissionResponse> matrix() {
@@ -46,7 +67,15 @@ public class RolePermissionService {
                 left join role_permissions rp on rp.role_code=r.code
                     and rp.module_code=p.module_code and rp.action_code=p.action_code
                 order by r.code,p.module_code,p.action_code
-                """, (rs, row) -> new RolePermissionResponse(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)));
+                """, (rs, row) -> new RolePermissionResponse(rs.getString(1), rs.getString(2), rs.getString(3), rs.getBoolean(4)))
+                .stream().filter(item -> {
+                    try {
+                        return SUPPORTED_ACTIONS.getOrDefault(Role.valueOf(item.role()), Map.of())
+                                .getOrDefault(item.module(), Set.of()).contains(item.action());
+                    } catch (IllegalArgumentException ignored) {
+                        return false;
+                    }
+                }).toList();
     }
 
     @Transactional
@@ -56,7 +85,7 @@ public class RolePermissionService {
         }
         String module = request.module().trim().toUpperCase(Locale.ROOT);
         String action = request.action().trim().toUpperCase(Locale.ROOT);
-        if (!SUPPORTED_ACTIONS.getOrDefault(module, Set.of()).contains(action)) {
+        if (!SUPPORTED_ACTIONS.getOrDefault(role, Map.of()).getOrDefault(module, Set.of()).contains(action)) {
             throw new BusinessException("Quyền này không được backend hỗ trợ cho phân hệ đã chọn");
         }
         OffsetDateTime changedAt = OffsetDateTime.now();

@@ -1,6 +1,7 @@
 package com.racehorse.common.config;
 
 import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.auth.service.RolePermissionService;
 import com.racehorse.audit.security.AuditMutationFilter;
 import com.racehorse.wallet.OwnerOverdueFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
@@ -93,12 +94,10 @@ public class SecurityConfiguration {
                             List<GrantedAuthority> authorities = new ArrayList<>();
                             user.getRoles().forEach(role -> authorities.add(
                                     new SimpleGrantedAuthority("ROLE_" + role.name())));
-                            try {
-                                userRepository.findGrantedPermissionCodes(user.getId()).forEach(permission ->
-                                        authorities.add(new SimpleGrantedAuthority(permission)));
-                            } catch (Exception ex) {
-                                // If permission query encounters a dialect error, preserve role authorities so user isn't locked out with 401
-                            }
+                            userRepository.findGrantedPermissionCodes(user.getId()).stream()
+                                    .filter(permission -> user.getRoles().stream()
+                                            .anyMatch(role -> RolePermissionService.supports(role, permission)))
+                                    .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
                             return authorities;
                         })
                         .orElse(List.of());

@@ -27,7 +27,7 @@ public class InventoryController {
     // ==================== ITEMS ====================
 
     @GetMapping("/items")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_VIEW') and !hasRole('HORSE_OWNER')")
     public List<InventoryItemResponse> listItems(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) Boolean lowStockOnly,
@@ -36,14 +36,14 @@ public class InventoryController {
     }
 
     @GetMapping("/items/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_VIEW') and !hasRole('HORSE_OWNER')")
     public InventoryItemResponse getItem(@PathVariable UUID id) {
         return service.getItem(id);
     }
 
     @PostMapping("/items")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("(hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')) and !hasRole('STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_EDIT') and hasRole('CLUB_MANAGER')")
     public InventoryItemResponse createItem(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateInventoryItemRequest request) {
@@ -51,7 +51,7 @@ public class InventoryController {
     }
 
     @PutMapping("/items/{id}")
-    @PreAuthorize("(hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')) and !hasRole('STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_EDIT') and hasRole('CLUB_MANAGER')")
     public InventoryItemResponse updateItem(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -61,7 +61,7 @@ public class InventoryController {
 
     @DeleteMapping("/items/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @PreAuthorize("(hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')) and !hasRole('STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_EDIT') and hasRole('CLUB_MANAGER')")
     public void deleteItem(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt) {
@@ -69,7 +69,7 @@ public class InventoryController {
     }
 
     @PutMapping("/items/{id}/stock")
-    @PreAuthorize("(hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')) and !hasRole('STABLE_STAFF')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_EDIT') and hasRole('CLUB_MANAGER')")
     public InventoryItemResponse updateStock(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -79,7 +79,7 @@ public class InventoryController {
 
     @PostMapping("/items/{id}/usage")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_EDIT') and hasAnyRole('CLUB_MANAGER','STABLE_STAFF')")
     public InventoryUsageResponse recordUsage(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
                                               Authentication authentication,
                                               @Valid @RequestBody RecordInventoryUsageRequest request) {
@@ -94,7 +94,7 @@ public class InventoryController {
     }
 
     @GetMapping("/usage")
-    @PreAuthorize("(hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') or hasRole('CLUB_MANAGER')) and !hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_VIEW') and !hasRole('HORSE_OWNER')")
     public List<InventoryUsageResponse> listUsage(@RequestParam(defaultValue = "20") int limit) {
         return service.listUsage(limit);
     }
@@ -102,21 +102,21 @@ public class InventoryController {
     // ==================== REPLENISHMENTS ====================
 
     @GetMapping("/replenishments")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_VIEW') and !hasRole('HORSE_OWNER')")
     public List<ReplenishmentResponse> listReplenishments(
             @RequestParam(required = false) String status) {
         return service.listReplenishments(status);
     }
 
     @GetMapping("/replenishments/{id}")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_VIEW','PERM_STABLE_CARE_VIEW') and !hasRole('HORSE_OWNER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_VIEW') and !hasRole('HORSE_OWNER')")
     public ReplenishmentResponse getReplenishment(@PathVariable UUID id) {
         return service.getReplenishment(id);
     }
 
     @PostMapping("/replenishments")
     @ResponseStatus(HttpStatus.CREATED)
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_EDIT') and hasAnyRole('CLUB_MANAGER','STABLE_STAFF')")
     public ReplenishmentResponse createReplenishment(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateReplenishmentRequest request) {
@@ -124,7 +124,7 @@ public class InventoryController {
     }
 
     @PostMapping("/replenishments/{id}/review")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_APPROVE','PERM_INVENTORY_EDIT','PERM_STABLE_CARE_APPROVE','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_APPROVE') and hasRole('CLUB_MANAGER')")
     public ReplenishmentResponse reviewReplenishment(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt jwt,
@@ -133,7 +133,7 @@ public class InventoryController {
     }
 
     @PostMapping("/replenishments/{id}/receive")
-    @PreAuthorize("hasAnyAuthority('PERM_INVENTORY_EDIT','PERM_INVENTORY_CLAIM','PERM_STABLE_CARE_EDIT') or hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_INVENTORY_CLAIM') and hasAnyRole('CLUB_MANAGER','STABLE_STAFF')")
     public ReplenishmentResponse receiveReplenishment(
             @PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ReceiveReplenishmentRequest request) {

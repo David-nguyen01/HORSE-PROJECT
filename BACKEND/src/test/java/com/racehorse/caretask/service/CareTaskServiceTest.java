@@ -97,6 +97,26 @@ class CareTaskServiceTest {
     }
 
     @Test
+    void dailyRoutineCreatesSeparateInstanceForEachStaffMember() {
+        LocalDate date = LocalDate.of(2026, 11, 18);
+        UUID staffA = UUID.randomUUID();
+        UUID staffB = UUID.randomUUID();
+        when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class))).thenReturn(List.of());
+
+        service.listStaffTasks(staffA, date, null, false);
+        service.listStaffTasks(staffB, date, null, false);
+
+        verify(jdbc).update(contains("t.assigned_staff_id=?"), eq(Date.valueOf(date)), eq(staffA),
+                eq(Date.valueOf(date)), eq(staffA));
+        verify(jdbc).update(contains("t.assigned_staff_id=?"), eq(Date.valueOf(date)), eq(staffB),
+                eq(Date.valueOf(date)), eq(staffB));
+        verify(jdbc).query(contains("t.assigned_staff_id = ?"), any(RowMapper.class),
+                eq(new Object[]{staffA, Date.valueOf(date)}));
+        verify(jdbc).query(contains("t.assigned_staff_id = ?"), any(RowMapper.class),
+                eq(new Object[]{staffB, Date.valueOf(date)}));
+    }
+
+    @Test
     void completeTaskUpdatesStatusAndRecordsCompletionDetails() {
         UUID taskId = UUID.randomUUID();
         UUID staffId = UUID.randomUUID();
@@ -109,6 +129,7 @@ class CareTaskServiceTest {
                     when(rs.getString("status")).thenReturn("PENDING");
                     when(rs.getString("task_category")).thenReturn("ROUTINE");
                     when(rs.getString("scope")).thenReturn("FACILITY");
+                    when(rs.getObject("assigned_staff_id", UUID.class)).thenReturn(staffId);
                     when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.now()));
                     when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(7, 0)));
                     when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
@@ -125,7 +146,7 @@ class CareTaskServiceTest {
 
         verify(jdbc).update(
                 contains("photo_bytes = ?"),
-                eq(staffId), eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"),
+                eq(staffId), eq("stable_groom"), eq("Đã dọn sạch"),
                 eq("https://img.example.com/clean.jpg"), isNull(), isNull(), eq(taskId), eq(staffId)
         );
     }
@@ -143,6 +164,7 @@ class CareTaskServiceTest {
                     when(rs.getString("status")).thenReturn("PENDING");
                     when(rs.getString("task_category")).thenReturn("ROUTINE");
                     when(rs.getString("scope")).thenReturn("FACILITY");
+                    when(rs.getObject("assigned_staff_id", UUID.class)).thenReturn(staffId);
                     when(rs.getDate("scheduled_date")).thenReturn(Date.valueOf(LocalDate.now()));
                     when(rs.getTime("scheduled_time")).thenReturn(Time.valueOf(LocalTime.of(7, 0)));
                     when(rs.getObject("created_at", OffsetDateTime.class)).thenReturn(OffsetDateTime.now());
@@ -160,7 +182,7 @@ class CareTaskServiceTest {
 
         verify(jdbc).update(
                 contains("UPDATE dbo.care_tasks"),
-                eq(staffId), eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
+                eq(staffId), eq("stable_groom"), eq("Dọn chuồng xong, đã chụp ảnh"),
                 eq("/api/care-tasks/" + taskId + "/photo"),
                 eq(fakeImage), eq("image/jpeg"), eq(taskId), eq(staffId)
         );

@@ -281,8 +281,8 @@ export default function StableCarePage() {
         <>
           {activeTab === 'tasks' && <CareTasksView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canEdit={canEditRoutine} />}
           {activeTab === 'training' && <TrainingPreparationView isStaff={isStaff} />}
-          {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} canManageDailyRoutine={canManageDailyRoutine} isStaff={isStaff} isVet={userRoles.includes('VETERINARIAN')} />}
-          {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} canApplyTemplate={isStaff || isVet || isManager || isTrainer} isStaff={isStaff} isVet={userRoles.includes('VETERINARIAN')} />}
+          {activeTab === 'stables' && <StablesView canEditRoutine={canEditRoutine} canManageDailyRoutine={canManageDailyRoutine} isStaff={isStaff} currentUserId={authMe?.id} isVet={userRoles.includes('VETERINARIAN')} />}
+          {activeTab === 'nutrition' && <NutritionView canEditPlan={canEditRoutine || userRoles.includes('VETERINARIAN')} canApplyTemplate={isStaff || isVet || isManager || isTrainer} isStaff={isStaff} currentUserId={authMe?.id} isVet={userRoles.includes('VETERINARIAN')} />}
           {activeTab === 'incidents' && <IncidentsView isStaff={isStaff} isManager={isManager} currentUserId={authMe?.id} canUpdateStatus={isManager || isStaff} />}
           {activeTab === 'inventory' && <InventoryView canApprove={canApproveInventory} isStaff={isStaff} />}
         </>
@@ -294,7 +294,7 @@ export default function StableCarePage() {
 // =========================================================================
 // 1. FR13: STABLES & DAILY ROUTINES
 // =========================================================================
-function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff, isVet = false }) {
+function StablesView({ canEditRoutine, isStaff, currentUserId, canManageDailyRoutine = isStaff, isVet = false }) {
   const [searchParams] = useSearchParams()
   const targetHorseId = searchParams.get('horseId')
   const [stables, setStables] = useState([])
@@ -391,11 +391,13 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
             trainingLockReason: matchingStall.currentAssignment.trainingLockReason,
             emergencyActive: matchingStall.currentAssignment.emergencyActive,
             photoUrl: matchingStall.currentAssignment.photoUrl || null,
+            caretakerUserId: matchingStall.currentAssignment.caretakerUserId,
             isTrainingActive: Boolean(matchingStall.currentAssignment.isTrainingActive),
             trainingSchedule: matchingStall.currentAssignment.trainingSchedule || null,
           }
           setSelectedHorse(updatedHorse)
-          loadRoutines(updatedHorse.id)
+          if (!isStaff || updatedHorse.caretakerUserId === currentUserId) loadRoutines(updatedHorse.id)
+          else setRoutines([])
         } else {
           // Selected horse or its stall assignment no longer exists
           setSelectedHorse(null)
@@ -410,7 +412,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
       isFetchingRef.current = false
       setLoading(false)
     }
-  }, [selectedStableId, loadRoutines])
+  }, [selectedStableId, loadRoutines, isStaff, currentUserId])
 
   const handleRefresh = useCallback(async () => {
     if (loading || isFetchingRef.current) return
@@ -425,6 +427,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
   }, [loadStables])
 
   const activeStable = stables.find((s) => s.id === selectedStableId) || stables[0]
+  const ownsSelectedHorse = !isStaff || (Boolean(currentUserId) && selectedHorse?.caretakerUserId === currentUserId)
 
   const handleSelectStall = useCallback((stall) => {
     if (stall.currentAssignment) {
@@ -440,20 +443,22 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
         trainingLockReason: stall.currentAssignment.trainingLockReason,
         emergencyActive: stall.currentAssignment.emergencyActive,
         photoUrl: stall.currentAssignment.photoUrl || null,
+        caretakerUserId: stall.currentAssignment.caretakerUserId,
         isTrainingActive: Boolean(stall.currentAssignment.isTrainingActive),
         trainingSchedule: stall.currentAssignment.trainingSchedule || null,
       }
       setSelectedHorse(horse)
       setRoutineNotice('')
       setRoutineError('')
-      loadRoutines(horse.id)
+      if (!isStaff || horse.caretakerUserId === currentUserId) loadRoutines(horse.id)
+      else setRoutines([])
     } else {
       setSelectedHorse(null)
       setRoutines([])
       setRoutineNotice('')
       setRoutineError('')
     }
-  }, [loadRoutines])
+  }, [loadRoutines, isStaff, currentUserId])
 
   useEffect(() => {
     if (targetHorseId && stables.length > 0) {
@@ -693,7 +698,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
 
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid rgba(0,0,0,0.06)' }}>
                           <span className="muted" style={{ fontSize: '10px' }}>Ô: <b>{stall.code}</b></span>
-                          <button
+                          {(!isStaff || (currentUserId && assigned.caretakerUserId === currentUserId)) && <button
                             type="button"
                             className="button secondary"
                             style={{ fontSize: '10px', padding: '2px 8px', minHeight: '24px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
@@ -712,7 +717,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
                             }}
                           >
                             <ArrowRightLeft size={11} /> Chuyển ô
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     ) : (
@@ -757,7 +762,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
                   <RotateCcw size={13} /> Khởi tạo lịch mặc định
                 </button>
               )}
-              {canManageDailyRoutine && selectedHorse && (
+              {canManageDailyRoutine && selectedHorse && ownsSelectedHorse && (
                 <button
                   type="button"
                   className="button primary"
@@ -779,7 +784,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
                   <Calendar size={13} /> Thay đổi lịch sinh hoạt
                 </button>
               )}
-              {canManageDailyRoutine && selectedHorse && (
+              {canManageDailyRoutine && selectedHorse && ownsSelectedHorse && (
                 <button
                   type="button"
                   className="button secondary"
@@ -809,6 +814,10 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
               <Clock size={24} style={{ color: 'var(--muted)', opacity: 0.7 }} />
               <b>Chọn một ô chuồng có ngựa</b>
               <span>để xem lịch trình sinh hoạt phi tập luyện (thả bãi, chải lông, nghỉ ngơi).</span>
+            </div>
+          ) : !ownsSelectedHorse ? (
+            <div className="empty" style={{ minHeight: '140px', padding: '24px 18px' }}>
+              <b>Đây không phải ngựa bạn phụ trách</b>
             </div>
           ) : (
             <div>
@@ -966,7 +975,7 @@ function StablesView({ canEditRoutine, isStaff, canManageDailyRoutine = isStaff,
                           r.notes && <div style={{ fontSize: '10px', color: 'var(--muted)', marginTop: '2px' }}>{r.notes}</div>
                         )}
                       </div>
-                      {canManageDailyRoutine && (
+                      {canManageDailyRoutine && ownsSelectedHorse && (
                         <div style={{ display: 'inline-flex', gap: '4px', alignItems: 'center' }}>
                           <button
                             type="button"
@@ -2475,7 +2484,7 @@ function TrainingPreparationView({ isStaff }) {
 // =========================================================================
 // 2. FR14: NUTRITION PLAN & DAILY FEEDING CHECKLIST
 // =========================================================================
-export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, isVet }) {
+export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, currentUserId, isVet }) {
   const [subTab, setSubTab] = useState('stables') // 'stables' or 'standard'
   const [targetDate, setTargetDate] = useState(today())
   const [workload, setWorkload] = useState(null)
@@ -2566,8 +2575,8 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
       const stalls = workloadData?.stalls || []
       if (stalls.length > 0) {
         setSelectedStallId((prev) => {
-          if (prev && stalls.some((s) => s.stallId === prev && s.hasPlan)) return prev
-          const firstWithPlan = stalls.find((s) => s.hasPlan)
+          if (prev && stalls.some((s) => s.stallId === prev && s.hasPlan && (!isOperationalStaff || s.caretakerUserId === currentUserId))) return prev
+          const firstWithPlan = stalls.find((s) => s.hasPlan && (!isOperationalStaff || s.caretakerUserId === currentUserId))
           return firstWithPlan ? firstWithPlan.stallId : (stalls[0]?.stallId || '')
         })
       }
@@ -2576,7 +2585,7 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
     } finally {
       setLoading(false)
     }
-  }, [targetDate])
+  }, [targetDate, isOperationalStaff, currentUserId])
 
   useEffect(() => {
     loadData()
@@ -2585,8 +2594,8 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
   const enrichedStalls = useMemo(() => workload?.stalls || [], [workload])
 
   const selectedStall = useMemo(
-    () => enrichedStalls.find((s) => s.stallId === selectedStallId) || null,
-    [enrichedStalls, selectedStallId]
+    () => enrichedStalls.find((s) => s.stallId === selectedStallId && (!isOperationalStaff || (currentUserId && s.caretakerUserId === currentUserId))) || null,
+    [enrichedStalls, selectedStallId, isOperationalStaff, currentUserId]
   )
 
   // 2. Load checklist and history for selected stall/horse (with race-condition / cancellation protection)
@@ -2671,11 +2680,13 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
   const checklistSectionRef = useRef(null)
 
   const handleSelectStallForChecklist = useCallback((stallId) => {
+    const stall = enrichedStalls.find((s) => s.stallId === stallId)
+    if (isOperationalStaff && (!currentUserId || stall?.caretakerUserId !== currentUserId)) return
     setSelectedStallId(stallId)
     setTimeout(() => {
       checklistSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 100)
-  }, [])
+  }, [enrichedStalls, isOperationalStaff, currentUserId])
 
   const toggleHistory = () => {
     setShowHistory((prev) => !prev)
@@ -2984,7 +2995,8 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '16px' }}>
                       {stalls.map((s) => {
-                        const isSelected = s.stallId === selectedStallId
+                        const isSelected = s.stallId === selectedStallId && (!isOperationalStaff || s.caretakerUserId === currentUserId)
+                        const canViewChecklist = !isOperationalStaff || (currentUserId && s.caretakerUserId === currentUserId)
                         return (
                           <div
                             key={s.stallId}
@@ -3054,7 +3066,9 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
                             </div>
 
                             <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid #f1f5f9' }}>
-                              {s.hasHorse && s.hasChecklist ? (
+                              {s.hasHorse && !canViewChecklist ? (
+                                <button type="button" className="button secondary" disabled title="Đây không phải ngựa bạn phụ trách" style={{ width: '100%', minHeight: '32px', fontSize: '12px' }}>Không phải ngựa bạn phụ trách</button>
+                              ) : s.hasHorse && s.hasChecklist ? (
                                 <button
                                   className={`button ${isSelected ? 'primary' : 'secondary'}`}
                                   style={{ width: '100%', minHeight: '32px', fontSize: '12px', justifyContent: 'center' }}
@@ -3109,14 +3123,15 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
                   <span>Thao tác</span>
                 </div>
                 {filteredStalls.map((s) => {
-                  const isSelected = s.stallId === selectedStallId
+                  const isSelected = s.stallId === selectedStallId && (!isOperationalStaff || s.caretakerUserId === currentUserId)
+                  const canViewChecklist = !isOperationalStaff || (currentUserId && s.caretakerUserId === currentUserId)
                   return (
                     <div
                       key={s.stallId}
                       className="table-row"
                       style={{
                         gridTemplateColumns: '150px 160px 180px 130px 130px',
-                        cursor: 'pointer',
+                        cursor: canViewChecklist ? 'pointer' : 'default',
                         opacity: !s.hasHorse ? 0.75 : 1,
                       }}
                       onClick={() => handleSelectStallForChecklist(s.stallId)}
@@ -3146,7 +3161,9 @@ export function NutritionView({ canEditPlan, canApplyTemplate = true, isStaff, i
                       <span style={{ fontSize: '12px' }}>{s.feedingSummary}</span>
 
                       <div>
-                        {s.hasHorse && s.hasChecklist ? (
+                        {s.hasHorse && !canViewChecklist ? (
+                          <span className="muted" style={{ fontSize: '11px' }}>Không phải ngựa bạn phụ trách</span>
+                        ) : s.hasHorse && s.hasChecklist ? (
                           <button
                             className={`button ${isSelected ? 'primary' : 'secondary'}`}
                             style={{ minHeight: '30px', fontSize: '11px', padding: '0 10px' }}

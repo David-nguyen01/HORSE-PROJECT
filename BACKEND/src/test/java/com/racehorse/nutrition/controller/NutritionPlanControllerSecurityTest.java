@@ -5,6 +5,7 @@ import com.racehorse.nutrition.dto.ApplyFeedingTemplateRequest;
 import com.racehorse.nutrition.dto.CreateNutritionPlanRequest;
 import com.racehorse.nutrition.dto.NutritionPlanResponse;
 import com.racehorse.nutrition.service.NutritionPlanService;
+import com.racehorse.stable.service.StaffHorseGuard;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,8 +64,11 @@ class NutritionPlanControllerSecurityTest {
         }
 
         @Bean
-        public NutritionPlanController nutritionPlanController(NutritionPlanService service, OwnerHorseReadGuard ownerGuard) {
-            return new NutritionPlanController(service, ownerGuard);
+        public StaffHorseGuard staffHorseGuard() { return mock(StaffHorseGuard.class); }
+
+        @Bean
+        public NutritionPlanController nutritionPlanController(NutritionPlanService service, OwnerHorseReadGuard ownerGuard, StaffHorseGuard staffHorseGuard) {
+            return new NutritionPlanController(service, ownerGuard, staffHorseGuard);
         }
 
         @Bean

@@ -12,41 +12,13 @@ const stableCarePage = fs.readFileSync(stableCarePagePath, 'utf8')
 const useStablesQuickFeedJs = fs.readFileSync(useStablesQuickFeedPath, 'utf8')
 const apiJs = fs.readFileSync(apiJsPath, 'utf8')
 
-test('1. StablesView integrates Quick-Feed directly into primary operational overview', () => {
-  // Feed date selector in StablesView action header
-  assert.ok(
-    stableCarePage.includes('const [feedDate, setFeedDate] = useState(today())'),
-    'StablesView must maintain feedDate state defaulting to today()'
-  )
-  assert.ok(
-    stableCarePage.includes('value={feedDate}'),
-    'StablesView must render date picker bound to feedDate'
-  )
-  assert.ok(
-    stableCarePage.includes('onChange={(e) => setFeedDate(e.target.value)}'),
-    'StablesView date picker must update feedDate'
-  )
-  assert.ok(
-    stableCarePage.includes('quickFeed.reloadQuickFeed()'),
-    'handleRefresh in StablesView must reload quick feed data'
-  )
+test('Only the assigned staff can open a horse feeding checklist', () => {
+  assert.ok(stableCarePage.includes('s.caretakerUserId === currentUserId'))
+  assert.ok(stableCarePage.includes('s.hasHorse && !canViewChecklist'))
+  assert.ok(stableCarePage.includes('Đây không phải ngựa bạn phụ trách'))
+  assert.ok(stableCarePage.includes('Khẩu phần & Checklist chi tiết'))
+  assert.ok(stableCarePage.includes('/stable-care/nutrition?horseId='))
 })
-
-test('3. StablesView right detail panel renders full meal schedule and link to detailed checklist', () => {
-  assert.ok(
-    stableCarePage.includes('Bữa ăn dinh dưỡng hôm nay'),
-    'StablesView detail panel must render Bữa ăn dinh dưỡng hôm nay section'
-  )
-  assert.ok(
-    stableCarePage.includes('Khẩu phần & Checklist chi tiết'),
-    'StablesView detail panel must link to detailed checklist'
-  )
-  assert.ok(
-    stableCarePage.includes('/stable-care/nutrition?horseId='),
-    'Detailed checklist link must direct staff to NutritionView for selected horse'
-  )
-})
-
 test('4. NutritionView preserves detailed checklist and plan viewer as secondary view', () => {
   assert.ok(
     stableCarePage.includes('Danh sách kiểm tra cho ăn trong ca (Daily Feeding Checklist)'),

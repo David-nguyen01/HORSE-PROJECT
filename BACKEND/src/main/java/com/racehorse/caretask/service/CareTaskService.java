@@ -60,6 +60,31 @@ public class CareTaskService {
     }
 
     @Transactional
+    public void ensureStaffRoutineInstancesForDate(LocalDate date, UUID staffId) {
+        if (date == null || staffId == null) return;
+        try {
+            jdbc.update("""
+                INSERT INTO dbo.care_tasks (
+                    id, routine_definition_id, task_category, scope, horse_id,
+                    title, description, task_type, scheduled_date, scheduled_time,
+                    assigned_staff_id, status, created_at, updated_at
+                )
+                SELECT gen_random_uuid(), d.id, 'ROUTINE', d.scope, NULL,
+                       d.title, d.description, d.task_type, ?, d.scheduled_time,
+                       ?, 'PENDING', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                FROM dbo.care_routine_definitions d
+                WHERE d.is_active=true AND NOT EXISTS (
+                    SELECT 1 FROM dbo.care_tasks t
+                    WHERE t.routine_definition_id=d.id AND t.scheduled_date=?
+                      AND t.horse_id IS NULL AND t.assigned_staff_id=?
+                )
+                """, java.sql.Date.valueOf(date), staffId, java.sql.Date.valueOf(date), staffId);
+        } catch (DataIntegrityViolationException ex) {
+            // A parallel request already created this staff member's copy.
+        }
+    }
+
+    @Transactional
     public void createRecoveryTask(com.racehorse.training.entity.TrainingSchedule schedule, UUID staffId) {
         if (schedule == null || staffId == null || schedule.getHorse() == null) return;
         LocalDate date = schedule.getScheduledStart().atZone(clubZone).toLocalDate();
@@ -194,8 +219,7 @@ public class CareTaskService {
         if ("CANCELLED".equals(existing.status())) {
             throw new BusinessException("Không thể hoàn thành nhiệm vụ đã bị hủy");
         }
-        boolean sharedRoutine = existing.assignedStaffId() == null && "ROUTINE".equals(existing.taskCategory());
-        if (!manager && !actor.equals(existing.assignedStaffId()) && !sharedRoutine) {
+        if (!manager && !actor.equals(existing.assignedStaffId())) {
             throw new BusinessException("Bạn không được phân công nhiệm vụ chăm sóc này");
         }
 
@@ -227,7 +251,6 @@ public class CareTaskService {
                     """
                     UPDATE dbo.care_tasks
                     SET status = 'COMPLETED',
-                        assigned_staff_id = COALESCE(assigned_staff_id, ?),
                         completed_at = CURRENT_TIMESTAMP,
                         completed_by_user_id = ?,
                         completed_by_name = ?,
@@ -237,10 +260,9 @@ public class CareTaskService {
                         photo_content_type = ?,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = ? AND status = 'PENDING'
-                      AND (assigned_staff_id = ?
-                           OR (assigned_staff_id IS NULL AND task_category = 'ROUTINE'))
+                      AND assigned_staff_id = ?
                     """,
-                    actor, actor, staffName, notes, photoUrl, photoBytes, photoContentType, taskId, actor
+                    actor, staffName, notes, photoUrl, photoBytes, photoContentType, taskId, actor
             );
         }
         if (updated != 1) {
@@ -333,6 +355,12 @@ public class CareTaskService {
             return list.stream().filter(CareTaskResponse::isOverdue).toList();
         }
         return list;
+    }
+
+    @Transactional
+    public List<CareTaskResponse> listStaffTasks(UUID staffId, LocalDate date, String status, Boolean overdueOnly) {
+        ensureStaffRoutineInstancesForDate(date, staffId);
+        return listTasks(null, staffId, date, status, overdueOnly);
     }
 
     private String baseSelect() {

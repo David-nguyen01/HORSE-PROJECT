@@ -6,6 +6,8 @@ import com.racehorse.auth.dto.LogoutRequest;
 import com.racehorse.auth.dto.RegisterRequest;
 import com.racehorse.auth.dto.RefreshRequest;
 import com.racehorse.auth.dto.UserResponse;
+import com.racehorse.auth.repository.UserAccountRepository;
+import com.racehorse.auth.service.RolePermissionService;
 import com.racehorse.auth.entity.Role;
 import com.racehorse.auth.service.AuthService;
 import com.racehorse.auth.service.ClientContext;
@@ -24,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -32,10 +35,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserManagementService userManagementService;
+    private final UserAccountRepository userRepository;
 
-    public AuthController(AuthService authService, UserManagementService userManagementService) {
+    public AuthController(AuthService authService, UserManagementService userManagementService,
+                          UserAccountRepository userRepository) {
         this.authService = authService;
         this.userManagementService = userManagementService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping("/register-roles")
@@ -72,8 +78,15 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    UserResponse currentUser(@AuthenticationPrincipal Jwt jwt) {
-        return userManagementService.getById(UUID.fromString(jwt.getSubject()));
+    Map<String, Object> currentUser(@AuthenticationPrincipal Jwt jwt) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        UserResponse user = userManagementService.getById(userId);
+        List<String> permissions = userRepository.findGrantedPermissionCodes(userId).stream()
+                .filter(code -> user.roles().stream().anyMatch(role -> RolePermissionService.supports(role, code)))
+                .distinct().toList();
+        return Map.of("id", user.id(), "username", user.username(), "email", user.email(),
+                "enabled", user.enabled(), "roles", user.roles(), "createdAt", user.createdAt(),
+                "permissions", permissions);
     }
 
     private ClientContext clientContext(HttpServletRequest request) {

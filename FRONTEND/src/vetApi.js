@@ -201,19 +201,6 @@ export const vetApi = {
       body: JSON.stringify({ notes }),
     }),
 
-  // Vet Training Assessment
-  getTrainingSessionsByDate: (date) =>
-    api(`/api/training-schedules?date=${date}`),
-  submitVetAssessment: (scheduleId, payload) =>
-    api(`/api/training-evaluations/${scheduleId}/vet-assessment`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }),
-  getVetAssessment: (scheduleId) =>
-    api(`/api/training-evaluations/${scheduleId}/vet-assessment`),
-  getVetAssessmentsByDate: (date) =>
-    api(`/api/training-evaluations/vet-assessments?date=${date}`),
-
   // Horse Detailed Profile
   getHorseTrainingPlans: (horseId) =>
     api(`/api/horses/${horseId}/training-plans`),
@@ -230,12 +217,4 @@ export const vetApi = {
   getStablesQuickFeed: (date) =>
     api(`/api/nutrition/stables-quick-feed${date ? `?date=${date}` : ''}`),
 
-  // Sessions of horses assigned to the diagnosing veterinarian
-  getMyTrainingSessions: (from, to) => {
-    const q = new URLSearchParams()
-    if (from) q.set('from', from)
-    if (to)   q.set('to', to)
-    const qs = q.toString()
-    return api(`/api/training-schedules/mine${qs ? `?${qs}` : ''}`)
-  },
 }

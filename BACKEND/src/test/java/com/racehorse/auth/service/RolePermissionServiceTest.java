@@ -70,17 +70,11 @@ class RolePermissionServiceTest {
     }
 
     @Test
-    void update_systemViewPermission_succeeds() {
-        when(jdbc.update(contains("update role_permissions"), any(), any(), any(), any(), any(), any()))
-                .thenReturn(1);
-
+    void update_systemViewPermission_isRejected() {
         UpdateRolePermissionRequest request = new UpdateRolePermissionRequest("SYSTEM", "VIEW", true);
-        RolePermissionResponse response = service.update(actor, Role.HEAD_TRAINER, request);
-
-        assertThat(response).isNotNull();
-        assertThat(response.module()).isEqualTo("SYSTEM");
-        assertThat(response.action()).isEqualTo("VIEW");
-        assertThat(response.granted()).isTrue();
+        assertThatThrownBy(() -> service.update(actor, Role.HEAD_TRAINER, request))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(jdbc);
     }
 
     @Test
@@ -102,10 +96,20 @@ class RolePermissionServiceTest {
                 .thenReturn(1);
 
         RolePermissionResponse response = service.update(
-                actor, Role.VETERINARIAN, new UpdateRolePermissionRequest("MEDICAL", "CLAIM", true));
+                actor, Role.VETERINARIAN, new UpdateRolePermissionRequest("MEDICAL", "EDIT", true));
 
         assertThat(response.granted()).isTrue();
         verify(jdbc).update(contains("insert into role_permissions"),
-                eq("VETERINARIAN"), eq("MEDICAL"), eq("CLAIM"), eq(true), eq(actor), any());
+                eq("VETERINARIAN"), eq("MEDICAL"), eq("EDIT"), eq(true), eq(actor), any());
+    }
+
+    @Test
+    void cannotGrantVeterinaryEditingToTrainer() {
+        assertThatThrownBy(() -> service.update(actor, Role.HEAD_TRAINER,
+                new UpdateRolePermissionRequest("MEDICAL", "EDIT", true)))
+                .isInstanceOf(BusinessException.class);
+        verifyNoInteractions(jdbc);
+        assertThat(RolePermissionService.supports(Role.HEAD_TRAINER, "PERM_MEDICAL_EDIT")).isFalse();
+        assertThat(RolePermissionService.supports(Role.VETERINARIAN, "PERM_MEDICAL_EDIT")).isTrue();
     }
 }

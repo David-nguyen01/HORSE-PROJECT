@@ -1,6 +1,7 @@
 package com.racehorse.nutrition.controller;
 
 import com.racehorse.horse.service.OwnerHorseReadGuard;
+import com.racehorse.stable.service.StaffHorseGuard;
 import com.racehorse.nutrition.dto.ConfirmMealFeedingRequest;
 import com.racehorse.nutrition.dto.DailyFeedingLogResponse;
 import com.racehorse.nutrition.service.DailyFeedingService;
@@ -23,10 +24,12 @@ public class DailyFeedingController {
 
     private final DailyFeedingService dailyFeedingService;
     private final OwnerHorseReadGuard ownerGuard;
+    private final StaffHorseGuard staffHorseGuard;
 
-    public DailyFeedingController(DailyFeedingService dailyFeedingService, OwnerHorseReadGuard ownerGuard) {
+    public DailyFeedingController(DailyFeedingService dailyFeedingService, OwnerHorseReadGuard ownerGuard, StaffHorseGuard staffHorseGuard) {
         this.dailyFeedingService = dailyFeedingService;
         this.ownerGuard = ownerGuard;
+        this.staffHorseGuard = staffHorseGuard;
     }
 
     @PostMapping("/confirm")
@@ -38,6 +41,7 @@ public class DailyFeedingController {
             Authentication authentication,
             @Valid @RequestBody ConfirmMealFeedingRequest request) {
         UUID actorUserId = getActorId(jwt, authentication);
+        staffHorseGuard.requireCaretaker(horseId, actorUserId, authentication);
         return dailyFeedingService.confirmMeal(horseId, actorUserId, request);
     }
 
@@ -50,6 +54,7 @@ public class DailyFeedingController {
             @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
         ownerGuard.requireHorse(horseId, jwt, authentication);
+        staffHorseGuard.requireCaretaker(horseId, getActorId(jwt, authentication), authentication);
         return dailyFeedingService.getHistory(horseId, startDate, endDate);
     }
 

@@ -26,6 +26,7 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import java.util.UUID;
 
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -106,18 +107,22 @@ class CareTaskControllerSecurityTest {
     }
 
     @Test
-    @WithMockUser(authorities = {"ROLE_STABLE_STAFF", "PERM_STABLE_CARE_VIEW"})
     void authorizedStaffCanRetrievePhotoWithCorrectContentTypeAndBytes() throws Exception {
         UUID taskId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
         byte[] imageBytes = new byte[]{(byte) 0x89, (byte) 0x50, (byte) 0x4E, (byte) 0x47};
         CareTaskResponse task = mock(CareTaskResponse.class);
         when(task.horseId()).thenReturn(null);
+        when(task.assignedStaffId()).thenReturn(staffId);
         when(service.getTask(taskId)).thenReturn(task);
         when(service.getTaskPhoto(taskId)).thenReturn(
                 new CareTaskService.TaskPhotoData(imageBytes, "image/png", "/api/care-tasks/" + taskId + "/photo", "Máng nước")
         );
 
-        mockMvc.perform(get("/api/care-tasks/" + taskId + "/photo"))
+        mockMvc.perform(get("/api/care-tasks/" + taskId + "/photo")
+                        .with(jwt().jwt(j -> j.subject(staffId.toString()))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STABLE_STAFF"),
+                                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_STABLE_CARE_VIEW"))))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type", "image/png"))
                 .andExpect(header().string("Cache-Control", "private, no-store"))
@@ -128,15 +133,19 @@ class CareTaskControllerSecurityTest {
     }
 
     @Test
-    @WithMockUser(authorities = {"ROLE_STABLE_STAFF", "PERM_STABLE_CARE_VIEW"})
     void taskWithoutPhotoReturnsNotFound() throws Exception {
         UUID taskId = UUID.randomUUID();
+        UUID staffId = UUID.randomUUID();
         CareTaskResponse task = mock(CareTaskResponse.class);
         when(task.horseId()).thenReturn(null);
+        when(task.assignedStaffId()).thenReturn(staffId);
         when(service.getTask(taskId)).thenReturn(task);
         when(service.getTaskPhoto(taskId)).thenThrow(new ResourceNotFoundException("Nhiệm vụ này không có ảnh đính kèm"));
 
-        mockMvc.perform(get("/api/care-tasks/" + taskId + "/photo"))
+        mockMvc.perform(get("/api/care-tasks/" + taskId + "/photo")
+                        .with(jwt().jwt(j -> j.subject(staffId.toString()))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STABLE_STAFF"),
+                                        new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_STABLE_CARE_VIEW"))))
                 .andExpect(status().isNotFound());
     }
 }

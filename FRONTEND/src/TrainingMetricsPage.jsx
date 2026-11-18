@@ -93,17 +93,20 @@ export default function TrainingMetricsPage({ user, isOwner }) {
     setMedical(null)
     if (!horseId || !horses.some(horse => horse.id === horseId)) return
     const controller = new AbortController()
-    api(`/api/horses/${horseId}/race-readiness`, { signal: controller.signal })
-      .then(readiness => {
+    Promise.allSettled([
+      api(`/api/horses/${horseId}/race-readiness`, { signal: controller.signal }),
+      api(`/api/horses/${horseId}/medical-examinations`, { signal: controller.signal }),
+    ])
+      .then(([readiness, exams]) => {
         if (!controller.signal.aborted) setMedical({
-          health: readiness.healthStatus,
-          restingHeartRateBpm: readiness.restingHeartRateBpm,
-          weightKg: readiness.latestWeightKg,
-          errors: [],
+          health: readiness.status === 'fulfilled' ? readiness.value.healthStatus : null,
+          examHeartRateBpm: exams.status === 'fulfilled' ? exams.value.find(exam => exam.heartRateBpm != null)?.heartRateBpm ?? null : null,
+          weightKg: readiness.status === 'fulfilled' ? readiness.value.latestWeightKg : null,
+          errors: [readiness, exams].filter(result => result.status === 'rejected').map(result => result.reason.message),
         })
       })
       .catch(err => {
-        if (!controller.signal.aborted) setMedical({ health: null, restingHeartRateBpm: null, weightKg: null, errors: [err.message] })
+        if (!controller.signal.aborted) setMedical({ health: null, examHeartRateBpm: null, weightKg: null, errors: [err.message] })
       })
     return () => controller.abort()
   }, [horseId, horses])
@@ -144,7 +147,7 @@ export default function TrainingMetricsPage({ user, isOwner }) {
       </button> })}</div>{!visibleHorses.length && <div className="card tm-empty">Không có ngựa phù hợp.</div>}
     </> : <>
       {horse.error && <div className="notice error">Không tải được đánh giá: {horse.error}</div>}
-      <div className="tm-summaries"><Summary label="Buổi đã đánh giá" value={horse.error ? '—' : rows.length} /><Summary label="Tốc độ trung bình các buổi (km/h)" value={number(mean(rows))} /><Summary label="Sức khỏe hiện tại" value={medical ? HEALTH[medical.health] || medical.health || 'Chưa có dữ liệu' : 'Đang tải…'} /><Summary label="Nhịp tim nghỉ (BPM)" value={medical ? (medical.restingHeartRateBpm == null ? 'Chưa ghi nhận' : number(medical.restingHeartRateBpm)) : 'Đang tải…'} /><Summary label="Cân nặng hiện tại (kg)" value={medical ? number(medical.weightKg) : 'Đang tải…'} /></div>
+      <div className="tm-summaries"><Summary label="Buổi đã đánh giá" value={horse.error ? '—' : rows.length} /><Summary label="Tốc độ trung bình các buổi (km/h)" value={number(mean(rows))} /><Summary label="Sức khỏe hiện tại" value={medical ? HEALTH[medical.health] || medical.health || 'Chưa có dữ liệu' : 'Đang tải…'} /><Summary label="Nhịp tim khi khám gần nhất (BPM)" value={medical ? (medical.examHeartRateBpm == null ? 'Chưa ghi nhận' : number(medical.examHeartRateBpm)) : 'Đang tải…'} /><Summary label="Cân nặng hiện tại (kg)" value={medical ? number(medical.weightKg) : 'Đang tải…'} /></div>
       {medical?.errors.map(message => <div className="notice error" key={message}>{message}</div>)}
       {session && <section className="card tm-session" aria-label="Chi tiết đánh giá"><div className="card-head"><h2>Buổi tập ngày {date(session.sessionDate)}</h2><Badge status={session.fitnessStatus} /></div><p>Mã đánh giá: {session.id}</p><div className="tm-session-values">{METRICS.map(([key, label, unit]) => <div key={key}><span>{label}</span><strong>{number(session[key])} {unit}</strong></div>)}</div><p className="tm-notes">{session.trainerNotes || 'Không có ghi chú.'}</p>{/^https?:\/\//i.test(session.videoUrl || '') && <a href={session.videoUrl} target="_blank" rel="noreferrer">Xem video buổi tập</a>}</section>}
       <div className="tm-charts">{METRICS.map(metric => <MetricChart key={metric[0]} rows={rows} metric={metric} />)}</div>

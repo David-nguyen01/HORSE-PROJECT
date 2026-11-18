@@ -604,7 +604,7 @@ public class NutritionPlanService {
 
                 // Check active assignment for this stall
                 List<Map<String, Object>> assignmentRows = jdbc.query(
-                        "select m.id, m.horse_id, h.code as horse_code, h.name as horse_name "
+                        "select m.id, m.horse_id, h.code as horse_code, h.name as horse_name, h.caretaker_user_id "
                                 + "from module_records m join horses h on h.id=m.horse_id "
                                 + "where m.module_code='STABLE_CARE' and m.record_type='STALL_ASSIGNMENT' and m.status='ACTIVE' "
                                 + "and dbo.json_value(m.data_json,'$.stallId')=? and dbo.json_value(m.data_json,'$.assignedUntil') is null limit 1",
@@ -614,6 +614,7 @@ public class NutritionPlanService {
                             a.put("horseId", rs.getObject("horse_id", UUID.class));
                             a.put("horseCode", rs.getString("horse_code"));
                             a.put("horseName", rs.getString("horse_name"));
+                            a.put("caretakerUserId", rs.getObject("caretaker_user_id", UUID.class));
                             return a;
                         }, stallId.toString());
 
@@ -637,6 +638,7 @@ public class NutritionPlanService {
                     stallItem.put("horseCode", horseCode);
                     stallItem.put("horseName", horseName);
                     stallItem.put("horseDisplay", horseDisplay);
+                    stallItem.put("caretakerUserId", a.get("caretakerUserId"));
 
                     try {
                         NutritionPlanResponse plan = getEffectivePlan(horseId, targetDate);
@@ -901,6 +903,11 @@ public class NutritionPlanService {
 
     @Transactional(readOnly = true)
     public List<StallQuickFeedItem> getStablesQuickFeed(LocalDate date) {
+        return getStablesQuickFeed(date, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<StallQuickFeedItem> getStablesQuickFeed(LocalDate date, UUID staffId) {
         LocalDate targetDate = date == null ? LocalDate.now(clock) : date;
         LocalDate today = LocalDate.now(clock);
         LocalTime nowTime = LocalTime.now(clock);
@@ -924,6 +931,7 @@ public class NutritionPlanService {
 
         List<StallQuickFeedItem> result = new ArrayList<>();
         for (Map<String, Object> stall : stalls) {
+            if (staffId != null && !staffId.equals(stall.get("caretakerUserId"))) continue;
             boolean hasHorse = Boolean.TRUE.equals(stall.get("hasHorse"));
             if (!hasHorse) {
                 continue;

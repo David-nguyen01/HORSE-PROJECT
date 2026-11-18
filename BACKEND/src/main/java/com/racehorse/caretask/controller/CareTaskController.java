@@ -45,6 +45,9 @@ public class CareTaskController {
             @RequestParam(required = false) Boolean overdueOnly,
             @AuthenticationPrincipal Jwt jwt, Authentication authentication) {
         ownerGuard.requireHorse(horseId, jwt, authentication);
+        if (staff(authentication)) {
+            return service.listStaffTasks(UUID.fromString(jwt.getSubject()), date, status, overdueOnly);
+        }
         return service.listTasks(horseId, assignedStaffId, date, status, overdueOnly);
     }
 
@@ -54,6 +57,7 @@ public class CareTaskController {
             Authentication authentication) {
         CareTaskResponse task = service.getTask(id);
         ownerGuard.requireHorse(task.horseId(), jwt, authentication);
+        requireStaffTask(task, jwt, authentication);
         return task;
     }
 
@@ -61,7 +65,9 @@ public class CareTaskController {
     @PreAuthorize("hasAuthority('PERM_STABLE_CARE_VIEW')")
     public ResponseEntity<?> getTaskPhoto(@PathVariable UUID id, @AuthenticationPrincipal Jwt jwt,
             Authentication authentication) {
-        ownerGuard.requireHorse(service.getTask(id).horseId(), jwt, authentication);
+        CareTaskResponse task = service.getTask(id);
+        ownerGuard.requireHorse(task.horseId(), jwt, authentication);
+        requireStaffTask(task, jwt, authentication);
         CareTaskService.TaskPhotoData photo = service.getTaskPhoto(id);
         if (photo.bytes() != null && photo.bytes().length > 0) {
             String ct = photo.contentType() != null && !photo.contentType().isBlank()
@@ -119,5 +125,16 @@ public class CareTaskController {
     private boolean manager(Authentication authentication) {
         return authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_CLUB_MANAGER".equals(authority.getAuthority()));
+    }
+
+    private boolean staff(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_STABLE_STAFF".equals(authority.getAuthority()));
+    }
+
+    private void requireStaffTask(CareTaskResponse task, Jwt jwt, Authentication authentication) {
+        if (staff(authentication) && !UUID.fromString(jwt.getSubject()).equals(task.assignedStaffId())) {
+            throw new com.racehorse.common.exception.BusinessException("Đây không phải nhiệm vụ được phân công cho bạn");
+        }
     }
 }

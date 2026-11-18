@@ -1,6 +1,7 @@
 package com.racehorse.stable.controller;
 
 import com.racehorse.stable.service.StableService;
+import com.racehorse.stable.service.StaffHorseGuard;
 import com.racehorse.horse.service.OwnerHorseReadGuard;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -21,9 +22,11 @@ import java.util.UUID;
 public class StableController {
     private final StableService service;
     private final OwnerHorseReadGuard ownerGuard;
-    public StableController(StableService service, OwnerHorseReadGuard ownerGuard) {
+    private final StaffHorseGuard staffHorseGuard;
+    public StableController(StableService service, OwnerHorseReadGuard ownerGuard, StaffHorseGuard staffHorseGuard) {
         this.service = service;
         this.ownerGuard = ownerGuard;
+        this.staffHorseGuard = staffHorseGuard;
     }
 
     @GetMapping
@@ -77,7 +80,8 @@ public class StableController {
     @PostMapping("/horses/{horseId}/transfer")
     @PreAuthorize("hasAnyRole('CLUB_MANAGER','STABLE_STAFF') and hasAuthority('PERM_STABLE_CARE_EDIT')")
     StableService.AssignmentView transfer(@PathVariable UUID horseId, @AuthenticationPrincipal Jwt jwt,
-                                           @Valid @RequestBody TransferRequest request) {
+                                           Authentication authentication, @Valid @RequestBody TransferRequest request) {
+        staffHorseGuard.requireCaretaker(horseId, user(jwt), authentication);
         return service.transferHorse(horseId, request.targetStableId(), request.targetStallId(), user(jwt), request.reason());
     }
 

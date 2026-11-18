@@ -518,12 +518,14 @@ public class StableService {
                                       String photoUrl, boolean isTrainingActive, TrainingScheduleSummary trainingSchedule) {
         JsonNode node = read(jsonValue);
         String until = node.path("assignedUntil").isNull() ? null : node.path("assignedUntil").asText(null);
+        UUID caretakerUserId = horseId == null ? null : jdbc.queryForObject(
+                "select caretaker_user_id from dbo.horses where id=?", UUID.class, horseId);
         return new AssignmentView(id, stableId, stableName, UUID.fromString(node.path("stallId").asText()),
                 node.path("stallCode").asText(), horseId, horseName, horseCode, actor,
                 OffsetDateTime.parse(node.path("assignedFrom").asText()),
                 until == null || until.isBlank() ? null : OffsetDateTime.parse(until), active,
                 horseHealthStatus, trainingLocked, trainingLockReason, emergencyActive, photoUrl,
-                isTrainingActive, trainingSchedule);
+                isTrainingActive, trainingSchedule, caretakerUserId);
     }
 
     private String findActivePhotoUrl(UUID horseId) {
@@ -991,7 +993,17 @@ public class StableService {
                                  String horseHealthStatus, boolean trainingLocked, String trainingLockReason, boolean emergencyActive,
                                  String photoUrl,
                                  boolean isTrainingActive,
-                                 TrainingScheduleSummary trainingSchedule) {
+                                 TrainingScheduleSummary trainingSchedule,
+                                 UUID caretakerUserId) {
+        public AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
+                              UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
+                              OffsetDateTime assignedUntil, boolean active, String horseHealthStatus,
+                              boolean trainingLocked, String trainingLockReason, boolean emergencyActive,
+                              String photoUrl, boolean isTrainingActive, TrainingScheduleSummary trainingSchedule) {
+            this(id, stableId, stableName, stallId, stallCode, horseId, horseName, horseCode, assignedBy,
+                    assignedFrom, assignedUntil, active, horseHealthStatus, trainingLocked, trainingLockReason,
+                    emergencyActive, photoUrl, isTrainingActive, trainingSchedule, null);
+        }
         public AssignmentView(UUID id, UUID stableId, String stableName, UUID stallId, String stallCode,
                               UUID horseId, String horseName, String horseCode, UUID assignedBy, OffsetDateTime assignedFrom,
                               OffsetDateTime assignedUntil, boolean active) {
