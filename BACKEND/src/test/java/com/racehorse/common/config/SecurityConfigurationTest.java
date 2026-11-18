@@ -22,6 +22,22 @@ import static org.mockito.Mockito.when;
 
 class SecurityConfigurationTest {
     @Test
+    void managerHasAllPermissionsWithoutDependingOnMatrixRows() {
+        UUID userId = UUID.randomUUID();
+        UserAccountRepository repository = mock(UserAccountRepository.class);
+        UserAccount manager = new UserAccount("admin", "admin@example.com", "hash", Set.of(Role.CLUB_MANAGER));
+        when(repository.findById(userId)).thenReturn(Optional.of(manager));
+        Jwt jwt = Jwt.withTokenValue("token").subject(userId.toString())
+                .header("alg", "none").build();
+        var authentication = new SecurityConfiguration().jwtAuthenticationConverter(repository).convert(jwt);
+        assertThat(authentication.getAuthorities()).extracting("authority")
+                .contains("ROLE_CLUB_MANAGER", "PERM_PROFILE_APPROVE", "PERM_INVENTORY_APPROVE",
+                        "PERM_MEDICAL_EDIT", "PERM_SYSTEM_EDIT", "PERM_TRAINING_EDIT")
+                .doesNotContain("ROLE_HORSE_OWNER", "ROLE_STABLE_STAFF", "PERM_RACING_VIEW");
+        org.mockito.Mockito.verify(repository, org.mockito.Mockito.never()).findGrantedPermissionCodes(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     void allowsPrivateNetworkAccessOnlyFromConfiguredFrontend() throws IOException {
         var source = new SecurityConfiguration().corsConfigurationSource(
                 new CorsProperties(List.of("https://horse-project-phi.vercel.app")));

@@ -20,7 +20,7 @@ public class RolePermissionService {
     // Only expose permissions checked by an API that the role can actually use.
     private static final Map<Role, Map<String, Set<String>>> SUPPORTED_ACTIONS = Map.of(
             Role.CLUB_MANAGER, Map.of(
-                    "PROFILE", Set.of("VIEW", "EDIT"), "TRAINING", Set.of("VIEW", "EDIT"),
+                    "PROFILE", Set.of("VIEW", "EDIT", "APPROVE"), "TRAINING", Set.of("VIEW", "EDIT"),
                     "MEDICAL", Set.of("VIEW", "EDIT"), "STABLE_CARE", Set.of("VIEW", "EDIT"),
                     "REPORTING", Set.of("VIEW", "EDIT"), "INVENTORY", Set.of("VIEW", "EDIT", "APPROVE", "CLAIM")),
             Role.HEAD_TRAINER, Map.of(
@@ -41,7 +41,15 @@ public class RolePermissionService {
 
     public RolePermissionService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
 
+    public static List<String> managerPermissions() {
+        return java.util.stream.Stream.of("PROFILE", "TRAINING", "MEDICAL", "STABLE_CARE", "REPORTING", "INVENTORY", "SYSTEM")
+                .flatMap(module -> java.util.stream.Stream.of("VIEW", "EDIT", "APPROVE", "CLAIM")
+                        .map(action -> "PERM_" + module + "_" + action))
+                .toList();
+    }
+
     public static boolean supports(Role role, String permissionCode) {
+        if (role == Role.CLUB_MANAGER) return managerPermissions().contains(permissionCode);
         if (permissionCode == null || !permissionCode.startsWith("PERM_")) return false;
         String value = permissionCode.substring(5);
         int separator = value.lastIndexOf('_');

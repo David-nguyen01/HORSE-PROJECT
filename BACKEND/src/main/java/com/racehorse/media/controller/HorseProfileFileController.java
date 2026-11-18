@@ -78,7 +78,7 @@ public class HorseProfileFileController {
     }
 
     @PostMapping("/proposals/{proposalId}/approve")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_APPROVE') and hasRole('CLUB_MANAGER')")
     HorseProfileFileResponse approve(
             @PathVariable UUID horseId,
             @PathVariable UUID proposalId,
@@ -87,7 +87,7 @@ public class HorseProfileFileController {
     }
 
     @PostMapping("/proposals/{proposalId}/reject")
-    @PreAuthorize("hasAuthority('PERM_PROFILE_EDIT') and hasRole('CLUB_MANAGER')")
+    @PreAuthorize("hasAuthority('PERM_PROFILE_APPROVE') and hasRole('CLUB_MANAGER')")
     ResponseEntity<Void> reject(
             @PathVariable UUID horseId,
             @PathVariable UUID proposalId,

@@ -81,7 +81,9 @@ public class AuthController {
     Map<String, Object> currentUser(@AuthenticationPrincipal Jwt jwt) {
         UUID userId = UUID.fromString(jwt.getSubject());
         UserResponse user = userManagementService.getById(userId);
-        List<String> permissions = userRepository.findGrantedPermissionCodes(userId).stream()
+        List<String> permissionCodes = user.roles().contains(Role.CLUB_MANAGER)
+                ? RolePermissionService.managerPermissions() : userRepository.findGrantedPermissionCodes(userId);
+        List<String> permissions = permissionCodes.stream()
                 .filter(code -> user.roles().stream().anyMatch(role -> RolePermissionService.supports(role, code)))
                 .distinct().toList();
         return Map.of("id", user.id(), "username", user.username(), "email", user.email(),

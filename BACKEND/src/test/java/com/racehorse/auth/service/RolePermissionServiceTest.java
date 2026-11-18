@@ -112,4 +112,11 @@ class RolePermissionServiceTest {
         assertThat(RolePermissionService.supports(Role.HEAD_TRAINER, "PERM_MEDICAL_EDIT")).isFalse();
         assertThat(RolePermissionService.supports(Role.VETERINARIAN, "PERM_MEDICAL_EDIT")).isTrue();
     }
+
+    @Test
+    void preservesManagerProfileApprovalWithoutGrantingItToOtherRoles() {
+        assertThat(RolePermissionService.supports(Role.CLUB_MANAGER, "PERM_PROFILE_APPROVE")).isTrue();
+        assertThat(RolePermissionService.supports(Role.HEAD_TRAINER, "PERM_PROFILE_APPROVE")).isFalse();
+        assertThat(RolePermissionService.supports(Role.HORSE_OWNER, "PERM_PROFILE_APPROVE")).isFalse();
+    }
 }

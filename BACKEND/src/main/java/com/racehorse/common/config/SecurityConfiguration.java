@@ -94,7 +94,10 @@ public class SecurityConfiguration {
                             List<GrantedAuthority> authorities = new ArrayList<>();
                             user.getRoles().forEach(role -> authorities.add(
                                     new SimpleGrantedAuthority("ROLE_" + role.name())));
-                            userRepository.findGrantedPermissionCodes(user.getId()).stream()
+                            List<String> permissions = user.getRoles().contains(com.racehorse.auth.entity.Role.CLUB_MANAGER)
+                                    ? RolePermissionService.managerPermissions()
+                                    : userRepository.findGrantedPermissionCodes(user.getId());
+                            permissions.stream()
                                     .filter(permission -> user.getRoles().stream()
                                             .anyMatch(role -> RolePermissionService.supports(role, permission)))
                                     .forEach(permission -> authorities.add(new SimpleGrantedAuthority(permission)));
