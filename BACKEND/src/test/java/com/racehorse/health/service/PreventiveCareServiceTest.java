@@ -190,7 +190,7 @@ class PreventiveCareServiceTest {
         UUID id = UUID.randomUUID();
         UUID actor = UUID.randomUUID();
         when(jdbc.queryForList(contains("for update"), eq(id)))
-                .thenReturn(List.of(Map.of("recurrence_days", 30)));
+                .thenReturn(List.of(Map.of("recurrence_days", 30, "horse_id", UUID.randomUUID())));
         when(jdbc.update(contains("where id=? and completed_at is null and cancelled_at is null"),
                 eq(actor), any(OffsetDateTime.class), anyString(), eq(id))).thenReturn(0);
 
@@ -215,6 +215,7 @@ class PreventiveCareServiceTest {
                 .thenReturn(List.of(mockItem));
 
         List<DuePreventiveCareResponse> list = service.listDue(asOf, "FARRIER", true);
+        verify(jdbc).query(contains("h.archived_at is null"), any(RowMapper.class), any(Object[].class));
 
         assertThat(list).hasSize(1);
         DuePreventiveCareResponse item = list.getFirst();

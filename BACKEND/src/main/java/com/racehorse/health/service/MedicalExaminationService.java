@@ -88,6 +88,7 @@ public class MedicalExaminationService {
         }
         jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = horseAccessService.requireActive(horseId);
+        requireAssignedVeterinarian(horse, veterinarianId);
         UUID emergencyIncidentId = activeEmergencyClaim(horseId, veterinarianId);
         if (emergencyIncidentId == null && activeEmergencyClaimByAnotherVet(horseId)) {
             throw new BusinessException("Ngựa đang được bác sĩ khác xử lý cấp cứu; bạn chỉ có thể xem hồ sơ");
@@ -276,6 +277,7 @@ public class MedicalExaminationService {
         UUID horseId = toUuid(rows.getFirst().get("horse_id"));
         jdbc.queryForObject("select id from horses where id=? for update", UUID.class, horseId);
         Horse horse = horseAccessService.requireActive(horseId);
+        requireAssignedVeterinarian(horse, authorId);
         requireInitialExamAccess(horseId, authorId, horse.getIntakeStatus());
         UUID currentFollowUpId = followUpService != null
                 ? followUpService.requireAssignedForExamination(horseId, authorId) : null;
@@ -712,6 +714,13 @@ public class MedicalExaminationService {
         return count != null && count > 0;
     }
 
+    private void requireAssignedVeterinarian(Horse horse, UUID veterinarianId) {
+        if (horse.getDiagnosingVet() != null
+                && !veterinarianId.equals(horse.getDiagnosingVet().getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Đây không phải ngựa bạn phụ trách");
+        }
+    }
+
     private void requireDoctorForExamination(Horse horse, UUID veterinarianId, UUID currentFollowUpId) {
         if ("IN_MEDICAL".equals(horse.getIntakeStatus())) return;
         if (("PENDING_STALL".equals(horse.getIntakeStatus()) || "STABLED".equals(horse.getIntakeStatus()))
@@ -721,9 +730,10 @@ public class MedicalExaminationService {
     }
 
     private void requireFollowUpMutationAccess(UUID horseId, UUID actorId) {
-        if (followUpService == null) return;
         if (userRepository != null && userRepository.findById(actorId)
                 .map(user -> user.getRoles().contains(Role.CLUB_MANAGER)).orElse(false)) return;
+        requireAssignedVeterinarian(horseAccessService.requireActive(horseId), actorId);
+        if (followUpService == null) return;
         followUpService.requireAssignedForExamination(horseId, actorId);
     }
 

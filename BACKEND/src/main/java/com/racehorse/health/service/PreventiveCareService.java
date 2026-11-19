@@ -38,6 +38,7 @@ public class PreventiveCareService {
         Map<String,Object> s=rows.getFirst();
         if(s.get("cancelled_at")!=null) throw new BusinessException("Lịch này đã bị hủy");
         if(s.get("completed_at")!=null) throw new BusinessException("Lịch này đã được hoàn thành");
+        access.requireActive(uuid(s.get("horse_id")));
         Integer recurrence=(Integer)s.get("recurrence_days"); UUID next=null;
         int changed=jdbc.update("update preventive_care_schedules set completed_by_user_id=?,completed_at=?,completion_notes=? "
                         + "where id=? and completed_at is null and cancelled_at is null",
@@ -97,6 +98,7 @@ public class PreventiveCareService {
                 from preventive_care_schedules s
                 join horses h on h.id = s.horse_id
                 where s.completed_at is null and s.cancelled_at is null
+                  and h.archived_at is null
                 """);
         List<Object> args = new ArrayList<>();
         if (careType != null && !careType.isBlank()) {

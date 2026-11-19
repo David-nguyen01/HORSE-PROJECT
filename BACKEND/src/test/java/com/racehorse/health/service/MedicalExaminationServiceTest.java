@@ -69,6 +69,16 @@ class MedicalExaminationServiceTest {
     }
 
     @Test
+    void anotherVeterinarianCannotCreateExamForAssignedHorse() {
+        assignOriginalVeterinarian(UUID.randomUUID());
+        var request = new CreateMedicalExaminationRequest(LocalDate.now(), "Cough", "Diagnosis",
+                "Rest", "", null, "MONITOR");
+        assertThatThrownBy(() -> service.create(UUID.randomUUID(), UUID.randomUUID(), request))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
+    @Test
     void createRejectsFutureExamDate() {
         UUID horseId = UUID.randomUUID();
         UUID vetId = UUID.randomUUID();
@@ -196,7 +206,8 @@ class MedicalExaminationServiceTest {
                 LocalDate.now(), "Kiểm tra", "Theo dõi", "Nghỉ ngơi", null, null, "MONITOR");
 
         assertThatThrownBy(() -> service.create(horseId, otherVetId, request))
-                .isInstanceOf(BusinessException.class).hasMessageContaining("Chỉ bác sĩ phụ trách");
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
+                .hasMessageContaining("Đây không phải ngựa bạn phụ trách");
         verify(jdbc, never()).update(contains("insert into module_records"), any(Object[].class));
     }
 
@@ -244,7 +255,7 @@ class MedicalExaminationServiceTest {
         assertThat(response.symptoms()).isEqualTo("Lameness in left hind");
         assertThat(response.healthStatusAfter()).isEqualTo("INJURED");
 
-        verify(horseAccessService).requireActive(horseId);
+        verify(horseAccessService, atLeastOnce()).requireActive(horseId);
         // Verify insert into module_records
         verify(jdbc).update(contains("insert into module_records"),
                 any(), eq(horseId), eq(vetId), eq(req.examinationDate()), anyString());
@@ -291,7 +302,7 @@ class MedicalExaminationServiceTest {
         assertThat(response.notes()).contains("Swelling reduced");
         assertThat(response.healthStatusAfter()).isEqualTo("MONITOR");
 
-        verify(horseAccessService).requireActive(horseId);
+        verify(horseAccessService, atLeastOnce()).requireActive(horseId);
         // Verify insert addendum into module_records
         verify(jdbc).update(contains("insert into module_records"),
                 any(), eq(horseId), eq(vetId), any(), anyString());
@@ -354,7 +365,7 @@ class MedicalExaminationServiceTest {
 
         service.delete(examId, actorId);
 
-        verify(horseAccessService).requireActive(horseId);
+        verify(horseAccessService, atLeastOnce()).requireActive(horseId);
         verify(jdbc).update(contains("status='CANCELLED'"), eq(horseId));
         verify(jdbc).update(contains("record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(examId.toString()));
         verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION'"), eq(examId));
@@ -409,7 +420,7 @@ class MedicalExaminationServiceTest {
 
         service.deleteAddendum(addendumId, actorId);
 
-        verify(horseAccessService).requireActive(horseId);
+        verify(horseAccessService, atLeastOnce()).requireActive(horseId);
         verify(jdbc).update(contains("delete from module_records where id=? and module_code='MEDICAL' and record_type='MEDICAL_EXAMINATION_ADDENDUM'"), eq(addendumId));
         verify(jdbc).update(contains("set health_status = 'FIT'"), eq(actorId), eq(horseId));
     }

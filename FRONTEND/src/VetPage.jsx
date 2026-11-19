@@ -1869,8 +1869,9 @@ function MedicalRecordsView({ initialHorseId = '', defaultSubTab = 'exams' }) {
       ? myMedicalAssignments?.some((item) => item.horseId === selectedHorseId)
       : ['PENDING_STALL', 'STABLED'].includes(activeHorse?.intakeStatus)
         && activeHorse?.diagnosingVet?.id === currentVetId
-  const caseBlocked = followUpCases === null || myMedicalAssignments === null || !caseAllowed
-  const caseBlockReason = followUpCases === null || myMedicalAssignments === null
+  const belongsToOtherVet = activeHorse?.diagnosingVet?.id && activeHorse.diagnosingVet.id !== currentVetId
+  const caseBlocked = belongsToOtherVet || followUpCases === null || myMedicalAssignments === null || !caseAllowed
+  const caseBlockReason = belongsToOtherVet ? 'Đây không phải ngựa bạn phụ trách' : followUpCases === null || myMedicalAssignments === null
     ? 'Chưa kiểm tra được phân công ca khám. Bấm Làm mới để thử lại.'
     : activeEmergency && activeEmergency.emergencyVetId !== currentVetId
       ? `Ca cấp cứu đang do ${activeEmergency.emergencyVetName || 'bác sĩ khác'} xử lý.`
